@@ -147,6 +147,7 @@ const DEFAULT_WORKER_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "
 const SAFE_LEAD_TOOLS = ["read", "grep", "find", "ls"];
 const BUILTIN_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
 const DEFAULT_EXPERTISE_MAX_LINES = 120;
+const EXPERTISE_NOTE_MAX_CHARS = 1000;
 
 interface ParsedYamlLine {
 	indent: number;
@@ -1330,15 +1331,16 @@ export default function (pi: ExtensionAPI) {
 		if (!expertiseMeta(agent).updatable) return;
 		ensureExpertiseFile(agent);
 		const doc = loadExpertiseDocument(agent);
+		const note = shortText(`${shortText(task, 240)} -> ${shortText(firstUsefulLine(output), 720)}`, EXPERTISE_NOTE_MAX_CHARS);
 		doc.observations.push({
 			date: new Date().toISOString().slice(0, 10),
-			note: shortText(`${shortText(task, 100)} -> ${shortText(firstUsefulLine(output), 200)}`, 260),
+			note,
 		});
 		saveExpertiseDocument(agent, doc);
 		appendEvent("expertise_update", {
 			target: agent.name,
 			path: expertisePathFor(agent),
-			note: shortText(`${shortText(task, 100)} -> ${shortText(firstUsefulLine(output), 200)}`, 260),
+			note,
 		});
 	}
 
@@ -1350,16 +1352,17 @@ export default function (pi: ExtensionAPI) {
 		if (!Array.isArray(doc[key])) {
 			doc[key] = [];
 		}
+		const normalizedNote = shortText(note, EXPERTISE_NOTE_MAX_CHARS);
 		doc[key].push({
 			date: new Date().toISOString().slice(0, 10),
-			note: shortText(note, 400),
+			note: normalizedNote,
 		});
 		saveExpertiseDocument(agent, doc);
 		appendEvent("mental_model_update", {
 			target: agent.name,
 			path: expertisePathFor(agent),
 			category: category || null,
-			note: shortText(note, 400),
+			note: normalizedNote,
 		});
 	}
 
