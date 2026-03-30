@@ -145,6 +145,7 @@ interface CardState {
 
 const DEFAULT_WORKER_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 const SAFE_LEAD_TOOLS = ["read", "grep", "find", "ls"];
+const BUILTIN_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
 const DEFAULT_EXPERTISE_MAX_LINES = 120;
 
 interface ParsedYamlLine {
@@ -620,6 +621,10 @@ function normalizeTools(tools: AgentConfig["tools"], role: RuntimeRole): string[
 	}
 	if (role === "worker") return DEFAULT_WORKER_TOOLS;
 	return ["delegate_agent"];
+}
+
+function builtinToolsForSpawn(tools: string[]): string[] {
+	return tools.filter((tool) => BUILTIN_TOOL_NAMES.has(tool));
 }
 
 function matchesName(left: string, right: string): boolean {
@@ -1583,7 +1588,26 @@ export default function (pi: ExtensionAPI) {
 			"3. Files changed",
 			"4. Risks or open questions",
 		];
+		if (target.role === "worker") {
+			lines.push(
+				"",
+				"Execution requirements:",
+				"- Use repo tools for any inspection, edits, or verification needed to complete the task.",
+				"- Do not report success if you did not execute concrete operations in this turn.",
+				"- If blocked, report the exact blocker and stop instead of writing a completion-shaped answer.",
+			);
+		}
 		return lines.join("\n");
+	}
+
+	function outputSignalsNoExecution(output: string): boolean {
+		const text = output.toLowerCase();
+		return text.includes("did not execute in this turn")
+			|| text.includes("didn't execute in this turn")
+			|| text.includes("without executing")
+			|| text.includes("no operations were executed")
+			|| text.includes("no commands were executed")
+			|| text.includes("no file changes were made");
 	}
 
 	function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget }> {
@@ -1634,7 +1658,9 @@ export default function (pi: ExtensionAPI) {
 		const prompt = buildDelegationPrompt(child, task);
 		const extensionPath = resolve(config.baseDir, "extensions", "multi-team.ts");
 		const childTools = normalizeTools(effectiveTools(config, child.agent), child.role);
-		const builtinTools = child.role === "worker" ? childTools : SAFE_LEAD_TOOLS;
+		const builtinTools = child.role === "worker"
+			? builtinToolsForSpawn(childTools)
+			: builtinToolsForSpawn(SAFE_LEAD_TOOLS);
 		const sessionFile = resolve(currentSessionRoot(), "state", `${slugify(child.agent.name)}.session.jsonl`);
 		const logFile = resolve(currentSessionRoot(), "jsonl", `${Date.now()}-${slugify(runtime.agent.name)}-to-${slugify(child.agent.name)}.jsonl`);
 		const args = [
@@ -1653,29 +1679,29 @@ export default function (pi: ExtensionAPI) {
 		if (model) args.push("--model", model);
 		args.push(prompt);
 
-			appendEvent("delegate_start", {
-				target: child.agent.name,
+		appendEvent("delegate_start", {
+			target: child.agent.name,
+			targetRole: child.role,
+			targetTeam: child.team?.name || null,
+			task,
+			logFile,
+			sessionFile,
+		});
+		appendConversation(
+			"system",
+			`Delegation from ${runtime.agent.name} to ${child.agent.name} (${child.role}${child.team ? ` / ${child.team.name}` : ""})\n\n${task}`,
+			{
+				source: "delegation",
+				targetAgent: child.agent.name,
 				targetRole: child.role,
 				targetTeam: child.team?.name || null,
-				task,
-				logFile,
-				sessionFile,
-			});
-			appendConversation(
-				"system",
-				`Delegation from ${runtime.agent.name} to ${child.agent.name} (${child.role}${child.team ? ` / ${child.team.name}` : ""})\n\n${task}`,
-				{
-					source: "delegation",
-					targetAgent: child.agent.name,
-					targetRole: child.role,
-					targetTeam: child.team?.name || null,
-				},
-			);
-			mutateSessionIndex((index) => {
-				index.counts.delegations = (index.counts.delegations || 0) + 1;
-			});
+			},
+		);
+		mutateSessionIndex((index) => {
+			index.counts.delegations = (index.counts.delegations || 0) + 1;
+		});
 
-			const textChunks: string[] = [];
+		const textChunks: string[] = [];
 
 		return new Promise((resolvePromise) => {
 			const proc = spawn("pi", args, {
@@ -1694,6 +1720,7 @@ export default function (pi: ExtensionAPI) {
 			});
 
 			let buffer = "";
+			const toolCalls: string[] = [];
 
 			proc.stdout!.setEncoding("utf-8");
 			proc.stdout!.on("data", (chunk: string) => {
@@ -1707,6 +1734,12 @@ export default function (pi: ExtensionAPI) {
 						const event = JSON.parse(line);
 						if (event.type === "message_update") {
 							const delta = event.assistantMessageEvent;
+							if (delta?.type === "toolcall_start") {
+								const toolName = delta.partial?.content?.[delta.contentIndex || 0]?.name
+									|| event.message?.content?.[delta.contentIndex || 0]?.name
+									|| "";
+								if (toolName) toolCalls.push(toolName);
+							}
 							if (delta?.type === "text_delta") {
 								textChunks.push(delta.delta || "");
 								if (card) {
@@ -1729,7 +1762,7 @@ export default function (pi: ExtensionAPI) {
 				}) + "\n");
 			});
 
-				proc.on("close", (code) => {
+			proc.on("close", (code) => {
 				if (buffer.trim()) {
 					appendFileSync(logFile, buffer.trim() + "\n");
 					try {
@@ -1744,61 +1777,81 @@ export default function (pi: ExtensionAPI) {
 				if (card?.timer) clearInterval(card.timer);
 				const elapsed = Date.now() - startTime;
 				const output = textChunks.join("");
+				const realToolCalls = toolCalls.filter((tool) => tool && tool !== "update_mental_model");
+				const executionPostureFailure = child.role === "worker"
+					&& realToolCalls.length === 0
+					&& outputSignalsNoExecution(output);
+				const effectiveExitCode = executionPostureFailure
+					? (code === 0 || code === null ? 2 : code ?? 2)
+					: (code ?? 1);
+				const effectiveOutput = executionPostureFailure
+					? [
+						output || "(empty)",
+						"",
+						"[Runtime] Worker returned without any concrete tool execution in this turn.",
+						`[Runtime] Detected tool calls: ${toolCalls.join(", ") || "(none)"}`,
+					].join("\n")
+					: output;
 
 				if (card) {
 					card.elapsed = elapsed;
-					card.status = code === 0 ? "done" : "error";
-					card.lastLine = output.split("\n").filter((line) => line.trim()).pop() || "";
+					card.status = effectiveExitCode === 0 ? "done" : "error";
+					card.lastLine = effectiveOutput.split("\n").filter((line) => line.trim()).pop() || "";
 					updateWidget();
 				}
 
-					if ((code ?? 1) === 0) {
-						updateExpertise(child.agent, task, output);
-					}
+				if (effectiveExitCode === 0) {
+					updateExpertise(child.agent, task, effectiveOutput);
+				}
 
 					const artifactPath = persistArtifact(
 						"delegation-result",
 						child.agent.name,
 						[
-							`# Delegation Result`,
-							``,
-							`- Target: ${child.agent.name}`,
-							`- Target role: ${child.role}`,
-							`- Team: ${child.team?.name || "global"}`,
-							`- Exit code: ${code ?? 1}`,
-							`- Elapsed: ${Math.round(elapsed / 1000)}s`,
-							``,
-							`## Task`,
-							``,
-							task,
-							``,
-							`## Output`,
-							``,
-							output || "(empty)",
-						].join("\n"),
-						{
+								`# Delegation Result`,
+								``,
+								`- Target: ${child.agent.name}`,
+								`- Target role: ${child.role}`,
+								`- Team: ${child.team?.name || "global"}`,
+								`- Exit code: ${effectiveExitCode}`,
+								`- Elapsed: ${Math.round(elapsed / 1000)}s`,
+								`- Tool calls: ${toolCalls.join(", ") || "(none)"}`,
+								``,
+								`## Task`,
+								``,
+								task,
+								``,
+								`## Output`,
+								``,
+								effectiveOutput || "(empty)",
+							].join("\n"),
+							{
+								target: child.agent.name,
+								targetRole: child.role,
+								targetTeam: child.team?.name || null,
+								exitCode: effectiveExitCode,
+								toolCalls,
+								executionPostureFailure,
+							},
+						);
+
+						appendEvent("delegate_end", {
 							target: child.agent.name,
 							targetRole: child.role,
-							targetTeam: child.team?.name || null,
-							exitCode: code ?? 1,
-						},
-					);
+							exitCode: effectiveExitCode,
+							elapsed,
+							summary: shortText(firstUsefulLine(effectiveOutput), 200),
+							artifactPath,
+							toolCalls,
+							executionPostureFailure,
+						});
 
-					appendEvent("delegate_end", {
-						target: child.agent.name,
-						targetRole: child.role,
-						exitCode: code ?? 1,
+					resolvePromise({
+						output: effectiveOutput,
+						exitCode: effectiveExitCode,
 						elapsed,
-						summary: shortText(firstUsefulLine(output), 200),
-						artifactPath,
+						child,
 					});
-
-				resolvePromise({
-					output,
-					exitCode: code ?? 1,
-					elapsed,
-					child,
-				});
 			});
 
 			proc.on("error", (err) => {
