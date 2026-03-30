@@ -1,0 +1,22 @@
+agent:
+  name: "frontend-dev"
+  role: "worker"
+  team: "Engineering"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Keep view, state, and component changes localized to apps/frontend and packages/ui."
+workflows: []
+risks:
+  - date: "2026-03-30"
+    note: "Do not silently patch backend behavior from the frontend layer; escalate the dependency."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions:
+  - date: "2026-03-30"
+    note: "Confirm whether packages/ui exists or if UI code is fully contained in apps/frontend."

@@ -1,0 +1,22 @@
+agent:
+  name: "backend-dev"
+  role: "worker"
+  team: "Engineering"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Keep API, service, and persistence changes localized to apps/backend."
+workflows: []
+risks:
+  - date: "2026-03-30"
+    note: "Surface frontend-visible contract changes explicitly so they can be validated and adapted."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions:
+  - date: "2026-03-30"
+    note: "Confirm whether backend contracts are colocated in apps/backend or exposed through another package."

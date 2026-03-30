@@ -1,0 +1,22 @@
+agent:
+  name: "engineering-lead"
+  role: "lead"
+  team: "Engineering"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Route UI work to frontend-dev and service/data work to backend-dev."
+workflows:
+  - date: "2026-03-30"
+    note: "Sequence backend changes before frontend adaptation when API contracts move."
+risks:
+  - date: "2026-03-30"
+    note: "Cross-cutting changes create regressions when ownership and order are not explicit."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

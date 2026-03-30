@@ -1,0 +1,184 @@
+name: HivehueMultiTeam
+session_dir: .pi/multi-team/sessions
+expertise_dir: .pi/expertise/hivehue
+
+orchestrator:
+  name: ceo-orchestrator
+  description: Central coordinator that routes Hivehue work across planning, engineering, and validation.
+  prompt: .pi/agents/orchestrator.md
+  expertise: .pi/expertise/ceo-orchestrator-mental-model.yaml
+  model: inherit
+  tools: [delegate_agent, update_mental_model]
+  skills:
+    - .pi/multi-team/skills/delegate.md
+    - .pi/multi-team/skills/active_listener.md
+    - .pi/multi-team/skills/mental_model.md
+    - .pi/multi-team/skills/zero_micromanagement.md
+  domain:
+    - path: .
+      read: true
+      upsert: false
+      delete: false
+
+teams:
+  - name: Planning
+    lead:
+      name: planning-lead
+      description: Planning lead for Hivehue repository discovery and design work.
+      prompt: .pi/agents/hivehue/planning_lead.md
+      expertise: .pi/expertise/hivehue/planning-lead-mental-model.yaml
+      model: inherit
+      tools: [delegate_agent, update_mental_model]
+      skills:
+        - .pi/multi-team/skills/delegate.md
+        - .pi/multi-team/skills/active_listener.md
+        - .pi/multi-team/skills/mental_model.md
+        - .pi/multi-team/skills/zero_micromanagement.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: repo-analyst
+        description: Read-only repository analyst for Hivehue structure, patterns, and constraints.
+        prompt: .pi/agents/hivehue/repo_analyst.md
+        expertise: .pi/expertise/hivehue/repo-analyst-mental-model.yaml
+        tools: [read, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: solution-architect
+        description: Writes Hivehue implementation plans and specs under specs/.
+        prompt: .pi/agents/hivehue/solution_architect.md
+        expertise: .pi/expertise/hivehue/solution-architect-mental-model.yaml
+        tools: [read, write, edit, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: specs/
+            read: true
+            upsert: true
+            delete: false
+
+  - name: Engineering
+    lead:
+      name: engineering-lead
+      description: Engineering lead for Hivehue implementation and sequencing.
+      prompt: .pi/agents/hivehue/engineering_lead.md
+      expertise: .pi/expertise/hivehue/engineering-lead-mental-model.yaml
+      model: inherit
+      tools: [delegate_agent, update_mental_model]
+      skills:
+        - .pi/multi-team/skills/delegate.md
+        - .pi/multi-team/skills/active_listener.md
+        - .pi/multi-team/skills/mental_model.md
+        - .pi/multi-team/skills/zero_micromanagement.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: frontend-dev
+        description: Implements Hivehue frontend work under apps/frontend/.
+        prompt: .pi/agents/hivehue/frontend_dev.md
+        expertise: .pi/expertise/hivehue/frontend-dev-mental-model.yaml
+        tools: [read, write, edit, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: apps/
+            read: true
+            upsert: false
+            delete: false
+          - path: apps/frontend/
+            read: true
+            upsert: true
+            delete: true
+          - path: packages/ui/
+            read: true
+            upsert: true
+            delete: false
+      - name: backend-dev
+        description: Implements Hivehue backend work under apps/backend/.
+        prompt: .pi/agents/hivehue/backend_dev.md
+        expertise: .pi/expertise/hivehue/backend-dev-mental-model.yaml
+        tools: [read, write, edit, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: apps/
+            read: true
+            upsert: false
+            delete: false
+          - path: apps/backend/
+            read: true
+            upsert: true
+            delete: true
+
+  - name: Validation
+    lead:
+      name: validation-lead
+      description: Validation lead for Hivehue QA and security review.
+      prompt: .pi/agents/hivehue/validation_lead.md
+      expertise: .pi/expertise/hivehue/validation-lead-mental-model.yaml
+      model: inherit
+      tools: [delegate_agent, update_mental_model]
+      skills:
+        - .pi/multi-team/skills/delegate.md
+        - .pi/multi-team/skills/active_listener.md
+        - .pi/multi-team/skills/mental_model.md
+        - .pi/multi-team/skills/zero_micromanagement.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: qa-reviewer
+        description: Runs read-only Hivehue validation and smoke checks.
+        prompt: .pi/agents/hivehue/qa_reviewer.md
+        expertise: .pi/expertise/hivehue/qa-reviewer-mental-model.yaml
+        tools: [read, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: security-reviewer
+        description: Performs read-only Hivehue security review and blast-radius checks.
+        prompt: .pi/agents/hivehue/security_reviewer.md
+        expertise: .pi/expertise/hivehue/security-reviewer-mental-model.yaml
+        tools: [read, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false

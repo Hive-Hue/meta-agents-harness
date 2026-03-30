@@ -1,0 +1,195 @@
+name: RepoMultiTeam
+session_dir: .pi/multi-team/sessions
+expertise_dir: .pi/expertise
+
+# Replace "inherit" with explicit provider/model IDs if you want hard routing.
+# Example:
+#   openrouter/anthropic/claude-3.5-sonnet
+#   openrouter/anthropic/claude-3.5-haiku
+orchestrator:
+  name: ceo-orchestrator
+  description: Central coordinator that routes requests across planning, engineering, and validation.
+  prompt: .pi/agents/orchestrator.md
+  expertise: .pi/expertise/ceo-orchestrator-mental-model.yaml
+  model: inherit
+  tools: [delegate_agent, update_mental_model]
+  skills:
+    - .pi/multi-team/skills/delegate.md
+    - .pi/multi-team/skills/active_listener.md
+    - .pi/multi-team/skills/mental_model.md
+    - .pi/multi-team/skills/zero_micromanagement.md
+  domain:
+    - path: .
+      read: true
+      upsert: false
+      delete: false
+
+teams:
+  - name: Planning
+    lead:
+      name: planning-lead
+      description: Planning lead that delegates analysis and spec work to planning workers.
+      prompt: .pi/agents/planning_lead.md
+      expertise: .pi/expertise/planning-lead-mental-model.yaml
+      model: inherit
+      tools: [delegate_agent, update_mental_model]
+      skills:
+        - .pi/multi-team/skills/delegate.md
+        - .pi/multi-team/skills/active_listener.md
+        - .pi/multi-team/skills/mental_model.md
+        - .pi/multi-team/skills/zero_micromanagement.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: repo-analyst
+        description: Read-only repository analyst for structure, patterns, and constraints.
+        prompt: .pi/agents/repo_analyst.md
+        expertise: .pi/expertise/repo-analyst-mental-model.yaml
+        tools: [read, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: solution-architect
+        description: Writes implementation plans and specs under specs/.
+        prompt: .pi/agents/solution_architect.md
+        expertise: .pi/expertise/solution-architect-mental-model.yaml
+        tools: [read, write, edit, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: specs/
+            read: true
+            upsert: true
+            delete: false
+
+  - name: Engineering
+    lead:
+      name: engineering-lead
+      description: Engineering lead that delegates implementation to extension and config workers.
+      prompt: .pi/agents/engineering_lead.md
+      expertise: .pi/expertise/engineering-lead-mental-model.yaml
+      model: inherit
+      tools: [delegate_agent, update_mental_model]
+      skills:
+        - .pi/multi-team/skills/delegate.md
+        - .pi/multi-team/skills/active_listener.md
+        - .pi/multi-team/skills/mental_model.md
+        - .pi/multi-team/skills/zero_micromanagement.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: extension-engineer
+        description: Implements and refactors Pi extensions under extensions/.
+        prompt: .pi/agents/extension_engineer.md
+        expertise: .pi/expertise/extension-engineer-mental-model.yaml
+        tools: [read, write, edit, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: extensions/
+            read: true
+            upsert: true
+            delete: true
+      - name: config-engineer
+        description: Owns runtime config, prompts, skills, expertise seeds, and Pi support files.
+        prompt: .pi/agents/config_engineer.md
+        expertise: .pi/expertise/config-engineer-mental-model.yaml
+        tools: [read, write, edit, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: multi-team.yaml
+            read: true
+            upsert: true
+            delete: false
+          - path: .pi/agents/
+            read: true
+            upsert: true
+            delete: false
+          - path: .pi/multi-team/skills/
+            read: true
+            upsert: true
+            delete: false
+          - path: .pi/expertise/
+            read: true
+            upsert: true
+            delete: false
+          - path: .pi/
+            read: true
+            upsert: true
+            delete: false
+          - path: .gitignore
+            read: true
+            upsert: true
+            delete: false
+
+  - name: Validation
+    lead:
+      name: validation-lead
+      description: Validation lead that coordinates QA and security review.
+      prompt: .pi/agents/validation_lead.md
+      expertise: .pi/expertise/validation-lead-mental-model.yaml
+      model: inherit
+      tools: [delegate_agent, update_mental_model]
+      skills:
+        - .pi/multi-team/skills/delegate.md
+        - .pi/multi-team/skills/active_listener.md
+        - .pi/multi-team/skills/mental_model.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: qa-reviewer
+        description: Runs read-only validation and smoke checks.
+        prompt: .pi/agents/qa_reviewer.md
+        expertise: .pi/expertise/qa-reviewer-mental-model.yaml
+        tools: [read, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: security-reviewer
+        description: Performs read-only security review and blast-radius checks.
+        prompt: .pi/agents/security_reviewer.md
+        expertise: .pi/expertise/security-reviewer-mental-model.yaml
+        tools: [read, bash, grep, find, ls, update_mental_model]
+        skills:
+          - .pi/multi-team/skills/active_listener.md
+          - .pi/multi-team/skills/mental_model.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false

@@ -1,0 +1,20 @@
+agent:
+  name: "qa-reviewer"
+  role: "worker"
+  team: "Validation"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Check user-facing regressions, missing tests, and weak smoke coverage across frontend and backend."
+workflows: []
+risks:
+  - date: "2026-03-30"
+    note: "Cross-boundary changes often ship without enough end-to-end verification."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

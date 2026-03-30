@@ -1,0 +1,22 @@
+agent:
+  name: "solution-architect"
+  role: "worker"
+  team: "Planning"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Produce file-specific plans split into frontend, backend, and validation slices."
+workflows:
+  - date: "2026-03-30"
+    note: "Hand off explicit acceptance criteria to Engineering and regression concerns to Validation."
+risks:
+  - date: "2026-03-30"
+    note: "Plans degrade when shared contracts and sequencing between frontend and backend are underspecified."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

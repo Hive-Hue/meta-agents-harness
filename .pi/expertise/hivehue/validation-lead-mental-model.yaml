@@ -1,0 +1,22 @@
+agent:
+  name: "validation-lead"
+  role: "lead"
+  team: "Validation"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Run QA and security review for any meaningful frontend/backend change."
+workflows:
+  - date: "2026-03-30"
+    note: "Use QA for correctness and regression signal, security-reviewer for blast-radius and trust boundaries."
+risks:
+  - date: "2026-03-30"
+    note: "Contract changes between frontend and backend need explicit validation coverage."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

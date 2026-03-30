@@ -1,0 +1,20 @@
+agent:
+  name: "solution-architect"
+  role: "worker"
+  team: "Planning"
+meta:
+  version: 1
+  max_lines: 120
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Converts findings into implementable plans and specs."
+lessons:
+  - date: "2026-03-30"
+    note: "Prefer concise steps over long essays."
+risks: []
+tools: []
+workflows: []
+decisions: []
+observations: []
+open_questions: []

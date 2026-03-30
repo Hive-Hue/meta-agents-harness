@@ -1,0 +1,30 @@
+agent:
+  name: "planning-lead"
+  role: "lead"
+  team: "Planning"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T17:12:31.330Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Separate repository discovery from solution design before routing Engineering work."
+workflows:
+  - date: "2026-03-30"
+    note: "Use repo-analyst first, then solution-architect when the request is non-trivial."
+risks:
+  - date: "2026-03-30"
+    note: "Cross-cutting frontend/backend requests need explicit dependency ordering."
+tools: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-03-30"
+    note: "Using repo-analyst only: inspect the repository at a high level and report a single-sentence summ... -> 1. **Outcome**"
+  - date: "2026-03-30"
+    note: "Using only the Repo Analyst role, inspect the repository at a high level and return exactly one s... -> 1. **Outcome**"
+  - date: "2026-03-30"
+    note: "Using repo-analyst only, inspect the repository at a high level and return a single-sentence summ... -> 1. **Outcome**"
+open_questions:
+  - date: "2026-03-30"
+    note: "Confirm that Hivehue really uses apps/frontend and apps/backend before implementation begins."

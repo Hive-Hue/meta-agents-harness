@@ -1,0 +1,20 @@
+agent:
+  name: "security-reviewer"
+  role: "worker"
+  team: "Validation"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T00:00:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Review auth, permission checks, data exposure, and blast-radius changes at frontend/backend boundaries."
+workflows: []
+risks:
+  - date: "2026-03-30"
+    note: "Heuristic safeguards around path ownership and bash usage should be treated as review hotspots."
+tools: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []
