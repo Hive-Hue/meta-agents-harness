@@ -236,6 +236,7 @@ Current skills:
 - [active_listener.md](./.pi/multi-team/skills/active_listener.md)
 - [mental_model.md](./.pi/multi-team/skills/mental_model.md)
 - [zero_micromanagement.md](./.pi/multi-team/skills/zero_micromanagement.md)
+- [multi_team_bootstrap.md](./.pi/multi-team/skills/multi_team_bootstrap.md)
 
 The runtime loads these files into the prompt bundle and also surfaces their `use-when` guidance in the effective contract shown to each agent.
 
