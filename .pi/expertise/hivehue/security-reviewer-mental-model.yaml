@@ -5,16 +5,42 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-03-30T00:00:00.000Z"
+  last_updated: "2026-03-30T23:25:41.754Z"
 patterns:
   - date: "2026-03-30"
-    note: "Review auth, permission checks, data exposure, and blast-radius changes at frontend/backend boundaries."
-workflows: []
+    note: "Review auth, trust boundaries, exposed endpoints, and unsafe defaults before focusing on lower-severity hardening."
+  - date: "2026-03-30"
+    note: "Auth flow uses httpOnly cookies (good) but with secure=false (critical flaw). BCrypt password hashing implemented correctly. JWT uses proper HMAC-SHA with jjwt library. Token extraction from both cookies and Authorization header increases XSS attack surface unnecessarily."
+  - date: "2026-03-30"
+    note: "GlobalExceptionHandler properly sanitizes NullPointerException responses (generic message only) and AuthException responses avoid leaking implementation details. Error codes distinguish EMAIL_ALREADY_EXISTS from INVALID_CREDENTIALS which enables user enumeration attacks."
+workflows:
+  - date: "2026-03-30"
+    note: "Start with backend SecurityConfig and auth flows, then assess data exposure, input handling, and external integrations such as payment or file upload."
 risks:
   - date: "2026-03-30"
-    note: "Heuristic safeguards around path ownership and bash usage should be treated as review hotspots."
+    note: "SecurityConfig currently permits all requests, so auth and authorization protections are effectively absent."
+  - date: "2026-03-30"
+    note: "Plaintext password handling and missing JWT dependency wiring keep the login area in a high-risk state."
+  - date: "2026-03-30"
+    note: "Future payment, upload, and real-time features will expand the attack surface significantly if auth and validation remain weak."
+  - date: "2026-03-30"
+    note: "Login/signup review revealed critical missing safeguards: cookies without Secure flag, no refresh token rotation, no rate limiting, JWT secret unvalidated at startup, and logout only clears client-side cookies. Refresh tokens valid for 7 days with no revocation mechanism creates high blast radius for token theft."
+  - date: "2026-03-30"
+    note: "SecurityConfig enforces authenticated access to /api/** endpoints (good), but anyRequest().permitAll() after means non-api routes have no protection. Frontend CORS allows all headers (*) with credentials=true, which is overly permissive and could enable credential theft via malicious origins if misconfigured."
 tools: []
-decisions: []
-lessons: []
-observations: []
-open_questions: []
+decisions:
+  - date: "2026-03-30"
+    note: "High-priority remediation order: (1) Enable Secure flag on cookies in production, (2) Implement refresh token rotation with server-side tracking, (3) Add rate limiting on auth endpoints, (4) Validate JWT secret strength at startup, (5) Implement server-side token invalidation on logout."
+lessons:
+  - date: "2026-03-30"
+    note: "Security expertise is most useful when it preserves attack surface, boundary, and remediation priorities rather than detailed prompt narratives."
+observations:
+  - date: "2026-03-30"
+    note: "Frontend currently contains mock login behavior while backend auth remains incomplete, so any security validation of login must treat the flow as partially stubbed."
+  - date: "2026-03-30"
+    note: "Missing features that would significantly improve auth security: refresh token rotation endpoint, server-side token blacklist, rate limiting on auth endpoints, email verification, password complexity requirements, account lockout mechanism. FEATURES.md confirms rate limiting is planned but not implemented."
+  - date: "2026-03-30"
+    note: "Review the login/signup implementation for authentication and session security risks -> Based on my comprehensive review of the login/signup implementation, here are my security findings:"
+open_questions:
+  - date: "2026-03-30"
+    note: "Decide whether the next security checkpoint should focus on completing auth basics first or on documenting blast radius for the current permissive backend."

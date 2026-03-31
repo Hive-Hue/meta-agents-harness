@@ -5,24 +5,37 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-03-30T17:12:25.692Z"
+  last_updated: "2026-03-30T23:13:43.981Z"
 patterns:
   - date: "2026-03-30"
-    note: "Map user-facing flows, backend services, and ownership boundaries before proposing changes."
+    note: "Map real repository structure and ownership boundaries before proposing plans or delegations."
   - date: "2026-03-30"
-    note: "Repo does NOT use apps/frontend or apps/backend. It's a Pi extension runtime with .pi/, extensions/, specs/, and config YAML. multi-team.hivehue.yaml references Hivehue paths that don't exist here—likely a template for a different product or an external repo."
-workflows: []
+    note: "Frontend auth structure: Next.js App Router with (auth)/signin and (auth)/signup routes, AuthContext for state management, localStorage for JWT token, Bearer auth in API client. Signup form exists but is non-functional (action='#')."
+workflows:
+  - date: "2026-03-30"
+    note: "For HiveHue discovery, inspect hivehue-app-backend/, hivehue-app-frontend/, and hivehue-app-journeys/ together to understand implementation gaps against documented journeys."
 risks:
   - date: "2026-03-30"
-    note: "Implicit contracts between frontend and backend are easy to miss unless request/response boundaries are traced."
-tools: []
+    note: "Template assumptions about apps/frontend and apps/backend are wrong for this workspace and can misroute runtime permissions."
+  - date: "2026-03-30"
+    note: "User model uses plain text password storage (no BCrypt) in UserEntity.password field. Password validation exists but passwords are stored raw. Critical security gap for any real auth implementation."
+tools:
+  - date: "2026-03-30"
+    note: "Repo-analyst is read-only and is best used for structure, dependency, and contract discovery rather than remediation."
 decisions: []
-lessons: []
+lessons:
+  - date: "2026-03-30"
+    note: "Expertise should capture stable repository facts, not multi-paragraph reproductions of prior prompts or ad hoc task transcripts."
 observations:
   - date: "2026-03-30"
-    note: "Inspect repo at high level; return exactly one-sentence summary of repository shape (major folder... -> 1. Outcome"
+    note: "Backend uses Spring Boot 4.0.1 and Java 21 with modular packages under app-core; frontend uses Next.js App Router under src/app with auth-related code in src/contexts and src/lib/api."
   - date: "2026-03-30"
-    note: "Inspect repo at high level: identify major directories/components and notable top-level files; re... -> **One-sentence summary:** This is a Pi multi-agent runtime extension repo containing `.pi/` (agents, expertise, skills, sessions), `extensions/` (TypeScr..."
+    note: "Journey docs in hivehue-app-journeys/docs/ui-handoff/ remain the main source of truth for staged user flow expectations."
+  - date: "2026-03-30"
+    note: "Fazer discovery no repo sobre auth atual: endpoints de login/signup no backend, config de security (Spring), modelos User, persistência (... -> I'll conduct a comprehensive discovery of the authentication implementation in the Hivehue repository. Let me start by examining the repository structure and then dive into backend and frontend auth components.## 1. Outcome"
 open_questions:
   - date: "2026-03-30"
-    note: "Verify the real frontend/backend directory layout instead of assuming template paths."
+    note: "Reconfirm the highest-priority repo gap before new discovery work so analysis stays aligned with the active delivery milestone."
+architecture:
+  - date: "2026-03-30"
+    note: "Auth is NOT implemented despite infrastructure being in place. Backend has JwtService but NO AuthController, no password encoding, and open SecurityConfig (permitAll). Frontend has mock auth (USE_MOCK_AUTH=true) calling non-existent /auth/login and /auth/me endpoints. JWT lib (jjwt) is missing from pom.xml despite JwtService existing."

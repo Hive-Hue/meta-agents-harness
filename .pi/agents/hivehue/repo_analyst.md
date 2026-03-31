@@ -14,6 +14,9 @@ tools:
   - find
   - ls
   - update_mental_model
+  - mcp_servers
+  - mcp_tools
+  - mcp_call
 skills:
   - path: .pi/multi-team/skills/active_listener.md
     use-when: Always. Preserve the exact user question and any prior findings while exploring.

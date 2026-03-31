@@ -16,6 +16,9 @@ tools:
   - find
   - ls
   - update_mental_model
+  - mcp_servers
+  - mcp_tools
+  - mcp_call
 skills:
   - path: .pi/multi-team/skills/active_listener.md
     use-when: Always. Keep the latest findings, risks, and ownership constraints visible while drafting specs.

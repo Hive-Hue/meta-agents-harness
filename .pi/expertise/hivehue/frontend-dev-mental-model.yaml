@@ -5,18 +5,32 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-03-30T00:00:00.000Z"
+  last_updated: "2026-03-30T23:59:00.000Z"
 patterns:
   - date: "2026-03-30"
-    note: "Keep view, state, and component changes localized to apps/frontend and packages/ui."
-workflows: []
+    note: "Keep frontend work inside hivehue-app-frontend/src/, especially src/app, src/components, src/contexts, and src/lib."
+  - date: "2026-03-30"
+    note: "Do not patch backend gaps from the UI layer silently; preserve contract boundaries and report dependencies."
+workflows:
+  - date: "2026-03-30"
+    note: "When preparing frontend auth integration, inspect AuthContext, src/lib/api/auth.ts, and the signin/signup app routes before editing."
 risks:
   - date: "2026-03-30"
-    note: "Do not silently patch backend behavior from the frontend layer; escalate the dependency."
-tools: []
+    note: "Signup page still uses form action='#', so registration is not wired to a real API path yet."
+  - date: "2026-03-30"
+    note: "Current login flow uses mock credentials in src/lib/api/auth.ts and is not connected to real backend JWT auth."
+tools:
+  - date: "2026-03-30"
+    note: "Frontend worker runtime was validated after the harness fix; file create/read/delete evidence can be returned reliably in-turn."
 decisions: []
-lessons: []
-observations: []
+lessons:
+  - date: "2026-03-30"
+    note: "Keep frontend runtime tests small and local to hivehue-app-frontend/ so they do not collide with backend ownership guardrails."
+observations:
+  - date: "2026-03-30"
+    note: "Frontend project uses Next.js App Router under src/app with shared utilities in src/lib and state/auth logic in src/contexts."
+  - date: "2026-03-30"
+    note: "Signin UI exposes testuser/testpass123 placeholders, reflecting the current mock-auth implementation rather than a production login flow."
 open_questions:
   - date: "2026-03-30"
-    note: "Confirm whether packages/ui exists or if UI code is fully contained in apps/frontend."
+    note: "Decide whether signup should be integrated next with a real backend contract or remain clearly marked as mock/incomplete until backend auth is ready."

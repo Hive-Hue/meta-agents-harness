@@ -34,7 +34,7 @@ teams:
         - .pi/multi-team/skills/active_listener.md
         - .pi/multi-team/skills/mental_model.md
         - .pi/multi-team/skills/zero_micromanagement.md
-        - .pi/skills/figma-via-codex/SKILL.md
+        - .pi/multi-team/skills/figma-via-codex/SKILL.md
       domain:
         - path: .
           read: true
@@ -45,7 +45,7 @@ teams:
         description: Read-only repository analyst for Hivehue structure, patterns, and constraints.
         prompt: .pi/agents/hivehue/repo_analyst.md
         expertise: .pi/expertise/hivehue/repo-analyst-mental-model.yaml
-        tools: [read, grep, find, ls, update_mental_model]
+        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
         skills:
           - .pi/multi-team/skills/active_listener.md
           - .pi/multi-team/skills/mental_model.md
@@ -58,10 +58,11 @@ teams:
         description: Writes Hivehue implementation plans and specs under specs/.
         prompt: .pi/agents/hivehue/solution_architect.md
         expertise: .pi/expertise/hivehue/solution-architect-mental-model.yaml
-        tools: [read, write, edit, grep, find, ls, update_mental_model]
+        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
         skills:
           - .pi/multi-team/skills/active_listener.md
           - .pi/multi-team/skills/mental_model.md
+          - .pi/multi-team/skills/figma-via-codex/SKILL.md
         domain:
           - path: .
             read: true
@@ -79,12 +80,13 @@ teams:
       prompt: .pi/agents/hivehue/engineering_lead.md
       expertise: .pi/expertise/hivehue/engineering-lead-mental-model.yaml
       model: inherit
-      tools: [delegate_agent, update_mental_model]
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
       skills:
         - .pi/multi-team/skills/delegate.md
         - .pi/multi-team/skills/active_listener.md
         - .pi/multi-team/skills/mental_model.md
         - .pi/multi-team/skills/zero_micromanagement.md
+        - .pi/multi-team/skills/figma-via-codex/SKILL.md
       domain:
         - path: .
           read: true
@@ -99,6 +101,7 @@ teams:
         skills:
           - .pi/multi-team/skills/active_listener.md
           - .pi/multi-team/skills/mental_model.md
+          - .pi/multi-team/skills/figma-via-codex/SKILL.md
         domain:
           - path: .
             read: true
@@ -137,12 +140,13 @@ teams:
       prompt: .pi/agents/hivehue/validation_lead.md
       expertise: .pi/expertise/hivehue/validation-lead-mental-model.yaml
       model: inherit
-      tools: [delegate_agent, update_mental_model]
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
       skills:
         - .pi/multi-team/skills/delegate.md
         - .pi/multi-team/skills/active_listener.md
         - .pi/multi-team/skills/mental_model.md
         - .pi/multi-team/skills/zero_micromanagement.md
+        - .pi/multi-team/skills/figma-via-codex/SKILL.md
       domain:
         - path: .
           read: true
@@ -157,6 +161,7 @@ teams:
         skills:
           - .pi/multi-team/skills/active_listener.md
           - .pi/multi-team/skills/mental_model.md
+          - .pi/multi-team/skills/figma-via-codex/SKILL.md
         domain:
           - path: .
             read: true

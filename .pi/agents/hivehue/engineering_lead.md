@@ -11,6 +11,9 @@ expertise:
 tools:
   - delegate_agent
   - update_mental_model
+  - mcp_servers
+  - mcp_tools
+  - mcp_call
 skills:
   - path: .pi/multi-team/skills/delegate.md
     use-when: Always. Delegate to the right engineering owner instead of implementing directly.

@@ -1512,6 +1512,7 @@ export default function (pi: ExtensionAPI) {
 
 	function renderCard(state: CardState, colWidth: number, theme: any): string[] {
 		const width = colWidth - 2;
+		const contentWidth = Math.max(1, width - 1);
 		const statusColor = state.status === "idle" ? "dim"
 			: state.status === "running" ? "accent"
 			: state.status === "done" ? "success" : "error";
@@ -1519,25 +1520,28 @@ export default function (pi: ExtensionAPI) {
 			: state.status === "running" ? "●"
 			: state.status === "done" ? "✓" : "✗";
 		const roleLabel = state.role === "lead" ? "Lead" : "Worker";
-		const title = theme.fg("accent", theme.bold(shortText(displayName(state.agent.name), width)));
-		const meta = state.teamName
-			? theme.fg("dim", shortText(`${roleLabel} · ${state.teamName}`, width))
-			: theme.fg("dim", roleLabel);
-		const status = theme.fg(statusColor, `${statusIcon} ${state.status}${state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : ""}`);
-		const task = theme.fg("muted", shortText(state.task || state.agent.description || "idle", width));
-		const last = theme.fg("dim", shortText(state.lastLine || "—", width));
+		const titleText = shortText(displayName(state.agent.name), contentWidth);
+		const metaText = shortText(state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel, contentWidth);
+		const statusText = shortText(`${statusIcon} ${state.status}${state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : ""}`, contentWidth);
+		const taskText = shortText(state.task || state.agent.description || "idle", contentWidth);
+		const lastText = shortText(state.lastLine || "—", contentWidth);
+		const title = theme.fg("accent", theme.bold(titleText));
+		const meta = theme.fg("dim", metaText);
+		const status = theme.fg(statusColor, statusText);
+		const task = theme.fg("muted", taskText);
+		const last = theme.fg("dim", lastText);
 		const top = "┌" + "─".repeat(width) + "┐";
 		const bot = "└" + "─".repeat(width) + "┘";
 		const row = (content: string, visible: string) =>
-			theme.fg("dim", "│") + " " + content + " ".repeat(Math.max(0, width - 1 - visibleWidth(visible))) + theme.fg("dim", "│");
+			theme.fg("dim", "│") + " " + content + " ".repeat(Math.max(0, contentWidth - visibleWidth(visible))) + theme.fg("dim", "│");
 
 		return [
 			theme.fg("dim", top),
-			row(title, displayName(state.agent.name)),
-			row(meta, `${roleLabel}${state.teamName ? ` · ${state.teamName}` : ""}`),
-			row(status, `${statusIcon} ${state.status}${state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : ""}`),
-			row(task, shortText(state.task || state.agent.description || "idle", width)),
-			row(last, shortText(state.lastLine || "—", width)),
+			row(title, titleText),
+			row(meta, metaText),
+			row(status, statusText),
+			row(task, taskText),
+			row(last, lastText),
 			theme.fg("dim", bot),
 		];
 	}

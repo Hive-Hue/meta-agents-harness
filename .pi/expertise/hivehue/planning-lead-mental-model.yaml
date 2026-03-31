@@ -5,26 +5,40 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-03-30T17:12:31.330Z"
+  last_updated: "2026-03-31T03:49:15.547Z"
 patterns:
   - date: "2026-03-30"
-    note: "Separate repository discovery from solution design before routing Engineering work."
+    note: "Use repo-analyst for discovery first, then solution-architect for implementation plans and handoff specs."
+  - date: "2026-03-31"
+    note: "When the task is ClickUp planning administration, planning-lead can act directly through ClickUp MCP instead of delegating to repo workers."
 workflows:
   - date: "2026-03-30"
-    note: "Use repo-analyst first, then solution-architect when the request is non-trivial."
+    note: "Planning should establish real directory layout, contract boundaries, and sequencing before Engineering starts implementation."
+  - date: "2026-03-31"
+    note: "For straightforward ClickUp planning operations, first use mcp_tools/mcp_call to inspect available ClickUp actions, then perform the change directly and only delegate if repository work is also needed."
 risks:
   - date: "2026-03-30"
-    note: "Cross-cutting frontend/backend requests need explicit dependency ordering."
-tools: []
-decisions: []
-lessons: []
+    note: "Cross-cutting frontend/backend requests fail when assumptions about paths, contracts, or dependency order are wrong."
+  - date: "2026-03-30"
+    note: "HiveHue still has major backend capability gaps relative to journey requirements: auth, communities, events, services, programs, and supporting infra."
+tools:
+  - date: "2026-03-30"
+    note: "update_mental_model is append-only, so expertise cleanup requires direct file maintenance when contamination accumulates."
+decisions:
+  - date: "2026-03-30"
+    note: "Treat HiveHue as a multi-repo workspace with hivehue-app-frontend/, hivehue-app-backend/, and hivehue-app-journeys/ as the main planning anchors."
+lessons:
+  - date: "2026-03-30"
+    note: "Path assumptions copied from template configs cause avoidable runtime failures; confirm the actual workspace structure before routing execution."
 observations:
   - date: "2026-03-30"
-    note: "Using repo-analyst only: inspect the repository at a high level and report a single-sentence summ... -> 1. **Outcome**"
+    note: "HiveHue consists of a Spring Boot backend, a Next.js frontend, and journey docs that define staged user flows and acceptance criteria."
   - date: "2026-03-30"
-    note: "Using only the Repo Analyst role, inspect the repository at a high level and return exactly one s... -> 1. **Outcome**"
-  - date: "2026-03-30"
-    note: "Using repo-analyst only, inspect the repository at a high level and return a single-sentence summ... -> 1. **Outcome**"
+    note: "O usuário pediu para completar o sistema de login e signup, integrando backend e frontend. Você é o dono do planejamento. Produza uma análise objetiva do estado atual e um plano de implementação executável cobrindo fluxo de autenticação ... -> 1. Outcome"
+  - date: "2026-03-31"
+    note: "Owner: Planning team because this is a product/planning artifact request in ClickUp, not a code change -> - Subtask creation: Not created (blocked)."
+  - date: "2026-03-31"
+    note: "Owner: Planning team because this is a ClickUp planning artifact creation request -> Failure / Blocked. I cannot execute the ClickUp operation in this runtime because ClickUp MCP/tools are not available/accessible here, despite the instruction that they should be."
 open_questions:
   - date: "2026-03-30"
-    note: "Confirm that Hivehue really uses apps/frontend and apps/backend before implementation begins."
+    note: "Prioritize whether the next planning deliverable should focus on auth/login integration, broader backend capability gaps, or validation strategy."
