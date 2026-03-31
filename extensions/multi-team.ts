@@ -17,10 +17,11 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
-import { spawn } from "child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { basename, dirname, relative, resolve } from "path";
 import { applyExtensionDefaults } from "./themeMap.ts";
+import { loadPiEnv } from "./env-loader.ts";
 
 type RuntimeRole = "orchestrator" | "lead" | "worker";
 type CardStatus = "idle" | "running" | "done" | "error";
@@ -145,9 +146,26 @@ interface CardState {
 
 const DEFAULT_WORKER_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
 const SAFE_LEAD_TOOLS = ["read", "grep", "find", "ls"];
-const BUILTIN_TOOL_NAMES = new Set(["read", "bash", "edit", "write", "grep", "find", "ls"]);
+const SPAWNABLE_TOOL_NAMES = new Set([
+	"read",
+	"bash",
+	"edit",
+	"write",
+	"grep",
+	"find",
+	"ls",
+	"delegate_agent",
+	"update_mental_model",
+	"mcp_servers",
+	"mcp_tools",
+	"mcp_call",
+	"mcp_resources",
+	"mcp_read_resource",
+	"mcp_prompts",
+	"mcp_get_prompt",
+]);
 const DEFAULT_EXPERTISE_MAX_LINES = 120;
-const EXPERTISE_NOTE_MAX_CHARS = 1000;
+const EXPERTISE_NOTE_MAX_CHARS = 2000;
 
 interface ParsedYamlLine {
 	indent: number;
@@ -624,8 +642,8 @@ function normalizeTools(tools: AgentConfig["tools"], role: RuntimeRole): string[
 	return ["delegate_agent"];
 }
 
-function builtinToolsForSpawn(tools: string[]): string[] {
-	return tools.filter((tool) => BUILTIN_TOOL_NAMES.has(tool));
+function spawnableToolsForSpawn(tools: string[]): string[] {
+	return Array.from(new Set(tools.filter((tool) => SPAWNABLE_TOOL_NAMES.has(tool))));
 }
 
 function matchesName(left: string, right: string): boolean {
@@ -771,6 +789,48 @@ function firstUsefulLine(output: string): string {
 	return lines[0] || "No concise summary returned.";
 }
 
+function stripMarkdownNoise(value: string): string {
+	return value
+		.replace(/```[\s\S]*?```/g, " ")
+		.replace(/`([^`]+)`/g, "$1")
+		.replace(/\*\*/g, "")
+		.replace(/__/g, "")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function isLowSignalExpertiseSummary(summary: string): boolean {
+	const normalized = summary.trim().toLowerCase();
+	if (!normalized) return true;
+	return normalized === "1. outcome"
+		|| normalized === "---"
+		|| normalized === "no concise summary returned."
+		|| normalized === "none."
+		|| normalized === "no files changed."
+		|| normalized === "blocked."
+		|| normalized.startsWith("i haven't executed")
+		|| normalized.startsWith("i have not executed")
+		|| normalized.startsWith("delegated by ")
+		|| normalized.startsWith("return format:")
+		|| normalized.includes("no concise summary returned");
+}
+
+function summarizeTaskForExpertise(task: string): string {
+	const normalized = stripMarkdownNoise(task);
+	const firstSentence = normalized.split(/\.(\s|$)|\n/)[0]?.trim() || normalized;
+	return shortText(firstSentence, 140);
+}
+
+function buildExpertiseObservation(task: string, output: string): string | null {
+	const summary = stripMarkdownNoise(firstUsefulLine(output));
+	if (isLowSignalExpertiseSummary(summary)) return null;
+	const taskSummary = summarizeTaskForExpertise(task);
+	const note = taskSummary
+		? `${taskSummary} -> ${summary}`
+		: summary;
+	return shortText(note, EXPERTISE_NOTE_MAX_CHARS);
+}
+
 function newSessionId(): string {
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-");
 	const rand = Math.random().toString(36).slice(2, 8);
@@ -897,6 +957,7 @@ export default function (pi: ExtensionAPI) {
 	let toolCallSequence = 0;
 	const pendingToolCalls: PendingToolCall[] = [];
 	const cards = new Map<string, CardState>();
+	const childProcesses = new Map<string, ChildProcessWithoutNullStreams>();
 
 	function currentSessionId(): string {
 		return process.env.PI_MULTI_SESSION_ID?.trim() || sessionId;
@@ -1331,7 +1392,8 @@ export default function (pi: ExtensionAPI) {
 		if (!expertiseMeta(agent).updatable) return;
 		ensureExpertiseFile(agent);
 		const doc = loadExpertiseDocument(agent);
-		const note = shortText(`${shortText(task, 240)} -> ${shortText(firstUsefulLine(output), 720)}`, EXPERTISE_NOTE_MAX_CHARS);
+		const note = buildExpertiseObservation(task, output);
+		if (!note) return;
 		doc.observations.push({
 			date: new Date().toISOString().slice(0, 10),
 			note,
@@ -1582,22 +1644,22 @@ export default function (pi: ExtensionAPI) {
 			`Session id: ${currentSessionId()}.`,
 			`Parent depth: ${currentDepth()}.`,
 			"",
-			"Primary task:",
+			"Task:",
 			task,
 			"",
-			"Return format:",
+			"Return:",
 			"1. Outcome",
-			"2. Key decisions",
-			"3. Files changed",
-			"4. Risks or open questions",
+			"2. Files changed",
+			"3. Verification or evidence",
+			"4. Risks or blockers",
 		];
 		if (target.role === "worker") {
 			lines.push(
 				"",
-				"Execution requirements:",
-				"- Use repo tools for any inspection, edits, or verification needed to complete the task.",
-				"- Do not report success if you did not execute concrete operations in this turn.",
-				"- If blocked, report the exact blocker and stop instead of writing a completion-shaped answer.",
+				"Rules:",
+				"- Execute the repo work needed in this turn.",
+				"- Do not claim success without concrete operations or verification.",
+				"- If blocked, report the blocker directly and stop.",
 			);
 		}
 		return lines.join("\n");
@@ -1611,6 +1673,11 @@ export default function (pi: ExtensionAPI) {
 			|| text.includes("no operations were executed")
 			|| text.includes("no commands were executed")
 			|| text.includes("no file changes were made");
+	}
+
+	function shouldResumeChildSession(child: DispatchTarget, sessionFile: string): boolean {
+		if (!existsSync(sessionFile)) return false;
+		return false;
 	}
 
 	function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget }> {
@@ -1660,12 +1727,15 @@ export default function (pi: ExtensionAPI) {
 		const model = currentModel(ctx, effectiveModel(config, child.agent) || child.agent.model);
 		const prompt = buildDelegationPrompt(child, task);
 		const extensionPath = resolve(config.baseDir, "extensions", "multi-team.ts");
+		const mcpBridgePath = resolve(config.baseDir, "extensions", "mcp-bridge.ts");
 		const childTools = normalizeTools(effectiveTools(config, child.agent), child.role);
-		const builtinTools = child.role === "worker"
-			? builtinToolsForSpawn(childTools)
-			: builtinToolsForSpawn(SAFE_LEAD_TOOLS);
+		const requestedSpawnTools = child.role === "worker"
+			? childTools
+			: Array.from(new Set([...SAFE_LEAD_TOOLS, ...childTools]));
+		const spawnTools = spawnableToolsForSpawn(requestedSpawnTools);
 		const sessionFile = resolve(currentSessionRoot(), "state", `${slugify(child.agent.name)}.session.jsonl`);
 		const logFile = resolve(currentSessionRoot(), "jsonl", `${Date.now()}-${slugify(runtime.agent.name)}-to-${slugify(child.agent.name)}.jsonl`);
+		const resumeSession = shouldResumeChildSession(child, sessionFile);
 		const args = [
 			"--mode", "json",
 			"-p",
@@ -1675,10 +1745,11 @@ export default function (pi: ExtensionAPI) {
 			"--no-prompt-templates",
 			"--no-themes",
 			"--thinking", "off",
-			"--tools", builtinTools.join(","),
+			"--tools", spawnTools.join(","),
 			"--session", sessionFile,
 		];
-		if (existsSync(sessionFile)) args.push("-c");
+		if (existsSync(mcpBridgePath)) args.splice(6, 0, "-e", mcpBridgePath);
+		if (resumeSession) args.push("-c");
 		if (model) args.push("--model", model);
 		args.push(prompt);
 
@@ -1689,6 +1760,7 @@ export default function (pi: ExtensionAPI) {
 			task,
 			logFile,
 			sessionFile,
+			resumeSession,
 		});
 		appendConversation(
 			"system",
@@ -1721,6 +1793,7 @@ export default function (pi: ExtensionAPI) {
 					PI_MULTI_DEPTH: String(currentDepth() + 1),
 				},
 			});
+			childProcesses.set(child.agent.name, proc);
 
 			let buffer = "";
 			const toolCalls: string[] = [];
@@ -1766,6 +1839,7 @@ export default function (pi: ExtensionAPI) {
 			});
 
 			proc.on("close", (code) => {
+				childProcesses.delete(child.agent.name);
 				if (buffer.trim()) {
 					appendFileSync(logFile, buffer.trim() + "\n");
 					try {
@@ -1780,10 +1854,11 @@ export default function (pi: ExtensionAPI) {
 				if (card?.timer) clearInterval(card.timer);
 				const elapsed = Date.now() - startTime;
 				const output = textChunks.join("");
+				const outputTrimmed = output.trim();
 				const realToolCalls = toolCalls.filter((tool) => tool && tool !== "update_mental_model");
 				const executionPostureFailure = child.role === "worker"
 					&& realToolCalls.length === 0
-					&& outputSignalsNoExecution(output);
+					&& (outputTrimmed.length === 0 || outputSignalsNoExecution(output));
 				const effectiveExitCode = executionPostureFailure
 					? (code === 0 || code === null ? 2 : code ?? 2)
 					: (code ?? 1);
@@ -1793,6 +1868,7 @@ export default function (pi: ExtensionAPI) {
 						"",
 						"[Runtime] Worker returned without any concrete tool execution in this turn.",
 						`[Runtime] Detected tool calls: ${toolCalls.join(", ") || "(none)"}`,
+						`[Runtime] Resumed prior session: ${resumeSession ? "yes" : "no"}`,
 					].join("\n")
 					: output;
 
@@ -1858,6 +1934,7 @@ export default function (pi: ExtensionAPI) {
 			});
 
 			proc.on("error", (err) => {
+				childProcesses.delete(child.agent.name);
 				if (card?.timer) clearInterval(card.timer);
 				if (card) {
 					card.status = "error";
@@ -2135,6 +2212,51 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("stop", {
+		description: "Stop running multi-team child agents and return to idle",
+		handler: async (args, ctx) => {
+			if (!runtime) {
+				ctx.ui.notify("Multi-team runtime not initialized.", "warning");
+				return;
+			}
+
+			const target = args?.trim().toLowerCase();
+			const running = Array.from(childProcesses.entries());
+			if (running.length === 0) {
+				ctx.ui.notify("No running child agents.", "info");
+				return;
+			}
+
+			const shouldStop = (name: string) =>
+				!target || target === "all" || name.toLowerCase() === target;
+
+			let stopped = 0;
+			for (const [name, proc] of running) {
+				if (!shouldStop(name)) continue;
+				try {
+					proc.kill("SIGTERM");
+				} catch {}
+				childProcesses.delete(name);
+				stopped++;
+
+				const card = cards.get(childKey(name));
+				if (card && card.status === "running") {
+					card.status = "error";
+					card.lastLine = "Stopped by /stop";
+					updateWidget();
+				}
+			}
+
+			appendEvent("delegate_stop", {
+				target: target || "all",
+				stopped,
+			});
+
+			const label = target ? `target "${target}"` : "all running agents";
+			ctx.ui.notify(`Stopped ${stopped} child process(es) for ${label}.`, stopped ? "info" : "warning");
+		},
+	});
+
 	pi.on("input", async (event, _ctx) => {
 		if (!runtime) {
 			return { action: "continue" as const };
@@ -2236,6 +2358,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		loadPiEnv(ctx.cwd);
 		applyExtensionDefaults(import.meta.url, ctx);
 		widgetCtx = ctx;
 

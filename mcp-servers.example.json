@@ -1,0 +1,25 @@
+{
+  "servers": {
+    "context7": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "${CONTEXT7_API_KEY}"
+      ],
+      "timeout_ms": 20000
+    },
+    "clickup": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.clickup.com/mcp"
+      ],
+      "timeout_ms": 30000
+    }
+  }
+}

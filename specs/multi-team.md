@@ -78,6 +78,7 @@ domain:
   - explicit path references outside the domain are blocked
   - obvious mutating commands outside write scope are blocked
   - read-only commands remain allowed
+- Child delegations do not resume prior Pi conversation sessions by default. Durable memory should live in expertise files, not accumulated chat state, to avoid empty, slow, or contaminated follow-up turns.
 
 ## Session Layout
 
