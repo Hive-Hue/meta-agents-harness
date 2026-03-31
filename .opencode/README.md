@@ -13,10 +13,37 @@ This directory contains an OpenCode-native scaffold for a three-layer multi-team
 - `sessions/`: reserved for future session artifacts
 - `scripts/validate-multi-team.mjs`: validates topology + file references
 
-## Run
+## Install
 
 ```bash
-opencode
+git clone https://github.com/AlyssonM/multi-agents.git
+cd multi-agents
+npm --prefix .opencode install
+```
+
+Optional environment setup:
+
+```bash
+cp .env.sample .env
+# then fill required values in .env (e.g. CONTEXT7_API_KEY, GITHUB_PAT)
+```
+
+Verify OpenCode CLI is available:
+
+```bash
+if command -v opencode >/dev/null 2>&1; then
+  opencode --version
+else
+  echo "OpenCode CLI not found. Install it first: https://opencode.ai/"
+fi
+```
+
+## Get Started
+
+Generate/update all agent prompts from the canonical YAML:
+
+```bash
+npm --prefix .opencode run sync:multi-team
 ```
 
 Validate the high-level spec:
@@ -25,16 +52,16 @@ Validate the high-level spec:
 npm --prefix .opencode run validate:multi-team
 ```
 
-Generate/update all agent prompts from the canonical YAML:
-
-```bash
-npm --prefix .opencode run sync:multi-team
-```
-
 Check drift (CI-friendly, no file writes):
 
 ```bash
 npm --prefix .opencode run check:multi-team-sync
+```
+
+Start OpenCode:
+
+```bash
+opencode
 ```
 
 Recommended start:

@@ -65,28 +65,55 @@ Configured in [`.opencode/opencode.json`](./.opencode/opencode.json):
 
 If OAuth is required for a remote MCP server, use OpenCode MCP auth flow in CLI.
 
-## Run
+## Install
 
 ```bash
-opencode
+git clone https://github.com/AlyssonM/multi-agents.git
+cd multi-agents
+npm --prefix .opencode install
 ```
 
-Validate high-level config consistency:
+Optional environment setup:
 
 ```bash
-npm --prefix .opencode run validate:multi-team
+cp .env.sample .env
+# then fill required values in .env (e.g. CONTEXT7_API_KEY, GITHUB_PAT)
 ```
 
-Generate/update all `.opencode/agents/*.md` from canonical YAML:
+Verify OpenCode CLI is available:
+
+```bash
+if command -v opencode >/dev/null 2>&1; then
+  opencode --version
+else
+  echo "OpenCode CLI not found. Install it first: https://opencode.ai/"
+fi
+```
+
+## Get Started
+
+Sync generated agents from canonical topology:
 
 ```bash
 npm --prefix .opencode run sync:multi-team
 ```
 
-Check if generated agents are in sync (no writes):
+Validate topology and references:
+
+```bash
+npm --prefix .opencode run validate:multi-team
+```
+
+Check drift (CI-friendly, no writes):
 
 ```bash
 npm --prefix .opencode run check:multi-team-sync
+```
+
+Start OpenCode:
+
+```bash
+opencode
 ```
 
 Suggested workflow:
