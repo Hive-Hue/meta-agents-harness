@@ -13,6 +13,9 @@ This directory contains an OpenCode-native scaffold for a three-layer multi-team
 - `sessions/`: reserved for future session artifacts
 - `scripts/validate-multi-team.mjs`: validates topology + file references
 
+ClickUp MCP is configured via local `mcp-remote` (`https://mcp.clickup.com/mcp`, callback port `19876`).
+First successful run performs OAuth and persists token in `~/.mcp-auth`.
+
 ## Install
 
 ```bash
@@ -61,6 +64,13 @@ npm --prefix .opencode run check:multi-team-sync
 Start OpenCode:
 
 ```bash
+opencode
+```
+
+If ClickUp OAuth session is broken, clear auth cache and retry:
+
+```bash
+rm -rf ~/.mcp-auth
 opencode
 ```
 

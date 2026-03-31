@@ -63,7 +63,8 @@ Configured in [`.opencode/opencode.json`](./.opencode/opencode.json):
 - `clickup`
 - `github`
 
-If OAuth is required for a remote MCP server, use OpenCode MCP auth flow in CLI.
+ClickUp is configured as local `mcp-remote` (port `19876`) and starts automatically with OpenCode.
+On first use, OAuth opens in the browser and token is persisted in `~/.mcp-auth`.
 
 ## Install
 
@@ -113,6 +114,13 @@ npm --prefix .opencode run check:multi-team-sync
 Start OpenCode:
 
 ```bash
+opencode
+```
+
+If ClickUp OAuth session is broken, clear auth cache and retry:
+
+```bash
+rm -rf ~/.mcp-auth
 opencode
 ```
 

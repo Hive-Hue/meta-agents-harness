@@ -29,9 +29,16 @@
       "timeout": 60000
     },
     "clickup": {
-      "type": "remote",
-      "url": "https://mcp.clickup.com/mcp",
-      "enabled": true
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "mcp-remote",
+        "https://mcp.clickup.com/mcp",
+        "19876"
+      ],
+      "enabled": true,
+      "timeout": 120000
     },
     "github": {
       "type": "local",
