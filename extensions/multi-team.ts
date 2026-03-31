@@ -502,8 +502,8 @@ function normalizeExpertiseReference(value: any): ExpertiseReference | null {
 		maxLines: typeof maxLinesRaw === "number"
 			? maxLinesRaw
 			: typeof maxLinesRaw === "string" && /^-?\d+$/.test(maxLinesRaw.trim())
-			? Number(maxLinesRaw.trim())
-			: undefined,
+				? Number(maxLinesRaw.trim())
+				: undefined,
 	};
 }
 
@@ -567,29 +567,29 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 	const explicitRules = Array.isArray(agent.domain)
 		? agent.domain
 		: Array.isArray(agent.domain?.rules)
-		? agent.domain.rules
-		: [];
+			? agent.domain.rules
+			: [];
 	if (explicitRules.length > 0) {
 		return { rules: explicitRules };
 	}
 	const metadataRules = Array.isArray(metadata.domain)
 		? metadata.domain
 		: Array.isArray(metadata.domain?.rules)
-		? metadata.domain.rules
-		: [];
+			? metadata.domain.rules
+			: [];
 	if (metadataRules.length > 0) {
 		return { rules: metadataRules };
 	}
 	const read = agent.domain?.read && agent.domain.read.length > 0
 		? agent.domain.read
 		: Array.isArray(metadata.domain_read)
-		? metadata.domain_read
-		: [];
+			? metadata.domain_read
+			: [];
 	const write = agent.domain?.write && agent.domain.write.length > 0
 		? agent.domain.write
 		: Array.isArray(metadata.domain_write)
-		? metadata.domain_write
-		: [];
+			? metadata.domain_write
+			: [];
 	return { read, write, rules: legacyDomainToRules(read, write) };
 }
 
@@ -737,8 +737,8 @@ function normalizeDomainRules(config: ResolvedConfig, domain: DomainConfig | Dom
 	const rules = Array.isArray(domain)
 		? domain
 		: domain?.rules && domain.rules.length > 0
-		? domain.rules
-		: legacyDomainToRules(domain?.read || [fallbackRead], domain?.write || []);
+			? domain.rules
+			: legacyDomainToRules(domain?.read || [fallbackRead], domain?.write || []);
 	return rules.map((rule, index) => ({
 		path: rule.path,
 		absolutePath: resolve(config.baseDir, rule.path),
@@ -1028,7 +1028,7 @@ export default function (pi: ExtensionAPI) {
 					...(index.counts || {}),
 				};
 				index.processes = Array.isArray(index.processes) ? index.processes : [];
-			} catch {}
+			} catch { }
 		}
 
 		mutator(index);
@@ -1487,8 +1487,8 @@ export default function (pi: ExtensionAPI) {
 			runtime.role === "orchestrator"
 				? "You must coordinate only through team leads. You do not write code directly."
 				: runtime.role === "lead"
-				? "You must coordinate only through workers in your own team. You do not write code directly."
-				: "You are the execution layer. You may use direct tools, but ownership guardrails will block paths outside your domain.",
+					? "You must coordinate only through workers in your own team. You do not write code directly."
+					: "You are the execution layer. You may use direct tools, but ownership guardrails will block paths outside your domain.",
 		];
 
 		if (runtime.role === "orchestrator") {
@@ -1515,21 +1515,19 @@ export default function (pi: ExtensionAPI) {
 		const contentWidth = Math.max(1, width - 1);
 		const statusColor = state.status === "idle" ? "dim"
 			: state.status === "running" ? "accent"
-			: state.status === "done" ? "success" : "error";
+				: state.status === "done" ? "success" : "error";
 		const statusIcon = state.status === "idle" ? "○"
 			: state.status === "running" ? "●"
-			: state.status === "done" ? "✓" : "✗";
+				: state.status === "done" ? "✓" : "✗";
 		const roleLabel = state.role === "lead" ? "Lead" : "Worker";
 		const titleText = shortText(displayName(state.agent.name), contentWidth);
 		const metaText = shortText(state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel, contentWidth);
 		const statusText = shortText(`${statusIcon} ${state.status}${state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : ""}`, contentWidth);
 		const taskText = shortText(state.task || state.agent.description || "idle", contentWidth);
-		const lastText = shortText(state.lastLine || "—", contentWidth);
 		const title = theme.fg("accent", theme.bold(titleText));
 		const meta = theme.fg("dim", metaText);
 		const status = theme.fg(statusColor, statusText);
 		const task = theme.fg("muted", taskText);
-		const last = theme.fg("dim", lastText);
 		const top = "┌" + "─".repeat(width) + "┐";
 		const bot = "└" + "─".repeat(width) + "┘";
 		const row = (content: string, visible: string) =>
@@ -1541,7 +1539,6 @@ export default function (pi: ExtensionAPI) {
 			row(meta, metaText),
 			row(status, statusText),
 			row(task, taskText),
-			row(last, lastText),
 			theme.fg("dim", bot),
 		];
 	}
@@ -1567,9 +1564,24 @@ export default function (pi: ExtensionAPI) {
 					for (let i = 0; i < items.length; i += cols) {
 						const rowItems = items.slice(i, i + cols);
 						const cardRows = rowItems.map((item) => renderCard(item, colWidth, theme));
-						while (cardRows.length < cols) cardRows.push(Array(7).fill(" ".repeat(colWidth)));
+						const cardHeight = cardRows[0]?.length || 0;
+						while (cardRows.length < cols) cardRows.push(Array(cardHeight).fill(" ".repeat(colWidth)));
 						for (let row = 0; row < cardRows[0].length; row++) {
 							lines.push(cardRows.map((card) => card[row] || "").join(" ".repeat(gap)));
+						}
+					}
+
+					const runningWithLast = items.filter((item) =>
+						item.status === "running" && !!item.lastLine.trim()
+					);
+					if (runningWithLast.length > 0) {
+						lines.push(theme.fg("dim", "─".repeat(Math.max(1, width))));
+						for (const item of runningWithLast) {
+							const teamLabel = item.teamName || displayName(item.agent.name);
+							const prefix = `- ${teamLabel}: `;
+							const available = Math.max(8, width - visibleWidth(prefix));
+							const suffix = shortText(item.lastLine, available);
+							lines.push(truncateToWidth(theme.fg("dim", prefix + suffix), width));
 						}
 					}
 
@@ -1829,7 +1841,7 @@ export default function (pi: ExtensionAPI) {
 								}
 							}
 						}
-					} catch {}
+					} catch { }
 				}
 			});
 
@@ -1852,7 +1864,7 @@ export default function (pi: ExtensionAPI) {
 							const delta = event.assistantMessageEvent;
 							if (delta?.type === "text_delta") textChunks.push(delta.delta || "");
 						}
-					} catch {}
+					} catch { }
 				}
 
 				if (card?.timer) clearInterval(card.timer);
@@ -1887,54 +1899,54 @@ export default function (pi: ExtensionAPI) {
 					updateExpertise(child.agent, task, effectiveOutput);
 				}
 
-					const artifactPath = persistArtifact(
-						"delegation-result",
-						child.agent.name,
-						[
-								`# Delegation Result`,
-								``,
-								`- Target: ${child.agent.name}`,
-								`- Target role: ${child.role}`,
-								`- Team: ${child.team?.name || "global"}`,
-								`- Exit code: ${effectiveExitCode}`,
-								`- Elapsed: ${Math.round(elapsed / 1000)}s`,
-								`- Tool calls: ${toolCalls.join(", ") || "(none)"}`,
-								``,
-								`## Task`,
-								``,
-								task,
-								``,
-								`## Output`,
-								``,
-								effectiveOutput || "(empty)",
-							].join("\n"),
-							{
-								target: child.agent.name,
-								targetRole: child.role,
-								targetTeam: child.team?.name || null,
-								exitCode: effectiveExitCode,
-								toolCalls,
-								executionPostureFailure,
-							},
-						);
-
-						appendEvent("delegate_end", {
-							target: child.agent.name,
-							targetRole: child.role,
-							exitCode: effectiveExitCode,
-							elapsed,
-							summary: shortText(firstUsefulLine(effectiveOutput), 200),
-							artifactPath,
-							toolCalls,
-							executionPostureFailure,
-						});
-
-					resolvePromise({
-						output: effectiveOutput,
+				const artifactPath = persistArtifact(
+					"delegation-result",
+					child.agent.name,
+					[
+						`# Delegation Result`,
+						``,
+						`- Target: ${child.agent.name}`,
+						`- Target role: ${child.role}`,
+						`- Team: ${child.team?.name || "global"}`,
+						`- Exit code: ${effectiveExitCode}`,
+						`- Elapsed: ${Math.round(elapsed / 1000)}s`,
+						`- Tool calls: ${toolCalls.join(", ") || "(none)"}`,
+						``,
+						`## Task`,
+						``,
+						task,
+						``,
+						`## Output`,
+						``,
+						effectiveOutput || "(empty)",
+					].join("\n"),
+					{
+						target: child.agent.name,
+						targetRole: child.role,
+						targetTeam: child.team?.name || null,
 						exitCode: effectiveExitCode,
-						elapsed,
-						child,
-					});
+						toolCalls,
+						executionPostureFailure,
+					},
+				);
+
+				appendEvent("delegate_end", {
+					target: child.agent.name,
+					targetRole: child.role,
+					exitCode: effectiveExitCode,
+					elapsed,
+					summary: shortText(firstUsefulLine(effectiveOutput), 200),
+					artifactPath,
+					toolCalls,
+					executionPostureFailure,
+				});
+
+				resolvePromise({
+					output: effectiveOutput,
+					exitCode: effectiveExitCode,
+					elapsed,
+					child,
+				});
 			});
 
 			proc.on("error", (err) => {
@@ -1946,22 +1958,22 @@ export default function (pi: ExtensionAPI) {
 					card.elapsed = Date.now() - startTime;
 					updateWidget();
 				}
-					appendEvent("delegate_error", {
+				appendEvent("delegate_error", {
+					target: child.agent.name,
+					error: err.message,
+				});
+				persistArtifact(
+					"delegation-error",
+					child.agent.name,
+					`Error spawning ${child.agent.name}: ${err.message}\n`,
+					{
 						target: child.agent.name,
-						error: err.message,
-					});
-					persistArtifact(
-						"delegation-error",
-						child.agent.name,
-						`Error spawning ${child.agent.name}: ${err.message}\n`,
-						{
-							target: child.agent.name,
-							targetRole: child.role,
-							targetTeam: child.team?.name || null,
-						},
-					);
-					resolvePromise({
-						output: `Error spawning ${child.agent.name}: ${err.message}`,
+						targetRole: child.role,
+						targetTeam: child.team?.name || null,
+					},
+				);
+				resolvePromise({
+					output: `Error spawning ${child.agent.name}: ${err.message}`,
 					exitCode: 1,
 					elapsed: Date.now() - startTime,
 					child,
@@ -2239,7 +2251,7 @@ export default function (pi: ExtensionAPI) {
 				if (!shouldStop(name)) continue;
 				try {
 					proc.kill("SIGTERM");
-				} catch {}
+				} catch { }
 				childProcesses.delete(name);
 				stopped++;
 
@@ -2416,8 +2428,8 @@ export default function (pi: ExtensionAPI) {
 		);
 
 		ctx.ui.setFooter((_tui, theme, _footerData) => ({
-			dispose: () => {},
-			invalidate() {},
+			dispose: () => { },
+			invalidate() { },
 			render(width: number): string[] {
 				const model = ctx.model?.id || "no-model";
 				const usage = ctx.getContextUsage();

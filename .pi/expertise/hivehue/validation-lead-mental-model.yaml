@@ -5,7 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-03-31T02:58:18.719Z"
+  last_updated: "2026-03-31T14:18:28.116Z"
 patterns:
   - date: "2026-03-30"
     note: "Run QA and security review for any meaningful frontend or backend change, especially contract or auth work."
@@ -17,6 +17,8 @@ patterns:
     note: "Frontend build validation requires direct command execution evidence (npm run build, npm run lint output). QA reviewer completed task but returned minimal output format - may need more explicit output requirements in delegation."
   - date: "2026-03-31"
     note: "Frontend build validation completed with concrete evidence: npm run build PASS (8.2s, 10 pages), npm run lint PASS (zero warnings/errors). QA reviewer provided full command output when given explicit mandatory output format requirements."
+  - date: "2026-03-31"
+    note: "Password reset validation reveals 4 critical security areas: token handling (entropy, single-use, expiration), error messaging (enumeration prevention, timing attacks), rate limiting (per-IP, per-email, global), UX security (clickjacking, open redirects). NIST 800-63B and OWASP ASVS v4.0.3 provide comprehensive compliance requirements."
 workflows:
   - date: "2026-03-30"
     note: "Use qa-reviewer for correctness, regression coverage, and missing tests; use security-reviewer for blast radius, trust boundaries, and unsafe defaults."
@@ -24,6 +26,8 @@ workflows:
     note: "Read journey docs and current implementation status before delegating, then aggregate findings into a single prioritized validation view."
   - date: "2026-03-31"
     note: "Default to one evidence-heavy validation round instead of a soft first pass plus a stricter retry; explicit output requirements save minutes of rework."
+  - date: "2026-03-31"
+    note: "Password reset UX security requires balancing 15 requirements: generic messages, constant-time responses, accessibility (WCAG 2.1 AA), regression testing with existing auth flows. 25 edge cases across token lifecycle, email handling, network failures, password validation, concurrent operations."
 risks:
   - date: "2026-03-30"
     note: "Login remains a critical gap because frontend auth is mocked while backend auth is permissive and incomplete."
@@ -31,6 +35,8 @@ risks:
     note: "Contract changes between frontend and backend require explicit validation coverage to avoid false confidence from isolated smoke checks."
   - date: "2026-03-30"
     note: "Critical validation priorities for HiveHue auth: 1) Secure cookie flags must be environment-conditional, 2) Refresh token rotation is missing and creates 7-day persistent attack window, 3) Rate limiting on auth endpoints is absent, 4) JWT secret validation at startup is needed."
+  - date: "2026-03-31"
+    note: "Password reset planning identified 6 critical severity risks: insufficient token entropy, insecure transmission, single-use enforcement failure, timing attacks, account enumeration via differential messages, missing rate limiting. Must-have requirements: 32-byte SecureRandom tokens, 1-4 hour expiration, constant-time comparison, generic success messages, per-IP/per-email rate limits."
 tools:
   - date: "2026-03-30"
     note: "Validation expertise should preserve durable coverage strategy and current product risk, not historical delegation transcripts."
@@ -47,6 +53,10 @@ observations:
     note: "A Engineering corrigiu o build do frontend e reportou que npm run build e npm run lint passam -> I'll validate the frontend build fix by delegating to my QA reviewer to verify the build passes and check for any regressions.The QA reviewer has completed the validation but didn't return detailed findings. Let me update my mental model and synthesize what we know:## Validation Report: Frontend Build Fix"
   - date: "2026-03-31"
     note: "A validação anterior ficou inconclusiva por falta de evidência -> I'll re-delegate to the QA reviewer with explicit, mandatory output requirements and clear instructions to report any blockers.Excellent! Now I have concrete evidence. Let me update my mental model and synthesize the findings:## Validation Report: Frontend Build Fix"
+  - date: "2026-03-31"
+    note: "Starting password reset page validation. Key concerns: token handling, error messaging, rate limiting, UX security. Must identify pitfalls before ClickUp task is created."
+  - date: "2026-03-31"
+    note: "Review the proposed password reset page behavior planning for security/privacy/compliance pitfalls: token handling, error messaging, rate... -> I'll review the password reset page behavior planning for security, privacy, and compliance issues. Let me first read my mental model for context, then delegate focused security and QA reviews.Now let me delegate focused reviews to both specialists:Excellent! Both reviewers have completed their analysis. Let me update my mental model and synthesize the findings:## Password Reset Page Behavior Validation Report"
 open_questions:
   - date: "2026-03-30"
     note: "Define the exact acceptance criteria for 'login complete' before the next validation pass so QA and security review target the same milestone."
