@@ -5,17 +5,12 @@ __pycache__/
 *.swp
 *.swo
 
-# API keys — never commit real credentials
+# Local credentials
 .env
 
-.pi/agent-sessions/
-
-
-.playwright-cli/
+# Runtime/session artifacts
+.opencode/sessions/**
+!.opencode/sessions/.gitkeep
 
 tmp/
-
-.pi/multi-team/sessions/**
-!.pi/multi-team/sessions/.gitkeep
-
-.env
+.playwright-cli/

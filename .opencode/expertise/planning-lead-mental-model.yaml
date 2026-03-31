@@ -1,0 +1,10 @@
+agent:
+  name: planning-lead
+  role: lead
+  team: Planning
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-31T00:00:00.000Z"
+observations: []
+open_questions: []

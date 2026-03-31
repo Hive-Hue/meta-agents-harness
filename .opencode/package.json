@@ -1,0 +1,13 @@
+{
+  "name": "multi-agents-opencode",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:multi-team": "node scripts/sync-multi-team.mjs",
+    "check:multi-team-sync": "node scripts/sync-multi-team.mjs --check",
+    "validate:multi-team": "node scripts/validate-multi-team.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  }
+}
