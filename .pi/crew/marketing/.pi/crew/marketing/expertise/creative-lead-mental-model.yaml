@@ -1,0 +1,22 @@
+agent:
+  name: "creative-lead"
+  role: "lead"
+  team: "Creative"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-02T01:35:12.707Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-04-02"
+    note: "Forneça status + disponibilidade atuais (responda em pt-BR) -> 1) Outcome"
+  - date: "2026-04-02"
+    note: "PASSO 2: Pingue internamente TODOS os workers do seu time via delegate_agents_parallel -> 1) Outcome"
+  - date: "2026-04-02"
+    note: "Ping rápido: preciso de seu status + disponibilidade (min) -> 1) Outcome"
+open_questions: []

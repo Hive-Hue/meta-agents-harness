@@ -1,143 +1,128 @@
-# OpenCode Multi-Team Harness
+# Meta Agents Harness
 
-This branch contains an OpenCode-native multi-team scaffold focused on hierarchical delegation:
+Meta Agents Harness is an open-source Apache 2.0 product that provides a unified multi-agent harness for:
 
-- `orchestrator`
-- `team leads`
-- `workers`
+- OpenCode
+- Claude Code
+- PI
 
-The objective is to run a controlled multi-agent workflow in OpenCode with explicit task boundaries, durable expertise, and optional MCP integration.
+It detects the available runtime in the current repository and adapts commands dynamically through a single CLI: `mah`.
 
-## Repository Layout
+## Key Idea
 
-- [`.opencode/multi-team.yaml`](./.opencode/multi-team.yaml)  
-  High-level canonical multi-team topology (models, skills, tools, domains, routing).
-- [`.opencode/opencode.json`](./.opencode/opencode.json)  
-  OpenCode config (permissions, MCP servers).
-- [`.opencode/agents/`](./.opencode/agents)  
-  Orchestrator, leads, and worker prompts.
-- [`.opencode/skills/`](./.opencode/skills)  
-  Reusable skills (`SKILL.md`) for delegation and mental model discipline.
-- [`.opencode/tools/`](./.opencode/tools)  
-  Custom tools callable by the model (currently `update-mental-model`).
-- [`.opencode/expertise/`](./.opencode/expertise)  
-  Per-agent YAML mental-model files.
-- [`.opencode/scripts/validate-multi-team.mjs`](./.opencode/scripts/validate-multi-team.mjs)  
-  Topology/reference validator for `.opencode/multi-team.yaml`.
-- [specs/opencode-multi-team-plan.md](./specs/opencode-multi-team-plan.md)  
-  Implementation plan and rollout phases.
+Instead of maintaining separate operator flows per runtime, Meta Agents Harness exposes a common command surface and dispatches to the correct underlying toolchain.
 
-## Agent Topology
+Detection priority:
 
-Primary:
-
-- `orchestrator`
-
-Leads:
-
-- `planning-lead`
-- `engineering-lead`
-- `validation-lead`
-
-Workers:
-
-- Planning: `repo-analyst`, `solution-architect`
-- Engineering: `frontend-dev`, `backend-dev`
-- Validation: `qa-reviewer`, `security-reviewer`
-
-Task delegation is constrained through per-agent `permission.task` rules in each agent frontmatter.
-
-## Custom Tool
-
-Current custom tool:
-
-- [update-mental-model.ts](./.opencode/tools/update-mental-model.ts)
-
-It appends durable notes to `.opencode/expertise/<agent>-mental-model.yaml` with category support and line-limit trimming.
-
-## MCP
-
-Configured in [`.opencode/opencode.json`](./.opencode/opencode.json):
-
-- `context7`
-- `clickup`
-- `github`
-
-ClickUp is configured as local `mcp-remote` (port `19876`) and starts automatically with OpenCode.
-On first use, OAuth opens in the browser and token is persisted in `~/.mcp-auth`.
+1. Forced runtime via `--runtime` or `MAH_RUNTIME`
+2. Runtime marker directory in repository (`.pi`, `.claude`, `.opencode`)
+3. Installed CLI binaries (`pi`, `claude`, `opencode`)
 
 ## Install
 
 ```bash
-git clone https://github.com/AlyssonM/multi-agents.git
-cd multi-agents
-npm --prefix .opencode install
+git clone https://github.com/AlyssonM/meta-agents-harness.git
+cd meta-agents-harness
+npm install
 ```
 
 Optional environment setup:
 
 ```bash
 cp .env.sample .env
-# then fill required values in .env (e.g. CONTEXT7_API_KEY, GITHUB_PAT)
 ```
 
-Verify OpenCode CLI is available:
+## Unified CLI (`mah`)
+
+Show help:
 
 ```bash
-if command -v opencode >/dev/null 2>&1; then
-  opencode --version
-else
-  echo "OpenCode CLI not found. Install it first: https://opencode.ai/"
-fi
+mah --help
 ```
 
-## Get Started
-
-Sync generated agents from canonical topology:
+Detect runtime:
 
 ```bash
-npm --prefix .opencode run sync:multi-team
+mah detect
 ```
 
-Validate topology and references:
+Run runtime check:
 
 ```bash
-npm --prefix .opencode run validate:multi-team
+mah check:runtime
 ```
 
-Check drift (CI-friendly, no writes):
+Validate configuration:
 
 ```bash
-npm --prefix .opencode run check:multi-team-sync
+mah validate
 ```
 
-Start OpenCode:
+List crews:
 
 ```bash
-opencode
+mah list:crews
 ```
 
-If ClickUp OAuth session is broken, clear auth cache and retry:
+Activate crew:
 
 ```bash
-rm -rf ~/.mcp-auth
-opencode
+mah use <crew>
 ```
 
-Suggested workflow:
+Clear active crew:
 
-1. Switch to `@orchestrator`.
-2. Request a task that needs Planning -> Engineering -> Validation.
-3. Confirm delegation path respects `permission.task`.
-4. Ask an agent to persist a durable insight through `update-mental-model`.
+```bash
+mah clear
+```
 
-## Notes
+Run interactive runtime:
 
-- This branch intentionally removes legacy Pi runtime assets.
-- The focus here is OpenCode-native primitives, not Pi extension compatibility.
-- Authoring strategy:
-  - treat `.opencode/multi-team.yaml` as source-of-truth
-  - run `npm --prefix .opencode run sync:multi-team` after topology changes
-  - run `npm --prefix .opencode run check:multi-team-sync` in CI/pre-commit to prevent drift
-  - validate with `npm --prefix .opencode run validate:multi-team`
-  - keep `.opencode/opencode.json` aligned with runtime needs
+```bash
+mah run
+```
+
+Force explicit runtime:
+
+```bash
+mah --runtime opencode validate
+mah --runtime claude check:runtime
+mah --runtime pi run -c
+```
+
+## Runtime-Specific Assets
+
+This repository ships runtime assets for all three CLIs:
+
+- `.opencode/` for OpenCode harness topology and scripts
+- `.claude/` for Claude runtime wrappers and crew structure
+- `.pi/` for PI runtime wrappers and crew structure
+
+The `mah` CLI is runtime-agnostic and dispatches dynamically based on detected runtime markers or explicit `--runtime`.
+
+## Local Development
+
+Install OpenCode runtime dependencies:
+
+```bash
+npm --prefix .opencode install
+```
+
+Run smoke tests for `mah`:
+
+```bash
+npm run test:smoke
+```
+
+## License
+
+Dual licensing:
+
+- AGPLv3 open-source license
+- Commercial proprietary license
+
+See:
+
+- [LICENSE](./LICENSE)
+- [AGPL-3.0.md](./AGPL-3.0.md)
+- [COMMERCIAL-LICENSE.md](./COMMERCIAL-LICENSE.md)

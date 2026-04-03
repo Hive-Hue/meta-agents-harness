@@ -1,0 +1,15 @@
+agent:
+  name: "qa-reviewer"
+  role: "worker"
+  team: "Validation"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-02T19:15:11.829Z"
+patterns: []
+workflows: []
+risks: []
+tools: []
+decisions: []
+lessons: []
+open_questions: []

@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
+import { chmodSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const runtimeRoot = path.resolve(__dirname, '..');
+const repoRoot = path.resolve(runtimeRoot, '..');
+const scriptsDir = path.join(runtimeRoot, 'scripts');
+
+const COMMANDS = {
+  'list:crews': 'list-crews.mjs',
+  list: 'list-crews.mjs',
+  ls: 'list-crews.mjs',
+  'use:crew': 'use-crew.mjs',
+  use: 'use-crew.mjs',
+  'clear:crew': 'clear-crew.mjs',
+  clear: 'clear-crew.mjs',
+  'check:runtime': 'check-runtime.mjs',
+  doctor: 'doctor.mjs',
+  'ccr:validate-route-map': 'validate-ccr-route-map.mjs',
+  'test:smoke': 'test-smoke.mjs',
+  'run:crew': 'run-crew-claude.mjs',
+  run: 'run-crew-claude.mjs',
+  'run:crew:claude': 'run-crew-claude.mjs',
+  'ccr:install-router': 'install-ccr-router.mjs',
+  'ccr:sync-route-map': 'sync-ccr-route-map.mjs',
+};
+
+function printHelp() {
+  console.log('Usage: ccmh <command> [args]');
+  console.log('');
+  console.log('Core commands:');
+  console.log('  ccmh list:crews');
+  console.log('  ccmh use <crew>');
+  console.log('  ccmh use --<crew>');
+  console.log('  ccmh --use <crew>');
+  console.log('  ccmh clear');
+  console.log('  ccmh check:runtime');
+  console.log('  ccmh doctor');
+  console.log('  ccmh ccr:validate-route-map');
+  console.log('  ccmh test:smoke');
+  console.log('  ccmh run --crew <crew> [run-options] [-- <claude-args>]');
+  console.log('');
+  console.log('Examples:');
+  console.log('  ccmh list:crews');
+  console.log('  ccmh use marketing');
+  console.log('  ccmh use --marketing');
+  console.log('  ccmh --use marketing');
+  console.log('  ccmh check:runtime');
+  console.log('  ccmh run --crew marketing --dry-run');
+  console.log('  ccmh run --crew marketing -- -c');
+  console.log('  ccmh doctor');
+  console.log('  ccmh ccr:validate-route-map');
+  console.log('  ccmh test:smoke');
+}
+
+function runScript(scriptFile, args) {
+  const scriptPath = path.join(scriptsDir, scriptFile);
+  const child = spawnSync(process.execPath, [scriptPath, ...args], {
+    cwd: repoRoot,
+    stdio: 'inherit',
+    env: process.env,
+  });
+
+  if (typeof child.status === 'number') {
+    process.exitCode = child.status;
+    return;
+  }
+
+  if (child.error) {
+    console.error(`ERROR: failed to run ${scriptFile}: ${child.error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  process.exitCode = 1;
+}
+
+function normalizeUseCrew(raw) {
+  if (!raw) return '';
+  const value = raw.trim();
+  if (!value) return '';
+  if (value.startsWith('--') && value.length > 2) {
+    return value.slice(2);
+  }
+  return value;
+}
+
+function main() {
+  try {
+    chmodSync(__filename, 0o755);
+  } catch {}
+
+  const argv = process.argv.slice(2);
+  const first = argv[0];
+
+  if (!first || first === '-h' || first === '--help' || first === 'help') {
+    printHelp();
+    return;
+  }
+
+  if (first === '--use' || first.startsWith('--use=')) {
+    const crew = first.startsWith('--use=')
+      ? normalizeUseCrew(first.slice('--use='.length))
+      : normalizeUseCrew(argv[1]);
+
+    if (!crew) {
+      console.error('ERROR: missing crew name for --use');
+      printHelp();
+      process.exitCode = 1;
+      return;
+    }
+    runScript('use-crew.mjs', [crew]);
+    return;
+  }
+
+  if (first === 'use' || first === 'use:crew') {
+    const crew = normalizeUseCrew(argv[1]);
+    if (!crew) {
+      console.error('ERROR: missing crew name for use');
+      printHelp();
+      process.exitCode = 1;
+      return;
+    }
+    runScript('use-crew.mjs', [crew]);
+    return;
+  }
+
+  if (first.startsWith('-')) {
+    runScript('run-crew-claude.mjs', argv);
+    return;
+  }
+
+  const script = COMMANDS[first];
+  if (!script) {
+    console.error(`ERROR: unknown command: ${first}`);
+    printHelp();
+    process.exitCode = 1;
+    return;
+  }
+
+  runScript(script, argv.slice(1));
+}
+
+main();

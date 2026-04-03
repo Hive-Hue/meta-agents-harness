@@ -1,0 +1,16 @@
+agent:
+  name: "ceo-orchestrator"
+  role: "orchestrator"
+  team: "global"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-31T16:42:54.112Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

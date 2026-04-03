@@ -1,0 +1,32 @@
+agent:
+  name: market-researcher
+  role: worker
+  team: Planning
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: 2026-04-01T01:22:40.958Z
+observations: []
+open_questions: []
+decisions:
+  - date: 2026-04-01
+    note: For publication planning of technical repo articles, a primary owned
+      canonical home (e.g. GitHub Pages/custom domain) usually beats
+      social-native platforms on control, SEO, and reuse, while
+      dev.to/LinkedIn/X work better as distribution layers. Official platform
+      docs are best for confirming canonical-link, newsletter, and
+      feature-gating constraints.
+  - date: 2026-04-01
+    note: Owned canonical platforms tend to be best as primary homes for technical
+      repo articles; dev.to, LinkedIn, and X are usually stronger as
+      distribution layers than as the canonical source.
+  - date: 2026-04-01
+    note: For repo-centric technical articles, prefer an owned canonical home
+      (GitHub Pages/custom domain) and use dev.to, LinkedIn, X, and selective
+      technical communities as distribution layers; channel adaptations should
+      preserve repo evidence, canonical attribution, and community-specific
+      anti-promo norms.
+  - date: 2026-04-01
+    note: Repo-centric technical articles work best with an owned canonical home
+      plus dev.to, LinkedIn, X, and selective community distribution. Preserve
+      canonical attribution and adapt to anti-promo community norms.

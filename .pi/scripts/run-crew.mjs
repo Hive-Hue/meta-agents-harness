@@ -1,0 +1,338 @@
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
+import path from "node:path"
+import { spawnSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const piRoot = path.resolve(__dirname, "..")
+const repoRoot = path.resolve(piRoot, "..")
+const crewRoot = path.join(piRoot, "crew")
+const activeMetaPath = path.join(piRoot, ".active-crew.json")
+const defaultExtension = "extensions/multi-team.ts"
+
+function listCrews() {
+  if (!existsSync(crewRoot)) return []
+  return readdirSync(crewRoot)
+    .filter((entry) => {
+      const abs = path.join(crewRoot, entry)
+      return statSync(abs).isDirectory() && existsSync(path.join(abs, "multi-team.yaml"))
+    })
+    .sort((a, b) => a.localeCompare(b))
+}
+
+function fail(message) {
+  console.error(`ERROR: ${message}`)
+  process.exitCode = 1
+}
+
+function newSessionId() {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-")
+  const rand = Math.random().toString(36).slice(2, 8)
+  return `${stamp}-${rand}`
+}
+
+function readJson(filePath) {
+  if (!existsSync(filePath)) return null
+  try {
+    return JSON.parse(readFileSync(filePath, "utf-8"))
+  } catch {
+    return null
+  }
+}
+
+function isSessionLayoutRoot(dir) {
+  return (
+    existsSync(path.join(dir, "manifest.json")) ||
+    existsSync(path.join(dir, "session_index.json")) ||
+    existsSync(path.join(dir, "conversation.jsonl")) ||
+    existsSync(path.join(dir, "events.jsonl")) ||
+    existsSync(path.join(dir, "tool_calls.jsonl")) ||
+    existsSync(path.join(dir, "state"))
+  )
+}
+
+function readSessionIdFromRoot(dir) {
+  const fromIndex = readJson(path.join(dir, "session_index.json"))?.sessionId
+  if (typeof fromIndex === "string" && fromIndex.trim()) return fromIndex.trim()
+  const fromManifest = readJson(path.join(dir, "manifest.json"))?.sessionId
+  if (typeof fromManifest === "string" && fromManifest.trim()) return fromManifest.trim()
+  const base = path.basename(dir)
+  return base === "sessions" ? "" : base
+}
+
+function latestSessionRoot(sessionBaseRoot) {
+  if (!existsSync(sessionBaseRoot)) return null
+  const candidates = readdirSync(sessionBaseRoot)
+    .map((entry) => path.join(sessionBaseRoot, entry))
+    .filter((entryPath) => {
+      try {
+        return statSync(entryPath).isDirectory() && isSessionLayoutRoot(entryPath)
+      } catch {
+        return false
+      }
+    })
+    .sort((a, b) => {
+      try {
+        return statSync(b).mtimeMs - statSync(a).mtimeMs
+      } catch {
+        return 0
+      }
+    })
+  return candidates[0] || null
+}
+
+function resolveFromRepo(filePath) {
+  if (path.isAbsolute(filePath)) return filePath
+  return path.resolve(repoRoot, filePath)
+}
+
+function parseArgs(argv) {
+  const args = {
+    crew: undefined,
+    config: undefined,
+    sessionRoot: undefined,
+    extension: process.env.PI_MULTI_EXTENSION || defaultExtension,
+    newSession: false,
+    passthrough: []
+  }
+
+  let passthroughMode = false
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === "--") {
+      passthroughMode = true
+      continue
+    }
+    if (passthroughMode) {
+      args.passthrough.push(token)
+      continue
+    }
+    if (token === "--crew") {
+      args.crew = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--config") {
+      args.config = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--session-root") {
+      args.sessionRoot = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--extension") {
+      args.extension = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--new-session") {
+      args.newSession = true
+      continue
+    }
+
+    args.passthrough.push(token)
+  }
+  return args
+}
+
+function printHelp() {
+  console.log("Usage: pimh run [options] [-- <pi-args>]")
+  console.log("")
+  console.log("Options:")
+  console.log("  --crew <name>          Run using .pi/crew/<name>/multi-team.yaml")
+  console.log("  --config <path>        Explicit PI config path (overrides active crew)")
+  console.log("  --session-root <path>  Explicit PI session root")
+  console.log("  --extension <path>     PI extension path (default: extensions/multi-team.ts)")
+  console.log("  --new-session          Force a new multi-team session folder even with -c")
+  console.log("")
+  console.log("Examples:")
+  console.log("  pimh run -c")
+  console.log("  pimh run --crew dev -c")
+  console.log("  pimh run --config .pi/crew/dev/multi-team.yaml -c")
+}
+
+function readActiveMeta() {
+  if (!existsSync(activeMetaPath)) return null
+  try {
+    return JSON.parse(readFileSync(activeMetaPath, "utf-8"))
+  } catch {
+    return null
+  }
+}
+
+function resolveRuntimeSelection(args) {
+  const active = readActiveMeta()
+
+  if (args.config) {
+    const configPath = resolveFromRepo(args.config)
+    const sessionRoot = args.sessionRoot
+      ? resolveFromRepo(args.sessionRoot)
+      : path.join(piRoot, "multi-team", "sessions")
+    return {
+      configPath,
+      sessionRoot,
+      crew: active?.crew || null
+    }
+  }
+
+  if (args.crew) {
+    const crews = listCrews()
+    if (!crews.includes(args.crew)) {
+      fail(`crew not found: ${args.crew}`)
+      console.log("Available crews:")
+      for (const crew of crews) console.log(`- ${crew}`)
+      return null
+    }
+    return {
+      configPath: path.join(crewRoot, args.crew, "multi-team.yaml"),
+      sessionRoot: path.join(crewRoot, args.crew, "sessions"),
+      crew: args.crew
+    }
+  }
+
+  if (active?.source_config) {
+    return {
+      configPath: resolveFromRepo(active.source_config),
+      sessionRoot: active?.session_root
+        ? resolveFromRepo(active.session_root)
+        : path.join(piRoot, "multi-team", "sessions"),
+      crew: active?.crew || null
+    }
+  }
+
+  fail("no crew selected. Run: pimh use <crew>")
+  return null
+}
+
+function selectSessionLayout(sessionBaseRoot, args) {
+  const envSessionRoot = process.env.PI_MULTI_SESSION_ROOT?.trim()
+  const envSessionId = process.env.PI_MULTI_SESSION_ID?.trim()
+  const continueRequested = args.passthrough.includes("-c") || args.passthrough.includes("--continue")
+  const containerLikeRoot = path.basename(sessionBaseRoot) === "sessions"
+
+  if (envSessionRoot) {
+    const explicitRoot = resolveFromRepo(envSessionRoot)
+    return {
+      mode: "env-explicit",
+      sessionRoot: explicitRoot,
+      sessionId: envSessionId || readSessionIdFromRoot(explicitRoot) || newSessionId()
+    }
+  }
+
+  if (!containerLikeRoot && isSessionLayoutRoot(sessionBaseRoot)) {
+    return {
+      mode: "explicit-root",
+      sessionRoot: sessionBaseRoot,
+      sessionId: envSessionId || readSessionIdFromRoot(sessionBaseRoot) || newSessionId()
+    }
+  }
+
+  if (!args.newSession && continueRequested) {
+    const latest = latestSessionRoot(sessionBaseRoot)
+    if (latest) {
+      return {
+        mode: "continue-latest",
+        sessionRoot: latest,
+        sessionId: readSessionIdFromRoot(latest) || envSessionId || newSessionId()
+      }
+    }
+  }
+
+  const sessionId = envSessionId || newSessionId()
+  return {
+    mode: "new",
+    sessionRoot: path.join(sessionBaseRoot, sessionId),
+    sessionId
+  }
+}
+
+function persistRunMetadata(selection, configPath, sessionBaseRoot, sessionRoot, sessionId) {
+  const relativeConfig = path.relative(repoRoot, configPath)
+  const relativeBase = path.relative(repoRoot, sessionBaseRoot)
+  const relativeRoot = path.relative(repoRoot, sessionRoot)
+  const current = readActiveMeta() || {}
+
+  const next = {
+    ...current,
+    crew: selection.crew || current.crew || null,
+    source_config: relativeConfig,
+    session_root: relativeBase,
+    last_session_id: sessionId,
+    last_session_root: relativeRoot,
+    last_run_at: new Date().toISOString(),
+    note: "Used by .pi/scripts/run-crew.mjs to bootstrap PI with selected crew and encapsulated session folders."
+  }
+
+  writeFileSync(activeMetaPath, `${JSON.stringify(next, null, 2)}\n`, "utf-8")
+}
+
+function main() {
+  if (process.argv.includes("--help") || process.argv.includes("-h")) {
+    printHelp()
+    return
+  }
+
+  const args = parseArgs(process.argv.slice(2))
+  const selected = resolveRuntimeSelection(args)
+  if (!selected) return
+
+  const configPath = selected.configPath
+  const sessionBaseRoot = selected.sessionRoot
+  const extensionPath = resolveFromRepo(args.extension)
+
+  if (!existsSync(configPath)) {
+    fail(`config not found: ${path.relative(repoRoot, configPath)}`)
+    return
+  }
+  if (!existsSync(extensionPath)) {
+    fail(`extension not found: ${path.relative(repoRoot, extensionPath)}`)
+    return
+  }
+
+  mkdirSync(sessionBaseRoot, { recursive: true })
+
+  const sessionSelection = selectSessionLayout(sessionBaseRoot, args)
+  const sessionRoot = sessionSelection.sessionRoot
+  const sessionId = sessionSelection.sessionId
+  mkdirSync(sessionRoot, { recursive: true })
+  persistRunMetadata(selected, configPath, sessionBaseRoot, sessionRoot, sessionId)
+
+  const commandArgs = ["-e", extensionPath, ...args.passthrough]
+  const env = {
+    ...process.env,
+    PI_MULTI_CONFIG: configPath,
+    PI_MULTI_SESSION_ROOT: sessionRoot,
+    PI_MULTI_SESSION_ID: sessionId
+  }
+
+  console.log("Running PI with selected crew")
+  console.log(`- PI_MULTI_CONFIG=${path.relative(repoRoot, configPath)}`)
+  console.log(`- PI_MULTI_SESSION_BASE=${path.relative(repoRoot, sessionBaseRoot)}`)
+  console.log(`- PI_MULTI_SESSION_ROOT=${path.relative(repoRoot, sessionRoot)}`)
+  console.log(`- PI_MULTI_SESSION_ID=${sessionId}`)
+  console.log(`- session_mode=${sessionSelection.mode}`)
+  console.log(`- extension=${path.relative(repoRoot, extensionPath)}`)
+  if (args.passthrough.length > 0) {
+    console.log(`- args=${args.passthrough.join(" ")}`)
+  }
+  console.log("")
+
+  const child = spawnSync("pi", commandArgs, {
+    cwd: repoRoot,
+    env,
+    stdio: "inherit"
+  })
+
+  if (typeof child.status === "number") {
+    process.exitCode = child.status
+    return
+  }
+  if (child.error) {
+    fail(`failed to start pi: ${child.error.message}`)
+  }
+}
+
+main()

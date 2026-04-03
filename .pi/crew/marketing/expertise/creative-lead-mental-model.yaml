@@ -1,0 +1,25 @@
+agent:
+  name: creative-lead
+  role: worker
+  team: Creative
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: 2026-03-31T18:58:18.202Z
+observations: []
+open_questions: []
+campaign_narratives:
+  - date: 2026-03-31
+    note: For HiveHue pre-launch at Web Summit Rio, stronger campaign copy came from
+      grounding every message in 'first public presentation / debut' and
+      'qualified follow-up / next step' rather than abstract 'attention'
+      language. Channel adaptation worked best when LinkedIn led with context
+      and conversation, Instagram with journey/bastidores, X with short
+      headline-style updates, and Reels/TikTok with casual behind-the-scenes
+      framing.
+  - date: 2026-03-31
+    note: "HiveHue pre-launch copy is strongest when anchored on 'first public
+      presentation at Web Summit Rio 2026' plus clear next-step CTAs
+      (waitlist/demo/conversation); avoid abstract 'attention' language. Channel
+      voice split: LinkedIn=context, Instagram=journey, X=headline updates,
+      Reels/TikTok=bastidores."

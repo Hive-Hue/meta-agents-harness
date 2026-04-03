@@ -1,0 +1,35 @@
+agent:
+  name: performance-analyst
+  role: worker
+  team: Validation
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: 2026-04-01T01:35:05.597Z
+observations:
+  - date: 2026-04-01
+    note: "When validating repo-evidence marketing content for this harness, check
+      for overstatements about enforcement order and validator scope: `use:crew`
+      and `sync:multi-team` write runtime/canonical agent files before
+      validation, and `validate-multi-team.mjs` currently validates agent-level
+      references/routes but does not inspect `shared.skills` entries."
+  - date: 2026-04-01
+    note: "When validating repo-evidence marketing content, check for overstatements
+      about enforcement order and validator scope: use:crew and sync:multi-team
+      write files before validation, and validate-multi-team currently validates
+      agent-level references/routes but not shared.skills entries."
+open_questions: []
+workflows:
+  - date: 2026-03-31
+    note: "When reviewing a marketing package, verify one-to-one coverage between
+      the campaign brief, calendar, and templates: every scheduled post should
+      have a matching template or an explicit reuse plan, and the post-event
+      window should be fully populated across the exact date range promised in
+      the brief. Also check that the core proposition stays foregrounded in
+      mid-funnel/event assets, not just in the opening brief."
+  - date: 2026-03-31
+    note: "Verify one-to-one coverage between campaign brief, calendar, and
+      templates: every scheduled post should have a matching template or
+      explicit reuse plan, and the post-event window must match the brief’s
+      promised date range. Check that the core proposition stays foregrounded in
+      event-day and follow-up assets, not only in the brief."

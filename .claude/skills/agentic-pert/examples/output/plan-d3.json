@@ -1,0 +1,136 @@
+{
+  "nodes": [
+    {
+      "id": "T1",
+      "label": "Setup JWT library",
+      "duration": 2.0,
+      "critical": true,
+      "status": "pending",
+      "earlyStart": 0.0,
+      "earlyFinish": 2.0,
+      "lateStart": -4.440892098500626e-16,
+      "lateFinish": 1.9999999999999996,
+      "float": -4.440892098500626e-16
+    },
+    {
+      "id": "T2",
+      "label": "Auth endpoints",
+      "duration": 3.1666666666666665,
+      "critical": true,
+      "status": "pending",
+      "earlyStart": 2.0,
+      "earlyFinish": 5.166666666666666,
+      "lateStart": 1.9999999999999996,
+      "lateFinish": 5.166666666666666,
+      "float": -4.440892098500626e-16
+    },
+    {
+      "id": "T3",
+      "label": "Dashboard base",
+      "duration": 2.0,
+      "critical": false,
+      "status": "pending",
+      "earlyStart": 2.0,
+      "earlyFinish": 4.0,
+      "lateStart": 3.166666666666666,
+      "lateFinish": 5.166666666666666,
+      "float": 1.166666666666666
+    },
+    {
+      "id": "T4",
+      "label": "Auth integration",
+      "duration": 1.5,
+      "critical": true,
+      "status": "pending",
+      "earlyStart": 5.166666666666666,
+      "earlyFinish": 6.666666666666666,
+      "lateStart": 5.166666666666666,
+      "lateFinish": 6.666666666666666,
+      "float": 0.0
+    },
+    {
+      "id": "T5",
+      "label": "Integration tests",
+      "duration": 2.6666666666666665,
+      "critical": true,
+      "status": "pending",
+      "earlyStart": 6.666666666666666,
+      "earlyFinish": 9.333333333333332,
+      "lateStart": 6.666666666666666,
+      "lateFinish": 9.333333333333332,
+      "float": 0.0
+    }
+  ],
+  "links": [
+    {
+      "source": "T1",
+      "target": "T2",
+      "type": "dependency",
+      "critical": true
+    },
+    {
+      "source": "T1",
+      "target": "T3",
+      "type": "dependency",
+      "critical": false
+    },
+    {
+      "source": "T2",
+      "target": "T4",
+      "type": "dependency",
+      "critical": true
+    },
+    {
+      "source": "T3",
+      "target": "T4",
+      "type": "dependency",
+      "critical": false
+    },
+    {
+      "source": "T4",
+      "target": "T5",
+      "type": "dependency",
+      "critical": true
+    }
+  ],
+  "metadata": {
+    "totalDuration": 9.333333333333332,
+    "criticalPath": [
+      "T1",
+      "T2",
+      "T4",
+      "T5"
+    ],
+    "parallelismGroups": [
+      {
+        "batch": 1,
+        "tasks": [
+          "T1"
+        ],
+        "can_run_parallel": false
+      },
+      {
+        "batch": 2,
+        "tasks": [
+          "T2",
+          "T3"
+        ],
+        "can_run_parallel": true
+      },
+      {
+        "batch": 3,
+        "tasks": [
+          "T4"
+        ],
+        "can_run_parallel": false
+      },
+      {
+        "batch": 4,
+        "tasks": [
+          "T5"
+        ],
+        "can_run_parallel": false
+      }
+    ]
+  }
+}

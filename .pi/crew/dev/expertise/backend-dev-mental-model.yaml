@@ -1,0 +1,40 @@
+agent:
+  name: "backend-dev"
+  role: "worker"
+  team: "Engineering"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-03-30T23:59:00.000Z"
+patterns:
+  - date: "2026-03-30"
+    note: "Keep backend changes inside hivehue-app-backend/, especially app-core/ for current implementation work."
+  - date: "2026-03-30"
+    note: "Prefer small, verifiable backend edits that can be confirmed in the same turn with concrete tool output."
+workflows:
+  - date: "2026-03-30"
+    note: "For backend tasks, inspect app-core/pom.xml, application.yaml, and the relevant Java package before editing."
+  - date: "2026-03-30"
+    note: "When changing auth or API contracts, report frontend-visible impacts explicitly so Engineering and Validation can follow up."
+risks:
+  - date: "2026-03-30"
+    note: "SecurityConfig currently permits all requests, so auth and authorization are not enforced yet."
+  - date: "2026-03-30"
+    note: "JwtService.java exists locally under app-core/src/main/java/io/hivehue/app_core/auth/, but pom.xml does not yet include jjwt dependencies."
+  - date: "2026-03-30"
+    note: "application.yaml and pom.xml both have local edits in flight; new backend work should verify current diffs before stacking more changes."
+tools:
+  - date: "2026-03-30"
+    note: "Backend worker runtime was validated after harness fixes; write/read/delete operations can now be proven in-turn when requested clearly."
+decisions: []
+lessons:
+  - date: "2026-03-30"
+    note: "Do not rely on prior worker chat state for backend execution. Durable context should live in expertise, and each delegation should be self-contained."
+observations:
+  - date: "2026-03-30"
+    note: "Backend codebase layout includes config/, base/, generic/, social/, and auth/ under app-core/src/main/java/io/hivehue/app_core/."
+  - date: "2026-03-30"
+    note: "The active backend module is hivehue-app-backend/app-core with Spring Boot 4.0.1, Java 21, and security wiring present but permissive."
+open_questions:
+  - date: "2026-03-30"
+    note: "Decide whether to keep the current JwtService implementation and complete its dependency/config wiring, or redesign auth around a different contract."

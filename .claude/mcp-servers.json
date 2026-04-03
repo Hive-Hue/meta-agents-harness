@@ -1,0 +1,142 @@
+{
+  "servers": {
+    "context7": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "${CONTEXT7_API_KEY}"
+      ],
+      "timeout_ms": 60000
+    },
+    "clickup": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.clickup.com/mcp"
+      ],
+      "timeout_ms": 30000
+    },
+    "github": {
+      "transport": "stdio",
+      "command": "/usr/bin/github-mcp-server",
+      "args": [
+        "stdio"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}",
+        "GITHUB_TOOLSETS": "repos,issues,pull_requests"
+      }
+    },
+    "brave-search": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@brave/brave-search-mcp-server"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "timeout_ms": 60000
+    },
+    "firecrawl": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      },
+      "timeout_ms": 120000
+    },
+    "zeplin": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@zeplin/mcp-server@latest"
+      ],
+      "env": {
+        "ZEPLIN_ACCESS_TOKEN": "${ZEPLIN_ACCESS_TOKEN}"
+      },
+      "timeout_ms": 60000
+    }
+  },
+  "mcpServers": {
+    "context7": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp",
+        "--api-key",
+        "${CONTEXT7_API_KEY}"
+      ],
+      "timeout_ms": 60000
+    },
+    "clickup": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.clickup.com/mcp"
+      ],
+      "timeout_ms": 30000
+    },
+    "github": {
+      "transport": "stdio",
+      "command": "/usr/bin/github-mcp-server",
+      "args": [
+        "stdio"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PAT}",
+        "GITHUB_TOOLSETS": "repos,issues,pull_requests"
+      }
+    },
+    "brave-search": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@brave/brave-search-mcp-server"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "timeout_ms": 60000
+    },
+    "firecrawl": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      },
+      "timeout_ms": 120000
+    },
+    "zeplin": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@zeplin/mcp-server@latest"
+      ],
+      "env": {
+        "ZEPLIN_ACCESS_TOKEN": "${ZEPLIN_ACCESS_TOKEN}"
+      },
+      "timeout_ms": 60000
+    }
+  }
+}

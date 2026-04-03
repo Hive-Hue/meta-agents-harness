@@ -1,0 +1,231 @@
+name: DevMultiTeam
+session_dir: .claude/crew/dev/sessions
+expertise_dir: .claude/crew/dev/expertise
+
+orchestrator:
+  name: ceo-orchestrator
+  description: Central coordinator that routes development work across planning, engineering, and validation.
+  prompt: .claude/crew/dev/agents/orchestrator.md
+  expertise:
+    path: .claude/crew/dev/expertise/orchestrator-mental-model.yaml
+    use-when: Track routing quality, team sequencing, and cross-team coordination risks.
+    updatable: true
+    max-lines: 10000
+  model: inherit
+  tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+  skills:
+    - .claude/skills/delegate-bounded/SKILL.md
+    - .claude/skills/active-listener/SKILL.md
+    - .claude/skills/mental-model/SKILL.md
+    - .claude/skills/zero-micromanagement/SKILL.md
+    - .claude/skills/web-research/SKILL.md
+  domain:
+    - path: .
+      read: true
+      upsert: false
+      delete: false
+
+teams:
+  - name: Planning
+    lead:
+      name: planning-lead
+      description: Planning lead for repository discovery and implementation design work.
+      prompt: .claude/crew/dev/agents/planning_lead.md
+      expertise:
+        path: .claude/crew/dev/expertise/planning-lead-mental-model.yaml
+        use-when: Track which discovery and planning patterns produce executable plans.
+        updatable: true
+        max-lines: 10000
+      model: inherit
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      skills:
+        - .claude/skills/delegate-bounded/SKILL.md
+        - .claude/skills/active-listener/SKILL.md
+        - .claude/skills/mental-model/SKILL.md
+        - .claude/skills/zero-micromanagement/SKILL.md
+        - .claude/skills/web-research/SKILL.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: repo-analyst
+        description: Read-only repository analyst for structure, patterns, and constraints.
+        prompt: .claude/crew/dev/agents/repo_analyst.md
+        expertise:
+          path: .claude/crew/dev/expertise/repo-analyst-mental-model.yaml
+          use-when: Capture durable architecture map, hotspots, and recurring risks.
+          updatable: true
+          max-lines: 10000
+        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: solution-architect
+        description: Writes implementation plans and specs under specs/.
+        prompt: .claude/crew/dev/agents/solution_architect.md
+        expertise:
+          path: .claude/crew/dev/expertise/solution-architect-mental-model.yaml
+          use-when: Track architecture tradeoffs and delivery sequencing patterns.
+          updatable: true
+          max-lines: 10000
+        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+          - .claude/skills/zeplin-mcp-ops/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: specs/
+            read: true
+            upsert: true
+            delete: false
+
+  - name: Engineering
+    lead:
+      name: engineering-lead
+      description: Engineering lead for implementation and sequencing.
+      prompt: .claude/crew/dev/agents/engineering_lead.md
+      expertise:
+        path: .claude/crew/dev/expertise/engineering-lead-mental-model.yaml
+        use-when: Track implementation risks, quality gates, and worker strengths.
+        updatable: true
+        max-lines: 10000
+      model: inherit
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      skills:
+        - .claude/skills/delegate-bounded/SKILL.md
+        - .claude/skills/active-listener/SKILL.md
+        - .claude/skills/mental-model/SKILL.md
+        - .claude/skills/zero-micromanagement/SKILL.md
+        - .claude/skills/web-research/SKILL.md
+        - .claude/skills/zeplin-mcp-ops/SKILL.md
+        - .claude/skills/figma-via-codex/SKILL.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: frontend-dev
+        description: Implements frontend work under `src/frontend/`.
+        prompt: .claude/crew/dev/agents/frontend_dev.md
+        expertise:
+          path: .claude/crew/dev/expertise/frontend-dev-mental-model.yaml
+          use-when: Save reusable UI patterns, pitfalls, and verification checks.
+          updatable: true
+          max-lines: 10000
+        tools: [read, write, edit, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+          - .claude/skills/zeplin-mcp-ops/SKILL.md
+          - .claude/skills/figma-via-codex/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: src/frontend/
+            read: true
+            upsert: true
+            delete: true
+      - name: backend-dev
+        description: Implements backend work under `src/backend/`.
+        prompt: .claude/crew/dev/agents/backend_dev.md
+        expertise:
+          path: .claude/crew/dev/expertise/backend-dev-mental-model.yaml
+          use-when: Persist backend patterns, API decisions, and runtime caveats.
+          updatable: true
+          max-lines: 10000
+        tools: [read, write, edit, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: src/frontend/
+            read: true
+            upsert: false
+            delete: false
+          - path: src/backend/
+            read: true
+            upsert: true
+            delete: true
+
+  - name: Validation
+    lead:
+      name: validation-lead
+      description: Validation lead for QA and security review.
+      prompt: .claude/crew/dev/agents/validation_lead.md
+      expertise:
+        path: .claude/crew/dev/expertise/validation-lead-mental-model.yaml
+        use-when: Track validation risks, coverage gaps, and release readiness.
+        updatable: true
+        max-lines: 10000
+      model: inherit
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      skills:
+        - .claude/skills/delegate-bounded/SKILL.md
+        - .claude/skills/active-listener/SKILL.md
+        - .claude/skills/mental-model/SKILL.md
+        - .claude/skills/zero-micromanagement/SKILL.md
+        - .claude/skills/web-research/SKILL.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: qa-reviewer
+        description: Runs read-only validation and smoke checks.
+        prompt: .claude/crew/dev/agents/qa_reviewer.md
+        expertise:
+          path: .claude/crew/dev/expertise/qa-reviewer-mental-model.yaml
+          use-when: Record test findings, regressions, and quality trends.
+          updatable: true
+          max-lines: 10000
+        tools: [read, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: security-reviewer
+        description: Performs read-only security review and blast-radius checks.
+        prompt: .claude/crew/dev/agents/security_reviewer.md
+        expertise:
+          path: .claude/crew/dev/expertise/security-reviewer-mental-model.yaml
+          use-when: Save recurring security findings, controls, and mitigation patterns.
+          updatable: true
+          max-lines: 10000
+        tools: [read, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false

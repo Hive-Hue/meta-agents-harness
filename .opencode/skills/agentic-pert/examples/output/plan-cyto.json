@@ -1,0 +1,150 @@
+{
+  "elements": {
+    "nodes": [
+      {
+        "data": {
+          "id": "T1",
+          "label": "Setup JWT library",
+          "pert": 2.0,
+          "critical": true,
+          "status": "pending"
+        },
+        "style": {
+          "background-color": "#ff6b6b",
+          "label": "T1"
+        }
+      },
+      {
+        "data": {
+          "id": "T2",
+          "label": "Auth endpoints",
+          "pert": 3.1666666666666665,
+          "critical": true,
+          "status": "pending"
+        },
+        "style": {
+          "background-color": "#ff6b6b",
+          "label": "T2"
+        }
+      },
+      {
+        "data": {
+          "id": "T3",
+          "label": "Dashboard base",
+          "pert": 2.0,
+          "critical": false,
+          "status": "pending"
+        },
+        "style": {
+          "background-color": "#74c0fc",
+          "label": "T3"
+        }
+      },
+      {
+        "data": {
+          "id": "T4",
+          "label": "Auth integration",
+          "pert": 1.5,
+          "critical": true,
+          "status": "pending"
+        },
+        "style": {
+          "background-color": "#ff6b6b",
+          "label": "T4"
+        }
+      },
+      {
+        "data": {
+          "id": "T5",
+          "label": "Integration tests",
+          "pert": 2.6666666666666665,
+          "critical": true,
+          "status": "pending"
+        },
+        "style": {
+          "background-color": "#ff6b6b",
+          "label": "T5"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "data": {
+          "id": "e0",
+          "source": "T1",
+          "target": "T2"
+        },
+        "style": {
+          "line-color": "#ff6b6b",
+          "width": 3
+        }
+      },
+      {
+        "data": {
+          "id": "e1",
+          "source": "T1",
+          "target": "T3"
+        },
+        "style": {
+          "line-color": "#adb5bd",
+          "width": 1
+        }
+      },
+      {
+        "data": {
+          "id": "e2",
+          "source": "T2",
+          "target": "T4"
+        },
+        "style": {
+          "line-color": "#ff6b6b",
+          "width": 3
+        }
+      },
+      {
+        "data": {
+          "id": "e3",
+          "source": "T3",
+          "target": "T4"
+        },
+        "style": {
+          "line-color": "#adb5bd",
+          "width": 1
+        }
+      },
+      {
+        "data": {
+          "id": "e4",
+          "source": "T4",
+          "target": "T5"
+        },
+        "style": {
+          "line-color": "#ff6b6b",
+          "width": 3
+        }
+      }
+    ]
+  },
+  "layout": {
+    "name": "dagre",
+    "rankDir": "TB",
+    "nodeSep": 50,
+    "rankSep": 100
+  },
+  "style": [
+    {
+      "selector": "node",
+      "style": {
+        "label": "data(label)",
+        "text-valign": "center"
+      }
+    },
+    {
+      "selector": "edge",
+      "style": {
+        "curve-style": "bezier",
+        "target-arrow-shape": "triangle"
+      }
+    }
+  ]
+}

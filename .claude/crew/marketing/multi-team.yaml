@@ -1,0 +1,258 @@
+name: MarketingMultiTeam
+session_dir: .claude/crew/marketing/sessions
+expertise_dir: .claude/crew/marketing/expertise
+
+orchestrator:
+  name: orchestrator
+  description: Central coordinator for planning, creative execution, and validation of marketing operations.
+  prompt: .claude/crew/marketing/agents/orchestrator.md
+  expertise:
+    path: .claude/crew/marketing/expertise/orchestrator-mental-model.yaml
+    use-when: Capture coordination patterns, prioritization tradeoffs, and routing decisions.
+    updatable: true
+    max-lines: 10000
+  model: openai-codex/gpt-5.2
+  tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+  skills:
+    - .claude/skills/delegate-bounded/SKILL.md
+    - .claude/skills/active-listener/SKILL.md
+    - .claude/skills/mental-model/SKILL.md
+    - .claude/skills/zero-micromanagement/SKILL.md
+    - .claude/skills/web-research/SKILL.md
+  domain:
+    - path: .
+      read: true
+      upsert: false
+      delete: false
+
+teams:
+  - name: Planning
+    lead:
+      name: planning-lead
+      description: Planning lead for audience discovery and campaign strategy definition.
+      prompt: .claude/crew/marketing/agents/planning-lead.md
+      expertise:
+        path: .claude/crew/marketing/expertise/planning-lead-mental-model.yaml
+        use-when: Store positioning notes, audience hypotheses, and campaign scoping decisions.
+        updatable: true
+        max-lines: 10000
+      model: openai-codex/gpt-5.2
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      skills:
+        - .claude/skills/delegate-bounded/SKILL.md
+        - .claude/skills/active-listener/SKILL.md
+        - .claude/skills/mental-model/SKILL.md
+        - .claude/skills/zero-micromanagement/SKILL.md
+        - .claude/skills/web-research/SKILL.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: market-researcher
+        description: Researches channels, competitors, and audience evidence.
+        prompt: .claude/crew/marketing/agents/market-researcher.md
+        expertise:
+          path: .claude/crew/marketing/expertise/market-researcher-mental-model.yaml
+          use-when: Capture audience insights, competitor patterns, and channel opportunities.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: specs/marketing/
+            read: true
+            upsert: false
+            delete: false
+      - name: campaign-strategist
+        description: Converts discovery into campaign architecture and sequencing.
+        prompt: .claude/crew/marketing/agents/campaign-strategist.md
+        expertise:
+          path: .claude/crew/marketing/expertise/campaign-strategist-mental-model.yaml
+          use-when: Store campaign architecture, messaging pillars, and channel sequencing.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: specs/marketing/
+            read: true
+            upsert: true
+            delete: false
+
+  - name: Creative
+    lead:
+      name: creative-lead
+      description: Leads creative production for copy, visual strategy, and media operations.
+      prompt: .claude/crew/marketing/agents/creative-lead.md
+      expertise:
+        path: .claude/crew/marketing/expertise/creative-lead-mental-model.yaml
+        use-when: Track narrative direction, production tradeoffs, and delivery quality.
+        updatable: true
+        max-lines: 10000
+      model: openai-codex/gpt-5.2
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      skills:
+        - .claude/skills/delegate-bounded/SKILL.md
+        - .claude/skills/active-listener/SKILL.md
+        - .claude/skills/mental-model/SKILL.md
+        - .claude/skills/zero-micromanagement/SKILL.md
+        - .claude/skills/web-research/SKILL.md
+        - .claude/skills/zeplin-mcp-ops/SKILL.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: copywriter
+        description: Produces campaign copy and editorial variations.
+        prompt: .claude/crew/marketing/agents/copywriter.md
+        expertise:
+          path: .claude/crew/marketing/expertise/copywriter-mental-model.yaml
+          use-when: Save hooks, CTA patterns, and message variants that perform.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: campaigns/copy/
+            read: true
+            upsert: true
+            delete: false
+      - name: creative-strategist
+        description: Defines creative concepts and visual direction artifacts.
+        prompt: .claude/crew/marketing/agents/creative-strategist.md
+        expertise:
+          path: .claude/crew/marketing/expertise/creative-strategist-mental-model.yaml
+          use-when: Preserve concept systems, visual direction, and content formats.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+          - .claude/skills/zeplin-mcp-ops/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: campaigns/creative/
+            read: true
+            upsert: true
+            delete: false
+      - name: media-operator
+        description: Handles channel publishing operations and distribution logistics.
+        prompt: .claude/crew/marketing/agents/media-operator.md
+        expertise:
+          path: .claude/crew/marketing/expertise/media-operator-mental-model.yaml
+          use-when: Record publishing workflows, channel notes, and operational constraints.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+          - .claude/skills/zeplin-mcp-ops/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: campaigns/media/
+            read: true
+            upsert: true
+            delete: false
+
+  - name: Validation
+    lead:
+      name: validation-lead
+      description: Validation lead for performance and brand safety quality gates.
+      prompt: .claude/crew/marketing/agents/validation-lead.md
+      expertise:
+        path: .claude/crew/marketing/expertise/validation-lead-mental-model.yaml
+        use-when: Track performance risks, brand safety issues, and rollout readiness.
+        updatable: true
+        max-lines: 10000
+      model: openai-codex/gpt-5.2
+      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      skills:
+        - .claude/skills/delegate-bounded/SKILL.md
+        - .claude/skills/active-listener/SKILL.md
+        - .claude/skills/mental-model/SKILL.md
+        - .claude/skills/zero-micromanagement/SKILL.md
+        - .claude/skills/web-research/SKILL.md
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+    members:
+      - name: performance-analyst
+        description: Reviews metrics, benchmarks, and distribution efficiency.
+        prompt: .claude/crew/marketing/agents/performance-analyst.md
+        expertise:
+          path: .claude/crew/marketing/expertise/performance-analyst-mental-model.yaml
+          use-when: Save metrics interpretation patterns and optimization hypotheses.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+      - name: brand-safety-reviewer
+        description: Reviews brand consistency, policy risk, and safety constraints.
+        prompt: .claude/crew/marketing/agents/brand-safety-reviewer.md
+        expertise:
+          path: .claude/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml
+          use-when: Store brand risk patterns, compliance checks, and escalation cues.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-5
+        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        skills:
+          - .claude/skills/active-listener/SKILL.md
+          - .claude/skills/mental-model/SKILL.md
+          - .claude/skills/web-research/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false

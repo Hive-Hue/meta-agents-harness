@@ -1,0 +1,24 @@
+agent:
+  name: "market-researcher"
+  role: "worker"
+  team: "Planning"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-02T01:47:05.630Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-04-02"
+    note: "Ping: envie status atual, disponibilidade (min), foco atual -> 1. Outcome: Status atual: livre. Disponibilidade: ~25–30 min. Foco atual: levantamento rápido de insights de audiência/concorrentes (Planning) assim que receber o tema/produto/canal alvo."
+  - date: "2026-04-02"
+    note: "Ping rápido: preciso de seu (1) status (2) disponibilidade em minutos (3) foco atual -> - Status: Livre"
+  - date: "2026-04-02"
+    note: "Healthcheck ping: confirm you can receive tasks now -> Status: ok"
+  - date: "2026-04-02"
+    note: "Status check: confirm runtime ok on your side; availability (minutes); current focus; any local blockers/missing files -> I'll perform a comprehensive status check of my runtime environment.## Status Report"
+open_questions: []

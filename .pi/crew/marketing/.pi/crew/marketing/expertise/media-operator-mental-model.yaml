@@ -1,0 +1,20 @@
+agent:
+  name: "media-operator"
+  role: "worker"
+  team: "Creative"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-02T01:47:10.586Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-04-02"
+    note: "Healthcheck ping: can you receive tasks and use your tools (read/write/mcp_call)? Reply with: status (ok/issue), availability (mins), any... -> I'll perform a healthcheck by testing my available tools and verifying my operational status."
+  - date: "2026-04-02"
+    note: "Quick follow-up: please confirm status (ok/issue), availability (mins), and whether MCP servers respond (mcp_servers or mcp_call) -> Status: OK ✓"
+open_questions: []
