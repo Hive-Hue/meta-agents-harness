@@ -1,0 +1,18 @@
+agent:
+  name: "security-reviewer"
+  role: "worker"
+  team: "Validation"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-03T23:22:57.497Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-04-03"
+    note: "First session activation. Agent prompt file (.pi/crew/dev/agents/security_reviewer.md) and skill file (.pi/skills/mental-model/SKILL.md) are both missing. Operating with base capabilities only. Flagged to lead as medium-severity gap."
+open_questions: []

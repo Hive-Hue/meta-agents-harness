@@ -1,11 +1,12 @@
 ---
 name: validation-lead
-model: zai/glm-5
+model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
 role: lead
 team: Validation
 expertise:
   path: .pi/crew/dev/expertise/validation-lead-mental-model.yaml
-  use-when: Track regression patterns, review heuristics, and which validation combinations catch the highest-risk issues in Hivehue.
+  use-when: Track regression patterns, review heuristics, and which validation
+    combinations catch the highest-risk issues in Hivehue.
   updatable: true
   max-lines: 10000
 tools:
@@ -17,14 +18,12 @@ tools:
 skills:
   - path: .pi/skills/delegate-bounded/SKILL.md
     use-when: Always. Split QA and security work into focused review scopes.
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Preserve prior implementation context and explicit risk areas before replying.
-  - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after discovering new review or regression patterns.
   - path: .pi/skills/zero-micromanagement/SKILL.md
-    use-when: Always. Request findings and coverage, not keystroke-level review procedures.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when validation needs current vulnerability, policy, or benchmark references.
+    use-when: Always. Request findings and coverage, not keystroke-level review
+      procedures.
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Read at task start for context. Update after discovering new review or
+      regression patterns.
 domain:
   - path: .
     read: true

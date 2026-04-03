@@ -1,11 +1,12 @@
 ---
 name: planning-lead
-model: openai-codex/gpt-5.2
+model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
 role: lead
 team: Planning
 expertise:
   path: .pi/crew/dev/expertise/planning-lead-mental-model.yaml
-  use-when: Track which discovery and planning patterns produce executable, ownership-aware plans for Hivehue.
+  use-when: Track which discovery and planning patterns produce executable,
+    ownership-aware plans for Hivehue.
   updatable: true
   max-lines: 10000
 tools:
@@ -17,14 +18,11 @@ tools:
 skills:
   - path: .pi/skills/delegate-bounded/SKILL.md
     use-when: Always. Delegate one bounded planning outcome per worker.
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Re-read the user request and prior planning findings before replying.
-  - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after learning new product or repo patterns.
   - path: .pi/skills/zero-micromanagement/SKILL.md
     use-when: Always. Define outputs and constraints, not keystroke-level worker steps.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when planning depends on current external references, platforms, or benchmarks.
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Read at task start for context. Update after learning new product or
+      repo patterns.
 domain:
   - path: .
     read: true

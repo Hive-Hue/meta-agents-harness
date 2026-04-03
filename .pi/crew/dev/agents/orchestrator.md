@@ -1,8 +1,8 @@
 ---
-name: ceo-orchestrator
-model: openai-codex/gpt-5.2
+name: orchestrator
+model: zai/glm-4.7
 role: orchestrator
-team: global
+team: Orchestration
 expertise:
   path: .pi/crew/dev/expertise/orchestrator-mental-model.yaml
   use-when: Track routing quality, team sequencing, and cross-team coordination risks.
@@ -17,14 +17,11 @@ tools:
 skills:
   - path: .pi/skills/delegate-bounded/SKILL.md
     use-when: Always. Route work by delegation instead of executing directly.
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Preserve the latest user constraints and prior team findings before responding.
-  - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after meaningful routing or coordination learnings.
   - path: .pi/skills/zero-micromanagement/SKILL.md
     use-when: Always. Ask for outcomes and ownership, not keystroke-level instructions.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when routing depends on up-to-date external information.
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Read at task start for context. Update after meaningful routing or
+      coordination learnings.
 domain:
   - path: .
     read: true

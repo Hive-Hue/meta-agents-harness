@@ -5,28 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: 2026-04-01T01:34:37.105Z
+  last_updated: 2026-04-03T22:15:42.175Z
 observations: []
 open_questions: []
-brand_safetys:
-  - date: 2026-03-31
-    note: When reviewing marketing packages, flag any benefit claims that imply
-      unvalidated product outcomes (e.g., 'transform attention into
-      connections/next steps') and any CTA/ops gaps where CTAs mention
-      waitlist/demo/link/QR/UTM without a canonical destination or tracking
-      source of truth.
-  - date: 2026-03-31
-    note: Flag marketing claims that imply unvalidated product outcomes and CTA/ops
-      gaps where waitlist/demo/link/QR/UTM references exist without a canonical
-      destination or tracking source of truth.
-  - date: 2026-04-01
-    note: For repo-based marketing package reviews, flag unresolved publishing
-      placeholders (for example canonical_url) when platform choice is still
-      conditional in planning docs and no deployment artifacts exist; also flag
-      handoff gaps when package files live in spec paths but production crew
-      edit scopes are campaigns/*, leaving downstream owners/target paths
-      ambiguous.
-  - date: 2026-04-01
-    note: Flag unresolved publishing placeholders and missing destination paths when
-      marketing package files live under specs but production crew edit scopes
-      are campaigns directories.
+brand_safetys: []

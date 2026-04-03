@@ -64,8 +64,18 @@ runtimes:
 catalog:
   models:
     orchestrator_default: "zai/glm-4.7"
-    lead_default: "zai/glm-4.7"
-    worker_default: "zai/glm-4.7"
+    lead_default: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+    worker_default: "zai/glm-5-turbo"
+  model_fallbacks:
+    orchestrator_default:
+      - "zai/glm-5-turbo"
+      - "zai/glm-4.5-air"
+    lead_default:
+      - "zai/glm-5-turbo"
+      - "zai/glm-4.5-air"
+    worker_default:
+      - "zai/glm-4.7"
+      - "zai/glm-4.5-air"
   skills:
     delegate_bounded:
       opencode: ".opencode/skills/delegate-bounded/SKILL.md"

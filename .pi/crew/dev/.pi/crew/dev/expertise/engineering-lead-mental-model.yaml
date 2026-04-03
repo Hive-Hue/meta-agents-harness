@@ -1,11 +1,11 @@
 agent:
-  name: media-operator
-  role: worker
-  team: Creative
+  name: "engineering-lead"
+  role: "lead"
+  team: "Engineering"
 meta:
   version: 1
   max_lines: 10000
-  last_updated: 2026-04-03T22:15:42.168Z
+  last_updated: "2026-04-03T22:53:27.568Z"
 patterns: []
 risks: []
 tools: []

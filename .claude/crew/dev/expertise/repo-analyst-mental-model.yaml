@@ -1,11 +1,11 @@
 agent:
-  name: "repo-analyst"
-  role: "worker"
-  team: "Planning"
+  name: repo-analyst
+  role: worker
+  team: Planning
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-04-02T19:15:11.829Z"
+  last_updated: 2026-04-03T22:15:42.096Z
 patterns: []
 workflows: []
 risks: []

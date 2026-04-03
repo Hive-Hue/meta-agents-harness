@@ -1,11 +1,11 @@
 agent:
-  name: "ceo-orchestrator"
-  role: "orchestrator"
-  team: "global"
+  name: ceo-orchestrator
+  role: orchestrator
+  team: global
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-03-31T16:42:54.112Z"
+  last_updated: 2026-04-03T22:15:42.126Z
 patterns: []
 risks: []
 tools: []

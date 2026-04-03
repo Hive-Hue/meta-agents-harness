@@ -52,6 +52,22 @@ runtimes:
     config_root: ".opencode"
     task_policy: "permission.task"
 
+catalog:
+  models:
+    orchestrator_default: "zai/glm-4.7"
+    lead_default: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+    worker_default: "zai/glm-5-turbo"
+  model_fallbacks:
+    orchestrator_default:
+      - "zai/glm-5-turbo"
+      - "zai/glm-4.5-air"
+    lead_default:
+      - "zai/glm-5-turbo"
+      - "zai/glm-4.5-air"
+    worker_default:
+      - "zai/glm-4.7"
+      - "zai/glm-4.5-air"
+
 crews:
   - id: "dev"
     display_name: "Development Crew"
@@ -115,6 +131,73 @@ crews:
       pi:
         multi_team:
           session_root: ".pi/crew/dev/sessions"
+          extension_entry: "extensions/multi-team.ts"
+
+  - id: "marketing"
+    display_name: "Marketing Crew"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        planning: "planning-lead"
+        creative: "creative-lead"
+        validation: "validation-lead"
+      workers:
+        planning:
+          - "market-researcher"
+          - "campaign-strategist"
+        creative:
+          - "copywriter"
+          - "creative-strategist"
+          - "media-operator"
+        validation:
+          - "performance-analyst"
+          - "brand-safety-reviewer"
+    role_permissions:
+      orchestrator:
+        delegate_to:
+          - "planning-lead"
+          - "creative-lead"
+          - "validation-lead"
+        write_paths: []
+      lead:
+        delegate_to_scope: "own_team_only"
+        write_paths:
+          - "specs/marketing/**"
+          - "assets/**"
+      worker:
+        delegate_to: []
+        write_paths:
+          - "specs/marketing/**"
+          - "assets/**"
+    runtime_overrides:
+      opencode:
+        permission:
+          task:
+            allow_delegate:
+              orchestrator:
+                - "planning-lead"
+                - "creative-lead"
+                - "validation-lead"
+              planning-lead:
+                - "market-researcher"
+                - "campaign-strategist"
+              creative-lead:
+                - "copywriter"
+                - "creative-strategist"
+                - "media-operator"
+              validation-lead:
+                - "performance-analyst"
+                - "brand-safety-reviewer"
+      claude:
+        ccr:
+          team_routes:
+            orchestrator:
+              - "planning-lead"
+              - "creative-lead"
+              - "validation-lead"
+      pi:
+        multi_team:
+          session_root: ".pi/crew/marketing/sessions"
           extension_entry: "extensions/multi-team.ts"
 
 adapters:

@@ -1,11 +1,12 @@
 ---
 name: engineering-lead
-model: openai-codex/gpt-5.2
+model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
 role: lead
 team: Engineering
 expertise:
   path: .pi/crew/dev/expertise/engineering-lead-mental-model.yaml
-  use-when: Track architecture decisions, implementation sequencing, risk patterns, and which worker allocations reduce blast radius for Hivehue.
+  use-when: Track architecture decisions, implementation sequencing, risk
+    patterns, and which worker allocations reduce blast radius for Hivehue.
   updatable: true
   max-lines: 10000
 tools:
@@ -16,19 +17,14 @@ tools:
   - mcp_call
 skills:
   - path: .pi/skills/delegate-bounded/SKILL.md
-    use-when: Always. Delegate to the right engineering owner instead of implementing directly.
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Re-read the approved plan and current repo constraints before responding.
-  - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after learning architecture or sequencing lessons.
+    use-when: Always. Delegate to the right engineering owner instead of
+      implementing directly.
   - path: .pi/skills/zero-micromanagement/SKILL.md
-    use-when: Always. Set outcomes, ownership, and acceptance criteria, then let workers execute.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when implementation options depend on current external references.
-  - path: .pi/skills/zeplin-mcp-ops/SKILL.md
-    use-when: Use when engineering work requires Zeplin handoff details.
-  - path: .pi/skills/figma-via-codex/SKILL.md
-    use-when: Use when UI implementation requires Figma context via Codex sidecar.
+    use-when: Always. Set outcomes, ownership, and acceptance criteria, then let
+      workers execute.
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Read at task start for context. Update after learning architecture or
+      sequencing lessons.
 domain:
   - path: .
     read: true

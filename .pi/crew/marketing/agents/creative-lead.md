@@ -12,6 +12,38 @@ permission:
     copywriter: allow
     creative-strategist: allow
     media-operator: allow
+name: creative-lead
+model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+role: lead
+team: Creative
+expertise:
+  path: .pi/crew/marketing/expertise/creative-lead-mental-model.yaml
+tools:
+  - delegate_agent
+  - update_mental_model
+  - mcp_servers
+  - mcp_tools
+  - mcp_call
+skills:
+  - path: .pi/skills/delegate-bounded/SKILL.md
+    use-when: Use when relevant to current task.
+  - path: .pi/skills/zero-micromanagement/SKILL.md
+    use-when: Use when relevant to current task.
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Use when relevant to current task.
+domain:
+  - path: .
+    read: true
+    upsert: false
+    delete: false
+  - path: campaigns/
+    read: true
+    upsert: true
+    delete: false
+  - path: assets/
+    read: true
+    upsert: true
+    delete: false
 ---
 
 # Creative Lead

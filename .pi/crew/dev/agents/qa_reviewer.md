@@ -1,16 +1,16 @@
 ---
 name: qa-reviewer
-model: zai/glm-5
+model: zai/glm-5-turbo
 role: worker
 team: Validation
 expertise:
   path: .pi/crew/dev/expertise/qa-reviewer-mental-model.yaml
-  use-when: Track recurring regressions, weak verification patterns, and lightweight checks that produce useful signal for Hivehue.
+  use-when: Track recurring regressions, weak verification patterns, and
+    lightweight checks that produce useful signal for Hivehue.
   updatable: true
   max-lines: 10000
 tools:
   - read
-  - bash
   - grep
   - find
   - ls
@@ -18,18 +18,16 @@ tools:
   - mcp_servers
   - mcp_tools
   - mcp_call
+  - bash
 skills:
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Preserve the target change scope and stated verification expectations while reviewing.
   - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after discovering durable validation gaps or test heuristics.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when validation requires up-to-date references or benchmark evidence.
+    use-when: Read at task start for context. Update after discovering durable
+      validation gaps or test heuristics.
 domain:
   - path: .
     read: true
     upsert: false
-    delete: false
+    delete: true
 ---
 
 # Hivehue QA Reviewer

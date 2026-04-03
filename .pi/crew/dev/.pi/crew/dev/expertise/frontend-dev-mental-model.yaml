@@ -1,0 +1,18 @@
+agent:
+  name: "frontend-dev"
+  role: "worker"
+  team: "Engineering"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-03T23:22:47.325Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-04-03"
+    note: "Session 2026-04-03T22-53-13-171Z-5kyas9 started. Ownership domain: . (read), src/frontend (full), web (full). Responded to initial ping successfully."
+open_questions: []

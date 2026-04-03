@@ -8,6 +8,39 @@ permission:
   bash: deny
   task:
     "*": deny
+name: brand-safety-reviewer
+model: zai/glm-5-turbo
+role: worker
+team: Validation
+expertise:
+  path: .pi/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml
+tools:
+  - write
+  - edit
+  - read
+  - grep
+  - find
+  - ls
+  - update_mental_model
+  - mcp_servers
+  - mcp_tools
+  - mcp_call
+skills:
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Use when relevant to current task.
+domain:
+  - path: .
+    read: true
+    upsert: false
+    delete: false
+  - path: campaigns/
+    read: true
+    upsert: true
+    delete: false
+  - path: assets/
+    read: true
+    upsert: true
+    delete: false
 ---
 
 # Brand Safety Reviewer

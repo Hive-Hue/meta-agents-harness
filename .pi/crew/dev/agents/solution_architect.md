@@ -1,17 +1,18 @@
 ---
 name: solution-architect
-model: openai-codex/gpt-5.3-codex
+model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
 role: worker
 team: Planning
 expertise:
   path: .pi/crew/dev/expertise/solution-architect-mental-model.yaml
-  use-when: Track planning templates, implementation tradeoffs, and hand-off patterns that help Hivehue Engineering execute cleanly.
+  use-when: Track planning templates, implementation tradeoffs, and hand-off
+    patterns that help Hivehue Engineering execute cleanly.
   updatable: true
   max-lines: 10000
 tools:
-  - read
   - write
   - edit
+  - read
   - grep
   - find
   - ls
@@ -20,14 +21,9 @@ tools:
   - mcp_tools
   - mcp_call
 skills:
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Keep the latest findings, risks, and ownership constraints visible while drafting specs.
   - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after discovering repeatable design or planning patterns.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when architecture choices require current external references.
-  - path: .pi/skills/zeplin-mcp-ops/SKILL.md
-    use-when: Use when specs depend on Zeplin design context or tokens.
+    use-when: Read at task start for context. Update after discovering repeatable
+      design or planning patterns.
 domain:
   - path: .
     read: true

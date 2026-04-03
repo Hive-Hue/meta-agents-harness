@@ -94,6 +94,7 @@ interface AgentConfig {
 	prompt: string;
 	description?: string;
 	model?: string;
+	model_fallbacks?: string[];
 	tools?: string[] | string;
 	skills?: Array<string | SkillReference>;
 	expertise?: string | ExpertiseReference;
@@ -1827,6 +1828,21 @@ function isRetryableDelegationFailure(output: string): boolean {
 		|| text.includes("no models match pattern 'openai-codex/");
 }
 
+function isModelFallbackFailure(output: string): boolean {
+	const text = output.toLowerCase();
+	return text.includes("no endpoints available matching your guardrail restrictions")
+		|| text.includes("no models match pattern")
+		|| text.includes("model not found")
+		|| text.includes("provider returned error")
+		|| text.includes("404 no endpoints available");
+}
+
+function modelCandidates(ctx: any, child: DispatchTarget): string[] {
+	const primary = currentModel(ctx, effectiveModel(config!, child.agent) || child.agent.model);
+	const fallbacks = Array.isArray(child.agent.model_fallbacks) ? child.agent.model_fallbacks : [];
+	return Array.from(new Set([primary, ...fallbacks].map((item) => `${item || ""}`.trim()).filter(Boolean)));
+}
+
 function shouldResumeChildSession(child: DispatchTarget, sessionFile: string): boolean {
 	if (!existsSync(sessionFile)) return false;
 	return false;
@@ -1844,6 +1860,9 @@ async function dispatchChildWithRetry(
 ): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget; attempts: number; retried: boolean }> {
 	const maxAttempts = Math.max(1, options?.maxAttempts ?? 3);
 	const baseDelayMs = Math.max(50, options?.baseDelayMs ?? 350);
+	const child = config && runtime ? resolveTarget(targetName) : null;
+	const candidates = child ? modelCandidates(ctx, child) : [];
+	let modelIndex = 0;
 	let attempt = 0;
 	let lastResult: { output: string; exitCode: number; elapsed: number; child?: DispatchTarget } = {
 		output: "Delegation did not run.",
@@ -1853,9 +1872,19 @@ async function dispatchChildWithRetry(
 
 	while (attempt < maxAttempts) {
 		attempt += 1;
-		lastResult = await dispatchChild(targetName, task, ctx);
+		const modelOverride = candidates[modelIndex] || "";
+		lastResult = await dispatchChild(targetName, task, ctx, { modelOverride: modelOverride || undefined });
 		if (lastResult.exitCode === 0) {
 			return { ...lastResult, attempts: attempt, retried: attempt > 1 };
+		}
+		if (isModelFallbackFailure(lastResult.output) && modelIndex < candidates.length - 1) {
+			modelIndex += 1;
+			options?.onRetry?.(
+				attempt + 1,
+				maxAttempts,
+				`switching model to ${candidates[modelIndex]} after ${shortText(firstUsefulLine(lastResult.output), 120)}`,
+			);
+			continue;
 		}
 		if (!isRetryableDelegationFailure(lastResult.output) || attempt >= maxAttempts) {
 			break;
@@ -1868,7 +1897,12 @@ async function dispatchChildWithRetry(
 	return { ...lastResult, attempts: attempt, retried: attempt > 1 };
 }
 
-function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget }> {
+function dispatchChild(
+	targetName: string,
+	task: string,
+	ctx: any,
+	options?: { modelOverride?: string },
+): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget }> {
 	if (!config || !runtime) {
 		return Promise.resolve({ output: "Runtime not initialized.", exitCode: 1, elapsed: 0 });
 	}
@@ -1912,7 +1946,7 @@ function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ ou
 			}, 1000);
 		}
 
-		const model = currentModel(ctx, effectiveModel(config, child.agent) || child.agent.model);
+		const model = options?.modelOverride || currentModel(ctx, effectiveModel(config, child.agent) || child.agent.model);
 		const prompt = buildDelegationPrompt(child, task);
 		const extensionPath = SELF_EXTENSION_PATH;
 		const mcpBridgePath = SELF_MCP_BRIDGE_PATH;
@@ -1973,6 +2007,7 @@ function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ ou
 
 		const textChunks: string[] = [];
 		const stderrChunks: string[] = [];
+		const collectedAssistantTexts = new Set<string>();
 
 		return new Promise((resolvePromise) => {
 			const proc = spawn("pi", args, {
@@ -2004,6 +2039,16 @@ function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ ou
 					appendFileSync(logFile, line + "\n");
 					try {
 						const event = JSON.parse(line);
+						const pushAssistantText = (text: string) => {
+							const normalized = `${text || ""}`.trim();
+							if (!normalized || collectedAssistantTexts.has(normalized)) return;
+							collectedAssistantTexts.add(normalized);
+							textChunks.push(normalized);
+							if (card) {
+								card.lastLine = normalized.split("\n").filter((row: string) => row.trim()).pop() || "";
+								updateWidget();
+							}
+						};
 						if (event.type === "message_update") {
 							const delta = event.assistantMessageEvent;
 							if (delta?.type === "toolcall_start") {
@@ -2013,14 +2058,13 @@ function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ ou
 								if (toolName) toolCalls.push(toolName);
 							}
 							if (delta?.type === "text_delta") {
-								textChunks.push(delta.delta || "");
-								if (card) {
-									const full = textChunks.join("");
-									card.lastLine = full.split("\n").filter((row: string) => row.trim()).pop() || "";
-									updateWidget();
-								}
+								pushAssistantText(delta.delta || "");
 							}
 						}
+						const fromMessages = extractAssistantMessageText(event.messages || []);
+						if (fromMessages) pushAssistantText(fromMessages);
+						const fromEvent = extractStructuredText(event.message || event.output || event.response || event.final || event.result);
+						if (fromEvent) pushAssistantText(fromEvent);
 					} catch { }
 				}
 			});
@@ -2041,9 +2085,25 @@ function dispatchChild(targetName: string, task: string, ctx: any): Promise<{ ou
 					appendFileSync(logFile, buffer.trim() + "\n");
 					try {
 						const event = JSON.parse(buffer.trim());
+						const fromMessages = extractAssistantMessageText(event.messages || []);
+						if (fromMessages && !collectedAssistantTexts.has(fromMessages)) {
+							collectedAssistantTexts.add(fromMessages);
+							textChunks.push(fromMessages);
+						}
 						if (event.type === "message_update") {
 							const delta = event.assistantMessageEvent;
-							if (delta?.type === "text_delta") textChunks.push(delta.delta || "");
+							if (delta?.type === "text_delta") {
+								const normalized = `${delta.delta || ""}`.trim();
+								if (normalized && !collectedAssistantTexts.has(normalized)) {
+									collectedAssistantTexts.add(normalized);
+									textChunks.push(normalized);
+								}
+							}
+						}
+						const fromEvent = extractStructuredText(event.message || event.output || event.response || event.final || event.result);
+						if (fromEvent && !collectedAssistantTexts.has(fromEvent)) {
+							collectedAssistantTexts.add(fromEvent);
+							textChunks.push(fromEvent);
 						}
 					} catch { }
 				}

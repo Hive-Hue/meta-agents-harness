@@ -5,58 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: 2026-04-01T01:29:02.829Z
+  last_updated: 2026-04-03T22:15:42.182Z
 observations: []
 open_questions: []
-copywritings:
-  - date: 2026-03-31
-    note: "For launch-event social copy, keep channel differentiation explicit:
-      LinkedIn should lead with business rationale and next-step CTAs; Instagram
-      should feel visual and journey-driven with save/share prompts; X should
-      stay terse and headline-like; short-form video should use colloquial
-      backstage framing. Avoid broad claims beyond the documented launch/event
-      presence and demo/conversation/WAITLIST actions."
-  - date: 2026-03-31
-    note: "Channel voice for launch social copy: LinkedIn = rationale/outcome + demo
-      CTA; Instagram = visual/journey + save/share; X = terse/headline-like;
-      short-form video = colloquial backstage framing. Keep claims limited to
-      documented event presence, waitlist, demo, and conversation actions."
-  - date: 2026-04-01
-    note: "For technical editorial planning on agentic infrastructure, the strongest
-      framing is practical systems design: lead with failure modes (unbounded
-      delegation, weak ownership, no durable memory), then map problem →
-      architecture → workflow → outcomes, and finish with assets that visualize
-      routing boundaries and memory persistence."
-  - date: 2026-04-01
-    note: For technical editorial planning on agentic infrastructure, use problem →
-      architecture → workflow → outcomes framing, and emphasize bounded
-      delegation plus durable memory as the key differentiators.
-  - date: 2026-04-01
-    note: "For repo-evidence technical articles on agentic infrastructure, anchor
-      the piece to three proof layers: per-crew topology YAML as source of
-      truth, generated permission/task prompts as runtime evidence, and
-      operational scripts (use/sync/validate/check) as the workflow backbone.
-      Explicitly call out current per-crew source-of-truth paths instead of any
-      legacy single-file framing."
-  - date: 2026-04-01
-    note: For repo-evidence technical articles on agentic infrastructure, anchor the
-      piece to source-of-truth crew YAML, generated permission.task prompts, and
-      the use/sync/validate/check command loop. Explicitly cite per-crew
-      .pi/crew/<crew>/multi-team.yaml paths instead of legacy single-file
-      framing.
-  - date: 2026-04-01
-    note: "For repo-evidence social distribution of technical architecture content,
-      keep launch copy channel-specific and anchored to one concrete systems
-      claim per asset: LinkedIn should emphasize failure modes, architecture,
-      and repo workflow; X should compress to one sharp proof point or numbered
-      thread; dev.to intros should explicitly state canonical GitHub Pages
-      source and summarize what the repo demonstrates without sounding
-      promotional; Hacker News titles should stay descriptive and
-      pattern-oriented rather than brand-heavy or adjective-heavy."
-  - date: 2026-04-01
-    note: For repo-evidence social distribution of technical architecture content,
-      anchor each channel to one concrete systems claim. LinkedIn should lead
-      with failure modes, architecture, and workflow. X should compress to a
-      single proof point or numbered thread. dev.to intros should state
-      canonical GitHub Pages source. Hacker News titles should stay descriptive
-      and pattern-oriented, not promotional.
+copywritings: []

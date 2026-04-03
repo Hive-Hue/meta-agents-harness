@@ -23,6 +23,9 @@ orchestrator:
   id: orchestrator
   role: ceo
   model: zai/glm-4.7
+  model_fallbacks:
+    - zai/glm-5-turbo
+    - zai/glm-4.5-air
   agent_file: .opencode/crew/dev/agents/orchestrator.md
   expertise:
     path: .opencode/crew/dev/expertise/orchestrator-mental-model.yaml
@@ -56,6 +59,9 @@ teams:
       id: planning-lead
       role: lead
       model: zai/glm-4.7
+      model_fallbacks:
+        - zai/glm-5-turbo
+        - zai/glm-4.5-air
       agent_file: .opencode/crew/dev/agents/planning-lead.md
       expertise:
         path: .opencode/crew/dev/expertise/planning-lead-mental-model.yaml
@@ -86,6 +92,9 @@ teams:
       - id: repo-analyst
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/repo-analyst.md
         expertise:
           path: .opencode/crew/dev/expertise/repo-analyst-mental-model.yaml
@@ -111,6 +120,9 @@ teams:
       - id: solution-architect
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-5-turbo
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/solution-architect.md
         expertise:
           path: .opencode/crew/dev/expertise/solution-architect-mental-model.yaml
@@ -142,6 +154,9 @@ teams:
       id: engineering-lead
       role: lead
       model: zai/glm-4.7
+      model_fallbacks:
+        - zai/glm-5-turbo
+        - zai/glm-4.5-air
       agent_file: .opencode/crew/dev/agents/engineering-lead.md
       expertise:
         path: .opencode/crew/dev/expertise/engineering-lead-mental-model.yaml
@@ -172,6 +187,9 @@ teams:
       - id: frontend-dev
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/frontend-dev.md
         expertise:
           path: .opencode/crew/dev/expertise/frontend-dev-mental-model.yaml
@@ -205,6 +223,9 @@ teams:
       - id: backend-dev
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/backend-dev.md
         expertise:
           path: .opencode/crew/dev/expertise/backend-dev-mental-model.yaml
@@ -240,6 +261,9 @@ teams:
       id: validation-lead
       role: lead
       model: zai/glm-4.7
+      model_fallbacks:
+        - zai/glm-5-turbo
+        - zai/glm-4.5-air
       agent_file: .opencode/crew/dev/agents/validation-lead.md
       expertise:
         path: .opencode/crew/dev/expertise/validation-lead-mental-model.yaml
@@ -270,6 +294,9 @@ teams:
       - id: qa-reviewer
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/qa-reviewer.md
         expertise:
           path: .opencode/crew/dev/expertise/qa-reviewer-mental-model.yaml
@@ -295,6 +322,9 @@ teams:
       - id: security-reviewer
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/security-reviewer.md
         expertise:
           path: .opencode/crew/dev/expertise/security-reviewer-mental-model.yaml

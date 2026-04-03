@@ -12,6 +12,30 @@ permission:
     planning-lead: allow
     creative-lead: allow
     validation-lead: allow
+name: orchestrator
+model: zai/glm-4.7
+role: orchestrator
+team: Orchestration
+expertise:
+  path: .pi/crew/marketing/expertise/orchestrator-mental-model.yaml
+tools:
+  - delegate_agent
+  - update_mental_model
+  - mcp_servers
+  - mcp_tools
+  - mcp_call
+skills:
+  - path: .pi/skills/delegate-bounded/SKILL.md
+    use-when: Use when relevant to current task.
+  - path: .pi/skills/zero-micromanagement/SKILL.md
+    use-when: Use when relevant to current task.
+  - path: .pi/skills/mental-model/SKILL.md
+    use-when: Use when relevant to current task.
+domain:
+  - path: .
+    read: true
+    upsert: false
+    delete: false
 ---
 
 # Orchestrator

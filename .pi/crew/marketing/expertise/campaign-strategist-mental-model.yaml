@@ -5,44 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: 2026-04-01T01:24:41.751Z
+  last_updated: 2026-04-03T22:15:42.178Z
 observations: []
 open_questions: []
-workflows:
-  - date: 2026-03-31
-    note: "For Web Summit Rio social launch kits, make the campaign architecture
-      explicit: one-line proposition, segment-by-segment CTA mapping, and a
-      calendar that progresses Tease → Consideration → Conversion → Event →
-      Post-event. Channel templates should differ by platform hook and action,
-      while staying conservative about unvalidated product claims."
-  - date: 2026-03-31
-    note: "For Web Summit Rio social launch kits, make the campaign architecture
-      explicit: one-line proposition, segment-by-segment CTA mapping, and a
-      calendar that progresses Tease -> Consideration -> Conversion -> Event ->
-      Post-event. Channel templates should differ by platform hook and action,
-      while staying conservative about unvalidated product claims."
-  - date: 2026-03-31
-    note: HiveHue Web Summit Rio 2026 marketing package already defines message
-      hierarchy, phases, CTAs, and asset essentials, but still needs explicit
-      review/validation gates and clearer separation of strategy ownership
-      between creative-lead and validation-lead before pre-launch signoff.
-  - date: 2026-03-31
-    note: "HiveHue Web Summit Rio 2026 package: structure is coherent, but
-      pre-launch readiness depends on adding explicit validation gates and
-      clearer creative-lead vs validation-lead responsibilities."
-  - date: 2026-04-01
-    note: "For publish-ready technical article runbooks, keep distribution guidance
-      lightweight and evidence-linked: day-0/day-1/week-1 sequencing, repo-proof
-      messaging, minimal channels, and simple engagement metrics outperform
-      broad promotional playbooks for low-effort launches."
-  - date: 2026-04-01
-    note: "For repo-evidence technical article positioning briefs, compress the
-      message into six fields: target audience, one-sentence promise, core
-      thesis, three narrative pillars, distinct proof points, and the hype
-      framing to avoid; anchor differentiation on bounded delegation, durable
-      expertise, role-scoped tools, and validation guardrails."
-  - date: 2026-04-01
-    note: "For technical article positioning briefs, use six fields: audience,
-      promise, thesis, pillars, distinctions, and framing to avoid.
-      Differentiate this harness with bounded delegation, durable expertise,
-      role-scoped tooling, and validation guardrails."
+workflows: []

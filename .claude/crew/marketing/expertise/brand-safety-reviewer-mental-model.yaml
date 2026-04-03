@@ -1,11 +1,11 @@
 agent:
-  name: "brand-safety-reviewer"
-  role: "worker"
-  team: "Validation"
+  name: brand-safety-reviewer
+  role: worker
+  team: Validation
 meta:
   version: 1
   max_lines: 10000
-  last_updated: "2026-04-02T19:15:11.829Z"
+  last_updated: 2026-04-03T22:15:42.098Z
 patterns: []
 workflows: []
 risks: []

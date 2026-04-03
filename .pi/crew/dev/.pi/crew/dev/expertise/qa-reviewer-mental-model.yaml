@@ -1,0 +1,18 @@
+agent:
+  name: "qa-reviewer"
+  role: "worker"
+  team: "Validation"
+meta:
+  version: 1
+  max_lines: 10000
+  last_updated: "2026-04-03T23:22:54.926Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations:
+  - date: "2026-04-03"
+    note: "Agent prompt file (.pi/crew/dev/agents/qa_reviewer.md) and skill file (.pi/skills/mental-model/SKILL.md) are both missing. Operating on default QA reviewer capabilities. Noted as non-blocking but worth flagging if specialized review workflows are needed."
+open_questions: []

@@ -5,33 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: 2026-04-01T01:35:49.207Z
+  last_updated: 2026-04-03T22:15:42.195Z
 observations: []
 open_questions: []
-validations:
-  - date: 2026-03-31
-    note: "HiveHue Web Summit Rio 2026 marketing package: brief is directionally
-      consistent, but post-event window in calendar stops at D+5 while brief
-      specifies D+4 to D+10; templates do not cover all scheduled phases. Claim
-      language still uses unsupported outcome phrasing ('transformar atenção em
-      conexões/próximos passos') and CTA ops lack canonical URLs/UTM/QR
-      destination source-of-truth. Package not yet publication-ready without
-      these fixes."
-  - date: 2026-03-31
-    note: "HiveHue Web Summit Rio 2026 package: post-event calendar window is
-      incomplete vs brief (brief D+4 to D+10; calendar ends D+5). Templates
-      cover only teaser/convite/recap and miss some scheduled phases. Claim
-      language still uses unsupported outcome phrasing, and CTA ops need
-      canonical URLs/UTM/QR source-of-truth. Not publication-ready without
-      fixes."
-  - date: 2026-04-01
-    note: When reviewing marketing launch packages in this repo, verify generated
-      content against the active per-crew source of truth and distinguish
-      between runtime activation, drift checks, and validation. Also verify
-      publication assumptions (for example GitHub Pages vs fallback) from
-      in-repo setup docs before treating URLs/platforms as settled.
-  - date: 2026-04-01
-    note: Review generated marketing content against the active per-crew source of
-      truth. Treat activation, drift checks, and validation as distinct workflow
-      steps, and verify publication assumptions such as canonical URL or Pages
-      availability from repo docs before accepting them as facts.
+validations: []

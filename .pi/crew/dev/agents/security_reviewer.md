@@ -1,16 +1,16 @@
 ---
 name: security-reviewer
-model: zai/glm-5
+model: zai/glm-5-turbo
 role: worker
 team: Validation
 expertise:
   path: .pi/crew/dev/expertise/security-reviewer-mental-model.yaml
-  use-when: Track auth, data exposure, blast-radius risks, and recurring security review patterns in Hivehue.
+  use-when: Track auth, data exposure, blast-radius risks, and recurring security
+    review patterns in Hivehue.
   updatable: true
   max-lines: 10000
 tools:
   - read
-  - bash
   - grep
   - find
   - ls
@@ -18,18 +18,16 @@ tools:
   - mcp_servers
   - mcp_tools
   - mcp_call
+  - bash
 skills:
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Preserve explicit risk concerns, ownership boundaries, and review context while analyzing.
   - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after discovering durable guardrail or security lessons.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when security review depends on current CVE, advisory, or policy sources.
+    use-when: Read at task start for context. Update after discovering durable
+      guardrail or security lessons.
 domain:
   - path: .
     read: true
     upsert: false
-    delete: false
+    delete: true
 ---
 
 # Hivehue Security Reviewer

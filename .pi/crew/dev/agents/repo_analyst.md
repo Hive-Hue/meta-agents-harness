@@ -1,11 +1,12 @@
 ---
 name: repo-analyst
-model: zai/glm-4.7
+model: zai/glm-5-turbo
 role: worker
 team: Planning
 expertise:
   path: .pi/crew/dev/expertise/repo-analyst-mental-model.yaml
-  use-when: Track stable repository patterns, frontend/backend boundaries, and recurring structural constraints in Hivehue.
+  use-when: Track stable repository patterns, frontend/backend boundaries, and
+    recurring structural constraints in Hivehue.
   updatable: true
   max-lines: 10000
 tools:
@@ -18,12 +19,9 @@ tools:
   - mcp_tools
   - mcp_call
 skills:
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Preserve the exact user question and any prior findings while exploring.
   - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after learning durable structural patterns about Hivehue.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when repository analysis depends on external documentation or current references.
+    use-when: Read at task start for context. Update after learning durable
+      structural patterns about Hivehue.
 domain:
   - path: .
     read: true

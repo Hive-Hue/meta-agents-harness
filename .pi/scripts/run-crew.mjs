@@ -25,6 +25,51 @@ function parseExtensionList(raw) {
     .filter(Boolean)
 }
 
+function stripMatchingQuotes(value) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1)
+  }
+  return value
+}
+
+function parseDotEnv(raw) {
+  const out = {}
+  for (const line of `${raw || ""}`.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith("#")) continue
+    const normalized = trimmed.startsWith("export ") ? trimmed.slice("export ".length).trim() : trimmed
+    const separator = normalized.indexOf("=")
+    if (separator <= 0) continue
+    const key = normalized.slice(0, separator).trim()
+    if (!/^[A-Z0-9_]+$/i.test(key)) continue
+    out[key] = stripMatchingQuotes(normalized.slice(separator + 1).trim())
+  }
+  return out
+}
+
+function loadRuntimeEnv() {
+  const candidates = [
+    process.env.PI_ENV_FILE?.trim() ? resolveFromRepo(process.env.PI_ENV_FILE.trim()) : "",
+    path.join(repoRoot, "multi-agents", ".env"),
+    path.join(repoRoot, ".env")
+  ].filter(Boolean)
+
+  const loaded = {}
+  for (const filePath of candidates) {
+    if (!existsSync(filePath)) continue
+    const parsed = parseDotEnv(readFileSync(filePath, "utf-8"))
+    for (const [key, value] of Object.entries(parsed)) {
+      if (loaded[key] == null || loaded[key] === "") {
+        loaded[key] = value
+      }
+    }
+  }
+  return loaded
+}
+
 function loadDefaultExtensionsFromMeta() {
   const metaPath = path.join(repoRoot, "meta-agents.yaml")
   if (!existsSync(metaPath)) return fallbackExtensions
@@ -339,12 +384,18 @@ function main() {
 
   const extensionArgs = extensionPaths.flatMap((extensionPath) => ["-e", extensionPath])
   const commandArgs = [...extensionArgs, ...args.passthrough]
+  const loadedEnv = loadRuntimeEnv()
   const env = {
-    ...process.env,
-    PI_MULTI_CONFIG: configPath,
-    PI_MULTI_SESSION_ROOT: sessionRoot,
-    PI_MULTI_SESSION_ID: sessionId
+    ...process.env
   }
+  for (const [key, value] of Object.entries(loadedEnv)) {
+    if (env[key] == null || env[key] === "") {
+      env[key] = value
+    }
+  }
+  env.PI_MULTI_CONFIG = configPath
+  env.PI_MULTI_SESSION_ROOT = sessionRoot
+  env.PI_MULTI_SESSION_ID = sessionId
 
   console.log("Running PI with selected crew")
   console.log(`- PI_MULTI_CONFIG=${path.relative(repoRoot, configPath)}`)
@@ -353,6 +404,7 @@ function main() {
   console.log(`- PI_MULTI_SESSION_ID=${sessionId}`)
   console.log(`- session_mode=${sessionSelection.mode}`)
   console.log(`- extensions=${extensionPaths.map((item) => path.relative(repoRoot, item)).join(", ")}`)
+  console.log(`- OPENROUTER_API_KEY=${env.OPENROUTER_API_KEY ? "***" : "(missing)"}`)
   if (args.passthrough.length > 0) {
     console.log(`- args=${args.passthrough.join(" ")}`)
   }

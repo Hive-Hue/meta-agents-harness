@@ -1,0 +1,118 @@
+version: 1
+name: "meta-agents-harness"
+
+crews:
+  - id: "dev"
+    display_name: "Development Crew"
+    source_configs:
+      pi: ".pi/crew/dev/multi-team.yaml"
+      claude: ".claude/crew/dev/multi-team.yaml"
+      opencode: ".opencode/multi-team.yaml"
+    session:
+      pi_root: ".pi/crew/dev/sessions"
+      claude_mirror_root: ".claude/crew/dev/sessions"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        planning: "planning-lead"
+        engineering: "engineering-lead"
+        validation: "validation-lead"
+      workers:
+        planning: ["repo-analyst", "solution-architect"]
+        engineering: ["frontend-dev", "backend-dev"]
+        validation: ["qa-reviewer", "security-reviewer"]
+    agents:
+      - id: "orchestrator"
+        role: "orchestrator"
+        team: "orchestration"
+        model_ref: "orchestrator_default"
+        expertise: "orchestrator-mental-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        domain_profile: "read_only_repo"
+      - id: "planning-lead"
+        role: "lead"
+        team: "planning"
+        model_ref: "lead_default"
+        expertise: "planning-lead-mental-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        domain_profile: "read_only_repo"
+      - id: "engineering-lead"
+        role: "lead"
+        team: "engineering"
+        model_ref: "lead_default"
+        model: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
+        model_fallbacks:
+          - "zai/glm-5-turbo"
+          - "zai/glm-4.5-air"
+        expertise: "engineering-lead-mental-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        domain_profile: "read_only_repo"
+      - id: "validation-lead"
+        role: "lead"
+        team: "validation"
+        model_ref: "lead_default"
+        expertise: "validation-lead-mental-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        domain_profile: "read_only_repo"
+      - id: "repo-analyst"
+        role: "worker"
+        team: "planning"
+        model_ref: "worker_default"
+        expertise: "repo-analyst-mental-model"
+        skills: ["mental_model"]
+        domain_profile: "read_only_repo"
+      - id: "solution-architect"
+        role: "worker"
+        team: "planning"
+        model_ref: "lead_default"
+        expertise: "solution-architect-mental-model"
+        skills: ["mental_model"]
+        domain_profile: "specs_writer"
+      - id: "frontend-dev"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "frontend-dev-mental-model"
+        skills: ["mental_model"]
+        domain_profile: "frontend_impl"
+      - id: "backend-dev"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        model_fallbacks:
+          - "zai/glm-4.7"
+          - "zai/glm-4.5-air"
+        expertise: "backend-dev-mental-model"
+        skills: ["mental_model"]
+        domain_profile: "backend_impl"
+      - id: "qa-reviewer"
+        role: "worker"
+        team: "validation"
+        model_ref: "worker_default"
+        expertise: "qa-reviewer-mental-model"
+        skills: ["mental_model"]
+        domain_profile: "qa_security"
+      - id: "security-reviewer"
+        role: "worker"
+        team: "validation"
+        model_ref: "worker_default"
+        expertise: "security-reviewer-mental-model"
+        skills: ["mental_model"]
+        domain_profile: "qa_security"
+    runtime_overrides:
+      opencode:
+        permission:
+          task:
+            allow_delegate:
+              orchestrator: ["planning-lead", "engineering-lead", "validation-lead"]
+              planning-lead: ["repo-analyst", "solution-architect"]
+              engineering-lead: ["frontend-dev", "backend-dev"]
+              validation-lead: ["qa-reviewer", "security-reviewer"]
+      claude:
+        ccr:
+          team_routes:
+            orchestrator: ["planning-lead", "engineering-lead", "validation-lead"]
+      pi:
+        multi_team:
+          session_root: ".pi/crew/dev/sessions"
+          extension_entry: "extensions/multi-team.ts"

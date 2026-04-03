@@ -8,7 +8,7 @@
 
 # Meta Agents Harness
 
-Meta Agents Harness is a dual-licensed (AGPLv3 + commercial) product that provides a unified multi-agent harness for:
+Meta Agents Harness provides a unified multi-agent harness for:
 
 - OpenCode
 - Claude Code
@@ -179,9 +179,51 @@ The repository includes:
 
 - [meta-agents.yaml](./meta-agents.yaml)
 - [meta-agents.yaml.example](./examples/meta-agents.yaml.example)
+- [crew-dev.complete.example.yaml](./examples/crew-dev.complete.example.yaml)
+- [crew-marketing.complete.example.yaml](./examples/crew-marketing.complete.example.yaml)
 
 `meta-agents.yaml` is the canonical runtime index.  
 `examples/meta-agents.yaml.example` is the practical authoring template with crews, role permissions, and runtime-specific overrides.
+
+### Meta-Agents Schema & Examples
+
+Use this structure when authoring `meta-agents.yaml`:
+
+- `version`, `name`, `description`
+- `runtime_detection`
+  - `order`
+  - `forced.args`, `forced.env`
+  - `marker.<runtime>`
+  - `cli.<runtime>.direct_cli`, `cli.<runtime>.wrapper`
+- `runtimes`
+  - `pi.wrapper`, `pi.config_root`, `pi.config_pattern`, `pi.default_extensions`
+  - `claude.wrapper`, `claude.config_root`, `claude.config_pattern`, `claude.ccr.*`, `claude.mcp.*`
+  - `opencode.wrapper`, `opencode.config_root`, `opencode.config_pattern`, `opencode.task_policy`
+- `catalog`
+  - `models`
+  - `model_fallbacks` (ordered array por `model_ref`, com N níveis de fallback; inclua `worker_default` quando necessário)
+  - `skills`
+  - `domain_profiles`
+- `crews[]`
+  - `id`, `display_name`
+  - `source_configs`
+  - `session`
+  - `topology` (`orchestrator`, `leads`, `workers`)
+  - `agents[]` (`id`, `role`, `team`, `model_ref`, optional `model`, optional `model_fallbacks[]`, `expertise`, `skills`, `domain_profile`)
+  - `runtime_overrides` (`opencode.permission.task`, `claude.ccr.team_routes`, `pi.multi_team`)
+- `adapters.mapping_rules`
+
+Example files:
+
+- [meta-agents.yaml.example](./examples/meta-agents.yaml.example): full template with `dev` and `marketing` crews.
+- [crew-dev.complete.example.yaml](./examples/crew-dev.complete.example.yaml): complete isolated `dev` crew block.
+- [crew-marketing.complete.example.yaml](./examples/crew-marketing.complete.example.yaml): complete isolated `marketing` crew block.
+
+Model precedence in sync:
+
+- `agents[].model` (explicit per-agent override) has highest priority
+- then `agents[].model_ref -> catalog.models[model_ref]` (or OpenCode `runtimes.opencode.model_overrides[model_ref]`)
+- for fallbacks, `agents[].model_fallbacks` overrides `catalog.model_fallbacks[model_ref]`
 
 Generate runtime artifacts from canonical config:
 

@@ -1,18 +1,18 @@
 ---
 name: frontend-dev
-model: openai-codex/gpt-5.3-codex
+model: zai/glm-5-turbo
 role: worker
 team: Engineering
 expertise:
   path: .pi/crew/dev/expertise/frontend-dev-mental-model.yaml
-  use-when: Track UI architecture, component patterns, and safe frontend implementation approaches in Hivehue.
+  use-when: Track UI architecture, component patterns, and safe frontend
+    implementation approaches in Hivehue.
   updatable: true
   max-lines: 10000
 tools:
-  - read
   - write
   - edit
-  - bash
+  - read
   - grep
   - find
   - ls
@@ -20,23 +20,21 @@ tools:
   - mcp_servers
   - mcp_tools
   - mcp_call
+  - bash
 skills:
-  - path: .pi/skills/active-listener/SKILL.md
-    use-when: Always. Preserve the latest implementation constraints, acceptance criteria, and domain limits.
   - path: .pi/skills/mental-model/SKILL.md
-    use-when: Read at task start for context. Update after learning durable frontend patterns.
-  - path: .pi/skills/web-research/SKILL.md
-    use-when: Use when frontend decisions depend on current framework or ecosystem references.
-  - path: .pi/skills/zeplin-mcp-ops/SKILL.md
-    use-when: Use when implementation depends on Zeplin layers, tokens, or assets.
-  - path: .pi/skills/figma-via-codex/SKILL.md
-    use-when: Use when implementation depends on Figma context and MCP sidecar extraction.
+    use-when: Read at task start for context. Update after learning durable frontend
+      patterns.
 domain:
   - path: .
     read: true
     upsert: false
     delete: false
   - path: src/frontend/
+    read: true
+    upsert: true
+    delete: true
+  - path: web/
     read: true
     upsert: true
     delete: true

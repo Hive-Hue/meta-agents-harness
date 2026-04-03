@@ -47,10 +47,15 @@ function normalizeAgentNameFromFile(filePath: string): string {
 	return file;
 }
 
-function textFromContent(content: any): string {
+function textFromContent(content: any, message?: any): string {
 	if (typeof content === "string") return content;
-	if (!Array.isArray(content)) return "";
-	return content
+	if (!Array.isArray(content)) {
+		const errorMessage = `${message?.errorMessage || message?.error || ""}`.trim();
+		if (errorMessage) return `[error] ${errorMessage}`;
+		const stopReason = `${message?.stopReason || ""}`.trim();
+		return stopReason && stopReason !== "endTurn" ? `[stopReason] ${stopReason}` : "";
+	}
+	const text = content
 		.map((item: any) => {
 			if (!item) return "";
 			if (typeof item === "string") return item;
@@ -62,6 +67,11 @@ function textFromContent(content: any): string {
 		.filter(Boolean)
 		.join("\n")
 		.trim();
+	if (text) return text;
+	const errorMessage = `${message?.errorMessage || message?.error || ""}`.trim();
+	if (errorMessage) return `[error] ${errorMessage}`;
+	const stopReason = `${message?.stopReason || ""}`.trim();
+	return stopReason && stopReason !== "endTurn" ? `[stopReason] ${stopReason}` : "";
 }
 
 function summarizeSessionFile(filePath: string): AgentSessionSummary {
@@ -93,7 +103,7 @@ function summarizeSessionFile(filePath: string): AgentSessionSummary {
 		if (parsed?.type !== "message" || !parsed?.message) continue;
 
 		const role = parsed.message.role;
-		const contentText = textFromContent(parsed.message.content || []);
+		const contentText = textFromContent(parsed.message.content || [], parsed.message);
 		if (role === "user") {
 			userCount += 1;
 			if (contentText) lastUser = contentText;
@@ -304,7 +314,7 @@ class AgentSessionNavigator {
 				if (parsed?.type !== "message" || !parsed?.message) continue;
 
 				const role = String(parsed.message.role || "unknown").toUpperCase();
-				const text = textFromContent(parsed.message.content || []);
+				const text = textFromContent(parsed.message.content || [], parsed.message);
 				transcript.push(`[${String(index + 1).padStart(3, "0")}] ${role}`);
 				if (text.trim()) {
 					for (const row of text.replace(/\r/g, "").split("\n")) {

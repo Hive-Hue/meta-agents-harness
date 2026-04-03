@@ -5,20 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 10000
-  last_updated: 2026-03-31T18:55:52.916Z
+  last_updated: 2026-04-03T22:15:42.192Z
 observations: []
 open_questions: []
-campaign_orchestrations:
-  - date: 2026-03-31
-    note: "HiveHue Web Summit Rio 2026 marketing package needs an explicit workflow
-      layer: add phase exit criteria, staged review gates, and ownership split
-      (creative-lead for message/visual adaptation; validation-lead for claims,
-      CTA/link/UTM, and asset readiness). Current calendar ends earlier than
-      campaign post-event window, so D+6 to D+10 follow-up remains a risk unless
-      aligned."
-  - date: 2026-03-31
-    note: "HiveHue Web Summit Rio 2026 package needs workflow layer: phase exit
-      criteria, staged review gates, and split ownership (creative-lead =
-      message/visual adaptation; validation-lead = claims, CTA/link/UTM, asset
-      readiness). Calendar ends earlier than campaign post-event window, leaving
-      D+6 to D+10 underplanned."
+campaign_orchestrations: []

@@ -23,6 +23,9 @@ orchestrator:
   id: orchestrator
   role: ceo
   model: zai/glm-4.7
+  model_fallbacks:
+    - zai/glm-5-turbo
+    - zai/glm-4.5-air
   agent_file: .opencode/crew/marketing/agents/orchestrator.md
   expertise:
     path: .opencode/crew/marketing/expertise/orchestrator-mental-model.yaml
@@ -56,6 +59,9 @@ teams:
       id: planning-lead
       role: lead
       model: zai/glm-4.7
+      model_fallbacks:
+        - zai/glm-5-turbo
+        - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/planning-lead.md
       expertise:
         path: .opencode/crew/marketing/expertise/planning-lead-mental-model.yaml
@@ -94,6 +100,9 @@ teams:
       - id: market-researcher
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/market-researcher.md
         expertise:
           path: .opencode/crew/marketing/expertise/market-researcher-mental-model.yaml
@@ -127,6 +136,9 @@ teams:
       - id: campaign-strategist
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/campaign-strategist.md
         expertise:
           path: .opencode/crew/marketing/expertise/campaign-strategist-mental-model.yaml
@@ -162,6 +174,9 @@ teams:
       id: creative-lead
       role: lead
       model: zai/glm-4.7
+      model_fallbacks:
+        - zai/glm-5-turbo
+        - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/creative-lead.md
       expertise:
         path: .opencode/crew/marketing/expertise/creative-lead-mental-model.yaml
@@ -201,6 +216,9 @@ teams:
       - id: copywriter
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/copywriter.md
         expertise:
           path: .opencode/crew/marketing/expertise/copywriter-mental-model.yaml
@@ -234,6 +252,9 @@ teams:
       - id: creative-strategist
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/creative-strategist.md
         expertise:
           path: .opencode/crew/marketing/expertise/creative-strategist-mental-model.yaml
@@ -267,6 +288,9 @@ teams:
       - id: media-operator
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/media-operator.md
         expertise:
           path: .opencode/crew/marketing/expertise/media-operator-mental-model.yaml
@@ -302,6 +326,9 @@ teams:
       id: validation-lead
       role: lead
       model: zai/glm-4.7
+      model_fallbacks:
+        - zai/glm-5-turbo
+        - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/validation-lead.md
       expertise:
         path: .opencode/crew/marketing/expertise/validation-lead-mental-model.yaml
@@ -340,6 +367,9 @@ teams:
       - id: performance-analyst
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/performance-analyst.md
         expertise:
           path: .opencode/crew/marketing/expertise/performance-analyst-mental-model.yaml
@@ -373,6 +403,9 @@ teams:
       - id: brand-safety-reviewer
         role: worker
         model: zai/glm-4.7
+        model_fallbacks:
+          - zai/glm-4.7
+          - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/brand-safety-reviewer.md
         expertise:
           path: .opencode/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml

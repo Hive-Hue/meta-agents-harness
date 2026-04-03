@@ -46,6 +46,86 @@ function resolveExpertisePath(runtime, crewId, expertiseName) {
   return `.${runtime}/crew/${crewId}/expertise/${expertiseName}.yaml`
 }
 
+function parsePromptFrontmatter(raw) {
+  const match = `${raw || ""}`.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  if (!match) return { frontmatter: {}, body: `${raw || ""}` }
+  let frontmatter = {}
+  try {
+    frontmatter = YAML.parse(match[1]) || {}
+  } catch {
+    frontmatter = {}
+  }
+  return { frontmatter, body: match[2] || "" }
+}
+
+function buildPiPromptFromMeta(meta, crew, agent, currentRaw) {
+  const parsed = parsePromptFrontmatter(currentRaw)
+  const existing = parsed.frontmatter && typeof parsed.frontmatter === "object" ? parsed.frontmatter : {}
+  const skillsByPath = new Map(
+    Array.isArray(existing.skills)
+      ? existing.skills
+        .map((item) => [item?.path, item?.["use-when"] || item?.use_when || ""])
+        .filter((item) => typeof item[0] === "string" && item[0].trim())
+      : []
+  )
+
+  const next = {
+    ...existing,
+    name: agent.id,
+    model: resolveAgentModel(meta, "pi", agent),
+    role: agent.role,
+    team: titleCase(agent.team),
+    expertise: {
+      ...(existing.expertise && typeof existing.expertise === "object" ? existing.expertise : {}),
+      path: resolveExpertisePath("pi", crew.id, agent.expertise)
+    },
+    tools: runtimeTools(agent, "pi"),
+    skills: runtimeSkillPaths(meta, agent.skills, "pi").map((item) => ({
+      path: item,
+      "use-when": skillsByPath.get(item) || "Use when relevant to current task."
+    })),
+    domain: domainFromProfile(meta, agent.domain_profile, "pi")
+  }
+
+  const frontmatterText = YAML.stringify(next, { indent: 2 }).trimEnd()
+  const body = parsed.body && parsed.body.trim().length > 0
+    ? parsed.body.replace(/^\n+/, "")
+    : `# ${titleCase(agent.id)}\n`
+  return `---\n${frontmatterText}\n---\n\n${body}`
+}
+
+function syncPiPrompts(meta, crew, checkOnly) {
+  let ok = true
+  for (const agent of crew.agents || []) {
+    const relativePromptPath = resolvePromptPath("pi", crew.id, agent.id)
+    const promptPath = path.resolve(repoRoot, relativePromptPath)
+    if (checkOnly && !existsSync(promptPath)) {
+      console.log(`drift: missing ${rel(promptPath)}`)
+      ok = false
+      continue
+    }
+
+    const currentRaw = existsSync(promptPath) ? readFileSync(promptPath, "utf-8") : ""
+    const nextRaw = buildPiPromptFromMeta(meta, crew, agent, currentRaw)
+    if (checkOnly) {
+      if (currentRaw !== nextRaw) {
+        console.log(`drift: out-of-sync ${rel(promptPath)}`)
+        ok = false
+      } else {
+        console.log(`ok: ${rel(promptPath)}`)
+      }
+      continue
+    }
+
+    if (currentRaw !== nextRaw) {
+      mkdirSync(path.dirname(promptPath), { recursive: true })
+      writeFileSync(promptPath, nextRaw, "utf-8")
+      console.log(`synced: ${rel(promptPath)}`)
+    }
+  }
+  return ok
+}
+
 function ensureOpencodeArtifacts(crew) {
   const agentsDir = path.join(repoRoot, ".opencode", "crew", crew.id, "agents")
   const expertiseDir = path.join(repoRoot, ".opencode", "crew", crew.id, "expertise")
@@ -150,6 +230,45 @@ function resolveModel(meta, runtime, modelRef) {
   return meta.catalog?.models?.[modelRef] || "inherit"
 }
 
+function resolveModelToken(meta, runtime, token) {
+  const key = `${token || ""}`.trim()
+  if (!key) return ""
+  if (meta.catalog?.models?.[key] || runtime === "opencode") {
+    const resolved = resolveModel(meta, runtime, key)
+    return resolved || key
+  }
+  return key
+}
+
+function resolveAgentModel(meta, runtime, agent) {
+  const direct = `${agent?.model || ""}`.trim()
+  if (direct) return resolveModelToken(meta, runtime, direct)
+  return resolveModel(meta, runtime, agent?.model_ref)
+}
+
+function resolveModelFallbacks(meta, runtime, modelRef) {
+  const refs = meta.catalog?.model_fallbacks?.[modelRef]
+  if (!Array.isArray(refs)) return []
+  return refs
+    .map((item) => {
+      const key = `${item || ""}`.trim()
+      if (!key) return ""
+      if (meta.catalog?.models?.[key]) return resolveModel(meta, runtime, key)
+      return key
+    })
+    .filter(Boolean)
+}
+
+function resolveAgentFallbacks(meta, runtime, agent) {
+  const explicit = agent?.model_fallbacks
+  if (Array.isArray(explicit) && explicit.length > 0) {
+    return explicit
+      .map((item) => resolveModelToken(meta, runtime, item))
+      .filter(Boolean)
+  }
+  return resolveModelFallbacks(meta, runtime, agent?.model_ref)
+}
+
 function buildOpencodeCrewDoc(meta, crew) {
   const byId = new Map((crew.agents || []).map((agent) => [agent.id, agent]))
   const leadIds = Object.values(crew.topology?.leads || {})
@@ -168,7 +287,8 @@ function buildOpencodeCrewDoc(meta, crew) {
       .map((member) => ({
         id: member.id,
         role: "worker",
-        model: resolveModel(meta, "opencode", member.model_ref),
+        model: resolveAgentModel(meta, "opencode", member),
+        model_fallbacks: resolveAgentFallbacks(meta, "opencode", member),
         agent_file: `.opencode/crew/${crew.id}/agents/${member.id}.md`,
         expertise: {
           path: resolveExpertisePath("opencode", crew.id, member.expertise),
@@ -185,7 +305,8 @@ function buildOpencodeCrewDoc(meta, crew) {
       lead: {
         id: lead.id,
         role: "lead",
-        model: resolveModel(meta, "opencode", lead.model_ref),
+        model: resolveAgentModel(meta, "opencode", lead),
+        model_fallbacks: resolveAgentFallbacks(meta, "opencode", lead),
         agent_file: `.opencode/crew/${crew.id}/agents/${lead.id}.md`,
         expertise: {
           path: resolveExpertisePath("opencode", crew.id, lead.expertise),
@@ -224,7 +345,8 @@ function buildOpencodeCrewDoc(meta, crew) {
     orchestrator: {
       id: orchestrator.id,
       role: "ceo",
-      model: resolveModel(meta, "opencode", orchestrator.model_ref),
+      model: resolveAgentModel(meta, "opencode", orchestrator),
+      model_fallbacks: resolveAgentFallbacks(meta, "opencode", orchestrator),
       agent_file: `.opencode/crew/${crew.id}/agents/${orchestrator.id}.md`,
       expertise: {
         path: resolveExpertisePath("opencode", crew.id, orchestrator.expertise),
@@ -271,7 +393,8 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
           updatable: true,
           max_lines: 10000
         },
-        model: meta.catalog?.models?.[member.model_ref] || "inherit",
+        model: resolveAgentModel(meta, runtime, member),
+        model_fallbacks: resolveAgentFallbacks(meta, runtime, member),
         tools: runtimeTools(member, runtime),
         skills: runtimeSkillPaths(meta, member.skills, runtime),
         domain: domainFromProfile(meta, member.domain_profile, runtime)
@@ -289,7 +412,8 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
           updatable: true,
           max_lines: 10000
         },
-        model: meta.catalog?.models?.[lead.model_ref] || "inherit",
+        model: resolveAgentModel(meta, runtime, lead),
+        model_fallbacks: resolveAgentFallbacks(meta, runtime, lead),
         tools: runtimeTools(lead, runtime),
         skills: runtimeSkillPaths(meta, lead.skills, runtime),
         routes_to: memberIds,
@@ -327,7 +451,8 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
         updatable: true,
         max_lines: 10000
       },
-      model: meta.catalog?.models?.[orchestrator.model_ref] || "inherit",
+      model: resolveAgentModel(meta, runtime, orchestrator),
+      model_fallbacks: resolveAgentFallbacks(meta, runtime, orchestrator),
       tools: runtimeTools(orchestrator, runtime),
       skills: runtimeSkillPaths(meta, orchestrator.skills, runtime),
       routes_to: leadIds,
@@ -381,6 +506,7 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
     allGood = writeOrCheck(piPath, piYaml, checkOnly) && allGood
     allGood = writeOrCheck(claudePath, claudeYaml, checkOnly) && allGood
     allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, checkOnly) && allGood
+    allGood = syncPiPrompts(metaDoc, crew, checkOnly) && allGood
 
     if (!checkOnly) {
       ensureOpencodeArtifacts(crew)

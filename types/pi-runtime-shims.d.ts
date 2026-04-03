@@ -12,6 +12,7 @@ declare module "@mariozechner/pi-coding-agent" {
     registerShortcut(key: string, spec: { description?: string; handler: (ctx: ExtensionContext) => any }): void;
     registerTool(spec: any): void;
     on(event: string, handler: (event: any, ctx: ExtensionContext) => any): void;
+    setActiveTools?(tools: string[]): void;
   }
   export const isToolCallEventType: any;
 }
