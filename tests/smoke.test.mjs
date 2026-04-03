@@ -2,8 +2,11 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 
-const repoRoot = path.resolve("/home/alysson/Github/hivehue-multi-agents")
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const repoRoot = path.resolve(__dirname, "..")
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
 
 function run(args) {

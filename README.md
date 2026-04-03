@@ -1,3 +1,11 @@
+<p align="center">
+  <img src="./assets/banner_metaagent.png" alt="Meta Agents Harness" width="100%" />
+</p>
+
+[![](https://img.shields.io/github/actions/workflow/status/Hive-Hue/meta-agents-harness/validate.yml?style=flat&label=validate)](https://github.com/Hive-Hue/meta-agents-harness/actions/workflows/validate.yml)
+[![](https://img.shields.io/github/last-commit/Hive-Hue/meta-agents-harness?style=flat)](https://github.com/Hive-Hue/meta-agents-harness/commits)
+[![](https://img.shields.io/badge/license-AGPLv3%20%2B%20Commercial-6f42c1?style=flat)](./LICENSE)
+
 # Meta Agents Harness
 
 Meta Agents Harness is a dual-licensed (AGPLv3 + commercial) product that provides a unified multi-agent harness for:
