@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": false,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ]
+  },
+  "include": [
+    "extensions/**/*.ts",
+    ".pi/**/*.ts",
+    ".claude/**/*.ts",
+    ".opencode/**/*.ts",
+    "types/**/*.d.ts"
+  ]
+}

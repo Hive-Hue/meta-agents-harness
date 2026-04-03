@@ -212,6 +212,7 @@ Top-level sections:
 - `runtime_detection.order`: precedence between explicit runtime, repository markers, and installed executables.
 - `runtimes.<runtime>.wrapper`: command wrapper to execute (`pimh`, `ccmh`, `ocmh`).
 - `runtimes.<runtime>.config_root`: runtime root folder (`.pi`, `.claude`, `.opencode`).
+- `runtimes.pi.default_extensions`: default PI extensions injected by `pimh run` when `--extension` is not provided.
 - `crews[].topology`: orchestrator, leads, and workers in abstract form.
 - `crews[].role_permissions`: runtime-agnostic permission intent.
 - `crews[].runtime_overrides`: per-runtime controls (CCR on Claude, `permission.task` on OpenCode, `multi-team`/extension on PI).
@@ -283,6 +284,7 @@ PI runtime integration is based on:
 - `.pi/bin/pimh` wrapper orchestration
 - `.pi/scripts/*.mjs` runtime helpers
 - `extensions/*.ts` loaded by `.pi/scripts/run-crew.mjs`
+- default PI extension set on `run`: `multi-team`, `agent-session-navigator`, `mcp-bridge`, `theme-cycler`
 
 Quick checks:
 

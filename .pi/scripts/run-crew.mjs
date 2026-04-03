@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import YAML from "yaml"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -9,7 +10,36 @@ const piRoot = path.resolve(__dirname, "..")
 const repoRoot = path.resolve(piRoot, "..")
 const crewRoot = path.join(piRoot, "crew")
 const activeMetaPath = path.join(piRoot, ".active-crew.json")
-const defaultExtension = "extensions/multi-team.ts"
+const fallbackExtensions = [
+  "extensions/multi-team.ts",
+  "extensions/agent-session-navigator.ts",
+  "extensions/mcp-bridge.ts",
+  "extensions/theme-cycler.ts"
+]
+
+function parseExtensionList(raw) {
+  if (!raw) return []
+  return `${raw}`
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function loadDefaultExtensionsFromMeta() {
+  const metaPath = path.join(repoRoot, "meta-agents.yaml")
+  if (!existsSync(metaPath)) return fallbackExtensions
+  try {
+    const meta = YAML.parse(readFileSync(metaPath, "utf-8")) || {}
+    const configured = meta?.runtimes?.pi?.default_extensions
+    if (!Array.isArray(configured) || configured.length === 0) return fallbackExtensions
+    const normalized = configured
+      .map((item) => `${item || ""}`.trim())
+      .filter(Boolean)
+    return normalized.length > 0 ? normalized : fallbackExtensions
+  } catch {
+    return fallbackExtensions
+  }
+}
 
 function listCrews() {
   if (!existsSync(crewRoot)) return []
@@ -92,7 +122,7 @@ function parseArgs(argv) {
     crew: undefined,
     config: undefined,
     sessionRoot: undefined,
-    extension: process.env.PI_MULTI_EXTENSION || defaultExtension,
+    extensions: parseExtensionList(process.env.PI_MULTI_EXTENSION),
     newSession: false,
     passthrough: []
   }
@@ -124,7 +154,10 @@ function parseArgs(argv) {
       continue
     }
     if (token === "--extension") {
-      args.extension = argv[i + 1]
+      const value = argv[i + 1]
+      if (value) {
+        args.extensions.push(...parseExtensionList(value))
+      }
       i += 1
       continue
     }
@@ -145,7 +178,7 @@ function printHelp() {
   console.log("  --crew <name>          Run using .pi/crew/<name>/multi-team.yaml")
   console.log("  --config <path>        Explicit PI config path (overrides active crew)")
   console.log("  --session-root <path>  Explicit PI session root")
-  console.log("  --extension <path>     PI extension path (default: extensions/multi-team.ts)")
+  console.log("  --extension <path>     Add PI extension path (supports repeated flag or comma-separated values)")
   console.log("  --new-session          Force a new multi-team session folder even with -c")
   console.log("")
   console.log("Examples:")
@@ -281,15 +314,19 @@ function main() {
 
   const configPath = selected.configPath
   const sessionBaseRoot = selected.sessionRoot
-  const extensionPath = resolveFromRepo(args.extension)
+  const defaultExtensions = loadDefaultExtensionsFromMeta()
+  const configuredExtensions = args.extensions.length > 0 ? args.extensions : defaultExtensions
+  const extensionPaths = Array.from(new Set(configuredExtensions)).map((item) => resolveFromRepo(item))
 
   if (!existsSync(configPath)) {
     fail(`config not found: ${path.relative(repoRoot, configPath)}`)
     return
   }
-  if (!existsSync(extensionPath)) {
-    fail(`extension not found: ${path.relative(repoRoot, extensionPath)}`)
-    return
+  for (const extensionPath of extensionPaths) {
+    if (!existsSync(extensionPath)) {
+      fail(`extension not found: ${path.relative(repoRoot, extensionPath)}`)
+      return
+    }
   }
 
   mkdirSync(sessionBaseRoot, { recursive: true })
@@ -300,7 +337,8 @@ function main() {
   mkdirSync(sessionRoot, { recursive: true })
   persistRunMetadata(selected, configPath, sessionBaseRoot, sessionRoot, sessionId)
 
-  const commandArgs = ["-e", extensionPath, ...args.passthrough]
+  const extensionArgs = extensionPaths.flatMap((extensionPath) => ["-e", extensionPath])
+  const commandArgs = [...extensionArgs, ...args.passthrough]
   const env = {
     ...process.env,
     PI_MULTI_CONFIG: configPath,
@@ -314,7 +352,7 @@ function main() {
   console.log(`- PI_MULTI_SESSION_ROOT=${path.relative(repoRoot, sessionRoot)}`)
   console.log(`- PI_MULTI_SESSION_ID=${sessionId}`)
   console.log(`- session_mode=${sessionSelection.mode}`)
-  console.log(`- extension=${path.relative(repoRoot, extensionPath)}`)
+  console.log(`- extensions=${extensionPaths.map((item) => path.relative(repoRoot, item)).join(", ")}`)
   if (args.passthrough.length > 0) {
     console.log(`- args=${args.passthrough.join(" ")}`)
   }

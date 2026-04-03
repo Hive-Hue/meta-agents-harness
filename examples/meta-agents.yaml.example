@@ -36,6 +36,11 @@ runtimes:
     wrapper: "pimh"
     config_root: ".pi"
     extension_root: "extensions"
+    default_extensions:
+      - "extensions/multi-team.ts"
+      - "extensions/agent-session-navigator.ts"
+      - "extensions/mcp-bridge.ts"
+      - "extensions/theme-cycler.ts"
   claude:
     wrapper: "ccmh"
     config_root: ".claude"

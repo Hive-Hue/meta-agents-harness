@@ -36,6 +36,11 @@ runtimes:
     config_root: ".pi"
     extension_root: "extensions"
     config_pattern: ".pi/crew/<crew>/multi-team.yaml"
+    default_extensions:
+      - "extensions/multi-team.ts"
+      - "extensions/agent-session-navigator.ts"
+      - "extensions/mcp-bridge.ts"
+      - "extensions/theme-cycler.ts"
   claude:
     wrapper: "ccmh"
     config_root: ".claude"
