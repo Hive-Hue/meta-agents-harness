@@ -7,6 +7,7 @@
     "mah": "bin/mah"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "detect": "node scripts/meta-agents-harness.mjs detect",
     "doctor": "node scripts/meta-agents-harness.mjs doctor",
     "check:runtime": "node scripts/meta-agents-harness.mjs check:runtime",

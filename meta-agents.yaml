@@ -1,0 +1,33 @@
+version: 1
+name: meta-agents-harness
+description: Unified multi-runtime harness for OpenCode, Claude Code, and PI.
+runtime_detection:
+  order:
+    - forced
+    - marker
+    - cli
+  forced:
+    args:
+      - "--runtime=<name>"
+      - "--runtime <name>"
+    env:
+      - MAH_RUNTIME
+  marker:
+    pi: ".pi"
+    claude: ".claude"
+    opencode: ".opencode"
+  cli:
+    pi: "pi"
+    claude: "claude"
+    opencode: "opencode"
+runtimes:
+  pi:
+    wrapper: "pimh"
+    config_root: ".pi"
+    extension_root: "extensions"
+  claude:
+    wrapper: "ccmh"
+    config_root: ".claude"
+  opencode:
+    wrapper: "ocmh"
+    config_root: ".opencode"

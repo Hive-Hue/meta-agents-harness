@@ -16,6 +16,12 @@ Meta Agents Harness is a dual-licensed (AGPLv3 + commercial) product that provid
 
 It detects the available runtime in the current repository and adapts commands dynamically through a single CLI: `mah`.
 
+Core value:
+
+- one command surface for three runtimes
+- deterministic runtime detection and fallback behavior
+- shared multi-team operating model (orchestrator -> leads -> workers)
+
 ## Key Idea
 
 Instead of maintaining separate operator flows per runtime, Meta Agents Harness exposes a common command surface and dispatches to the correct underlying toolchain.
@@ -31,7 +37,7 @@ Detection priority:
 ```bash
 git clone https://github.com/Hive-Hue/meta-agents-harness.git
 cd meta-agents-harness
-npm install
+npm run setup
 ```
 
 Optional environment setup:
@@ -39,6 +45,8 @@ Optional environment setup:
 ```bash
 cp .env.sample .env
 ```
+
+`npm run setup` installs root dependencies plus runtime dependencies in `.opencode`, `.claude`, and `.pi`.
 
 ## Unified CLI (`mah`)
 
@@ -98,6 +106,14 @@ mah --runtime claude check:runtime
 mah --runtime pi run -c
 ```
 
+## Canonical Config
+
+The repository now includes a canonical runtime index file:
+
+- [meta-agents.yaml](./meta-agents.yaml)
+
+This file documents runtime detection order, marker directories, CLI fallback, and wrapper mappings in one place.
+
 ## Runtime-Specific Assets
 
 This repository ships runtime assets for all three CLIs:
@@ -109,12 +125,58 @@ This repository ships runtime assets for all three CLIs:
 
 The `mah` CLI is runtime-agnostic and dispatches dynamically based on detected runtime markers or explicit `--runtime`.
 
-## Local Development
+## Adapter Model
 
-Install OpenCode runtime dependencies:
+`mah` uses an adapter-like dispatch model:
+
+- runtime profile selection (`pi`, `claude`, `opencode`)
+- command variants per runtime (`list:crews`, `use`, `run`, `validate`)
+- executable fallback (wrapper first, runtime/package script fallback)
+
+Implementation reference:
+
+- [meta-agents-harness.mjs](./scripts/meta-agents-harness.mjs)
+
+## PI Integration Details
+
+PI runtime integration is based on:
+
+- `.pi/bin/pimh` wrapper orchestration
+- `.pi/scripts/*.mjs` runtime helpers
+- `extensions/*.ts` loaded by `.pi/scripts/run-crew.mjs`
+
+Quick checks:
 
 ```bash
-npm --prefix .opencode install
+node .pi/bin/pimh check:runtime
+node .pi/bin/pimh list:crews
+```
+
+## Comparison with Legacy Harness Repos
+
+- `pi-multi-harness`, `claude-multi-harness`, and `opencode-multi-harness` expose runtime-specific flows.
+- `meta-agents-harness` keeps those runtime assets, but adds a unified entrypoint (`mah`) and a canonical runtime index (`meta-agents.yaml`).
+- migration path is incremental: existing wrappers remain valid while teams adopt `mah`.
+
+## Troubleshooting
+
+- `ERROR: could not detect runtime`
+  - ensure one of `.pi`, `.claude`, `.opencode` exists
+  - or pass explicit `--runtime`
+- `ERROR: no executable found for runtime`
+  - install wrapper/runtime CLI (`pimh`, `ccmh`, `ocmh`, `pi`, `claude`, `opencode`)
+  - run `npm run setup`
+- PI runtime starts but fails on extension path
+  - confirm `extensions/` exists and includes `multi-team.ts`
+- validate badge shows not found
+  - ensure `.github/workflows/validate.yml` exists on default branch
+
+## Local Development
+
+Install all dependencies:
+
+```bash
+npm run setup
 ```
 
 Run smoke tests for `mah`:
