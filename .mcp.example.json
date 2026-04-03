@@ -1,5 +1,13 @@
 {
   "mcpServers": {
+    "mental-model": {
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        ".claude/scripts/update-mental-model-mcp.mjs"
+      ],
+      "timeout_ms": 30000
+    },
     "context7": {
       "transport": "stdio",
       "command": "npx",

@@ -60,13 +60,39 @@ function commandExists(command) {
   return probe.status === 0
 }
 
+function runtimeExecutableStatus(profile) {
+  const directCliAvailable = commandExists(profile.directCli)
+  const wrapperAvailable = commandExists(profile.wrapper)
+  return { directCliAvailable, wrapperAvailable }
+}
+
 function parseRuntimeArg(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i]
     if (token === "--runtime" && argv[i + 1]) return argv[i + 1]
+    if (token === "-r" && argv[i + 1]) return argv[i + 1]
+    if (token === "-f" && argv[i + 1]) return argv[i + 1]
     if (token.startsWith("--runtime=")) return token.slice("--runtime=".length)
+    if (token.startsWith("-r=")) return token.slice("-r=".length)
+    if (token.startsWith("-f=")) return token.slice("-f=".length)
   }
   return process.env.MAH_RUNTIME?.trim() || ""
+}
+
+function stripRuntimeArgs(argv) {
+  const cleaned = []
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === "--runtime" || token === "-r" || token === "-f") {
+      i += 1
+      continue
+    }
+    if (token.startsWith("--runtime=") || token.startsWith("-r=") || token.startsWith("-f=")) {
+      continue
+    }
+    cleaned.push(token)
+  }
+  return cleaned
 }
 
 function detectRuntime(cwd, forcedRuntime) {
@@ -87,9 +113,14 @@ function detectRuntime(cwd, forcedRuntime) {
     if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
   }
 
-  const byCli = Object.entries(runtimeProfiles).filter(([, profile]) => commandExists(profile.directCli))
+  const byCli = Object.entries(runtimeProfiles)
+    .map(([name, profile]) => ({ name, profile, status: runtimeExecutableStatus(profile) }))
+    .filter(({ status }) => status.directCliAvailable || status.wrapperAvailable)
+
   if (byCli.length > 0) {
-    return { runtime: byCli[0][0], reason: "cli" }
+    const selected = byCli[0]
+    const source = selected.status.directCliAvailable ? selected.profile.directCli : selected.profile.wrapper
+    return { runtime: selected.name, reason: `cli:${source}` }
   }
 
   return { runtime: null, reason: "none" }
@@ -113,6 +144,8 @@ function printHelp() {
   console.log("")
   console.log("Options:")
   console.log("  --runtime <pi|claude|opencode>")
+  console.log("  -r <pi|claude|opencode>")
+  console.log("  -f <pi|claude|opencode>")
 }
 
 function runCommand(command, args, passthrough = []) {
@@ -150,7 +183,8 @@ function dispatch(runtime, command, passthrough) {
 
 function main() {
   const argv = process.argv.slice(2)
-  const first = argv[0]
+  const normalizedArgv = stripRuntimeArgs(argv)
+  const first = normalizedArgv[0]
 
   if (!first || first === "--help" || first === "-h" || first === "help") {
     printHelp()
@@ -186,13 +220,7 @@ function main() {
   }
 
   const command = first
-  const passthrough = argv.slice(1).filter((token, index, array) => {
-    if (token === "--runtime") {
-      return false
-    }
-    if (array[index - 1] === "--runtime") return false
-    return !token.startsWith("--runtime=")
-  })
+  const passthrough = normalizedArgv.slice(1)
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)
   process.exitCode = status

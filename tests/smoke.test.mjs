@@ -28,3 +28,10 @@ test("help returns usage", () => {
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /Usage:/)
 })
+
+test("forced runtime works when flag appears before command", () => {
+  const result = run(["--runtime", "opencode", "detect"])
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /runtime=opencode/)
+  assert.match(result.stdout, /reason=forced/)
+})

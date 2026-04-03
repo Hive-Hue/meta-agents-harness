@@ -30,7 +30,7 @@ Detection priority:
 
 1. Forced runtime via `--runtime` or `MAH_RUNTIME`
 2. Runtime marker directory in repository (`.pi`, `.claude`, `.opencode`)
-3. Installed CLI binaries (`pi`, `claude`, `opencode`)
+3. Installed global/local executables (`pi`/`pimh`, `claude`/`ccmh`, `opencode`/`ocmh`)
 
 ## Install
 
@@ -47,63 +47,118 @@ cp .env.sample .env
 ```
 
 `npm run setup` installs root dependencies plus runtime dependencies in `.opencode`, `.claude`, and `.pi`.
+During setup, if `.mcp.example.json` exists and `.mcp.json` is missing, it auto-creates `.mcp.json`.
+
+### MCP Configuration
+
+Meta Agents Harness uses:
+
+- `.mcp.example.json`: tracked template for repository defaults
+- `.mcp.json`: local active MCP config (gitignored)
+
+Recommended flow:
+
+```bash
+cp .mcp.example.json .mcp.json
+```
+
+Then adjust `.mcp.json` with your local secrets/env references.
+
+### CLI Availability
+
+After setup, you have two ways to run `mah`:
+
+- Local (no global install): `node bin/mah <command>`
+- Global: install the package globally and run `mah` directly
+
+Global installation options:
+
+```bash
+npm install -g .
+# or
+npm install -g git+https://github.com/Hive-Hue/meta-agents-harness.git
+```
 
 ## Unified CLI (`mah`)
 
 Show help:
 
 ```bash
+node bin/mah --help
+# or, if installed globally:
 mah --help
 ```
 
 Detect runtime:
 
 ```bash
+node bin/mah detect
+# or:
 mah detect
 ```
 
 Run runtime check:
 
 ```bash
+node bin/mah check:runtime
+# or:
 mah check:runtime
 ```
 
 Validate configuration:
 
 ```bash
+node bin/mah validate
+# or:
 mah validate
 ```
 
 List crews:
 
 ```bash
+node bin/mah list:crews
+# or:
 mah list:crews
 ```
 
 Activate crew:
 
 ```bash
+node bin/mah use <crew>
+# or:
 mah use <crew>
 ```
 
 Clear active crew:
 
 ```bash
+node bin/mah clear
+# or:
 mah clear
 ```
 
 Run interactive runtime:
 
 ```bash
+node bin/mah run
+# or:
 mah run
 ```
 
 Force explicit runtime:
 
 ```bash
+node bin/mah --runtime opencode validate
+node bin/mah --runtime claude check:runtime
+node bin/mah --runtime pi run -c
+node bin/mah -r opencode validate
+node bin/mah -f opencode validate
+# or:
 mah --runtime opencode validate
 mah --runtime claude check:runtime
 mah --runtime pi run -c
+mah -r opencode validate
+mah -f opencode validate
 ```
 
 ## Canonical Config
@@ -128,7 +183,7 @@ Top-level sections:
 
 ### Field-by-Field Guide
 
-- `runtime_detection.order`: precedence between explicit runtime, repository markers, and installed CLIs.
+- `runtime_detection.order`: precedence between explicit runtime, repository markers, and installed executables.
 - `runtimes.<runtime>.wrapper`: command wrapper to execute (`pimh`, `ccmh`, `ocmh`).
 - `runtimes.<runtime>.config_root`: runtime root folder (`.pi`, `.claude`, `.opencode`).
 - `crews[].topology`: orchestrator, leads, and workers in abstract form.
@@ -194,10 +249,17 @@ node .pi/bin/pimh list:crews
 
 - `ERROR: could not detect runtime`
   - ensure one of `.pi`, `.claude`, `.opencode` exists
+  - or ensure runtime executables are installed globally/in PATH (`pi|pimh`, `claude|ccmh`, `opencode|ocmh`)
   - or pass explicit `--runtime`
 - `ERROR: no executable found for runtime`
   - install wrapper/runtime CLI (`pimh`, `ccmh`, `ocmh`, `pi`, `claude`, `opencode`)
   - run `npm run setup`
+- `ERROR: missing .mcp.json`
+  - copy template: `cp .mcp.example.json .mcp.json`
+  - review MCP server env vars in `.env`
+- `mah: command not found`
+  - run with local entrypoint: `node bin/mah --help`
+  - or install globally: `npm install -g .`
 - PI runtime starts but fails on extension path
   - confirm `extensions/` exists and includes `multi-team.ts`
 - validate badge shows not found

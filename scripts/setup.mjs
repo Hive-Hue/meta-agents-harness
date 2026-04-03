@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process"
+import { copyFileSync, existsSync } from "node:fs"
+import path from "node:path"
 
 const steps = [
   { name: "root dependencies", command: "npm", args: ["install"] },
@@ -18,6 +20,13 @@ for (const step of steps) {
     process.exitCode = typeof child.status === "number" ? child.status : 1
     process.exit(process.exitCode)
   }
+}
+
+const mcpExamplePath = path.resolve(process.cwd(), ".mcp.example.json")
+const mcpLocalPath = path.resolve(process.cwd(), ".mcp.json")
+if (existsSync(mcpExamplePath) && !existsSync(mcpLocalPath)) {
+  copyFileSync(mcpExamplePath, mcpLocalPath)
+  console.log("setup: created .mcp.json from .mcp.example.json")
 }
 
 console.log("setup: done")

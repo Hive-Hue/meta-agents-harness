@@ -17,9 +17,15 @@ runtime_detection:
     claude: ".claude"
     opencode: ".opencode"
   cli:
-    pi: "pi"
-    claude: "claude"
-    opencode: "opencode"
+    pi:
+      direct_cli: "pi"
+      wrapper: "pimh"
+    claude:
+      direct_cli: "claude"
+      wrapper: "ccmh"
+    opencode:
+      direct_cli: "opencode"
+      wrapper: "ocmh"
 runtimes:
   pi:
     wrapper: "pimh"

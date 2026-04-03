@@ -52,8 +52,10 @@ function main() {
     return [".mjs", ".cjs", ".js", ""].includes(path.extname(filePath));
   });
 
+  const mcpConfigPath = path.join(repoRoot, ".mcp.json");
+
   const jsonFiles = [
-    path.join(repoRoot, ".mcp.json"),
+    mcpConfigPath,
     path.join(runtimeRoot, "package.json"),
     path.join(runtimeRoot, "settings.json"),
     path.join(runtimeRoot, "ccr", "route-map.example.json"),
@@ -78,7 +80,11 @@ function main() {
   for (const filePath of jsonFiles) {
     if (!existsSync(filePath)) {
       failures += 1;
-      console.error(`ERROR: missing ${rel(filePath)}`);
+      if (filePath === mcpConfigPath) {
+        console.error(`ERROR: missing ${rel(filePath)} (copy from .mcp.example.json)`);
+      } else {
+        console.error(`ERROR: missing ${rel(filePath)}`);
+      }
       continue;
     }
 
