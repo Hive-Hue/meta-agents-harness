@@ -7,7 +7,31 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const opencodeRoot = path.resolve(__dirname, "..")
 const repoRoot = path.resolve(opencodeRoot, "..")
-const configPath = path.join(opencodeRoot, "multi-team.yaml")
+
+function parseConfigArg(argv) {
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === "--config" && argv[i + 1]) return argv[i + 1]
+    if (token.startsWith("--config=")) return token.slice("--config=".length)
+  }
+  return ""
+}
+
+function resolveConfigPath() {
+  const argPath = parseConfigArg(process.argv.slice(2))
+  const envPath = process.env.OPENCODE_MULTI_CREW_CONFIG || process.env.OPENCODE_MULTI_CONFIG || ""
+  const activeMetaPath = path.join(opencodeRoot, ".active-crew.json")
+  let activeSource = ""
+  if (existsSync(activeMetaPath)) {
+    try {
+      const active = JSON.parse(readFileSync(activeMetaPath, "utf-8"))
+      activeSource = `${active?.source_config || ""}`.trim()
+    } catch {}
+  }
+
+  const candidate = argPath || envPath || activeSource || path.join(opencodeRoot, "multi-team.yaml")
+  return path.isAbsolute(candidate) ? candidate : path.resolve(repoRoot, candidate)
+}
 
 function fail(message) {
   console.error(`ERROR: ${message}`)
@@ -71,6 +95,7 @@ function collectAgent(agent, label, registry) {
 }
 
 function main() {
+  const configPath = resolveConfigPath()
   if (!existsSync(configPath)) {
     fail(`config file not found at ${configPath}`)
     return

@@ -1,0 +1,319 @@
+version: 1
+name: dev-multi-team-harness
+runtime:
+  harness: opencode
+  source_of_truth: meta-agents.yaml
+  source_crew: dev
+  validation_command: npm --prefix .opencode run validate:multi-team
+shared:
+  skills:
+    - path: .opencode/skills/delegate-bounded/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/zero-micromanagement/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/mental-model/SKILL.md
+      use-when: Use when relevant to current task.
+  tools:
+    - update-mental-model
+  mcp:
+    - clickup
+    - github
+    - context7
+orchestrator:
+  id: orchestrator
+  role: ceo
+  model: zai/glm-4.7
+  agent_file: .opencode/crew/dev/agents/orchestrator.md
+  expertise:
+    path: .opencode/crew/dev/expertise/orchestrator-mental-model.yaml
+    use-when: Track durable learnings for orchestrator.
+  skills:
+    - path: .opencode/skills/delegate-bounded/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/zero-micromanagement/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/mental-model/SKILL.md
+      use-when: Use when relevant to current task.
+  tools:
+    - task
+    - update-mental-model
+  mcp_access:
+    - clickup
+    - github
+    - context7
+  routes_to:
+    - planning-lead
+    - engineering-lead
+    - validation-lead
+  domain:
+    - path: .
+      read: true
+      edit: false
+      bash: false
+teams:
+  - name: Planning
+    lead:
+      id: planning-lead
+      role: lead
+      model: zai/glm-4.7
+      agent_file: .opencode/crew/dev/agents/planning-lead.md
+      expertise:
+        path: .opencode/crew/dev/expertise/planning-lead-mental-model.yaml
+        use-when: Track durable learnings for planning-lead.
+      skills:
+        - path: .opencode/skills/delegate-bounded/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/zero-micromanagement/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/mental-model/SKILL.md
+          use-when: Use when relevant to current task.
+      tools:
+        - task
+        - update-mental-model
+      mcp_access:
+        - clickup
+        - github
+        - context7
+      routes_to:
+        - repo-analyst
+        - solution-architect
+      domain:
+        - path: .
+          read: true
+          edit: false
+          bash: false
+    members:
+      - id: repo-analyst
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/dev/agents/repo-analyst.md
+        expertise:
+          path: .opencode/crew/dev/expertise/repo-analyst-mental-model.yaml
+          use-when: Track durable learnings for repo-analyst.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+      - id: solution-architect
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/dev/agents/solution-architect.md
+        expertise:
+          path: .opencode/crew/dev/expertise/solution-architect-mental-model.yaml
+          use-when: Track durable learnings for solution-architect.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: specs/
+            read: true
+            edit: true
+            bash: false
+  - name: Engineering
+    lead:
+      id: engineering-lead
+      role: lead
+      model: zai/glm-4.7
+      agent_file: .opencode/crew/dev/agents/engineering-lead.md
+      expertise:
+        path: .opencode/crew/dev/expertise/engineering-lead-mental-model.yaml
+        use-when: Track durable learnings for engineering-lead.
+      skills:
+        - path: .opencode/skills/delegate-bounded/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/zero-micromanagement/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/mental-model/SKILL.md
+          use-when: Use when relevant to current task.
+      tools:
+        - task
+        - update-mental-model
+      mcp_access:
+        - clickup
+        - github
+        - context7
+      routes_to:
+        - frontend-dev
+        - backend-dev
+      domain:
+        - path: .
+          read: true
+          edit: false
+          bash: false
+    members:
+      - id: frontend-dev
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/dev/agents/frontend-dev.md
+        expertise:
+          path: .opencode/crew/dev/expertise/frontend-dev-mental-model.yaml
+          use-when: Track durable learnings for frontend-dev.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: src/frontend/
+            read: true
+            edit: true
+            bash: true
+          - path: web/
+            read: true
+            edit: true
+            bash: true
+      - id: backend-dev
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/dev/agents/backend-dev.md
+        expertise:
+          path: .opencode/crew/dev/expertise/backend-dev-mental-model.yaml
+          use-when: Track durable learnings for backend-dev.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: src/backend/
+            read: true
+            edit: true
+            bash: true
+          - path: api/
+            read: true
+            edit: true
+            bash: true
+  - name: Validation
+    lead:
+      id: validation-lead
+      role: lead
+      model: zai/glm-4.7
+      agent_file: .opencode/crew/dev/agents/validation-lead.md
+      expertise:
+        path: .opencode/crew/dev/expertise/validation-lead-mental-model.yaml
+        use-when: Track durable learnings for validation-lead.
+      skills:
+        - path: .opencode/skills/delegate-bounded/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/zero-micromanagement/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/mental-model/SKILL.md
+          use-when: Use when relevant to current task.
+      tools:
+        - task
+        - update-mental-model
+      mcp_access:
+        - clickup
+        - github
+        - context7
+      routes_to:
+        - qa-reviewer
+        - security-reviewer
+      domain:
+        - path: .
+          read: true
+          edit: false
+          bash: false
+    members:
+      - id: qa-reviewer
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/dev/agents/qa-reviewer.md
+        expertise:
+          path: .opencode/crew/dev/expertise/qa-reviewer-mental-model.yaml
+          use-when: Track durable learnings for qa-reviewer.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: true
+      - id: security-reviewer
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/dev/agents/security-reviewer.md
+        expertise:
+          path: .opencode/crew/dev/expertise/security-reviewer-mental-model.yaml
+          use-when: Track durable learnings for security-reviewer.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: true

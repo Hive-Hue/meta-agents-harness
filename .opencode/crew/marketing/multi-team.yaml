@@ -1,0 +1,405 @@
+version: 1
+name: marketing-multi-team-harness
+runtime:
+  harness: opencode
+  source_of_truth: meta-agents.yaml
+  source_crew: marketing
+  validation_command: npm --prefix .opencode run validate:multi-team
+shared:
+  skills:
+    - path: .opencode/skills/delegate-bounded/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/zero-micromanagement/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/mental-model/SKILL.md
+      use-when: Use when relevant to current task.
+  tools:
+    - update-mental-model
+  mcp:
+    - clickup
+    - github
+    - context7
+orchestrator:
+  id: orchestrator
+  role: ceo
+  model: zai/glm-4.7
+  agent_file: .opencode/crew/marketing/agents/orchestrator.md
+  expertise:
+    path: .opencode/crew/marketing/expertise/orchestrator-mental-model.yaml
+    use-when: Track durable learnings for orchestrator.
+  skills:
+    - path: .opencode/skills/delegate-bounded/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/zero-micromanagement/SKILL.md
+      use-when: Use when relevant to current task.
+    - path: .opencode/skills/mental-model/SKILL.md
+      use-when: Use when relevant to current task.
+  tools:
+    - task
+    - update-mental-model
+  mcp_access:
+    - clickup
+    - github
+    - context7
+  routes_to:
+    - planning-lead
+    - creative-lead
+    - validation-lead
+  domain:
+    - path: .
+      read: true
+      edit: false
+      bash: false
+teams:
+  - name: Planning
+    lead:
+      id: planning-lead
+      role: lead
+      model: zai/glm-4.7
+      agent_file: .opencode/crew/marketing/agents/planning-lead.md
+      expertise:
+        path: .opencode/crew/marketing/expertise/planning-lead-mental-model.yaml
+        use-when: Track durable learnings for planning-lead.
+      skills:
+        - path: .opencode/skills/delegate-bounded/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/zero-micromanagement/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/mental-model/SKILL.md
+          use-when: Use when relevant to current task.
+      tools:
+        - task
+        - update-mental-model
+      mcp_access:
+        - clickup
+        - github
+        - context7
+      routes_to:
+        - market-researcher
+        - campaign-strategist
+      domain:
+        - path: .
+          read: true
+          edit: false
+          bash: false
+        - path: campaigns/
+          read: true
+          edit: true
+          bash: false
+        - path: assets/
+          read: true
+          edit: true
+          bash: false
+    members:
+      - id: market-researcher
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/market-researcher.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/market-researcher-mental-model.yaml
+          use-when: Track durable learnings for market-researcher.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false
+      - id: campaign-strategist
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/campaign-strategist.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/campaign-strategist-mental-model.yaml
+          use-when: Track durable learnings for campaign-strategist.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false
+  - name: Creative
+    lead:
+      id: creative-lead
+      role: lead
+      model: zai/glm-4.7
+      agent_file: .opencode/crew/marketing/agents/creative-lead.md
+      expertise:
+        path: .opencode/crew/marketing/expertise/creative-lead-mental-model.yaml
+        use-when: Track durable learnings for creative-lead.
+      skills:
+        - path: .opencode/skills/delegate-bounded/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/zero-micromanagement/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/mental-model/SKILL.md
+          use-when: Use when relevant to current task.
+      tools:
+        - task
+        - update-mental-model
+      mcp_access:
+        - clickup
+        - github
+        - context7
+      routes_to:
+        - copywriter
+        - creative-strategist
+        - media-operator
+      domain:
+        - path: .
+          read: true
+          edit: false
+          bash: false
+        - path: campaigns/
+          read: true
+          edit: true
+          bash: false
+        - path: assets/
+          read: true
+          edit: true
+          bash: false
+    members:
+      - id: copywriter
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/copywriter.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/copywriter-mental-model.yaml
+          use-when: Track durable learnings for copywriter.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false
+      - id: creative-strategist
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/creative-strategist.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/creative-strategist-mental-model.yaml
+          use-when: Track durable learnings for creative-strategist.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false
+      - id: media-operator
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/media-operator.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/media-operator-mental-model.yaml
+          use-when: Track durable learnings for media-operator.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false
+  - name: Validation
+    lead:
+      id: validation-lead
+      role: lead
+      model: zai/glm-4.7
+      agent_file: .opencode/crew/marketing/agents/validation-lead.md
+      expertise:
+        path: .opencode/crew/marketing/expertise/validation-lead-mental-model.yaml
+        use-when: Track durable learnings for validation-lead.
+      skills:
+        - path: .opencode/skills/delegate-bounded/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/zero-micromanagement/SKILL.md
+          use-when: Use when relevant to current task.
+        - path: .opencode/skills/mental-model/SKILL.md
+          use-when: Use when relevant to current task.
+      tools:
+        - task
+        - update-mental-model
+      mcp_access:
+        - clickup
+        - github
+        - context7
+      routes_to:
+        - performance-analyst
+        - brand-safety-reviewer
+      domain:
+        - path: .
+          read: true
+          edit: false
+          bash: false
+        - path: campaigns/
+          read: true
+          edit: true
+          bash: false
+        - path: assets/
+          read: true
+          edit: true
+          bash: false
+    members:
+      - id: performance-analyst
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/performance-analyst.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/performance-analyst-mental-model.yaml
+          use-when: Track durable learnings for performance-analyst.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false
+      - id: brand-safety-reviewer
+        role: worker
+        model: zai/glm-4.7
+        agent_file: .opencode/crew/marketing/agents/brand-safety-reviewer.md
+        expertise:
+          path: .opencode/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml
+          use-when: Track durable learnings for brand-safety-reviewer.
+        skills:
+          - path: .opencode/skills/mental-model/SKILL.md
+            use-when: Use when relevant to current task.
+        tools:
+          - read
+          - grep
+          - glob
+          - list
+          - update-mental-model
+        mcp_access:
+          - clickup
+          - github
+          - context7
+        domain:
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: campaigns/
+            read: true
+            edit: true
+            bash: false
+          - path: assets/
+            read: true
+            edit: true
+            bash: false

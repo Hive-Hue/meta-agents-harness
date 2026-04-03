@@ -2,13 +2,24 @@
   "name": "multi-agents-opencode",
   "private": true,
   "type": "module",
+  "bin": {
+    "ocmh": "bin/ocmh"
+  },
   "scripts": {
+    "sync:meta": "npm --prefix .. run sync:meta",
+    "check:meta-sync": "npm --prefix .. run check:meta-sync",
+    "list:crews": "node scripts/list-crews.mjs",
+    "use:crew": "node scripts/use-crew.mjs",
+    "clear:crew": "node scripts/clear-crew.mjs",
+    "run:crew": "node scripts/run-crew-opencode.mjs",
+    "check:runtime": "node scripts/check-runtime.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "sync:multi-team": "node scripts/sync-multi-team.mjs",
     "check:multi-team-sync": "node scripts/sync-multi-team.mjs --check",
     "validate:multi-team": "node scripts/validate-multi-team.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.1",
-    "@opencode-ai/plugin": "1.3.10"
+    "@opencode-ai/plugin": "1.3.13"
   }
 }

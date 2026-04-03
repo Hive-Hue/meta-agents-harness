@@ -1,49 +1,60 @@
 name: DevMultiTeam
 session_dir: .pi/crew/dev/sessions
 expertise_dir: .pi/crew/dev/expertise
-
 orchestrator:
-  name: ceo-orchestrator
-  description: Central coordinator that routes development work across planning, engineering, and validation.
+  name: orchestrator
+  description: Orchestrator coordinator
   prompt: .pi/crew/dev/agents/orchestrator.md
   expertise:
     path: .pi/crew/dev/expertise/orchestrator-mental-model.yaml
-    use-when: Track routing quality, team sequencing, and cross-team coordination risks.
+    use-when: Track durable learnings for orchestrator.
     updatable: true
     max-lines: 10000
-  model: inherit
-  tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+  model: zai/glm-4.7
+  tools:
+    - delegate_agent
+    - update_mental_model
+    - mcp_servers
+    - mcp_tools
+    - mcp_call
   skills:
     - .pi/skills/delegate-bounded/SKILL.md
-    - .pi/skills/active-listener/SKILL.md
-    - .pi/skills/mental-model/SKILL.md
     - .pi/skills/zero-micromanagement/SKILL.md
-    - .pi/skills/web-research/SKILL.md
+    - .pi/skills/mental-model/SKILL.md
+  routes_to:
+    - planning-lead
+    - engineering-lead
+    - validation-lead
   domain:
     - path: .
       read: true
       upsert: false
       delete: false
-
 teams:
   - name: Planning
     lead:
       name: planning-lead
-      description: Planning lead for repository discovery and implementation design work.
+      description: Planning Lead planning lead
       prompt: .pi/crew/dev/agents/planning_lead.md
       expertise:
         path: .pi/crew/dev/expertise/planning-lead-mental-model.yaml
-        use-when: Track which discovery and planning patterns produce executable plans.
+        use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
-      model: inherit
-      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      model: zai/glm-4.7
+      tools:
+        - delegate_agent
+        - update_mental_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/active-listener/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/web-research/SKILL.md
+        - .pi/skills/mental-model/SKILL.md
+      routes_to:
+        - repo-analyst
+        - solution-architect
       domain:
         - path: .
           read: true
@@ -51,37 +62,52 @@ teams:
           delete: false
     members:
       - name: repo-analyst
-        description: Read-only repository analyst for structure, patterns, and constraints.
+        description: Repo Analyst planning worker
         prompt: .pi/crew/dev/agents/repo_analyst.md
         expertise:
           path: .pi/crew/dev/expertise/repo-analyst-mental-model.yaml
-          use-when: Capture durable architecture map, hotspots, and recurring risks.
+          use-when: Track durable learnings for repo-analyst.
           updatable: true
           max-lines: 10000
-        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
             delete: false
       - name: solution-architect
-        description: Writes implementation plans and specs under specs/.
+        description: Solution Architect planning worker
         prompt: .pi/crew/dev/agents/solution_architect.md
         expertise:
           path: .pi/crew/dev/expertise/solution-architect-mental-model.yaml
-          use-when: Track architecture tradeoffs and delivery sequencing patterns.
+          use-when: Track durable learnings for solution-architect.
           updatable: true
           max-lines: 10000
-        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
-          - .pi/skills/zeplin-mcp-ops/SKILL.md
         domain:
           - path: .
             read: true
@@ -91,27 +117,30 @@ teams:
             read: true
             upsert: true
             delete: false
-
   - name: Engineering
     lead:
       name: engineering-lead
-      description: Engineering lead for implementation and sequencing.
+      description: Engineering Lead engineering lead
       prompt: .pi/crew/dev/agents/engineering_lead.md
       expertise:
         path: .pi/crew/dev/expertise/engineering-lead-mental-model.yaml
-        use-when: Track implementation risks, quality gates, and worker strengths.
+        use-when: Track durable learnings for engineering-lead.
         updatable: true
         max-lines: 10000
-      model: inherit
-      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      model: zai/glm-4.7
+      tools:
+        - delegate_agent
+        - update_mental_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/active-listener/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/web-research/SKILL.md
-        - .pi/skills/zeplin-mcp-ops/SKILL.md
-        - .pi/skills/figma-via-codex/SKILL.md
+        - .pi/skills/mental-model/SKILL.md
+      routes_to:
+        - frontend-dev
+        - backend-dev
       domain:
         - path: .
           read: true
@@ -119,20 +148,28 @@ teams:
           delete: false
     members:
       - name: frontend-dev
-        description: Implements frontend work under `src/frontend/`.
+        description: Frontend Dev engineering worker
         prompt: .pi/crew/dev/agents/frontend_dev.md
         expertise:
           path: .pi/crew/dev/expertise/frontend-dev-mental-model.yaml
-          use-when: Save reusable UI patterns, pitfalls, and verification checks.
+          use-when: Track durable learnings for frontend-dev.
           updatable: true
           max-lines: 10000
-        tools: [read, write, edit, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
-          - .pi/skills/zeplin-mcp-ops/SKILL.md
-          - .pi/skills/figma-via-codex/SKILL.md
         domain:
           - path: .
             read: true
@@ -142,25 +179,35 @@ teams:
             read: true
             upsert: true
             delete: true
+          - path: web/
+            read: true
+            upsert: true
+            delete: true
       - name: backend-dev
-        description: Implements backend work under `src/backend/`.
+        description: Backend Dev engineering worker
         prompt: .pi/crew/dev/agents/backend_dev.md
         expertise:
           path: .pi/crew/dev/expertise/backend-dev-mental-model.yaml
-          use-when: Persist backend patterns, API decisions, and runtime caveats.
+          use-when: Track durable learnings for backend-dev.
           updatable: true
           max-lines: 10000
-        tools: [read, write, edit, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
-            read: true
-            upsert: false
-            delete: false
-          - path: src/frontend/
             read: true
             upsert: false
             delete: false
@@ -168,25 +215,34 @@ teams:
             read: true
             upsert: true
             delete: true
-
+          - path: api/
+            read: true
+            upsert: true
+            delete: true
   - name: Validation
     lead:
       name: validation-lead
-      description: Validation lead for QA and security review.
+      description: Validation Lead validation lead
       prompt: .pi/crew/dev/agents/validation_lead.md
       expertise:
         path: .pi/crew/dev/expertise/validation-lead-mental-model.yaml
-        use-when: Track validation risks, coverage gaps, and release readiness.
+        use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
-      model: inherit
-      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      model: zai/glm-4.7
+      tools:
+        - delegate_agent
+        - update_mental_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/active-listener/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/web-research/SKILL.md
+        - .pi/skills/mental-model/SKILL.md
+      routes_to:
+        - qa-reviewer
+        - security-reviewer
       domain:
         - path: .
           read: true
@@ -194,38 +250,54 @@ teams:
           delete: false
     members:
       - name: qa-reviewer
-        description: Runs read-only validation and smoke checks.
+        description: Qa Reviewer validation worker
         prompt: .pi/crew/dev/agents/qa_reviewer.md
         expertise:
           path: .pi/crew/dev/expertise/qa-reviewer-mental-model.yaml
-          use-when: Record test findings, regressions, and quality trends.
+          use-when: Track durable learnings for qa-reviewer.
           updatable: true
           max-lines: 10000
-        tools: [read, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
-            delete: false
+            delete: true
       - name: security-reviewer
-        description: Performs read-only security review and blast-radius checks.
+        description: Security Reviewer validation worker
         prompt: .pi/crew/dev/agents/security_reviewer.md
         expertise:
           path: .pi/crew/dev/expertise/security-reviewer-mental-model.yaml
-          use-when: Save recurring security findings, controls, and mitigation patterns.
+          use-when: Track durable learnings for security-reviewer.
           updatable: true
           max-lines: 10000
-        tools: [read, bash, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
-            delete: false
+            delete: true

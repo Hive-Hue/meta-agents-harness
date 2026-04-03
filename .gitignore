@@ -10,8 +10,11 @@ __pycache__/
 .mcp.json
 
 # Runtime/session artifacts
-.opencode/sessions/**
-!.opencode/sessions/.gitkeep
+.opencode/.active-crew.json
+.opencode/agents
+.opencode/multi-team.yaml
+.claude/.active-crew.json
+.pi/.active-crew.json
 
 tmp/
 .playwright-cli/

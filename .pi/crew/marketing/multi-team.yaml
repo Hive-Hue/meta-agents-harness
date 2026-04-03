@@ -1,258 +1,393 @@
 name: MarketingMultiTeam
 session_dir: .pi/crew/marketing/sessions
 expertise_dir: .pi/crew/marketing/expertise
-
 orchestrator:
   name: orchestrator
-  description: Central coordinator for planning, creative execution, and validation of marketing operations.
+  description: Orchestrator coordinator
   prompt: .pi/crew/marketing/agents/orchestrator.md
   expertise:
     path: .pi/crew/marketing/expertise/orchestrator-mental-model.yaml
-    use-when: Capture coordination patterns, prioritization tradeoffs, and routing decisions.
+    use-when: Track durable learnings for orchestrator.
     updatable: true
     max-lines: 10000
-  model: openai-codex/gpt-5.2
-  tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+  model: zai/glm-4.7
+  tools:
+    - delegate_agent
+    - update_mental_model
+    - mcp_servers
+    - mcp_tools
+    - mcp_call
   skills:
     - .pi/skills/delegate-bounded/SKILL.md
-    - .pi/skills/active-listener/SKILL.md
-    - .pi/skills/mental-model/SKILL.md
     - .pi/skills/zero-micromanagement/SKILL.md
-    - .pi/skills/web-research/SKILL.md
+    - .pi/skills/mental-model/SKILL.md
+  routes_to:
+    - planning-lead
+    - creative-lead
+    - validation-lead
   domain:
     - path: .
       read: true
       upsert: false
       delete: false
-
 teams:
   - name: Planning
     lead:
       name: planning-lead
-      description: Planning lead for audience discovery and campaign strategy definition.
+      description: Planning Lead planning lead
       prompt: .pi/crew/marketing/agents/planning-lead.md
       expertise:
         path: .pi/crew/marketing/expertise/planning-lead-mental-model.yaml
-        use-when: Store positioning notes, audience hypotheses, and campaign scoping decisions.
+        use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
-      model: openai-codex/gpt-5.2
-      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      model: zai/glm-4.7
+      tools:
+        - delegate_agent
+        - update_mental_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/active-listener/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/web-research/SKILL.md
+        - .pi/skills/mental-model/SKILL.md
+      routes_to:
+        - market-researcher
+        - campaign-strategist
       domain:
         - path: .
           read: true
           upsert: false
+          delete: false
+        - path: campaigns/
+          read: true
+          upsert: true
+          delete: false
+        - path: assets/
+          read: true
+          upsert: true
           delete: false
     members:
       - name: market-researcher
-        description: Researches channels, competitors, and audience evidence.
+        description: Market Researcher planning worker
         prompt: .pi/crew/marketing/agents/market-researcher.md
         expertise:
           path: .pi/crew/marketing/expertise/market-researcher-mental-model.yaml
-          use-when: Capture audience insights, competitor patterns, and channel opportunities.
+          use-when: Track durable learnings for market-researcher.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
-        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
             delete: false
-          - path: specs/marketing/
-            read: true
-            upsert: false
-            delete: false
-      - name: campaign-strategist
-        description: Converts discovery into campaign architecture and sequencing.
-        prompt: .pi/crew/marketing/agents/campaign-strategist.md
-        expertise:
-          path: .pi/crew/marketing/expertise/campaign-strategist-mental-model.yaml
-          use-when: Store campaign architecture, messaging pillars, and channel sequencing.
-          updatable: true
-          max-lines: 10000
-        model: zai/glm-5
-        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
-        skills:
-          - .pi/skills/active-listener/SKILL.md
-          - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
-        domain:
-          - path: .
-            read: true
-            upsert: false
-            delete: false
-          - path: specs/marketing/
+          - path: campaigns/
             read: true
             upsert: true
             delete: false
-
+          - path: assets/
+            read: true
+            upsert: true
+            delete: false
+      - name: campaign-strategist
+        description: Campaign Strategist planning worker
+        prompt: .pi/crew/marketing/agents/campaign-strategist.md
+        expertise:
+          path: .pi/crew/marketing/expertise/campaign-strategist-mental-model.yaml
+          use-when: Track durable learnings for campaign-strategist.
+          updatable: true
+          max-lines: 10000
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - .pi/skills/mental-model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: campaigns/
+            read: true
+            upsert: true
+            delete: false
+          - path: assets/
+            read: true
+            upsert: true
+            delete: false
   - name: Creative
     lead:
       name: creative-lead
-      description: Leads creative production for copy, visual strategy, and media operations.
+      description: Creative Lead creative lead
       prompt: .pi/crew/marketing/agents/creative-lead.md
       expertise:
         path: .pi/crew/marketing/expertise/creative-lead-mental-model.yaml
-        use-when: Track narrative direction, production tradeoffs, and delivery quality.
+        use-when: Track durable learnings for creative-lead.
         updatable: true
         max-lines: 10000
-      model: openai-codex/gpt-5.2
-      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      model: zai/glm-4.7
+      tools:
+        - delegate_agent
+        - update_mental_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/active-listener/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/web-research/SKILL.md
-        - .pi/skills/zeplin-mcp-ops/SKILL.md
+        - .pi/skills/mental-model/SKILL.md
+      routes_to:
+        - copywriter
+        - creative-strategist
+        - media-operator
       domain:
         - path: .
           read: true
           upsert: false
           delete: false
+        - path: campaigns/
+          read: true
+          upsert: true
+          delete: false
+        - path: assets/
+          read: true
+          upsert: true
+          delete: false
     members:
       - name: copywriter
-        description: Produces campaign copy and editorial variations.
+        description: Copywriter creative worker
         prompt: .pi/crew/marketing/agents/copywriter.md
         expertise:
           path: .pi/crew/marketing/expertise/copywriter-mental-model.yaml
-          use-when: Save hooks, CTA patterns, and message variants that perform.
+          use-when: Track durable learnings for copywriter.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
-        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
             delete: false
-          - path: campaigns/copy/
+          - path: campaigns/
+            read: true
+            upsert: true
+            delete: false
+          - path: assets/
             read: true
             upsert: true
             delete: false
       - name: creative-strategist
-        description: Defines creative concepts and visual direction artifacts.
+        description: Creative Strategist creative worker
         prompt: .pi/crew/marketing/agents/creative-strategist.md
         expertise:
           path: .pi/crew/marketing/expertise/creative-strategist-mental-model.yaml
-          use-when: Preserve concept systems, visual direction, and content formats.
+          use-when: Track durable learnings for creative-strategist.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
-        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
-          - .pi/skills/zeplin-mcp-ops/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
             delete: false
-          - path: campaigns/creative/
+          - path: campaigns/
+            read: true
+            upsert: true
+            delete: false
+          - path: assets/
             read: true
             upsert: true
             delete: false
       - name: media-operator
-        description: Handles channel publishing operations and distribution logistics.
+        description: Media Operator creative worker
         prompt: .pi/crew/marketing/agents/media-operator.md
         expertise:
           path: .pi/crew/marketing/expertise/media-operator-mental-model.yaml
-          use-when: Record publishing workflows, channel notes, and operational constraints.
+          use-when: Track durable learnings for media-operator.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
-        tools: [read, write, edit, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
-          - .pi/skills/zeplin-mcp-ops/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
             delete: false
-          - path: campaigns/media/
+          - path: campaigns/
             read: true
             upsert: true
             delete: false
-
+          - path: assets/
+            read: true
+            upsert: true
+            delete: false
   - name: Validation
     lead:
       name: validation-lead
-      description: Validation lead for performance and brand safety quality gates.
+      description: Validation Lead validation lead
       prompt: .pi/crew/marketing/agents/validation-lead.md
       expertise:
         path: .pi/crew/marketing/expertise/validation-lead-mental-model.yaml
-        use-when: Track performance risks, brand safety issues, and rollout readiness.
+        use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
-      model: openai-codex/gpt-5.2
-      tools: [delegate_agent, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+      model: zai/glm-4.7
+      tools:
+        - delegate_agent
+        - update_mental_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/active-listener/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/web-research/SKILL.md
+        - .pi/skills/mental-model/SKILL.md
+      routes_to:
+        - performance-analyst
+        - brand-safety-reviewer
       domain:
         - path: .
           read: true
           upsert: false
           delete: false
+        - path: campaigns/
+          read: true
+          upsert: true
+          delete: false
+        - path: assets/
+          read: true
+          upsert: true
+          delete: false
     members:
       - name: performance-analyst
-        description: Reviews metrics, benchmarks, and distribution efficiency.
+        description: Performance Analyst validation worker
         prompt: .pi/crew/marketing/agents/performance-analyst.md
         expertise:
           path: .pi/crew/marketing/expertise/performance-analyst-mental-model.yaml
-          use-when: Save metrics interpretation patterns and optimization hypotheses.
+          use-when: Track durable learnings for performance-analyst.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
-        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
             delete: false
+          - path: campaigns/
+            read: true
+            upsert: true
+            delete: false
+          - path: assets/
+            read: true
+            upsert: true
+            delete: false
       - name: brand-safety-reviewer
-        description: Reviews brand consistency, policy risk, and safety constraints.
+        description: Brand Safety Reviewer validation worker
         prompt: .pi/crew/marketing/agents/brand-safety-reviewer.md
         expertise:
           path: .pi/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml
-          use-when: Store brand risk patterns, compliance checks, and escalation cues.
+          use-when: Track durable learnings for brand-safety-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
-        tools: [read, grep, find, ls, update_mental_model, mcp_servers, mcp_tools, mcp_call]
+        model: zai/glm-4.7
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_mental_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
         skills:
-          - .pi/skills/active-listener/SKILL.md
           - .pi/skills/mental-model/SKILL.md
-          - .pi/skills/web-research/SKILL.md
         domain:
           - path: .
             read: true
             upsert: false
+            delete: false
+          - path: campaigns/
+            read: true
+            upsert: true
+            delete: false
+          - path: assets/
+            read: true
+            upsert: true
             delete: false

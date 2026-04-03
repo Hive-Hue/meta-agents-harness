@@ -56,6 +56,30 @@ function trimLines(doc: ExpertiseDoc): ExpertiseDoc {
   return clone
 }
 
+function resolveExpertisePath(root: string, agent: string): string {
+  const activeMetaPath = path.join(root, ".opencode", ".active-crew.json")
+  if (existsSync(activeMetaPath)) {
+    try {
+      const active = JSON.parse(readFileSync(activeMetaPath, "utf-8")) as { crew?: string }
+      const crew = `${active?.crew || ""}`.trim()
+      if (crew) {
+        return path.join(root, ".opencode", "crew", crew, "expertise", `${agent}-mental-model.yaml`)
+      }
+    } catch {}
+  }
+
+  const activeAgentPrompt = path.join(root, ".opencode", "agents", `${agent}.md`)
+  if (existsSync(activeAgentPrompt)) {
+    const body = readFileSync(activeAgentPrompt, "utf-8")
+    const match = body.match(/\.opencode\/crew\/[^/\s]+\/expertise\/[a-z0-9_-]+-mental-model\.yaml/i)
+    if (match?.[0]) {
+      return path.join(root, match[0])
+    }
+  }
+
+  return path.join(root, ".opencode", "expertise", `${agent}-mental-model.yaml`)
+}
+
 export default tool({
   description: "Append a durable note to the current OpenCode agent mental model YAML file.",
   args: {
@@ -66,8 +90,8 @@ export default tool({
   async execute(args, context) {
     const root = context.worktree || context.directory
     const agent = normalizeAgentName(context.agent || "unknown-agent")
-    const expertiseDir = path.join(root, ".opencode", "expertise")
-    const filePath = path.join(expertiseDir, `${agent}-mental-model.yaml`)
+    const filePath = resolveExpertisePath(root, agent)
+    const expertiseDir = path.dirname(filePath)
 
     mkdirSync(expertiseDir, { recursive: true })
 
@@ -106,11 +130,6 @@ export default tool({
     doc = trimLines(doc)
     writeFileSync(filePath, YAML.stringify(doc), "utf-8")
 
-    return {
-      status: "ok",
-      agent,
-      path: filePath,
-      category: key
-    }
+    return `ok agent=${agent} category=${key} path=${filePath}`
   }
 })

@@ -8,6 +8,8 @@
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "sync:meta": "node scripts/sync-meta-agents.mjs",
+    "check:meta-sync": "node scripts/sync-meta-agents.mjs --check",
     "detect": "node scripts/meta-agents-harness.mjs detect",
     "doctor": "node scripts/meta-agents-harness.mjs doctor",
     "check:runtime": "node scripts/meta-agents-harness.mjs check:runtime",
@@ -17,6 +19,9 @@
     "clear": "node scripts/meta-agents-harness.mjs clear",
     "run": "node scripts/meta-agents-harness.mjs run",
     "test:smoke": "node --test tests/smoke.test.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
   },
   "license": "SEE LICENSE IN LICENSE"
 }

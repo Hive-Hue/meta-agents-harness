@@ -145,6 +145,18 @@ node bin/mah run
 mah run
 ```
 
+Unified session controls:
+
+```bash
+mah run --session-mode continue
+mah run --session-mode new
+mah run --session-id 11111111-1111-1111-1111-111111111111
+mah run --session-root .pi/crew/dev/sessions
+mah run --session-mirror
+```
+
+`mah` maps these flags to runtime-native behavior internally.
+
 Force explicit runtime:
 
 ```bash
@@ -171,6 +183,20 @@ The repository includes:
 `meta-agents.yaml` is the canonical runtime index.  
 `examples/meta-agents.yaml.example` is the practical authoring template with crews, role permissions, and runtime-specific overrides.
 
+Generate runtime artifacts from canonical config:
+
+```bash
+npm run sync:meta
+```
+
+This updates artifacts for all runtimes (`.pi`, `.claude`, `.opencode`), not only OpenCode.
+
+Check drift without writing files:
+
+```bash
+npm run check:meta-sync
+```
+
 ### Full YAML Structure
 
 Top-level sections:
@@ -193,11 +219,11 @@ Top-level sections:
 
 ### How Adapter Conversion Works
 
-The adapter layer translates abstract crew intent into runtime-native models:
+The adapter layer translates abstract crew intent into runtime-native models and generated artifacts:
 
-- OpenCode: roles and delegation become agent files plus `permission.task` constraints.
-- Claude: role routing becomes CCR route-map constraints and wrapper routing policies.
-- PI: role + ownership intent maps into `.pi/crew/*/multi-team.yaml` and runtime extension wiring in `extensions/`.
+- OpenCode: roles and delegation become `.opencode/crew/<crew>/multi-team.yaml` and crew-scoped agent/expertise artifacts. Active runtime files are selected via symlinks on `use`.
+- Claude: role routing becomes `.claude/crew/<crew>/multi-team.yaml` plus CCR route constraints.
+- PI: role + ownership intent maps into `.pi/crew/<crew>/multi-team.yaml` and runtime extension wiring in `extensions/`.
 
 Current runtime dispatch is implemented in [meta-agents-harness.mjs](./scripts/meta-agents-harness.mjs); the YAML files define and document the canonical mapping contract for runtime parity.
 
@@ -211,6 +237,32 @@ This repository ships runtime assets for all three CLIs:
 - `extensions/` for PI runtime extension entrypoints used by `.pi/scripts/run-crew.mjs`
 
 The `mah` CLI is runtime-agnostic and dispatches dynamically based on detected runtime markers or explicit `--runtime`.
+
+### OpenCode Crew Runtime
+
+OpenCode now supports crew architecture via wrapper + crew configs:
+
+- `.opencode/crew/<crew>/multi-team.yaml` generated from `meta-agents.yaml`
+- `.opencode/.active-crew.json` for selected crew metadata
+- `.opencode/multi-team.yaml` as active runtime symlink and `.opencode/agents/*.md` as materialized active agent links
+
+Commands:
+
+```bash
+mah -f opencode list:crews
+mah -f opencode use marketing
+mah -f opencode use marketing --hierarchy
+mah -f opencode use marketing --no-hierarchy
+mah -f opencode run
+mah -f opencode run --crew marketing --hierarchy
+mah -f opencode run --crew marketing --no-hierarchy
+mah -f opencode clear
+```
+
+`mah -f opencode use <crew>` creates/updates runtime materialization for the selected crew.  
+`mah -f opencode clear` removes those symlinks.
+`--hierarchy` keeps strict lead-first delegation.
+`--no-hierarchy` allows orchestrator to delegate directly to workers in runtime materialization.
 
 ## Adapter Model
 
@@ -277,6 +329,12 @@ Run smoke tests for `mah`:
 
 ```bash
 npm run test:smoke
+```
+
+Validate generated runtime configs:
+
+```bash
+npm run check:meta-sync
 ```
 
 ## License

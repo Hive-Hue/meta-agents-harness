@@ -27,10 +27,10 @@ const runtimeProfiles = {
     wrapper: "ccmh",
     directCli: "claude",
     commands: {
-      "list:crews": [["ccmh", ["list:crews"]]],
-      use: [["ccmh", ["use"]]],
-      clear: [["ccmh", ["clear"]]],
-      run: [["ccmh", ["run"]]],
+      "list:crews": [["ccmh", ["list:crews"]], ["npm", ["--prefix", ".claude", "run", "list:crews"]]],
+      use: [["ccmh", ["use"]], ["npm", ["--prefix", ".claude", "run", "use:crew", "--"]]],
+      clear: [["ccmh", ["clear"]], ["npm", ["--prefix", ".claude", "run", "clear:crew"]]],
+      run: [["ccmh", ["run"]], ["npm", ["--prefix", ".claude", "run", "run:crew", "--"]]],
       doctor: [["ccmh", ["doctor"]], ["npm", ["--prefix", ".claude", "run", "doctor", "--"]]],
       "check:runtime": [["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]],
       validate: [["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]]
@@ -41,13 +41,13 @@ const runtimeProfiles = {
     wrapper: "ocmh",
     directCli: "opencode",
     commands: {
-      "list:crews": [["ocmh", ["list:crews"]]],
-      use: [["ocmh", ["use"]]],
-      clear: [["ocmh", ["clear"]]],
-      run: [["opencode", []]],
-      doctor: [["ocmh", ["doctor"]], ["npm", ["--prefix", ".opencode", "run", "validate:multi-team"]]],
-      "check:runtime": [["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "validate:multi-team"]]],
-      validate: [["ocmh", ["validate"]], ["npm", ["--prefix", ".opencode", "run", "validate:multi-team"]]]
+      "list:crews": [["ocmh", ["list:crews"]], ["npm", ["--prefix", ".opencode", "run", "list:crews"]]],
+      use: [["ocmh", ["use"]], ["npm", ["--prefix", ".opencode", "run", "use:crew", "--"]]],
+      clear: [["ocmh", ["clear"]], ["npm", ["--prefix", ".opencode", "run", "clear:crew"]]],
+      run: [["ocmh", ["run"]], ["npm", ["--prefix", ".opencode", "run", "run:crew", "--"]]],
+      doctor: [["ocmh", ["doctor"]], ["npm", ["--prefix", ".opencode", "run", "doctor", "--"]]],
+      "check:runtime": [["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
+      validate: [["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]]
     }
   }
 }
@@ -146,12 +146,106 @@ function printHelp() {
   console.log("  --runtime <pi|claude|opencode>")
   console.log("  -r <pi|claude|opencode>")
   console.log("  -f <pi|claude|opencode>")
+  console.log("  --session-mode <new|continue>")
+  console.log("  --session-id <id>")
+  console.log("  --session-root <path>")
+  console.log("  --session-mirror / --no-session-mirror")
 }
 
-function runCommand(command, args, passthrough = []) {
+function extractSessionOptions(argv) {
+  const options = {
+    mode: "",
+    sessionId: "",
+    sessionRoot: "",
+    sessionMirror: null
+  }
+  const remaining = []
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === "--session-mode" && argv[i + 1]) {
+      options.mode = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token.startsWith("--session-mode=")) {
+      options.mode = token.slice("--session-mode=".length)
+      continue
+    }
+    if (token === "--session-id" && argv[i + 1]) {
+      options.sessionId = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token.startsWith("--session-id=")) {
+      options.sessionId = token.slice("--session-id=".length)
+      continue
+    }
+    if (token === "--session-root" && argv[i + 1]) {
+      options.sessionRoot = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token.startsWith("--session-root=")) {
+      options.sessionRoot = token.slice("--session-root=".length)
+      continue
+    }
+    if (token === "--session-mirror") {
+      options.sessionMirror = true
+      continue
+    }
+    if (token === "--no-session-mirror") {
+      options.sessionMirror = false
+      continue
+    }
+    remaining.push(token)
+  }
+
+  return { options, remaining }
+}
+
+function hasContinueFlag(argv) {
+  return argv.includes("-c") || argv.includes("--continue") || argv.includes("--resume")
+}
+
+function normalizeRunArgs(runtime, passthrough) {
+  const { options, remaining } = extractSessionOptions(passthrough)
+  const envOverrides = {}
+  const warnings = []
+  const args = [...remaining]
+
+  if (!options.mode && !options.sessionId && !options.sessionRoot && options.sessionMirror === null) {
+    return { args, envOverrides, warnings }
+  }
+
+  if (runtime === "claude") {
+    if (options.sessionMirror === true) args.unshift("--session-mirror")
+    if (options.sessionMirror === false) args.unshift("--no-session-mirror")
+    const claudePassthrough = []
+    if (options.mode === "continue") claudePassthrough.push("--continue")
+    if (options.sessionId) claudePassthrough.push("--session-id", options.sessionId)
+    if (claudePassthrough.length > 0) args.push("--", ...claudePassthrough)
+    if (options.sessionRoot) warnings.push("--session-root is ignored for claude runtime")
+  } else if (runtime === "pi") {
+    if (options.mode === "new") args.unshift("--new-session")
+    if (options.mode === "continue" && !hasContinueFlag(args)) args.push("-c")
+    if (options.sessionRoot) args.unshift("--session-root", options.sessionRoot)
+    if (options.sessionId) envOverrides.PI_MULTI_SESSION_ID = options.sessionId
+    if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for pi runtime")
+  } else if (runtime === "opencode") {
+    if (options.mode === "continue" && !hasContinueFlag(args)) args.push("-c")
+    if (options.sessionId) args.push("--session-id", options.sessionId)
+    if (options.sessionRoot) warnings.push("--session-root is ignored for opencode runtime")
+    if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for opencode runtime")
+  }
+
+  return { args, envOverrides, warnings }
+}
+
+function runCommand(command, args, passthrough = [], envOverrides = {}) {
   const child = spawnSync(command, [...args, ...passthrough], {
     cwd: repoRoot,
-    env: process.env,
+    env: { ...process.env, ...envOverrides },
     stdio: "inherit"
   })
   if (typeof child.status === "number") return child.status
@@ -163,10 +257,22 @@ function runCommand(command, args, passthrough = []) {
 
 function dispatch(runtime, command, passthrough) {
   const profile = runtimeProfiles[runtime]
+  let normalizedPassthrough = passthrough
+  let envOverrides = {}
+
+  if (command === "run") {
+    const normalized = normalizeRunArgs(runtime, passthrough)
+    normalizedPassthrough = normalized.args
+    envOverrides = normalized.envOverrides
+    for (const warning of normalized.warnings) {
+      console.error(`WARN: ${warning}`)
+    }
+  }
+
   const variants = profile.commands[command]
   if (!variants || variants.length === 0) {
     if (command === "run") {
-      return runCommand(profile.directCli, passthrough)
+      return runCommand(profile.directCli, normalizedPassthrough, [], envOverrides)
     }
     console.error(`ERROR: command not supported for runtime ${runtime}: ${command}`)
     return 1
@@ -174,7 +280,7 @@ function dispatch(runtime, command, passthrough) {
 
   for (const [exec, args] of variants) {
     if (!commandExists(exec)) continue
-    return runCommand(exec, args, passthrough)
+    return runCommand(exec, args, normalizedPassthrough, envOverrides)
   }
 
   console.error(`ERROR: no executable found for runtime ${runtime} and command ${command}`)
