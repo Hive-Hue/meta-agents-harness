@@ -1,6 +1,6 @@
 # Meta Agents Harness
 
-Meta Agents Harness is an open-source Apache 2.0 product that provides a unified multi-agent harness for:
+Meta Agents Harness is a dual-licensed (AGPLv3 + commercial) product that provides a unified multi-agent harness for:
 
 - OpenCode
 - Claude Code
@@ -21,7 +21,7 @@ Detection priority:
 ## Install
 
 ```bash
-git clone https://github.com/AlyssonM/meta-agents-harness.git
+git clone https://github.com/Hive-Hue/meta-agents-harness.git
 cd meta-agents-harness
 npm install
 ```
@@ -97,6 +97,7 @@ This repository ships runtime assets for all three CLIs:
 - `.opencode/` for OpenCode harness topology and scripts
 - `.claude/` for Claude runtime wrappers and crew structure
 - `.pi/` for PI runtime wrappers and crew structure
+- `extensions/` for PI runtime extension entrypoints used by `.pi/scripts/run-crew.mjs`
 
 The `mah` CLI is runtime-agnostic and dispatches dynamically based on detected runtime markers or explicit `--runtime`.
 
