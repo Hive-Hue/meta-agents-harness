@@ -1,0 +1,119 @@
+# Canonical meta-agents configuration example
+# This file shows how one abstract team definition maps to multiple runtimes.
+
+version: 1
+name: "meta-agents-harness"
+description: "Unified configuration for OpenCode, Claude Code, and PI."
+
+runtime_detection:
+  order:
+    - forced
+    - marker
+    - cli
+  forced:
+    args:
+      - "--runtime=<name>"
+      - "--runtime <name>"
+    env:
+      - MAH_RUNTIME
+  marker:
+    pi: ".pi"
+    claude: ".claude"
+    opencode: ".opencode"
+  cli:
+    pi: "pi"
+    claude: "claude"
+    opencode: "opencode"
+
+runtimes:
+  pi:
+    wrapper: "pimh"
+    config_root: ".pi"
+    extension_root: "extensions"
+  claude:
+    wrapper: "ccmh"
+    config_root: ".claude"
+    ccr:
+      route_map: ".claude/ccr/route-map.example.json"
+      policy: "bounded"
+  opencode:
+    wrapper: "ocmh"
+    config_root: ".opencode"
+    task_policy: "permission.task"
+
+crews:
+  - id: "dev"
+    display_name: "Development Crew"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        planning: "planning-lead"
+        engineering: "engineering-lead"
+        validation: "validation-lead"
+      workers:
+        planning:
+          - "repo-analyst"
+          - "solution-architect"
+        engineering:
+          - "frontend-dev"
+          - "backend-dev"
+        validation:
+          - "qa-reviewer"
+          - "security-reviewer"
+    role_permissions:
+      orchestrator:
+        delegate_to:
+          - "planning-lead"
+          - "engineering-lead"
+          - "validation-lead"
+        write_paths: []
+      lead:
+        delegate_to_scope: "own_team_only"
+        write_paths:
+          - "specs/**"
+      worker:
+        delegate_to: []
+        write_paths:
+          - "src/**"
+          - "tests/**"
+    runtime_overrides:
+      opencode:
+        permission:
+          task:
+            allow_delegate:
+              orchestrator:
+                - "planning-lead"
+                - "engineering-lead"
+                - "validation-lead"
+              planning-lead:
+                - "repo-analyst"
+                - "solution-architect"
+              engineering-lead:
+                - "frontend-dev"
+                - "backend-dev"
+              validation-lead:
+                - "qa-reviewer"
+                - "security-reviewer"
+      claude:
+        ccr:
+          team_routes:
+            orchestrator:
+              - "planning-lead"
+              - "engineering-lead"
+              - "validation-lead"
+      pi:
+        multi_team:
+          session_root: ".pi/crew/dev/sessions"
+          extension_entry: "extensions/multi-team.ts"
+
+adapters:
+  mapping_rules:
+    roles_to_runtime:
+      opencode: "agents + permission.task"
+      claude: "agents + CCR route map"
+      pi: "multi-team.yaml + extension runtime"
+    permissions_to_runtime:
+      read_write_scopes:
+        opencode: "permission.read / permission.edit"
+        claude: "tool allowlist + route scope"
+        pi: "domain.read / domain.upsert / domain.delete"

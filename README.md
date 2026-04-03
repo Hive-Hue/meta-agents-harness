@@ -108,11 +108,43 @@ mah --runtime pi run -c
 
 ## Canonical Config
 
-The repository now includes a canonical runtime index file:
+The repository includes:
 
 - [meta-agents.yaml](./meta-agents.yaml)
+- [meta-agents.yaml.example](./examples/meta-agents.yaml.example)
 
-This file documents runtime detection order, marker directories, CLI fallback, and wrapper mappings in one place.
+`meta-agents.yaml` is the canonical runtime index.  
+`examples/meta-agents.yaml.example` is the practical authoring template with crews, role permissions, and runtime-specific overrides.
+
+### Full YAML Structure
+
+Top-level sections:
+
+- `version`, `name`, `description`
+- `runtime_detection` (forced args/env, marker dirs, CLI fallback)
+- `runtimes` (wrapper and config roots per runtime)
+- `crews` (topology, role permissions, runtime overrides)
+- `adapters` (mapping rules and translation contracts)
+
+### Field-by-Field Guide
+
+- `runtime_detection.order`: precedence between explicit runtime, repository markers, and installed CLIs.
+- `runtimes.<runtime>.wrapper`: command wrapper to execute (`pimh`, `ccmh`, `ocmh`).
+- `runtimes.<runtime>.config_root`: runtime root folder (`.pi`, `.claude`, `.opencode`).
+- `crews[].topology`: orchestrator, leads, and workers in abstract form.
+- `crews[].role_permissions`: runtime-agnostic permission intent.
+- `crews[].runtime_overrides`: per-runtime controls (CCR on Claude, `permission.task` on OpenCode, `multi-team`/extension on PI).
+- `adapters.mapping_rules`: conversion contract from abstract roles/scopes to runtime-native config fields.
+
+### How Adapter Conversion Works
+
+The adapter layer translates abstract crew intent into runtime-native models:
+
+- OpenCode: roles and delegation become agent files plus `permission.task` constraints.
+- Claude: role routing becomes CCR route-map constraints and wrapper routing policies.
+- PI: role + ownership intent maps into `.pi/crew/*/multi-team.yaml` and runtime extension wiring in `extensions/`.
+
+Current runtime dispatch is implemented in [meta-agents-harness.mjs](./scripts/meta-agents-harness.mjs); the YAML files define and document the canonical mapping contract for runtime parity.
 
 ## Runtime-Specific Assets
 
