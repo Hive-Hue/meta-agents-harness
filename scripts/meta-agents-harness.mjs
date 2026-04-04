@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -68,6 +68,10 @@ function detectRuntime(cwd, forcedRuntime) {
   }
 
   if (byMarker.length > 1) {
+    const strictMarkers = process.argv.includes("--strict-markers") || process.env.MAH_STRICT_MARKERS === "1"
+    if (strictMarkers) {
+      return { runtime: null, reason: `ambiguous-markers:${byMarker.join(",")}` }
+    }
     const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
     if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
   }
@@ -94,6 +98,8 @@ function printHelp() {
   console.log("Commands:")
   console.log("  detect")
   console.log("  doctor")
+  console.log("  explain [detect|use|run|sync] [args]")
+  console.log("  init [--runtime <name>] [--crew <name>]")
   console.log("  check:runtime")
   console.log("  validate:runtime")
   console.log("  validate:config")
@@ -104,6 +110,8 @@ function printHelp() {
   console.log("  use <crew>")
   console.log("  clear")
   console.log("  run [runtime-args]")
+  console.log("  plan")
+  console.log("  diff")
   console.log("")
   console.log("Options:")
   const runtimes = Object.keys(runtimeProfiles).join("|")
@@ -114,6 +122,26 @@ function printHelp() {
   console.log("  --session-id <id>")
   console.log("  --session-root <path>")
   console.log("  --session-mirror / --no-session-mirror")
+  console.log("  --trace")
+  console.log("  --strict-markers")
+}
+
+function hasFlag(argv, flag) {
+  return argv.includes(flag)
+}
+
+function removeFlag(argv, flag) {
+  return argv.filter((item) => item !== flag)
+}
+
+function parseValueArg(argv, flag, short = "") {
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === flag && argv[i + 1]) return argv[i + 1]
+    if (short && token === short && argv[i + 1]) return argv[i + 1]
+    if (token.startsWith(`${flag}=`)) return token.slice(flag.length + 1)
+  }
+  return ""
 }
 
 function runLocalScript(scriptPath, scriptArgs = []) {
@@ -237,45 +265,130 @@ function runCommand(command, args, passthrough = [], envOverrides = {}) {
   return 1
 }
 
-function dispatch(runtime, command, passthrough) {
+function resolveDispatchPlan(runtime, command, passthrough) {
   const profile = runtimeProfiles[runtime]
   if (!profile) {
-    console.error(`ERROR: unsupported runtime ${runtime}`)
-    return 1
+    return { error: `unsupported runtime ${runtime}` }
   }
   let normalizedPassthrough = passthrough
   let envOverrides = {}
-
+  const warnings = []
   if (command === "run") {
     const normalized = normalizeRunArgs(runtime, passthrough)
     normalizedPassthrough = normalized.args
     envOverrides = normalized.envOverrides
-    for (const warning of normalized.warnings) {
-      console.error(`WARN: ${warning}`)
-    }
+    warnings.push(...normalized.warnings)
   }
-
   const variants = profile.commands[command]
   if (!variants || variants.length === 0) {
     if (command === "run") {
-      return runCommand(profile.directCli, normalizedPassthrough, [], envOverrides)
+      return {
+        runtime,
+        command,
+        exec: profile.directCli,
+        args: normalizedPassthrough,
+        envOverrides,
+        warnings,
+        candidates: []
+      }
     }
-    console.error(`ERROR: command not supported for runtime ${runtime}: ${command}`)
+    return { error: `command not supported for runtime ${runtime}: ${command}` }
+  }
+  const candidates = variants.map(([exec, args]) => ({ exec, args, exists: commandExists(exec) }))
+  const selected = candidates.find((item) => item.exists)
+  if (!selected) {
+    return { error: `no executable found for runtime ${runtime} and command ${command}` }
+  }
+  return {
+    runtime,
+    command,
+    exec: selected.exec,
+    args: selected.args,
+    passthrough: normalizedPassthrough,
+    envOverrides,
+    warnings,
+    candidates
+  }
+}
+
+function printExplain(traceMode, payload) {
+  if (traceMode) {
+    console.log(JSON.stringify(payload, null, 2))
+    return
+  }
+  if (payload.runtime) console.log(`runtime=${payload.runtime}`)
+  if (payload.reason) console.log(`reason=${payload.reason}`)
+  if (payload.command) console.log(`command=${payload.command}`)
+  if (payload.exec) console.log(`resolved_exec=${payload.exec}`)
+  if (payload.execArgs) console.log(`resolved_args=${payload.execArgs.join(" ")}`)
+  if (payload.passthrough) console.log(`passthrough=${payload.passthrough.join(" ")}`)
+  if (payload.env && Object.keys(payload.env).length > 0) {
+    console.log(`env_overrides=${Object.keys(payload.env).join(",")}`)
+  }
+  if (Array.isArray(payload.warnings)) {
+    for (const warning of payload.warnings) {
+      console.log(`warning=${warning}`)
+    }
+  }
+}
+
+function runInit(argv) {
+  const runtime = parseValueArg(argv, "--runtime")
+  const crew = parseValueArg(argv, "--crew")
+  const created = []
+  const skipped = []
+  const metaTarget = path.join(repoRoot, "meta-agents.yaml")
+  const metaExample = path.join(repoRoot, "examples", "meta-agents.yaml.example")
+  if (!existsSync(metaTarget) && existsSync(metaExample)) {
+    copyFileSync(metaExample, metaTarget)
+    created.push("meta-agents.yaml")
+  } else {
+    skipped.push("meta-agents.yaml")
+  }
+  const mcpTarget = path.join(repoRoot, ".mcp.json")
+  const mcpExample = path.join(repoRoot, ".mcp.example.json")
+  if (!existsSync(mcpTarget) && existsSync(mcpExample)) {
+    copyFileSync(mcpExample, mcpTarget)
+    created.push(".mcp.json")
+  } else {
+    skipped.push(".mcp.json")
+  }
+  if (runtime && runtimeProfiles[runtime]) {
+    const markerPath = path.join(repoRoot, runtimeProfiles[runtime].markerDir)
+    if (!existsSync(markerPath)) {
+      mkdirSync(markerPath, { recursive: true })
+      created.push(runtimeProfiles[runtime].markerDir)
+    } else {
+      skipped.push(runtimeProfiles[runtime].markerDir)
+    }
+  }
+  console.log("mah init completed")
+  console.log(`created=${created.join(",") || "none"}`)
+  console.log(`skipped=${skipped.join(",") || "none"}`)
+  if (crew) {
+    console.log(`crew_hint=${crew}`)
+    console.log(`next=mah use ${crew}`)
+  }
+  console.log("next=npm run sync:meta")
+  return 0
+}
+
+function dispatch(runtime, command, passthrough) {
+  const plan = resolveDispatchPlan(runtime, command, passthrough)
+  if (plan.error) {
+    console.error(`ERROR: ${plan.error}`)
     return 1
   }
-
-  for (const [exec, args] of variants) {
-    if (!commandExists(exec)) continue
-    return runCommand(exec, args, normalizedPassthrough, envOverrides)
+  for (const warning of plan.warnings || []) {
+    console.error(`WARN: ${warning}`)
   }
-
-  console.error(`ERROR: no executable found for runtime ${runtime} and command ${command}`)
-  return 1
+  return runCommand(plan.exec, plan.args, plan.passthrough || [], plan.envOverrides || {})
 }
 
 function main() {
   const argv = process.argv.slice(2)
-  const normalizedArgv = stripRuntimeArgs(argv)
+  const traceMode = hasFlag(argv, "--trace")
+  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"))
   const first = normalizedArgv[0]
 
   if (!first || first === "--help" || first === "-h" || first === "help") {
@@ -294,6 +407,16 @@ function main() {
     }
     console.log(`runtime=${runtimeResult.runtime}`)
     console.log(`reason=${runtimeResult.reason}`)
+    return
+  }
+
+  if (first === "init") {
+    process.exitCode = runInit(normalizedArgv.slice(1))
+    return
+  }
+
+  if (first === "plan" || first === "diff") {
+    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
     return
   }
 
@@ -324,6 +447,56 @@ function main() {
       return
     }
     process.exitCode = dispatch(runtimeResult.runtime, "check:runtime", [])
+    return
+  }
+
+  if (first === "explain") {
+    const explainCommand = normalizedArgv[1] || "detect"
+    if (explainCommand === "detect") {
+      printExplain(traceMode, { runtime: runtimeResult.runtime, reason: runtimeResult.reason, command: "detect" })
+      process.exitCode = runtimeResult.runtime ? 0 : 1
+      return
+    }
+    if (!runtimeResult.runtime) {
+      console.error(`ERROR: could not detect runtime. Use --runtime <${RUNTIME_ORDER.join("|")}>`)
+      process.exitCode = 1
+      return
+    }
+    if (explainCommand === "sync") {
+      const payload = {
+        runtime: runtimeResult.runtime,
+        reason: runtimeResult.reason,
+        command: "sync",
+        resolved_exec: process.execPath,
+        resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"]
+      }
+      printExplain(traceMode, payload)
+      return
+    }
+    if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
+      const passthrough = normalizedArgv.slice(2)
+      const plan = resolveDispatchPlan(runtimeResult.runtime, explainCommand, passthrough)
+      if (plan.error) {
+        console.error(`ERROR: ${plan.error}`)
+        process.exitCode = 1
+        return
+      }
+      const payload = {
+        runtime: runtimeResult.runtime,
+        reason: runtimeResult.reason,
+        command: explainCommand,
+        exec: plan.exec,
+        execArgs: plan.args,
+        passthrough: plan.passthrough || [],
+        env: plan.envOverrides || {},
+        warnings: plan.warnings || [],
+        candidates: plan.candidates || []
+      }
+      printExplain(traceMode, payload)
+      return
+    }
+    console.error(`ERROR: unsupported explain target '${explainCommand}'`)
+    process.exitCode = 1
     return
   }
 

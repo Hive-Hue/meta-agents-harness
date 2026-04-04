@@ -100,7 +100,12 @@ Examples:
 
 ```bash
 mah detect
+mah explain
+mah explain run --trace
 mah doctor
+mah init --runtime opencode --crew dev
+mah plan
+mah diff
 mah validate:runtime
 mah validate:config
 mah validate:sync
@@ -231,6 +236,8 @@ mah validate:config
 mah validate:sync
 mah validate:all
 mah validate
+mah explain detect
+mah explain run --trace
 ```
 
 ### Crew operations
