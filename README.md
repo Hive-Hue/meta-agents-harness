@@ -106,6 +106,10 @@ mah doctor
 mah init --runtime opencode --crew dev
 mah plan
 mah diff
+mah sessions --json
+mah graph --crew dev --json
+mah demo dev
+MAH_AUDIT=1 mah run --session-mode continue
 mah validate:runtime
 mah validate:config
 mah validate:sync

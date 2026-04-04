@@ -26,6 +26,9 @@ jobs:
       - name: Run smoke tests
         run: npm run test:smoke
 
+      - name: Run runtime contract tests
+        run: npm run test:contract
+
       - name: Validate canonical config
         run: npm run validate:config
 

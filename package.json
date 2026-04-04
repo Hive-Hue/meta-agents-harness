@@ -18,6 +18,10 @@
     "init": "node scripts/meta-agents-harness.mjs init",
     "plan": "node scripts/meta-agents-harness.mjs plan",
     "diff": "node scripts/meta-agents-harness.mjs diff",
+    "sessions": "node scripts/meta-agents-harness.mjs sessions",
+    "graph": "node scripts/meta-agents-harness.mjs graph",
+    "demo": "node scripts/meta-agents-harness.mjs demo",
+    "contract:runtime": "node scripts/meta-agents-harness.mjs contract:runtime",
     "doctor": "node scripts/meta-agents-harness.mjs doctor",
     "check:runtime": "node scripts/meta-agents-harness.mjs check:runtime",
     "validate:runtime": "node scripts/meta-agents-harness.mjs validate:runtime",
@@ -26,7 +30,8 @@
     "use": "node scripts/meta-agents-harness.mjs use",
     "clear": "node scripts/meta-agents-harness.mjs clear",
     "run": "node scripts/meta-agents-harness.mjs run",
-    "test:smoke": "node --test tests/smoke.test.mjs"
+    "test:smoke": "node --test tests/smoke.test.mjs",
+    "test:contract": "node --test tests/runtime-contract.test.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.1",

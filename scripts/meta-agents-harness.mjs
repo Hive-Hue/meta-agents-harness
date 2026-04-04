@@ -3,6 +3,8 @@ import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { RUNTIME_ADAPTERS, RUNTIME_ORDER } from "./runtime-adapters.mjs"
+import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
+import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, readMetaConfig, readProvenance } from "./m3-ops.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -100,6 +102,10 @@ function printHelp() {
   console.log("  doctor")
   console.log("  explain [detect|use|run|sync] [args]")
   console.log("  init [--runtime <name>] [--crew <name>]")
+  console.log("  sessions [--runtime <name>] [--crew <name>] [--json]")
+  console.log("  graph [--crew <name>] [--run <id>] [--json]")
+  console.log("  demo [crew]")
+  console.log("  contract:runtime")
   console.log("  check:runtime")
   console.log("  validate:runtime")
   console.log("  validate:config")
@@ -123,6 +129,9 @@ function printHelp() {
   console.log("  --session-root <path>")
   console.log("  --session-mirror / --no-session-mirror")
   console.log("  --trace")
+  console.log("  --json")
+  console.log("  --crew <name>")
+  console.log("  --run <id>")
   console.log("  --strict-markers")
 }
 
@@ -144,6 +153,15 @@ function parseValueArg(argv, flag, short = "") {
   return ""
 }
 
+function parseFilterArgs(argv) {
+  return {
+    runtime: parseValueArg(argv, "--runtime", "-r"),
+    crew: parseValueArg(argv, "--crew"),
+    run: parseValueArg(argv, "--run"),
+    json: hasFlag(argv, "--json")
+  }
+}
+
 function runLocalScript(scriptPath, scriptArgs = []) {
   const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
     cwd: repoRoot,
@@ -155,6 +173,12 @@ function runLocalScript(scriptPath, scriptArgs = []) {
     console.error(`ERROR: failed to run ${scriptPath}: ${child.error.message}`)
   }
   return 1
+}
+
+function logProvenance(event) {
+  const enabled = process.env.MAH_AUDIT === "1" || process.env.MAH_PROVENANCE === "1"
+  if (!enabled) return
+  appendProvenance(repoRoot, event)
 }
 
 function extractSessionOptions(argv) {
@@ -373,6 +397,63 @@ function runInit(argv) {
   return 0
 }
 
+function runSessions(argv) {
+  const filters = parseFilterArgs(argv)
+  const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew })
+  if (filters.json) {
+    console.log(JSON.stringify({ sessions: rows }, null, 2))
+    return 0
+  }
+  if (rows.length === 0) {
+    console.log("sessions=none")
+    return 0
+  }
+  for (const row of rows) {
+    console.log(`${row.id} runtime=${row.runtime} crew=${row.crew} last_active_at=${row.last_active_at} path=${row.source_path}`)
+  }
+  return 0
+}
+
+function runGraph(argv) {
+  const filters = parseFilterArgs(argv)
+  const meta = readMetaConfig(repoRoot)
+  const topology = buildCrewGraph(meta, filters.crew)
+  const provenance = readProvenance(repoRoot, { run: filters.run, limit: 1000 })
+  const runGraph = buildRunGraphFromProvenance(provenance, { run: filters.run })
+  if (filters.json) {
+    console.log(JSON.stringify({ topology, run: runGraph }, null, 2))
+    return 0
+  }
+  console.log(`crew=${topology.crew}`)
+  for (const edge of topology.edges) {
+    console.log(`topology ${edge.from} -> ${edge.to}`)
+  }
+  if (runGraph.edges.length > 0) {
+    console.log("run_graph")
+    for (const edge of runGraph.edges) {
+      console.log(`execution ${edge.from} -> ${edge.to} at=${edge.at}`)
+    }
+  }
+  return 0
+}
+
+function runDemo(argv) {
+  const crew = argv[0] || "dev"
+  console.log(`demo crew=${crew}`)
+  const steps = [
+    ["explain", "detect", "--trace"],
+    ["plan"],
+    ["validate:all"],
+    ["explain", "run", "--session-mode", "continue", "--session-id", "demo-session", "--trace"]
+  ]
+  for (const step of steps) {
+    const status = runLocalScript(path.join("scripts", "meta-agents-harness.mjs"), step)
+    if (status !== 0) return status
+  }
+  console.log("demo completed")
+  return 0
+}
+
 function dispatch(runtime, command, passthrough) {
   const plan = resolveDispatchPlan(runtime, command, passthrough)
   if (plan.error) {
@@ -382,6 +463,13 @@ function dispatch(runtime, command, passthrough) {
   for (const warning of plan.warnings || []) {
     console.error(`WARN: ${warning}`)
   }
+  logProvenance({
+    run_id: process.env.MAH_RUN_ID || "",
+    runtime,
+    command,
+    exec: plan.exec,
+    args: [...(plan.args || []), ...(plan.passthrough || [])]
+  })
   return runCommand(plan.exec, plan.args, plan.passthrough || [], plan.envOverrides || {})
 }
 
@@ -399,6 +487,17 @@ function main() {
   const forcedRuntime = parseRuntimeArg(argv)
   const runtimeResult = detectRuntime(repoRoot, forcedRuntime)
 
+  if (first === "contract:runtime") {
+    const contract = validateRuntimeAdapterContract(runtimeProfiles)
+    if (!contract.ok) {
+      for (const error of contract.errors) console.error(`ERROR: ${error}`)
+      process.exitCode = 1
+      return
+    }
+    console.log("runtime adapter contract passed")
+    return
+  }
+
   if (first === "detect") {
     if (!runtimeResult.runtime) {
       console.log("runtime=unknown")
@@ -412,6 +511,21 @@ function main() {
 
   if (first === "init") {
     process.exitCode = runInit(normalizedArgv.slice(1))
+    return
+  }
+
+  if (first === "sessions") {
+    process.exitCode = runSessions(normalizedArgv.slice(1))
+    return
+  }
+
+  if (first === "graph") {
+    process.exitCode = runGraph(normalizedArgv.slice(1))
+    return
+  }
+
+  if (first === "demo") {
+    process.exitCode = runDemo(normalizedArgv.slice(1))
     return
   }
 
