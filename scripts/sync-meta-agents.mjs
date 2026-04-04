@@ -94,13 +94,38 @@ function buildPiPromptFromMeta(meta, crew, agent, currentRaw) {
   return `---\n${frontmatterText}\n---\n\n${body}`
 }
 
-function syncPiPrompts(meta, crew, checkOnly) {
+function pushRecord(records, entry) {
+  records.push(entry)
+}
+
+function diffPreview(currentRaw, nextRaw, maxLines = 40) {
+  const current = `${currentRaw || ""}`.split("\n")
+  const next = `${nextRaw || ""}`.split("\n")
+  const max = Math.max(current.length, next.length)
+  const lines = []
+  for (let i = 0; i < max; i += 1) {
+    const a = current[i]
+    const b = next[i]
+    if (a === b) continue
+    if (typeof a !== "undefined") lines.push(`-${a}`)
+    if (typeof b !== "undefined") lines.push(`+${b}`)
+    if (lines.length >= maxLines) break
+  }
+  return lines
+}
+
+function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
   let ok = true
   for (const agent of crew.agents || []) {
     const relativePromptPath = resolvePromptPath("pi", crew.id, agent.id)
     const promptPath = path.resolve(repoRoot, relativePromptPath)
     if (checkOnly && !existsSync(promptPath)) {
-      console.log(`drift: missing ${rel(promptPath)}`)
+      pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "missing", crew: crew.id, agent: agent.id })
+      if (!jsonOutput) {
+        if (mode === "plan") console.log(`plan: create ${rel(promptPath)}`)
+        else console.log(`drift: missing ${rel(promptPath)}`)
+      }
       ok = false
       continue
     }
@@ -109,10 +134,22 @@ function syncPiPrompts(meta, crew, checkOnly) {
     const nextRaw = buildPiPromptFromMeta(meta, crew, agent, currentRaw)
     if (checkOnly) {
       if (currentRaw !== nextRaw) {
-        console.log(`drift: out-of-sync ${rel(promptPath)}`)
+        const preview = mode === "diff" ? diffPreview(currentRaw, nextRaw) : []
+        pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "out_of_sync", crew: crew.id, agent: agent.id, preview })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: update ${rel(promptPath)}`)
+          else {
+            console.log(`drift: out-of-sync ${rel(promptPath)}`)
+            if (mode === "diff") for (const line of preview) console.log(line)
+          }
+        }
         ok = false
       } else {
-        console.log(`ok: ${rel(promptPath)}`)
+        pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "ok", crew: crew.id, agent: agent.id })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: no-change ${rel(promptPath)}`)
+          else console.log(`ok: ${rel(promptPath)}`)
+        }
       }
       continue
     }
@@ -121,6 +158,7 @@ function syncPiPrompts(meta, crew, checkOnly) {
       mkdirSync(path.dirname(promptPath), { recursive: true })
       writeFileSync(promptPath, nextRaw, "utf-8")
       console.log(`synced: ${rel(promptPath)}`)
+      pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "synced", crew: crew.id, agent: agent.id })
     }
   }
   return ok
@@ -464,30 +502,52 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
   return `${YAML.stringify(doc, { indent: 2 })}`.replaceAll("use_when", "use-when").replaceAll("max_lines", "max-lines")
 }
 
-function writeOrCheck(targetPath, content, checkOnly) {
+function writeOrCheck(targetPath, content, mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
   if (checkOnly) {
     if (!existsSync(targetPath)) {
-      console.log(`drift: missing ${rel(targetPath)}`)
+      pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "missing" })
+      if (!jsonOutput) {
+        if (mode === "plan") console.log(`plan: create ${rel(targetPath)}`)
+        else console.log(`drift: missing ${rel(targetPath)}`)
+      }
       return false
     }
     const current = readFileSync(targetPath, "utf-8")
     if (current !== content) {
-      console.log(`drift: out-of-sync ${rel(targetPath)}`)
+      const preview = mode === "diff" ? diffPreview(current, content) : []
+      pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "out_of_sync", preview })
+      if (!jsonOutput) {
+        if (mode === "plan") console.log(`plan: update ${rel(targetPath)}`)
+        else {
+          console.log(`drift: out-of-sync ${rel(targetPath)}`)
+          if (mode === "diff") for (const line of preview) console.log(line)
+        }
+      }
       return false
     }
-    console.log(`ok: ${rel(targetPath)}`)
+    pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "ok" })
+    if (!jsonOutput) {
+      if (mode === "plan") console.log(`plan: no-change ${rel(targetPath)}`)
+      else console.log(`ok: ${rel(targetPath)}`)
+    }
     return true
   }
 
   mkdirSync(path.dirname(targetPath), { recursive: true })
   writeFileSync(targetPath, content, "utf-8")
   console.log(`synced: ${rel(targetPath)}`)
+  pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "synced" })
   return true
 }
 
-const checkOnly = process.argv.includes("--check")
+const argv = process.argv.slice(2)
+const mode = argv.includes("--diff") ? "diff" : argv.includes("--plan") ? "plan" : argv.includes("--check") ? "check" : "sync"
+const checkOnly = mode !== "sync"
+const jsonOutput = argv.includes("--json")
 const raw = readFileSync(metaConfigPath, "utf-8")
 const metaDoc = YAML.parse(raw)
+const records = []
 
 if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   fail("meta-agents.yaml has no crews")
@@ -503,21 +563,37 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
     const claudePath = path.join(repoRoot, ".claude", "crew", crew.id, "multi-team.yaml")
     const opencodeCrewPath = path.join(repoRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
 
-    allGood = writeOrCheck(piPath, piYaml, checkOnly) && allGood
-    allGood = writeOrCheck(claudePath, claudeYaml, checkOnly) && allGood
-    allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, checkOnly) && allGood
-    allGood = syncPiPrompts(metaDoc, crew, checkOnly) && allGood
+    allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
+    allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
+    allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
+    allGood = syncPiPrompts(metaDoc, crew, mode, records, jsonOutput) && allGood
 
     if (!checkOnly) {
       ensureOpencodeArtifacts(crew)
     }
   }
 
-  if (checkOnly && !allGood) {
-    console.log("meta sync check failed: run `npm run sync:meta`")
+  const summary = {
+    mode,
+    ok: allGood,
+    totals: {
+      records: records.length,
+      missing: records.filter((item) => item.status === "missing").length,
+      out_of_sync: records.filter((item) => item.status === "out_of_sync").length,
+      ok: records.filter((item) => item.status === "ok").length,
+      synced: records.filter((item) => item.status === "synced").length
+    },
+    records
+  }
+  if (jsonOutput) {
+    console.log(JSON.stringify(summary, null, 2))
+  } else if (checkOnly && !allGood) {
+    const title = mode === "plan" ? "meta sync plan detected changes" : mode === "diff" ? "meta sync diff detected changes" : "meta sync check failed"
+    console.log(`${title}: run \`npm run sync:meta\``)
     process.exitCode = 1
   } else if (checkOnly) {
-    console.log("meta sync check passed")
+    const title = mode === "plan" ? "meta sync plan clean" : mode === "diff" ? "meta sync diff clean" : "meta sync check passed"
+    console.log(title)
   } else if (!process.exitCode) {
     console.log("meta sync completed")
   }

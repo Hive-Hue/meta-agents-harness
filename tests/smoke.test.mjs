@@ -35,3 +35,14 @@ test("forced runtime works when flag appears before command", () => {
   assert.match(result.stdout, /runtime=opencode/)
   assert.match(result.stdout, /reason=forced/)
 })
+
+test("explain detect with trace returns structured output", () => {
+  const result = run(["explain", "detect", "--trace"])
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /"command": "detect"/)
+})
+
+test("sessions command returns successfully", () => {
+  const result = run(["sessions"])
+  assert.equal(result.status, 0, result.stderr)
+})

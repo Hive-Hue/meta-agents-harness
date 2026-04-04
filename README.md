@@ -2,37 +2,164 @@
   <img src="./assets/banner_metaagent.png" alt="Meta Agents Harness" width="100%" />
 </p>
 
-[![](https://img.shields.io/github/actions/workflow/status/Hive-Hue/meta-agents-harness/validate.yml?style=flat&label=validate)](https://github.com/Hive-Hue/meta-agents-harness/actions/workflows/validate.yml)
-[![](https://img.shields.io/github/last-commit/Hive-Hue/meta-agents-harness?style=flat)](https://github.com/Hive-Hue/meta-agents-harness/commits)
+[![](https://img.shields.io/github/actions/workflow/status/Hive-Hue/meta-agents-harness/validate.yml?branch=development&style=flat&label=validate%20(development))](https://github.com/Hive-Hue/meta-agents-harness/actions/workflows/validate.yml)
+[![](https://img.shields.io/github/last-commit/Hive-Hue/meta-agents-harness/development?style=flat&label=last%20commit)](https://github.com/Hive-Hue/meta-agents-harness/commits/development)
 [![](https://img.shields.io/badge/license-AGPLv3%20%2B%20Commercial-6f42c1?style=flat)](./LICENSE)
 
 # Meta Agents Harness
 
-Meta Agents Harness provides a unified multi-agent harness for:
+**Meta Agents Harness** is a unified multi-agent control layer for **OpenCode**, **Claude Code**, and **PI**.
 
-- OpenCode
-- Claude Code
-- PI
+Instead of maintaining separate operator flows, wrappers, and team topologies for each runtime, this project exposes a **single command surface** — `mah` — and dispatches to the correct runtime automatically.
 
-It detects the available runtime in the current repository and adapts commands dynamically through a single CLI: `mah`.
+The `development` branch represents the **product-grade evolution path** of the project: stronger canonical configuration, layered validation, explainability, and a future adapter-based runtime architecture.
 
-Core value:
+---
 
-- one command surface for three runtimes
-- deterministic runtime detection and fallback behavior
-- shared multi-team operating model (orchestrator -> leads -> workers)
+## Why this exists
 
-## Key Idea
+Multi-agent teams often end up fragmented across runtime-specific repos and operator flows.
 
-Instead of maintaining separate operator flows per runtime, Meta Agents Harness exposes a common command surface and dispatches to the correct underlying toolchain.
+Meta Agents Harness solves that by providing:
 
-Detection priority:
+- **one CLI surface** for multiple runtimes
+- **runtime-aware dispatch** with deterministic detection
+- **shared multi-team topology** (`orchestrator -> leads -> workers`)
+- **canonical config generation** for runtime-specific artifacts
+- **incremental migration path** from runtime-specific harnesses to a unified entrypoint
 
-1. Forced runtime via `--runtime` or `MAH_RUNTIME`
-2. Runtime marker directory in repository (`.pi`, `.claude`, `.opencode`)
-3. Installed global/local executables (`pi`/`pimh`, `claude`/`ccmh`, `opencode`/`ocmh`)
+This makes it easier to standardize operations without forcing teams to abandon the runtime they already use.
 
-## Install
+---
+
+## Current status of the `development` branch
+
+This branch is where the project is being shaped into a more robust product layer.
+
+Current focus areas include:
+
+- making `meta-agents.yaml` the true canonical source of truth
+- reducing drift between config and generated runtime artifacts
+- improving validation and diagnostics
+- preparing an adapter model for future runtime extensibility
+- improving operator UX with explainability and safer sync flows
+
+This branch is the right place to evaluate the **direction**, **architecture**, and **product positioning** of the project.
+
+---
+
+## Core product idea
+
+Use one command surface:
+
+```bash
+mah <command>
+```
+
+And let the harness resolve:
+
+- which runtime is available
+- which wrapper or executable to use
+- which crew is active
+- how session flags should be normalized
+- how runtime-specific artifacts are generated or validated
+
+---
+
+## Runtime detection model
+
+Detection currently follows this priority:
+
+1. forced runtime via `--runtime`, `-r`, `-f`, or `MAH_RUNTIME`
+2. runtime marker directory in the repository (`.pi`, `.claude`, `.opencode`)
+3. installed executable or wrapper available in the environment
+
+This allows the same repository to remain runtime-aware while preserving explicit overrides for CI, local debugging, or controlled execution.
+
+---
+
+## Supported runtimes
+
+Meta Agents Harness currently targets:
+
+- **OpenCode**
+- **Claude Code**
+- **PI**
+
+The repository ships runtime assets for all three, while presenting a single operator entrypoint.
+
+---
+
+## Key concepts
+
+### 1. Unified CLI
+
+The main operator surface is `mah`.
+
+Examples:
+
+```bash
+mah detect
+mah explain
+mah explain run --trace
+mah doctor
+mah init --runtime opencode --crew dev
+mah plan
+mah diff
+mah sessions --json
+mah graph --crew dev --json
+mah demo dev
+MAH_AUDIT=1 mah run --session-mode continue
+mah validate:runtime
+mah validate:config
+mah validate:sync
+mah validate:all
+mah validate
+mah list:crews
+mah use dev
+mah clear
+mah run
+```
+
+### 2. Canonical configuration
+
+The project uses `meta-agents.yaml` as the canonical multi-runtime configuration index.
+
+This config is used to define:
+
+- runtime detection metadata
+- runtime-specific wrappers and config roots
+- model catalog and fallbacks
+- skill references
+- domain profiles
+- multi-team crew topology
+- runtime overrides and mapping rules
+
+### 3. Generated runtime artifacts
+
+From the canonical config, the project materializes runtime-specific files under:
+
+- `.pi/`
+- `.claude/`
+- `.opencode/`
+
+This preserves runtime-native structures while reducing duplicated authoring effort.
+
+### 4. Multi-team operating model
+
+The common abstraction is:
+
+- **orchestrator**
+- **team leads**
+- **workers**
+
+This structure is translated into each runtime’s expected configuration model.
+
+---
+
+## Installation
+
+Clone the repository and install dependencies:
 
 ```bash
 git clone https://github.com/Hive-Hue/meta-agents-harness.git
@@ -40,21 +167,22 @@ cd meta-agents-harness
 npm run setup
 ```
 
-Optional environment setup:
+Optional local environment setup:
 
 ```bash
 cp .env.sample .env
 ```
 
-`npm run setup` installs root dependencies plus runtime dependencies in `.opencode`, `.claude`, and `.pi`.
-During setup, if `.mcp.example.json` exists and `.mcp.json` is missing, it auto-creates `.mcp.json`.
+The setup script installs root dependencies and runtime dependencies used by the repository.
 
-### MCP Configuration
+---
 
-Meta Agents Harness uses:
+## MCP configuration
 
-- `.mcp.example.json`: tracked template for repository defaults
-- `.mcp.json`: local active MCP config (gitignored)
+The repository uses two MCP-related files:
+
+- `.mcp.example.json` — tracked repository template
+- `.mcp.json` — local active configuration (gitignored)
 
 Recommended flow:
 
@@ -62,90 +190,89 @@ Recommended flow:
 cp .mcp.example.json .mcp.json
 ```
 
-Then adjust `.mcp.json` with your local secrets/env references.
+Then adjust local values and secrets as needed.
 
-### CLI Availability
+---
 
-After setup, you have two ways to run `mah`:
+## Running the CLI
 
-- Local (no global install): `node bin/mah <command>`
-- Global: install the package globally and run `mah` directly
-
-Global installation options:
-
-```bash
-npm install -g .
-# or
-npm install -g git+https://github.com/Hive-Hue/meta-agents-harness.git
-```
-
-## Unified CLI (`mah`)
-
-Show help:
+You can use the CLI locally:
 
 ```bash
 node bin/mah --help
-# or, if installed globally:
+```
+
+Or install it globally:
+
+```bash
+npm install -g .
+```
+
+Then:
+
+```bash
 mah --help
 ```
 
-Detect runtime:
+---
+
+## Common commands
+
+### Show help
 
 ```bash
-node bin/mah detect
-# or:
+mah --help
+```
+
+### Detect runtime
+
+```bash
 mah detect
 ```
 
-Run runtime check:
+### Run diagnostics
 
 ```bash
-node bin/mah check:runtime
-# or:
+mah doctor
 mah check:runtime
-```
-
-Validate configuration:
-
-```bash
-node bin/mah validate
-# or:
+mah validate:runtime
+mah validate:config
+mah validate:sync
+mah validate:all
 mah validate
+mah explain detect
+mah explain run --trace
 ```
 
-List crews:
+### Crew operations
 
 ```bash
-node bin/mah list:crews
-# or:
 mah list:crews
-```
-
-Activate crew:
-
-```bash
-node bin/mah use <crew>
-# or:
 mah use <crew>
-```
-
-Clear active crew:
-
-```bash
-node bin/mah clear
-# or:
 mah clear
 ```
 
-Run interactive runtime:
+### Interactive runtime execution
 
 ```bash
-node bin/mah run
-# or:
 mah run
 ```
 
-Unified session controls:
+### Force runtime explicitly
+
+```bash
+mah --runtime opencode validate
+mah --runtime claude check:runtime
+mah --runtime pi run -c
+```
+
+---
+
+## Unified session controls
+
+The CLI normalizes session-related controls across runtimes.
+
+Examples:
 
 ```bash
 mah run --session-mode continue
@@ -155,75 +282,24 @@ mah run --session-root .pi/crew/dev/sessions
 mah run --session-mirror
 ```
 
-`mah` maps these flags to runtime-native behavior internally.
+These are translated to runtime-native behavior internally.
 
-Force explicit runtime:
+---
 
-```bash
-node bin/mah --runtime opencode validate
-node bin/mah --runtime claude check:runtime
-node bin/mah --runtime pi run -c
-node bin/mah -r opencode validate
-node bin/mah -f opencode validate
-# or:
-mah --runtime opencode validate
-mah --runtime claude check:runtime
-mah --runtime pi run -c
-mah -r opencode validate
-mah -f opencode validate
-```
-
-## Canonical Config
+## Canonical config and examples
 
 The repository includes:
 
-- [meta-agents.yaml](./meta-agents.yaml)
-- [meta-agents.yaml.example](./examples/meta-agents.yaml.example)
-- [crew-dev.complete.example.yaml](./examples/crew-dev.complete.example.yaml)
-- [crew-marketing.complete.example.yaml](./examples/crew-marketing.complete.example.yaml)
+- [`meta-agents.yaml`](./meta-agents.yaml)
+- [`examples/meta-agents.yaml.example`](./examples/meta-agents.yaml.example)
+- [`examples/crew-dev.complete.example.yaml`](./examples/crew-dev.complete.example.yaml)
+- [`examples/crew-marketing.complete.example.yaml`](./examples/crew-marketing.complete.example.yaml)
 
-`meta-agents.yaml` is the canonical runtime index.  
-`examples/meta-agents.yaml.example` is the practical authoring template with crews, role permissions, and runtime-specific overrides.
+Use these files to understand and author crew topology, model mapping, skill references, and runtime-specific overrides.
 
-### Meta-Agents Schema & Examples
+---
 
-Use this structure when authoring `meta-agents.yaml`:
-
-- `version`, `name`, `description`
-- `runtime_detection`
-  - `order`
-  - `forced.args`, `forced.env`
-  - `marker.<runtime>`
-  - `cli.<runtime>.direct_cli`, `cli.<runtime>.wrapper`
-- `runtimes`
-  - `pi.wrapper`, `pi.config_root`, `pi.config_pattern`, `pi.default_extensions`
-  - `claude.wrapper`, `claude.config_root`, `claude.config_pattern`, `claude.ccr.*`, `claude.mcp.*`
-  - `opencode.wrapper`, `opencode.config_root`, `opencode.config_pattern`, `opencode.task_policy`
-- `catalog`
-  - `models`
-  - `model_fallbacks` (ordered array por `model_ref`, com N níveis de fallback; inclua `worker_default` quando necessário)
-  - `skills`
-  - `domain_profiles`
-- `crews[]`
-  - `id`, `display_name`
-  - `source_configs`
-  - `session`
-  - `topology` (`orchestrator`, `leads`, `workers`)
-  - `agents[]` (`id`, `role`, `team`, `model_ref`, optional `model`, optional `model_fallbacks[]`, `expertise`, `skills`, `domain_profile`)
-  - `runtime_overrides` (`opencode.permission.task`, `claude.ccr.team_routes`, `pi.multi_team`)
-- `adapters.mapping_rules`
-
-Example files:
-
-- [meta-agents.yaml.example](./examples/meta-agents.yaml.example): full template with `dev` and `marketing` crews.
-- [crew-dev.complete.example.yaml](./examples/crew-dev.complete.example.yaml): complete isolated `dev` crew block.
-- [crew-marketing.complete.example.yaml](./examples/crew-marketing.complete.example.yaml): complete isolated `marketing` crew block.
-
-Model precedence in sync:
-
-- `agents[].model` (explicit per-agent override) has highest priority
-- then `agents[].model_ref -> catalog.models[model_ref]` (or OpenCode `runtimes.opencode.model_overrides[model_ref]`)
-- for fallbacks, `agents[].model_fallbacks` overrides `catalog.model_fallbacks[model_ref]`
+## Sync and drift detection
 
 Generate runtime artifacts from canonical config:
 
@@ -231,155 +307,191 @@ Generate runtime artifacts from canonical config:
 npm run sync:meta
 ```
 
-This updates artifacts for all runtimes (`.pi`, `.claude`, `.opencode`), not only OpenCode.
-
 Check drift without writing files:
 
 ```bash
 npm run check:meta-sync
 ```
 
-### Full YAML Structure
+This is an important part of keeping runtime artifacts aligned with the source configuration.
 
-Top-level sections:
+---
 
-- `version`, `name`, `description`
-- `runtime_detection` (forced args/env, marker dirs, CLI fallback)
-- `runtimes` (wrapper and config roots per runtime)
-- `crews` (topology, role permissions, runtime overrides)
-- `adapters` (mapping rules and translation contracts)
+## Runtime assets
 
-### Field-by-Field Guide
+The repository currently contains runtime-specific assets such as:
 
-- `runtime_detection.order`: precedence between explicit runtime, repository markers, and installed executables.
-- `runtimes.<runtime>.wrapper`: command wrapper to execute (`pimh`, `ccmh`, `ocmh`).
-- `runtimes.<runtime>.config_root`: runtime root folder (`.pi`, `.claude`, `.opencode`).
-- `runtimes.pi.default_extensions`: default PI extensions injected by `pimh run` when `--extension` is not provided.
-- `crews[].topology`: orchestrator, leads, and workers in abstract form.
-- `crews[].role_permissions`: runtime-agnostic permission intent.
-- `crews[].runtime_overrides`: per-runtime controls (CCR on Claude, `permission.task` on OpenCode, `multi-team`/extension on PI).
-- `adapters.mapping_rules`: conversion contract from abstract roles/scopes to runtime-native config fields.
+- `.opencode/` — OpenCode harness topology and scripts
+- `.claude/` — Claude runtime wrappers and crew structure
+- `.pi/` — PI runtime wrappers and crew structure
+- `extensions/` — PI runtime extensions and entrypoints
 
-### How Adapter Conversion Works
+The purpose of the unified CLI is not to remove those assets, but to make them easier to manage from a single operational layer.
 
-The adapter layer translates abstract crew intent into runtime-native models and generated artifacts:
+---
 
-- OpenCode: roles and delegation become `.opencode/crew/<crew>/multi-team.yaml` and crew-scoped agent/expertise artifacts. Active runtime files are selected via symlinks on `use`.
-- Claude: role routing becomes `.claude/crew/<crew>/multi-team.yaml` plus CCR route constraints.
-- PI: role + ownership intent maps into `.pi/crew/<crew>/multi-team.yaml` and runtime extension wiring in `extensions/`.
+## Product direction for this branch
 
-Current runtime dispatch is implemented in [meta-agents-harness.mjs](./scripts/meta-agents-harness.mjs); the YAML files define and document the canonical mapping contract for runtime parity.
+The `development` branch is focused on turning the project into a more mature platform.
 
-## Runtime-Specific Assets
+### Planned evolution areas
 
-This repository ships runtime assets for all three CLIs:
+#### Canonical config hardening
+- formal config schema
+- explicit config versioning
+- stronger validation boundaries
+- reduced duplication between YAML and dispatcher logic
 
-- `.opencode/` for OpenCode harness topology and scripts
-- `.claude/` for Claude runtime wrappers and crew structure
-- `.pi/` for PI runtime wrappers and crew structure
-- `extensions/` for PI runtime extension entrypoints used by `.pi/scripts/run-crew.mjs`
+#### Validation model
+- split validation by concern:
+  - config
+  - runtime
+  - sync
+  - full validation
 
-The `mah` CLI is runtime-agnostic and dispatches dynamically based on detected runtime markers or explicit `--runtime`.
+#### Operator UX
+- improved diagnostics
+- explainability for runtime resolution
+- preview-oriented checks of generated changes before sync (`plan` / `diff`)
+- stricter handling of ambiguous runtime markers
 
-### OpenCode Crew Runtime
+#### Platform capabilities
+- initial unified session registry
+- initial provenance and execution audit trails
+- initial execution graph visibility
+- runtime adapter foundation (still evolving, not a final external plugin API)
 
-OpenCode now supports crew architecture via wrapper + crew configs:
+This branch is therefore useful both as a working branch and as a public-facing signal of the product roadmap.
 
-- `.opencode/crew/<crew>/multi-team.yaml` generated from `meta-agents.yaml`
-- `.opencode/.active-crew.json` for selected crew metadata
-- `.opencode/multi-team.yaml` as active runtime symlink and `.opencode/agents/*.md` as materialized active agent links
+Current maturity note:
 
-Commands:
+- diagnostics include expanded structured outputs, but output schemas are still being normalized
+- `plan` and `diff` are currently lightweight operator workflows around sync reporting
 
-```bash
-mah -f opencode list:crews
-mah -f opencode use marketing
-mah -f opencode use marketing --hierarchy
-mah -f opencode use marketing --no-hierarchy
-mah -f opencode run
-mah -f opencode run --crew marketing --hierarchy
-mah -f opencode run --crew marketing --no-hierarchy
-mah -f opencode clear
+---
+
+## Architectural direction
+
+The long-term direction is to move toward an adapter model for runtimes.
+
+A runtime should be represented as an explicit contract rather than implicit command branching scattered through the dispatcher.
+
+Illustrative direction:
+
+```ts
+interface RuntimeAdapter {
+  name: string
+  detect(context: DetectContext): DetectResult
+  validate(level: "runtime" | "config" | "sync"): ValidationResult
+  run(args: RunArgs): RunResult
+  useCrew(crew: string): CommandResult
+  clearCrew(): CommandResult
+  capabilities(): CapabilityMatrix
+}
 ```
 
-`mah -f opencode use <crew>` creates/updates runtime materialization for the selected crew.  
-`mah -f opencode clear` removes those symlinks.
-`--hierarchy` keeps strict lead-first delegation.
-`--no-hierarchy` allows orchestrator to delegate directly to workers in runtime materialization.
+This is an architectural direction for the branch, not yet a claim of completed implementation.
 
-## Adapter Model
+---
 
-`mah` uses an adapter-like dispatch model:
+## Why this branch may matter publicly
 
-- runtime profile selection (`pi`, `claude`, `opencode`)
-- command variants per runtime (`list:crews`, `use`, `run`, `validate`)
-- executable fallback (wrapper first, runtime/package script fallback)
+If you are evaluating the project from the outside, the `development` branch is where you can understand:
 
-Implementation reference:
+- how the project intends to evolve from wrapper to orchestration layer
+- how canonical config and runtime parity are being shaped
+- what product-grade features are being prioritized
+- how future extensibility and observability may work
 
-- [meta-agents-harness.mjs](./scripts/meta-agents-harness.mjs)
+It is the best branch to inspect for **roadmap**, **direction**, and **product architecture**.
 
-## PI Integration Details
-
-PI runtime integration is based on:
-
-- `.pi/bin/pimh` wrapper orchestration
-- `.pi/scripts/*.mjs` runtime helpers
-- `extensions/*.ts` loaded by `.pi/scripts/run-crew.mjs`
-- default PI extension set on `run`: `multi-team`, `agent-session-navigator`, `mcp-bridge`, `theme-cycler`
-
-Quick checks:
-
-```bash
-node .pi/bin/pimh check:runtime
-node .pi/bin/pimh list:crews
-```
-
-## Comparison with Legacy Harness Repos
-
-- `pi-multi-harness`, `claude-multi-harness`, and `opencode-multi-harness` expose runtime-specific flows.
-- `meta-agents-harness` keeps those runtime assets, but adds a unified entrypoint (`mah`) and a canonical runtime index (`meta-agents.yaml`).
-- migration path is incremental: existing wrappers remain valid while teams adopt `mah`.
+---
 
 ## Troubleshooting
 
-- `ERROR: could not detect runtime`
-  - ensure one of `.pi`, `.claude`, `.opencode` exists
-  - or ensure runtime executables are installed globally/in PATH (`pi|pimh`, `claude|ccmh`, `opencode|ocmh`)
-  - or pass explicit `--runtime`
-- `ERROR: no executable found for runtime`
-  - install wrapper/runtime CLI (`pimh`, `ccmh`, `ocmh`, `pi`, `claude`, `opencode`)
-  - run `npm run setup`
-- `ERROR: missing .mcp.json`
-  - copy template: `cp .mcp.example.json .mcp.json`
-  - review MCP server env vars in `.env`
-- `mah: command not found`
-  - run with local entrypoint: `node bin/mah --help`
-  - or install globally: `npm install -g .`
-- PI runtime starts but fails on extension path
-  - confirm `extensions/` exists and includes `multi-team.ts`
-- validate badge shows not found
-  - ensure `.github/workflows/validate.yml` exists on default branch
+### Runtime could not be detected
 
-## Local Development
+Possible causes:
 
-Install all dependencies:
+- the repository has no `.pi`, `.claude`, or `.opencode` marker
+- no relevant runtime executable is available
+- no explicit `--runtime` was passed
+
+Try:
+
+```bash
+mah detect
+mah --runtime opencode detect
+```
+
+### Executable not found for runtime
+
+Try:
+
+- running `npm run setup`
+- verifying wrapper/runtime availability
+- forcing a known runtime explicitly
+
+### MCP configuration missing
+
+If `.mcp.json` is missing:
+
+```bash
+cp .mcp.example.json .mcp.json
+```
+
+### `mah` command not available
+
+Use the local entrypoint:
+
+```bash
+node bin/mah --help
+```
+
+Or install globally:
+
+```bash
+npm install -g .
+```
+
+---
+
+## Local development
+
+Install dependencies:
 
 ```bash
 npm run setup
 ```
 
-Run smoke tests for `mah`:
+Run smoke tests:
 
 ```bash
 npm run test:smoke
 ```
 
-Validate generated runtime configs:
+Validate canonical sync:
 
 ```bash
 npm run check:meta-sync
 ```
+
+---
+
+## Related positioning
+
+Meta Agents Harness can be viewed as the unification layer above runtime-specific harness repos.
+
+Instead of replacing runtime-native behavior, it provides:
+
+- shared operator commands
+- canonical team definition
+- consistent validation direction
+- structured migration path
+
+That makes it useful both for greenfield setups and for teams already operating per-runtime harnesses.
+
+---
 
 ## License
 
