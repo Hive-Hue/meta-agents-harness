@@ -2,55 +2,13 @@ import { existsSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
+import { RUNTIME_ADAPTERS, RUNTIME_ORDER } from "./runtime-adapters.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 
-const runtimeProfiles = {
-  pi: {
-    markerDir: ".pi",
-    wrapper: "pimh",
-    directCli: "pi",
-    commands: {
-      "list:crews": [["node", [".pi/bin/pimh", "list:crews"]], ["pimh", ["list:crews"]], ["npm", ["--prefix", ".pi", "run", "list:crews"]]],
-      use: [["node", [".pi/bin/pimh", "use"]], ["pimh", ["use"]], ["npm", ["--prefix", ".pi", "run", "use:crew", "--"]]],
-      clear: [["node", [".pi/bin/pimh", "clear"]], ["pimh", ["clear"]], ["npm", ["--prefix", ".pi", "run", "clear:crew"]]],
-      run: [["node", [".pi/bin/pimh", "run"]], ["pimh", ["run"]], ["npm", ["--prefix", ".pi", "run", "run:crew", "--"]]],
-      doctor: [["node", [".pi/bin/pimh", "doctor"]], ["pimh", ["doctor"]], ["npm", ["--prefix", ".pi", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]],
-      validate: [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]]
-    }
-  },
-  claude: {
-    markerDir: ".claude",
-    wrapper: "ccmh",
-    directCli: "claude",
-    commands: {
-      "list:crews": [["node", [".claude/bin/ccmh", "list:crews"]], ["ccmh", ["list:crews"]], ["npm", ["--prefix", ".claude", "run", "list:crews"]]],
-      use: [["node", [".claude/bin/ccmh", "use"]], ["ccmh", ["use"]], ["npm", ["--prefix", ".claude", "run", "use:crew", "--"]]],
-      clear: [["node", [".claude/bin/ccmh", "clear"]], ["ccmh", ["clear"]], ["npm", ["--prefix", ".claude", "run", "clear:crew"]]],
-      run: [["node", [".claude/bin/ccmh", "run"]], ["ccmh", ["run"]], ["npm", ["--prefix", ".claude", "run", "run:crew", "--"]]],
-      doctor: [["node", [".claude/bin/ccmh", "doctor"]], ["ccmh", ["doctor"]], ["npm", ["--prefix", ".claude", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]],
-      validate: [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]]
-    }
-  },
-  opencode: {
-    markerDir: ".opencode",
-    wrapper: "ocmh",
-    directCli: "opencode",
-    commands: {
-      "list:crews": [["node", [".opencode/bin/ocmh", "list:crews"]], ["ocmh", ["list:crews"]], ["npm", ["--prefix", ".opencode", "run", "list:crews"]]],
-      use: [["node", [".opencode/bin/ocmh", "use"]], ["ocmh", ["use"]], ["npm", ["--prefix", ".opencode", "run", "use:crew", "--"]]],
-      clear: [["node", [".opencode/bin/ocmh", "clear"]], ["ocmh", ["clear"]], ["npm", ["--prefix", ".opencode", "run", "clear:crew"]]],
-      run: [["node", [".opencode/bin/ocmh", "run"]], ["ocmh", ["run"]], ["npm", ["--prefix", ".opencode", "run", "run:crew", "--"]]],
-      doctor: [["node", [".opencode/bin/ocmh", "doctor"]], ["ocmh", ["doctor"]], ["npm", ["--prefix", ".opencode", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
-      validate: [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]]
-    }
-  }
-}
+const runtimeProfiles = RUNTIME_ADAPTERS
 
 function commandExists(command) {
   const probe = spawnSync("bash", ["-lc", `command -v ${command} >/dev/null 2>&1`], {
@@ -60,9 +18,10 @@ function commandExists(command) {
   return probe.status === 0
 }
 
-function runtimeExecutableStatus(profile) {
-  const directCliAvailable = commandExists(profile.directCli)
-  const wrapperAvailable = commandExists(profile.wrapper)
+function runtimeExecutableStatus(runtimeName) {
+  const profile = runtimeProfiles[runtimeName]
+  const directCliAvailable = profile?.directCli ? commandExists(profile.directCli) : false
+  const wrapperAvailable = profile?.wrapper ? commandExists(profile.wrapper) : false
   return { directCliAvailable, wrapperAvailable }
 }
 
@@ -109,12 +68,12 @@ function detectRuntime(cwd, forcedRuntime) {
   }
 
   if (byMarker.length > 1) {
-    const preferred = ["pi", "claude", "opencode"].find((name) => byMarker.includes(name))
+    const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
     if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
   }
 
   const byCli = Object.entries(runtimeProfiles)
-    .map(([name, profile]) => ({ name, profile, status: runtimeExecutableStatus(profile) }))
+    .map(([name, profile]) => ({ name, profile, status: runtimeExecutableStatus(name) }))
     .filter(({ status }) => status.directCliAvailable || status.wrapperAvailable)
 
   if (byCli.length > 0) {
@@ -136,6 +95,7 @@ function printHelp() {
   console.log("  detect")
   console.log("  doctor")
   console.log("  check:runtime")
+  console.log("  validate:runtime")
   console.log("  validate:config")
   console.log("  validate:sync")
   console.log("  validate:all")
@@ -146,9 +106,10 @@ function printHelp() {
   console.log("  run [runtime-args]")
   console.log("")
   console.log("Options:")
-  console.log("  --runtime <pi|claude|opencode>")
-  console.log("  -r <pi|claude|opencode>")
-  console.log("  -f <pi|claude|opencode>")
+  const runtimes = Object.keys(runtimeProfiles).join("|")
+  console.log(`  --runtime <${runtimes}>`)
+  console.log(`  -r <${runtimes}>`)
+  console.log(`  -f <${runtimes}>`)
   console.log("  --session-mode <new|continue>")
   console.log("  --session-id <id>")
   console.log("  --session-root <path>")
@@ -225,6 +186,8 @@ function hasContinueFlag(argv) {
 }
 
 function normalizeRunArgs(runtime, passthrough) {
+  const adapter = runtimeProfiles[runtime]
+  const capabilities = adapter?.capabilities || {}
   const { options, remaining } = extractSessionOptions(passthrough)
   const envOverrides = {}
   const warnings = []
@@ -234,23 +197,26 @@ function normalizeRunArgs(runtime, passthrough) {
     return { args, envOverrides, warnings }
   }
 
-  if (runtime === "claude") {
+  if (capabilities.sessionMirrorFlag === true) {
     if (options.sessionMirror === true) args.unshift("--session-mirror")
     if (options.sessionMirror === false) args.unshift("--no-session-mirror")
+  }
+
+  if (runtime === "claude") {
     const claudePassthrough = []
-    if (options.mode === "continue") claudePassthrough.push("--continue")
-    if (options.sessionId) claudePassthrough.push("--session-id", options.sessionId)
+    if (options.mode === "continue" && capabilities.sessionModeContinue) claudePassthrough.push("--continue")
+    if (options.sessionId && capabilities.sessionIdFlag) claudePassthrough.push(capabilities.sessionIdFlag, options.sessionId)
     if (claudePassthrough.length > 0) args.push("--", ...claudePassthrough)
     if (options.sessionRoot) warnings.push("--session-root is ignored for claude runtime")
   } else if (runtime === "pi") {
-    if (options.mode === "new") args.unshift("--new-session")
-    if (options.mode === "continue" && !hasContinueFlag(args)) args.push("-c")
-    if (options.sessionRoot) args.unshift("--session-root", options.sessionRoot)
-    if (options.sessionId) envOverrides.PI_MULTI_SESSION_ID = options.sessionId
+    if (options.mode === "new" && capabilities.sessionModeNew) args.unshift("--new-session")
+    if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
+    if (options.sessionRoot && capabilities.sessionRootFlag) args.unshift(capabilities.sessionRootFlag, options.sessionRoot)
+    if (options.sessionId && capabilities.sessionIdViaEnv) envOverrides[capabilities.sessionIdViaEnv] = options.sessionId
     if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for pi runtime")
   } else if (runtime === "opencode") {
-    if (options.mode === "continue" && !hasContinueFlag(args)) args.push("-c")
-    if (options.sessionId) args.push("--session-id", options.sessionId)
+    if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
+    if (options.sessionId && capabilities.sessionIdFlag) args.push(capabilities.sessionIdFlag, options.sessionId)
     if (options.sessionRoot) warnings.push("--session-root is ignored for opencode runtime")
     if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for opencode runtime")
   }
@@ -273,6 +239,10 @@ function runCommand(command, args, passthrough = [], envOverrides = {}) {
 
 function dispatch(runtime, command, passthrough) {
   const profile = runtimeProfiles[runtime]
+  if (!profile) {
+    console.error(`ERROR: unsupported runtime ${runtime}`)
+    return 1
+  }
   let normalizedPassthrough = passthrough
   let envOverrides = {}
 
@@ -366,7 +336,7 @@ function main() {
   }
 
   if (!runtimeResult.runtime) {
-    console.error("ERROR: could not detect runtime. Use --runtime <pi|claude|opencode>")
+    console.error(`ERROR: could not detect runtime. Use --runtime <${RUNTIME_ORDER.join("|")}>`)
     process.exitCode = 1
     return
   }

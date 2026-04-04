@@ -16,6 +16,7 @@
     "detect": "node scripts/meta-agents-harness.mjs detect",
     "doctor": "node scripts/meta-agents-harness.mjs doctor",
     "check:runtime": "node scripts/meta-agents-harness.mjs check:runtime",
+    "validate:runtime": "node scripts/meta-agents-harness.mjs validate:runtime",
     "validate": "node scripts/meta-agents-harness.mjs validate",
     "list:crews": "node scripts/meta-agents-harness.mjs list:crews",
     "use": "node scripts/meta-agents-harness.mjs use",

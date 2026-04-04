@@ -101,6 +101,7 @@ Examples:
 ```bash
 mah detect
 mah doctor
+mah validate:runtime
 mah validate:config
 mah validate:sync
 mah validate:all
@@ -225,6 +226,7 @@ mah detect
 ```bash
 mah doctor
 mah check:runtime
+mah validate:runtime
 mah validate:config
 mah validate:sync
 mah validate:all
