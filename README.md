@@ -352,16 +352,21 @@ The `development` branch is focused on turning the project into a more mature pl
 #### Operator UX
 - improved diagnostics
 - explainability for runtime resolution
-- preview of generated changes before sync
+- preview-oriented checks of generated changes before sync (`plan` / `diff`)
 - stricter handling of ambiguous runtime markers
 
 #### Platform capabilities
-- unified session registry
-- provenance and execution audit trails
-- execution graph visibility
-- adapter-based runtime extensibility
+- initial unified session registry
+- initial provenance and execution audit trails
+- initial execution graph visibility
+- runtime adapter foundation (still evolving, not a final external plugin API)
 
 This branch is therefore useful both as a working branch and as a public-facing signal of the product roadmap.
+
+Current maturity note:
+
+- diagnostics include expanded structured outputs, but output schemas are still being normalized
+- `plan` and `diff` are currently lightweight operator workflows around sync reporting
 
 ---
 
