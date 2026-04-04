@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-Consolidar o `meta-agents-harness` como camada interoperável de orquestração multi-runtime, com fonte canônica única, validação forte, observabilidade operacional e extensibilidade via adapters.
+Consolidar o `meta-agents-harness` como camada interoperável de orquestração multi-runtime, com fonte canônica para crews, artefatos e metadata estável, validação forte, observabilidade operacional e extensibilidade via adapters.
 
 ## Diagnóstico Consolidado
 
@@ -13,26 +13,34 @@ Consolidar o `meta-agents-harness` como camada interoperável de orquestração 
 
 ## Princípios de Evolução
 
-- Fonte única de verdade declarativa.
+- YAML canônico e conservador para crews, modelos, skills, perfis, artefatos e metadata estável não-executável.
 - Compatibilidade com automação (`--json`) e rastreabilidade (`--trace`).
 - Mudanças incrementais para evitar big-bang refactor.
 - Contratos explícitos para extensão de runtimes.
-- Separação clara entre config declarativa, adapter operacional e registry resolvido em runtime.
+- Separação clara entre config declarativa e comportamento operacional em código.
 
 ## Modelo Arquitetural Desejado
 
 - O YAML descreve:
-  - capacidades
-  - comandos declarativos
-  - metadata
-  - comportamento configurável
-- Os adapters implementam o contrato operacional.
-- O dispatcher resolve a execução a partir da combinação entre config carregada e adapters registrados.
+  - crews
+  - topologia
+  - modelos
+  - skills
+  - perfis
+  - paths e artefatos derivados
+  - metadata estável de runtime
+  - capabilities de alto nível não-executáveis
+- Os adapters implementam:
+  - lógica operacional
+  - integração com binários
+  - semântica de execução
+- O dispatcher continua responsável por:
+  - seleção de runtime
+  - despacho de comandos
+  - normalização de flags
+  - uso de capabilities modeladas em código
 
-Esse modelo evita dois extremos indesejáveis:
-
-- duplicação de verdade entre YAML e código
-- excesso de comportamento executável codificado diretamente no YAML
+Esse modelo evita meta-config excessiva, mas também não deixa o YAML totalmente cego ao runtime.
 
 ## Milestones
 
@@ -62,14 +70,17 @@ Esse modelo evita dois extremos indesejáveis:
 
 ### M1B — Arquitetura Canônica de Runtime
 
-**Meta:** remover duplicação estrutural entre YAML e dispatcher.
+**Meta:** reduzir duplicação estrutural entre domínio canônico e dispatcher, sem deslocar comportamento operacional demais para config.
 
 **Escopo**
 
-- Runtime registry dinâmico derivado do YAML.
-- Remoção progressiva de `runtimeProfiles` hardcoded.
-- Capacidades por runtime declaradas no YAML.
-- Resolução e normalização de flags orientadas por capabilities declaradas.
+- Separar explicitamente:
+  - domínio canônico no YAML
+  - comportamento operacional no dispatcher/adapters
+- Introduzir runtime adapters como contrato operacional.
+- Reduzir hardcodes ad hoc no dispatcher, movendo-os para adapters em vez de para YAML.
+- Introduzir capabilities por runtime em código tipado/estruturado.
+- Resolução e normalização de flags orientadas por capabilities implementadas em código.
 - `mah validate:runtime`, `mah validate:sync`, `mah validate:all`, com fronteiras explícitas:
   - `validate:runtime`: presença de binários, wrappers e compatibilidade do ambiente
   - `validate:config`: schema, versão e referências cruzadas
@@ -82,8 +93,9 @@ Esse modelo evita dois extremos indesejáveis:
 
 **Issues sugeridas**
 
-- `feat(config): runtime registry dinâmico`
-- `refactor(dispatcher): consumir runtime config declarativa`
+- `refactor(dispatcher): extrair adapter layer por runtime`
+- `refactor(runtime): mover comportamento operacional para adapters`
+- `feat(runtime): capability matrix em código estruturado`
 - `feat(validation): split validate em níveis`
 - `feat(cli): --json para detect/doctor/validate`
 
@@ -162,6 +174,7 @@ Notas:
 
 - Este é o contrato mínimo inicial.
 - É esperado que ele evolua após M2 para acomodar `doctor`, `explain`, `listCrews`, `resumeSession` e normalização padronizada de args/capabilities.
+- `listCrews` é o candidato natural mais provável para a primeira expansão do contrato.
 
 ## Estratégia de Testes
 
@@ -231,15 +244,14 @@ Notas:
 Antes de implementar M1B, três decisões precisam ser fechadas:
 
 1. Até onde vai a responsabilidade declarativa do YAML
-   - o que fica na config
-   - o que permanece no adapter
-   - o que é resolvido pelo dispatcher em runtime
+   - decisão atual: YAML mínimo, focado em conteúdo canônico
 2. Quais campos entram no contrato mínimo de `RuntimeAdapter`
    - escopo inicial obrigatório
    - pontos previstos de extensão futura
 3. Definição operacional exata dos níveis `validate:*`
    - fronteiras sem sobreposição ambígua
    - ordenação e composição em `validate:all`
+   - cada erro pertencendo a um único nível principal
 
 ## Notas de Execução
 

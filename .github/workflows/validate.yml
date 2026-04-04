@@ -26,5 +26,11 @@ jobs:
       - name: Run smoke tests
         run: npm run test:smoke
 
+      - name: Validate canonical config
+        run: npm run validate:config
+
+      - name: Validate canonical sync drift
+        run: npm run check:meta-sync
+
       - name: Validate runtime
         run: npm run validate

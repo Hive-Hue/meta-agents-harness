@@ -136,6 +136,9 @@ function printHelp() {
   console.log("  detect")
   console.log("  doctor")
   console.log("  check:runtime")
+  console.log("  validate:config")
+  console.log("  validate:sync")
+  console.log("  validate:all")
   console.log("  validate")
   console.log("  list:crews")
   console.log("  use <crew>")
@@ -150,6 +153,19 @@ function printHelp() {
   console.log("  --session-id <id>")
   console.log("  --session-root <path>")
   console.log("  --session-mirror / --no-session-mirror")
+}
+
+function runLocalScript(scriptPath, scriptArgs = []) {
+  const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: "inherit"
+  })
+  if (typeof child.status === "number") return child.status
+  if (child.error) {
+    console.error(`ERROR: failed to run ${scriptPath}: ${child.error.message}`)
+  }
+  return 1
 }
 
 function extractSessionOptions(argv) {
@@ -309,6 +325,44 @@ function main() {
     console.log(`runtime=${runtimeResult.runtime}`)
     console.log(`reason=${runtimeResult.reason}`)
     return
+  }
+
+  if (first === "validate:config") {
+    process.exitCode = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    return
+  }
+
+  if (first === "validate:sync") {
+    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    return
+  }
+
+  if (first === "validate:all") {
+    const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    if (configStatus !== 0) {
+      process.exitCode = configStatus
+      return
+    }
+    const syncStatus = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    if (syncStatus !== 0) {
+      process.exitCode = syncStatus
+      return
+    }
+    if (!runtimeResult.runtime) {
+      console.error("WARN: validate:all skipped runtime validation because no runtime was detected")
+      process.exitCode = 0
+      return
+    }
+    process.exitCode = dispatch(runtimeResult.runtime, "check:runtime", [])
+    return
+  }
+
+  if (first === "validate") {
+    const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    if (configStatus !== 0) {
+      process.exitCode = configStatus
+      return
+    }
   }
 
   if (!runtimeResult.runtime) {
