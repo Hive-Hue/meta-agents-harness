@@ -7,15 +7,15 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ## [Unreleased]
 
 ### Added
-- Placeholder for final release-prep updates before `v0.2.0`.
+- Placeholder for post-`v0.2.0` additions.
 
 ### Changed
-- Placeholder for wording/stability adjustments and final release hygiene changes.
+- Placeholder for post-`v0.2.0` behavior and stability updates.
 
 ### Notes
-- `v0.2.0` is planned as a product-grade foundation release, not a stability guarantee equivalent to `1.0.0`.
+- Continue with conservative pre-1.0 SemVer (`0.x`) and disciplined minor releases.
 
-## [0.2.0] - TBD
+## [0.2.0] - 2026-04-04
 
 ### Added
 - Expanded layered validation workflows (`validate:config`, `validate:runtime`, `validate:sync`, `validate:all`).
@@ -28,8 +28,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - CI validation expanded with smoke, contract, config, sync, and runtime checks.
 
 ### Notes
-- This section is a prepared release structure for the upcoming `v0.2.0` cut.
-- Final release notes must confirm only capabilities validated at release time.
+- Product-grade foundation milestone in pre-1.0 phase.
+- Runtime adapter model remains evolutive.
+- Platform capabilities (`sessions`, `provenance`, `graph`, `demo`) are initial support.
+- Structured diagnostics are expanded, with normalization still in progress.
 
 ## [0.1.0] - 2026-04-04
 
