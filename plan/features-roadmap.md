@@ -258,3 +258,47 @@ Antes de implementar M1B, três decisões precisam ser fechadas:
 - Entregar em PRs pequenos por feature.
 - Preservar retrocompatibilidade da CLI durante transição.
 - Migrar runtime internals por adapter, evitando refactor monolítico.
+
+## Checklist de Conformidade do Roadmap
+
+### M1A — Segurança Mínima de Config
+
+- [done] schema inicial implementado para `meta-agents.yaml`
+- [done] validação de versão ativa (`version: 1`)
+- [done] `mah validate:config` implementado
+- [done] `check:meta-sync` obrigatório na CI
+
+### M1B — Arquitetura Canônica de Runtime
+
+- [done] adapter layer extraída para `runtime-adapters.mjs`
+- [done] camada canônica de comportamento formalizada em `runtime-adapters.mjs` (YAML permanece canônico para conteúdo)
+- [done] capability matrix estruturada em código
+- [done] `validate:runtime`, `validate:sync`, `validate:all` disponíveis
+- [done] `RuntimeAdapter` com interface operacional mínima por métodos (`detect`, `supports`, `resolveCommandPlan`, `validateRuntime`)
+- [done] `validate:runtime` com precheck semântico próprio via adapter + execução de runtime check
+- [done] `--json` uniforme em `detect`, `doctor` e `validate:*`
+
+### M2 — UX Operacional e Explainability
+
+- [done] `mah explain` com targets `detect/use/run/sync`
+- [done] `mah explain --trace` com saída estruturada
+- [done] `mah init` com bootstrap mínimo
+- [done] tratamento de múltiplos markers com modo estrito (`--strict-markers` / `MAH_STRICT_MARKERS=1`)
+- [done] `mah plan` e `mah diff` com modos dedicados (`--plan` e `--diff`) e relatórios próprios
+
+### M3 — Plataforma e Diferenciação
+
+- [done] `mah sessions` com filtros e `--json`
+- [done] provenance opcional (`MAH_AUDIT=1` / `MAH_PROVENANCE=1`) em `.mah/provenance.jsonl`
+- [done] `mah graph` para topologia e run graph
+- [done] contrato mínimo de adapter formalizado + `test:contract`
+- [done] `mah demo` implementado
+- [partial] plugin API ainda está em contrato interno; falta mecanismo explícito de carregamento externo de plugins
+- [missing] `mah resume <id>` ainda não implementado
+
+### Ações Recomendadas para Fechar Gaps
+
+- [done] evoluir `RuntimeAdapter` de shape estrutural para interface operacional mínima por métodos
+- [done] desacoplar `validate:runtime` com precheck semântico próprio e relatório estruturado
+- [done] uniformização de `--json` em comandos de diagnóstico
+- [done] semântica diferenciada de `plan` e `diff` com relatórios dedicados

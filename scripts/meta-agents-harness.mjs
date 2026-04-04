@@ -175,6 +175,19 @@ function runLocalScript(scriptPath, scriptArgs = []) {
   return 1
 }
 
+function runLocalScriptCapture(scriptPath, scriptArgs = []) {
+  const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: "utf-8"
+  })
+  return {
+    status: typeof child.status === "number" ? child.status : 1,
+    stdout: child.stdout || "",
+    stderr: child.stderr || ""
+  }
+}
+
 function logProvenance(event) {
   const enabled = process.env.MAH_AUDIT === "1" || process.env.MAH_PROVENANCE === "1"
   if (!enabled) return
@@ -303,8 +316,8 @@ function resolveDispatchPlan(runtime, command, passthrough) {
     envOverrides = normalized.envOverrides
     warnings.push(...normalized.warnings)
   }
-  const variants = profile.commands[command]
-  if (!variants || variants.length === 0) {
+  const resolved = profile.resolveCommandPlan(command, commandExists)
+  if (!resolved.ok) {
     if (command === "run") {
       return {
         runtime,
@@ -316,23 +329,24 @@ function resolveDispatchPlan(runtime, command, passthrough) {
         candidates: []
       }
     }
-    return { error: `command not supported for runtime ${runtime}: ${command}` }
-  }
-  const candidates = variants.map(([exec, args]) => ({ exec, args, exists: commandExists(exec) }))
-  const selected = candidates.find((item) => item.exists)
-  if (!selected) {
-    return { error: `no executable found for runtime ${runtime} and command ${command}` }
+    return { error: resolved.error || `command not supported for runtime ${runtime}: ${command}` }
   }
   return {
     runtime,
     command,
-    exec: selected.exec,
-    args: selected.args,
+    exec: resolved.exec,
+    args: resolved.args,
     passthrough: normalizedPassthrough,
     envOverrides,
     warnings,
-    candidates
+    candidates: resolved.variants || []
   }
+}
+
+function runtimeValidationReport(runtime) {
+  const adapter = runtimeProfiles[runtime]
+  if (!adapter) return { ok: false, checks: [{ name: "adapter", ok: false }] }
+  return adapter.validateRuntime(commandExists)
 }
 
 function printExplain(traceMode, payload) {
@@ -473,10 +487,27 @@ function dispatch(runtime, command, passthrough) {
   return runCommand(plan.exec, plan.args, plan.passthrough || [], plan.envOverrides || {})
 }
 
+function dispatchCapture(runtime, command, passthrough) {
+  const plan = resolveDispatchPlan(runtime, command, passthrough)
+  if (plan.error) return { status: 1, stdout: "", stderr: plan.error, plan: null }
+  const child = spawnSync(plan.exec, [...(plan.args || []), ...(plan.passthrough || [])], {
+    cwd: repoRoot,
+    env: { ...process.env, ...(plan.envOverrides || {}) },
+    encoding: "utf-8"
+  })
+  return {
+    status: typeof child.status === "number" ? child.status : 1,
+    stdout: child.stdout || "",
+    stderr: child.stderr || "",
+    plan
+  }
+}
+
 function main() {
   const argv = process.argv.slice(2)
   const traceMode = hasFlag(argv, "--trace")
-  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"))
+  const jsonMode = hasFlag(argv, "--json")
+  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"))
   const first = normalizedArgv[0]
 
   if (!first || first === "--help" || first === "-h" || first === "help") {
@@ -500,12 +531,20 @@ function main() {
 
   if (first === "detect") {
     if (!runtimeResult.runtime) {
-      console.log("runtime=unknown")
+      if (jsonMode) {
+        console.log(JSON.stringify({ runtime: "unknown", reason: runtimeResult.reason }, null, 2))
+      } else {
+        console.log("runtime=unknown")
+      }
       process.exitCode = 1
       return
     }
-    console.log(`runtime=${runtimeResult.runtime}`)
-    console.log(`reason=${runtimeResult.reason}`)
+    if (jsonMode) {
+      console.log(JSON.stringify({ runtime: runtimeResult.runtime, reason: runtimeResult.reason }, null, 2))
+    } else {
+      console.log(`runtime=${runtimeResult.runtime}`)
+      console.log(`reason=${runtimeResult.reason}`)
+    }
     return
   }
 
@@ -530,21 +569,102 @@ function main() {
   }
 
   if (first === "plan" || first === "diff") {
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    const modeFlag = first === "plan" ? "--plan" : "--diff"
+    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), jsonMode ? [modeFlag, "--json"] : [modeFlag])
     return
   }
 
   if (first === "validate:config") {
+    if (jsonMode) {
+      const captured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      console.log(JSON.stringify({
+        command: "validate:config",
+        status: captured.status,
+        ok: captured.status === 0,
+        stdout: captured.stdout.trim(),
+        stderr: captured.stderr.trim()
+      }, null, 2))
+      process.exitCode = captured.status
+      return
+    }
     process.exitCode = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
     return
   }
 
   if (first === "validate:sync") {
+    if (jsonMode) {
+      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
+      process.stdout.write(captured.stdout)
+      if (captured.stderr.trim()) process.stderr.write(captured.stderr)
+      process.exitCode = captured.status
+      return
+    }
     process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
     return
   }
 
+  if (first === "validate:runtime") {
+    if (!runtimeResult.runtime) {
+      const payload = { command: "validate:runtime", ok: false, status: 1, reason: "no-runtime-detected" }
+      if (jsonMode) console.log(JSON.stringify(payload, null, 2))
+      else console.error("ERROR: could not detect runtime. Use --runtime to run validate:runtime")
+      process.exitCode = 1
+      return
+    }
+    if (jsonMode) {
+      const captured = dispatchCapture(runtimeResult.runtime, "check:runtime", [])
+      const precheck = runtimeValidationReport(runtimeResult.runtime)
+      console.log(JSON.stringify({
+        command: "validate:runtime",
+        runtime: runtimeResult.runtime,
+        reason: runtimeResult.reason,
+        status: precheck.ok ? captured.status : 1,
+        ok: precheck.ok && captured.status === 0,
+        precheck,
+        stdout: captured.stdout.trim(),
+        stderr: captured.stderr.trim()
+      }, null, 2))
+      process.exitCode = precheck.ok ? captured.status : 1
+      return
+    }
+    const precheck = runtimeValidationReport(runtimeResult.runtime)
+    if (!precheck.ok) {
+      console.error("ERROR: runtime precheck failed")
+      for (const check of precheck.checks || []) {
+        if (!check.ok) console.error(`- ${check.name}`)
+      }
+      process.exitCode = 1
+      return
+    }
+    process.exitCode = dispatch(runtimeResult.runtime, "check:runtime", [])
+    return
+  }
+
   if (first === "validate:all") {
+    if (jsonMode) {
+      const config = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      const sync = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
+      const runtime = runtimeResult.runtime
+        ? dispatchCapture(runtimeResult.runtime, "check:runtime", [])
+        : { status: 0, stdout: "", stderr: "skipped: no runtime detected" }
+      const status = config.status !== 0 ? config.status : sync.status !== 0 ? sync.status : runtime.status
+      let syncJson = null
+      try { syncJson = JSON.parse(sync.stdout || "{}") } catch { syncJson = null }
+      console.log(JSON.stringify({
+        command: "validate:all",
+        status,
+        ok: status === 0,
+        runtime: runtimeResult.runtime || "",
+        reason: runtimeResult.reason,
+        checks: {
+          config: { status: config.status, stdout: config.stdout.trim(), stderr: config.stderr.trim() },
+          sync: { status: sync.status, report: syncJson, stdout: sync.stdout.trim(), stderr: sync.stderr.trim() },
+          runtime: { status: runtime.status, stdout: runtime.stdout.trim(), stderr: runtime.stderr.trim() }
+        }
+      }, null, 2))
+      process.exitCode = status
+      return
+    }
     const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
     if (configStatus !== 0) {
       process.exitCode = configStatus
@@ -614,11 +734,74 @@ function main() {
     return
   }
 
-  if (first === "validate") {
-    const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
-    if (configStatus !== 0) {
-      process.exitCode = configStatus
+  if (first === "doctor" && jsonMode) {
+    if (!runtimeResult.runtime) {
+      console.log(JSON.stringify({ command: "doctor", ok: false, reason: "no-runtime-detected", status: 1 }, null, 2))
+      process.exitCode = 1
       return
+    }
+    const captured = dispatchCapture(runtimeResult.runtime, "check:runtime", [])
+    const precheck = runtimeValidationReport(runtimeResult.runtime)
+    console.log(JSON.stringify({
+      command: "doctor",
+      runtime: runtimeResult.runtime,
+      reason: runtimeResult.reason,
+      status: precheck.ok ? captured.status : 1,
+      ok: precheck.ok && captured.status === 0,
+      precheck,
+      stdout: captured.stdout.trim(),
+      stderr: captured.stderr.trim()
+    }, null, 2))
+    process.exitCode = precheck.ok ? captured.status : 1
+    return
+  }
+
+  if (first === "validate") {
+    if (jsonMode) {
+      const configCaptured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      if (configCaptured.status !== 0) {
+        console.log(JSON.stringify({
+          command: "validate",
+          status: configCaptured.status,
+          ok: false,
+          config: { status: configCaptured.status, stdout: configCaptured.stdout.trim(), stderr: configCaptured.stderr.trim() }
+        }, null, 2))
+        process.exitCode = configCaptured.status
+        return
+      }
+      if (!runtimeResult.runtime) {
+        console.log(JSON.stringify({
+          command: "validate",
+          status: 1,
+          ok: false,
+          config: { status: 0 },
+          runtime: { status: 1, reason: "no-runtime-detected" }
+        }, null, 2))
+        process.exitCode = 1
+        return
+      }
+      const runtimeCaptured = dispatchCapture(runtimeResult.runtime, "check:runtime", [])
+      console.log(JSON.stringify({
+        command: "validate",
+        status: runtimeCaptured.status,
+        ok: runtimeCaptured.status === 0,
+        runtime: runtimeResult.runtime,
+        reason: runtimeResult.reason,
+        config: { status: 0 },
+        runtime_check: {
+          status: runtimeCaptured.status,
+          stdout: runtimeCaptured.stdout.trim(),
+          stderr: runtimeCaptured.stderr.trim()
+        }
+      }, null, 2))
+      process.exitCode = runtimeCaptured.status
+      return
+    } else {
+      const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+      if (configStatus !== 0) {
+        process.exitCode = configStatus
+        return
+      }
     }
   }
 

@@ -4,7 +4,11 @@ export const REQUIRED_RUNTIME_ADAPTER_FIELDS = [
   "wrapper",
   "directCli",
   "capabilities",
-  "commands"
+  "commands",
+  "detect",
+  "supports",
+  "resolveCommandPlan",
+  "validateRuntime"
 ]
 
 export const REQUIRED_RUNTIME_COMMANDS = [
@@ -24,6 +28,11 @@ export function validateRuntimeAdapterContract(adapters) {
     for (const field of REQUIRED_RUNTIME_ADAPTER_FIELDS) {
       if (!(field in adapter)) {
         errors.push(`${runtimeName}: missing field '${field}'`)
+      }
+    }
+    for (const method of ["detect", "supports", "resolveCommandPlan", "validateRuntime"]) {
+      if (typeof adapter?.[method] !== "function") {
+        errors.push(`${runtimeName}: method '${method}' must be a function`)
       }
     }
     for (const command of REQUIRED_RUNTIME_COMMANDS) {

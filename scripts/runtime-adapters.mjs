@@ -1,7 +1,40 @@
 export const RUNTIME_ORDER = ["pi", "claude", "opencode"]
 
+function createAdapter(definition) {
+  return {
+    ...definition,
+    detect(cwd, existsFn) {
+      return existsFn(`${cwd}/${this.markerDir}`)
+    },
+    supports(command) {
+      return Array.isArray(this.commands?.[command]) && this.commands[command].length > 0
+    },
+    resolveCommandPlan(command, commandExistsFn) {
+      const variants = this.commands?.[command] || []
+      if (variants.length === 0) return { ok: false, error: `command not supported: ${command}`, variants: [] }
+      const candidates = variants.map(([exec, args]) => ({ exec, args, exists: commandExistsFn(exec) }))
+      const selected = candidates.find((item) => item.exists)
+      if (!selected) return { ok: false, error: `no executable available for ${command}`, variants: candidates }
+      return { ok: true, exec: selected.exec, args: selected.args, variants: candidates }
+    },
+    validateRuntime(commandExistsFn) {
+      const checks = [
+        { name: "marker_dir", ok: Boolean(this.markerDir) },
+        { name: "wrapper_declared", ok: Boolean(this.wrapper) },
+        { name: "direct_cli_declared", ok: Boolean(this.directCli) },
+        { name: "wrapper_available", ok: Boolean(this.wrapper) ? commandExistsFn(this.wrapper) : false },
+        { name: "direct_cli_available", ok: Boolean(this.directCli) ? commandExistsFn(this.directCli) : false }
+      ]
+      const hasCommandTable = Object.keys(this.commands || {}).length > 0
+      checks.push({ name: "commands_declared", ok: hasCommandTable })
+      const ok = checks.every((item) => item.ok || item.name.endsWith("_available"))
+      return { ok, checks }
+    }
+  }
+}
+
 export const RUNTIME_ADAPTERS = {
-  pi: {
+  pi: createAdapter({
     name: "pi",
     markerDir: ".pi",
     wrapper: "pimh",
@@ -23,8 +56,8 @@ export const RUNTIME_ADAPTERS = {
       validate: [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]],
       "validate:runtime": [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]]
     }
-  },
-  claude: {
+  }),
+  claude: createAdapter({
     name: "claude",
     markerDir: ".claude",
     wrapper: "ccmh",
@@ -46,8 +79,8 @@ export const RUNTIME_ADAPTERS = {
       validate: [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]],
       "validate:runtime": [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]]
     }
-  },
-  opencode: {
+  }),
+  opencode: createAdapter({
     name: "opencode",
     markerDir: ".opencode",
     wrapper: "ocmh",
@@ -69,5 +102,5 @@ export const RUNTIME_ADAPTERS = {
       validate: [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
       "validate:runtime": [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]]
     }
-  }
+  })
 }
