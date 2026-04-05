@@ -31,6 +31,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
   - `docs/validate-semantics.md`
   - `docs/runtime-boundary.md`
   - `docs/platform-capabilities.md`.
+- Expertise Model foundation documentation:
+  - `docs/expertise-model-foundation.md`.
 - Additional diagnostics/platform reliability tests and CI coverage (`test:diagnostics`).
 
 ### Changed
@@ -54,6 +56,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Notes
 - This release continues the pre-1.0 stabilization path and should be treated as hardening, not final API stability.
 - Runtime adapter contract and platform features remain under incremental maturation in `0.x`.
+- Expertise Model is consolidated as a foundation concept in this release; orchestration intelligence capabilities are deferred.
 
 ## [0.2.0] - 2026-04-04
 

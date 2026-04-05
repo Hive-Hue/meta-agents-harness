@@ -159,6 +159,19 @@ The common abstraction is:
 
 This structure is translated into each runtime’s expected configuration model.
 
+### 5. Expertise model foundation
+
+In `v0.3.0`, expertise model is treated as a normalized foundation concept:
+
+- consistent naming in paths, scripts, tools, and generated artifacts
+- consistent runtime references in configs and prompts
+- visibility in graph and documentation
+
+This phase is intentionally structural.  
+It does not yet add expertise-aware routing/scoring/governance behavior.
+
+See: `docs/expertise-model-foundation.md`
+
 ---
 
 ## Installation
