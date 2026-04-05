@@ -6,7 +6,7 @@ orchestrator:
   description: Orchestrator coordinator
   prompt: .pi/crew/marketing/agents/orchestrator.md
   expertise:
-    path: .pi/crew/marketing/expertise/orchestrator-mental-model.yaml
+    path: .pi/crew/marketing/expertise/orchestrator-expertise-model.yaml
     use-when: Track durable learnings for orchestrator.
     updatable: true
     max-lines: 10000
@@ -16,14 +16,14 @@ orchestrator:
     - zai/glm-4.5-air
   tools:
     - delegate_agent
-    - update_mental_model
+    - update_expertise_model
     - mcp_servers
     - mcp_tools
     - mcp_call
   skills:
     - .pi/skills/delegate-bounded/SKILL.md
     - .pi/skills/zero-micromanagement/SKILL.md
-    - .pi/skills/mental-model/SKILL.md
+    - .pi/skills/expertise-model/SKILL.md
   routes_to:
     - planning-lead
     - creative-lead
@@ -40,7 +40,7 @@ teams:
       description: Planning Lead planning lead
       prompt: .pi/crew/marketing/agents/planning-lead.md
       expertise:
-        path: .pi/crew/marketing/expertise/planning-lead-mental-model.yaml
+        path: .pi/crew/marketing/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
@@ -50,14 +50,14 @@ teams:
         - zai/glm-4.5-air
       tools:
         - delegate_agent
-        - update_mental_model
+        - update_expertise_model
         - mcp_servers
         - mcp_tools
         - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
+        - .pi/skills/expertise-model/SKILL.md
       routes_to:
         - market-researcher
         - campaign-strategist
@@ -79,7 +79,7 @@ teams:
         description: Market Researcher planning worker
         prompt: .pi/crew/marketing/agents/market-researcher.md
         expertise:
-          path: .pi/crew/marketing/expertise/market-researcher-mental-model.yaml
+          path: .pi/crew/marketing/expertise/market-researcher-expertise-model.yaml
           use-when: Track durable learnings for market-researcher.
           updatable: true
           max-lines: 10000
@@ -94,12 +94,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -117,7 +117,7 @@ teams:
         description: Campaign Strategist planning worker
         prompt: .pi/crew/marketing/agents/campaign-strategist.md
         expertise:
-          path: .pi/crew/marketing/expertise/campaign-strategist-mental-model.yaml
+          path: .pi/crew/marketing/expertise/campaign-strategist-expertise-model.yaml
           use-when: Track durable learnings for campaign-strategist.
           updatable: true
           max-lines: 10000
@@ -132,12 +132,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -157,7 +157,7 @@ teams:
       description: Creative Lead creative lead
       prompt: .pi/crew/marketing/agents/creative-lead.md
       expertise:
-        path: .pi/crew/marketing/expertise/creative-lead-mental-model.yaml
+        path: .pi/crew/marketing/expertise/creative-lead-expertise-model.yaml
         use-when: Track durable learnings for creative-lead.
         updatable: true
         max-lines: 10000
@@ -167,14 +167,14 @@ teams:
         - zai/glm-4.5-air
       tools:
         - delegate_agent
-        - update_mental_model
+        - update_expertise_model
         - mcp_servers
         - mcp_tools
         - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
+        - .pi/skills/expertise-model/SKILL.md
       routes_to:
         - copywriter
         - creative-strategist
@@ -197,7 +197,7 @@ teams:
         description: Copywriter creative worker
         prompt: .pi/crew/marketing/agents/copywriter.md
         expertise:
-          path: .pi/crew/marketing/expertise/copywriter-mental-model.yaml
+          path: .pi/crew/marketing/expertise/copywriter-expertise-model.yaml
           use-when: Track durable learnings for copywriter.
           updatable: true
           max-lines: 10000
@@ -212,12 +212,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -235,7 +235,7 @@ teams:
         description: Creative Strategist creative worker
         prompt: .pi/crew/marketing/agents/creative-strategist.md
         expertise:
-          path: .pi/crew/marketing/expertise/creative-strategist-mental-model.yaml
+          path: .pi/crew/marketing/expertise/creative-strategist-expertise-model.yaml
           use-when: Track durable learnings for creative-strategist.
           updatable: true
           max-lines: 10000
@@ -250,12 +250,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -273,7 +273,7 @@ teams:
         description: Media Operator creative worker
         prompt: .pi/crew/marketing/agents/media-operator.md
         expertise:
-          path: .pi/crew/marketing/expertise/media-operator-mental-model.yaml
+          path: .pi/crew/marketing/expertise/media-operator-expertise-model.yaml
           use-when: Track durable learnings for media-operator.
           updatable: true
           max-lines: 10000
@@ -288,12 +288,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -313,7 +313,7 @@ teams:
       description: Validation Lead validation lead
       prompt: .pi/crew/marketing/agents/validation-lead.md
       expertise:
-        path: .pi/crew/marketing/expertise/validation-lead-mental-model.yaml
+        path: .pi/crew/marketing/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
@@ -323,14 +323,14 @@ teams:
         - zai/glm-4.5-air
       tools:
         - delegate_agent
-        - update_mental_model
+        - update_expertise_model
         - mcp_servers
         - mcp_tools
         - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
+        - .pi/skills/expertise-model/SKILL.md
       routes_to:
         - performance-analyst
         - brand-safety-reviewer
@@ -352,7 +352,7 @@ teams:
         description: Performance Analyst validation worker
         prompt: .pi/crew/marketing/agents/performance-analyst.md
         expertise:
-          path: .pi/crew/marketing/expertise/performance-analyst-mental-model.yaml
+          path: .pi/crew/marketing/expertise/performance-analyst-expertise-model.yaml
           use-when: Track durable learnings for performance-analyst.
           updatable: true
           max-lines: 10000
@@ -367,12 +367,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -390,7 +390,7 @@ teams:
         description: Brand Safety Reviewer validation worker
         prompt: .pi/crew/marketing/agents/brand-safety-reviewer.md
         expertise:
-          path: .pi/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml
+          path: .pi/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml
           use-when: Track durable learnings for brand-safety-reviewer.
           updatable: true
           max-lines: 10000
@@ -405,12 +405,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true

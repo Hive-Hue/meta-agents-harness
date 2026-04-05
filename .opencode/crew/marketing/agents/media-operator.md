@@ -21,11 +21,11 @@ Model: `zai/glm-5-turbo`
 Creative worker focused on scoped execution within assigned ownership boundaries.
 
 ## Expertise
-- path: `.opencode/crew/marketing/expertise/media-operator-mental-model.yaml`
+- path: `.opencode/crew/marketing/expertise/media-operator-expertise-model.yaml`
 - use-when: Record publishing workflows, channel notes, and operational constraints.
 
 ## Skills
-- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Before and after media operations tasks.
+- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Before and after media operations tasks.
 
 ## Tools
 - read
@@ -33,7 +33,7 @@ Creative worker focused on scoped execution within assigned ownership boundaries
 - glob
 - list
 - edit
-- update-mental-model
+- update-expertise-model
 
 ## MCP Access
 - none
@@ -49,7 +49,7 @@ Creative worker focused on scoped execution within assigned ownership boundaries
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-mental-model` after meaningful work.
+- Persist durable learnings using `update-expertise-model` after meaningful work.
 
 ## Response Contract
 1. execution summary

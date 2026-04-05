@@ -58,7 +58,7 @@ Always generate:
 2. `.claude/crew/<crew>/agents/orchestrator.md`
 3. one lead prompt per team/workstream
 4. one or more worker prompts per team/workstream
-5. `.claude/crew/<crew>/expertise/*-mental-model.yaml` for every generated agent
+5. `.claude/crew/<crew>/expertise/*-expertise-model.yaml` for every generated agent
 
 ## Team Topology Rules
 
@@ -99,15 +99,15 @@ Profile worker defaults:
 
 Use Claude harness tool names and runtime semantics:
 
-- Orchestrator: `delegate_agent`, `update_mental_model`
-- Leads: `delegate_agent`, `update_mental_model`
-- Research/review workers: `read`, `grep`, `find`, `ls`, `update_mental_model`
+- Orchestrator: `delegate_agent`, `update_expertise_model`
+- Leads: `delegate_agent`, `update_expertise_model`
+- Research/review workers: `read`, `grep`, `find`, `ls`, `update_expertise_model`
 - Document/spec/content workers: add `write`, `edit`
 - Code/script execution workers: add `bash`
 
-In Claude runtime, `update_mental_model` is a local MCP-backed tool. Agents should call it with their own `agent` id instead of editing expertise YAML manually.
+In Claude runtime, `update_expertise_model` is a local MCP-backed tool. Agents should call it with their own `agent` id instead of editing expertise YAML manually.
 
-Avoid OpenCode-only names (`task`, `update-mental-model`, `glob`, `list`) in Claude output.
+Avoid OpenCode-only names (`task`, `update-expertise-model`, `glob`, `list`) in Claude output.
 
 ## MCP Inference Rules (Claude)
 
@@ -163,7 +163,7 @@ Each agent `.md` must follow the Claude harness conventions:
 Default skill paths:
 
 - `.claude/skills/delegate-bounded/SKILL.md`
-- `.claude/skills/mental-model/SKILL.md`
+- `.claude/skills/expertise-model/SKILL.md`
 - `.claude/skills/zero-micromanagement/SKILL.md`
 
 Mission text must reflect domain language (coding, marketing, teaching, etc.), not coding-only assumptions.
@@ -172,7 +172,7 @@ Mission text must reflect domain language (coding, marketing, teaching, etc.), n
 
 Create one expertise file per agent:
 
-- `.claude/crew/<crew>/expertise/<agent-name>-mental-model.yaml`
+- `.claude/crew/<crew>/expertise/<agent-name>-expertise-model.yaml`
 
 Initial structure:
 

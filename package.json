@@ -31,7 +31,8 @@
     "clear": "node scripts/meta-agents-harness.mjs clear",
     "run": "node scripts/meta-agents-harness.mjs run",
     "test:smoke": "node --test tests/smoke.test.mjs",
-    "test:contract": "node --test tests/runtime-contract.test.mjs"
+    "test:contract": "node --test tests/runtime-contract.test.mjs",
+    "test:diagnostics": "node --test tests/diagnostics-json.test.mjs tests/sync-helpers.test.mjs tests/platform-reliability.test.mjs"
   },
   "dependencies": {
     "yaml": "^2.8.1",

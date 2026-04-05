@@ -13,7 +13,7 @@
     "webfetch": "ask",
     "websearch": "ask",
     "question": "allow",
-    "update-mental-model": "allow"
+    "update-expertise-model": "allow"
   },
   "mcp": {
     "context7": {

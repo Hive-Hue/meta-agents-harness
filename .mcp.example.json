@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "mental-model": {
+    "expertise-model": {
       "transport": "stdio",
       "command": "node",
       "args": [
-        ".claude/scripts/update-mental-model-mcp.mjs"
+        ".claude/scripts/update-expertise-model-mcp.mjs"
       ],
       "timeout_ms": 30000
     },

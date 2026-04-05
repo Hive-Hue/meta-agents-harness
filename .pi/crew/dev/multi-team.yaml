@@ -6,7 +6,7 @@ orchestrator:
   description: Orchestrator coordinator
   prompt: .pi/crew/dev/agents/orchestrator.md
   expertise:
-    path: .pi/crew/dev/expertise/orchestrator-mental-model.yaml
+    path: .pi/crew/dev/expertise/orchestrator-expertise-model.yaml
     use-when: Track durable learnings for orchestrator.
     updatable: true
     max-lines: 10000
@@ -16,14 +16,14 @@ orchestrator:
     - zai/glm-4.5-air
   tools:
     - delegate_agent
-    - update_mental_model
+    - update_expertise_model
     - mcp_servers
     - mcp_tools
     - mcp_call
   skills:
     - .pi/skills/delegate-bounded/SKILL.md
     - .pi/skills/zero-micromanagement/SKILL.md
-    - .pi/skills/mental-model/SKILL.md
+    - .pi/skills/expertise-model/SKILL.md
   routes_to:
     - planning-lead
     - engineering-lead
@@ -40,7 +40,7 @@ teams:
       description: Planning Lead planning lead
       prompt: .pi/crew/dev/agents/planning_lead.md
       expertise:
-        path: .pi/crew/dev/expertise/planning-lead-mental-model.yaml
+        path: .pi/crew/dev/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
@@ -50,14 +50,14 @@ teams:
         - zai/glm-4.5-air
       tools:
         - delegate_agent
-        - update_mental_model
+        - update_expertise_model
         - mcp_servers
         - mcp_tools
         - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
+        - .pi/skills/expertise-model/SKILL.md
       routes_to:
         - repo-analyst
         - solution-architect
@@ -71,7 +71,7 @@ teams:
         description: Repo Analyst planning worker
         prompt: .pi/crew/dev/agents/repo_analyst.md
         expertise:
-          path: .pi/crew/dev/expertise/repo-analyst-mental-model.yaml
+          path: .pi/crew/dev/expertise/repo-analyst-expertise-model.yaml
           use-when: Track durable learnings for repo-analyst.
           updatable: true
           max-lines: 10000
@@ -84,12 +84,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -99,7 +99,7 @@ teams:
         description: Solution Architect planning worker
         prompt: .pi/crew/dev/agents/solution_architect.md
         expertise:
-          path: .pi/crew/dev/expertise/solution-architect-mental-model.yaml
+          path: .pi/crew/dev/expertise/solution-architect-expertise-model.yaml
           use-when: Track durable learnings for solution-architect.
           updatable: true
           max-lines: 10000
@@ -114,12 +114,12 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -135,7 +135,7 @@ teams:
       description: Engineering Lead engineering lead
       prompt: .pi/crew/dev/agents/engineering_lead.md
       expertise:
-        path: .pi/crew/dev/expertise/engineering-lead-mental-model.yaml
+        path: .pi/crew/dev/expertise/engineering-lead-expertise-model.yaml
         use-when: Track durable learnings for engineering-lead.
         updatable: true
         max-lines: 10000
@@ -145,14 +145,14 @@ teams:
         - zai/glm-4.5-air
       tools:
         - delegate_agent
-        - update_mental_model
+        - update_expertise_model
         - mcp_servers
         - mcp_tools
         - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
+        - .pi/skills/expertise-model/SKILL.md
       routes_to:
         - frontend-dev
         - backend-dev
@@ -166,7 +166,7 @@ teams:
         description: Frontend Dev engineering worker
         prompt: .pi/crew/dev/agents/frontend_dev.md
         expertise:
-          path: .pi/crew/dev/expertise/frontend-dev-mental-model.yaml
+          path: .pi/crew/dev/expertise/frontend-dev-expertise-model.yaml
           use-when: Track durable learnings for frontend-dev.
           updatable: true
           max-lines: 10000
@@ -181,13 +181,13 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
           - bash
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -205,7 +205,7 @@ teams:
         description: Backend Dev engineering worker
         prompt: .pi/crew/dev/agents/backend_dev.md
         expertise:
-          path: .pi/crew/dev/expertise/backend-dev-mental-model.yaml
+          path: .pi/crew/dev/expertise/backend-dev-expertise-model.yaml
           use-when: Track durable learnings for backend-dev.
           updatable: true
           max-lines: 10000
@@ -220,13 +220,13 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
           - bash
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -246,7 +246,7 @@ teams:
       description: Validation Lead validation lead
       prompt: .pi/crew/dev/agents/validation_lead.md
       expertise:
-        path: .pi/crew/dev/expertise/validation-lead-mental-model.yaml
+        path: .pi/crew/dev/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
@@ -256,14 +256,14 @@ teams:
         - zai/glm-4.5-air
       tools:
         - delegate_agent
-        - update_mental_model
+        - update_expertise_model
         - mcp_servers
         - mcp_tools
         - mcp_call
       skills:
         - .pi/skills/delegate-bounded/SKILL.md
         - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/mental-model/SKILL.md
+        - .pi/skills/expertise-model/SKILL.md
       routes_to:
         - qa-reviewer
         - security-reviewer
@@ -277,7 +277,7 @@ teams:
         description: Qa Reviewer validation worker
         prompt: .pi/crew/dev/agents/qa_reviewer.md
         expertise:
-          path: .pi/crew/dev/expertise/qa-reviewer-mental-model.yaml
+          path: .pi/crew/dev/expertise/qa-reviewer-expertise-model.yaml
           use-when: Track durable learnings for qa-reviewer.
           updatable: true
           max-lines: 10000
@@ -290,13 +290,13 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
           - bash
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true
@@ -306,7 +306,7 @@ teams:
         description: Security Reviewer validation worker
         prompt: .pi/crew/dev/agents/security_reviewer.md
         expertise:
-          path: .pi/crew/dev/expertise/security-reviewer-mental-model.yaml
+          path: .pi/crew/dev/expertise/security-reviewer-expertise-model.yaml
           use-when: Track durable learnings for security-reviewer.
           updatable: true
           max-lines: 10000
@@ -319,13 +319,13 @@ teams:
           - grep
           - find
           - ls
-          - update_mental_model
+          - update_expertise_model
           - mcp_servers
           - mcp_tools
           - mcp_call
           - bash
         skills:
-          - .pi/skills/mental-model/SKILL.md
+          - .pi/skills/expertise-model/SKILL.md
         domain:
           - path: .
             read: true

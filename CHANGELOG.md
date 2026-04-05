@@ -7,14 +7,56 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ## [Unreleased]
 
 ### Added
-- Placeholder for post-`v0.2.0` feature work.
+- Placeholder for changes after `v0.3.0`.
 
 ### Changed
-- Placeholder for post-`v0.2.0` behavior and stability updates.
+- Placeholder for behavior and stability updates after `v0.3.0`.
 
 ### Notes
-- Keep pre-1.0 expectations for compatibility and API evolution.
+- Continue with conservative pre-1.0 SemVer (`0.x`) and disciplined minor releases.
 
+## [0.3.0] - TBD
+
+### Added
+- Mermaid architecture output for `mah graph` with selectable detail levels:
+  - `--mermaid-level basic`
+  - `--mermaid-level group`
+  - `--mermaid-level detailed`
+- Optional capability rendering in detailed Mermaid view with:
+  - `--mermaid-capabilities`
+  - role-based skills/MCP blocks
+  - visual legend and color classes.
+- Structured diagnostics envelope `mah.diagnostics.v1` for key diagnostic commands (`detect`, `doctor`, `validate*`, `plan`, `diff`, `explain`).
+- New documentation for stabilization and operational boundaries:
+  - `docs/validate-semantics.md`
+  - `docs/runtime-boundary.md`
+  - `docs/platform-capabilities.md`.
+- Expertise Model foundation documentation:
+  - `docs/expertise-model-foundation.md`.
+- Additional diagnostics/platform reliability tests and CI coverage (`test:diagnostics`).
+
+### Changed
+- Terminology renamed across the project:
+  - `mental model` -> `expertise model`
+  - `update mental model` -> `update expertise model`.
+- Related paths, skill references, runtime tool names, scripts, and generated artifacts were updated to match the new naming.
+- Mermaid detailed layout refined for readability:
+  - orchestrator kept in final tier block
+  - delegation-only arrows (`can delegate`)
+  - capabilities presented as low-level contextual blocks.
+- `mah graph` capabilities now read MCP servers from local configuration (`.mcp.json` with fallback to `.mcp.example.json`) instead of fixed static values.
+- Provenance retention/rotation behavior introduced with configurable limits:
+  - `MAH_PROVENANCE_MAX_LINES`
+  - `MAH_PROVENANCE_MAX_DAYS`.
+
+### Fixed
+- Graph JSON/Mermaid command behavior normalized for CLI flags and output consistency.
+- Deterministic sync action reporting improved for create/update/no-change/applied flows.
+
+### Notes
+- This release continues the pre-1.0 stabilization path and should be treated as hardening, not final API stability.
+- Runtime adapter contract and platform features remain under incremental maturation in `0.x`.
+- Expertise Model is consolidated as a foundation concept in this release; orchestration intelligence capabilities are deferred.
 ## [0.2.0] - 2026-04-04
 
 ### Added

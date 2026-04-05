@@ -4,13 +4,13 @@ model: zai/glm-5
 role: lead
 team: Validation
 expertise:
-  path: .claude/crew/dev/expertise/validation-lead-mental-model.yaml
+  path: .claude/crew/dev/expertise/validation-lead-expertise-model.yaml
   use-when: Track regression patterns, review heuristics, and which validation combinations catch the highest-risk issues in Hivehue.
   updatable: true
   max-lines: 10000
 tools:
   - delegate_agent
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
@@ -19,7 +19,7 @@ skills:
     use-when: Always. Split QA and security work into focused review scopes.
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Preserve prior implementation context and explicit risk areas before replying.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering new review or regression patterns.
   - path: .claude/skills/zero-micromanagement/SKILL.md
     use-when: Always. Request findings and coverage, not keystroke-level review procedures.

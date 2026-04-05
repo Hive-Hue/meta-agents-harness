@@ -26,15 +26,15 @@ crews:
         role: "orchestrator"
         team: "orchestration"
         model_ref: "orchestrator_default"
-        expertise: "orchestrator-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "orchestrator-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "planning-lead"
         role: "lead"
         team: "planning"
         model_ref: "lead_default"
-        expertise: "planning-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "planning-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "engineering-lead"
         role: "lead"
@@ -44,36 +44,36 @@ crews:
         model_fallbacks:
           - "zai/glm-5-turbo"
           - "zai/glm-4.5-air"
-        expertise: "engineering-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "engineering-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
-        expertise: "validation-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "validation-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "repo-analyst"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
-        expertise: "repo-analyst-mental-model"
-        skills: ["mental_model"]
+        expertise: "repo-analyst-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "read_only_repo"
       - id: "solution-architect"
         role: "worker"
         team: "planning"
         model_ref: "lead_default"
-        expertise: "solution-architect-mental-model"
-        skills: ["mental_model"]
+        expertise: "solution-architect-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "specs_writer"
       - id: "frontend-dev"
         role: "worker"
         team: "engineering"
         model_ref: "worker_default"
-        expertise: "frontend-dev-mental-model"
-        skills: ["mental_model"]
+        expertise: "frontend-dev-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "frontend_impl"
       - id: "backend-dev"
         role: "worker"
@@ -82,22 +82,22 @@ crews:
         model_fallbacks:
           - "zai/glm-4.7"
           - "zai/glm-4.5-air"
-        expertise: "backend-dev-mental-model"
-        skills: ["mental_model"]
+        expertise: "backend-dev-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "backend_impl"
       - id: "qa-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "qa-reviewer-mental-model"
-        skills: ["mental_model"]
+        expertise: "qa-reviewer-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "qa_security"
       - id: "security-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "security-reviewer-mental-model"
-        skills: ["mental_model"]
+        expertise: "security-reviewer-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "qa_security"
     runtime_overrides:
       opencode:

@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
@@ -103,7 +103,7 @@ function printHelp() {
   console.log("  explain [detect|use|run|sync] [args]")
   console.log("  init [--runtime <name>] [--crew <name>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json]")
-  console.log("  graph [--crew <name>] [--run <id>] [--json]")
+  console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
   console.log("  check:runtime")
@@ -130,6 +130,9 @@ function printHelp() {
   console.log("  --session-mirror / --no-session-mirror")
   console.log("  --trace")
   console.log("  --json")
+  console.log("  --mermaid")
+  console.log("  --mermaid-level <basic|group|detailed>")
+  console.log("  --mermaid-capabilities")
   console.log("  --crew <name>")
   console.log("  --run <id>")
   console.log("  --strict-markers")
@@ -158,7 +161,10 @@ function parseFilterArgs(argv) {
     runtime: parseValueArg(argv, "--runtime", "-r"),
     crew: parseValueArg(argv, "--crew"),
     run: parseValueArg(argv, "--run"),
-    json: hasFlag(argv, "--json")
+    json: hasFlag(argv, "--json"),
+    mermaid: hasFlag(argv, "--mermaid"),
+    mermaidLevel: parseValueArg(argv, "--mermaid-level"),
+    mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities")
   }
 }
 
@@ -186,6 +192,40 @@ function runLocalScriptCapture(scriptPath, scriptArgs = []) {
     stdout: child.stdout || "",
     stderr: child.stderr || ""
   }
+}
+
+function readConfiguredMcpServers() {
+  const candidates = [path.join(repoRoot, ".mcp.json"), path.join(repoRoot, ".mcp.example.json")]
+  for (const filePath of candidates) {
+    if (!existsSync(filePath)) continue
+    try {
+      const raw = readFileSync(filePath, "utf-8")
+      const parsed = JSON.parse(raw)
+      const servers = Object.keys(parsed?.mcpServers || {}).filter(Boolean).sort()
+      if (servers.length > 0) return servers
+    } catch {
+    }
+  }
+  return ["context7", "github"]
+}
+
+function createDiagnosticPayload(command, values = {}) {
+  const status = Number.isInteger(values.status) ? values.status : 0
+  const errors = Array.isArray(values.errors) ? values.errors : []
+  return {
+    schema: "mah.diagnostics.v1",
+    command,
+    ok: status === 0 && errors.length === 0,
+    status,
+    runtime: values.runtime || "",
+    reason: values.reason || "",
+    data: values.data || {},
+    errors
+  }
+}
+
+function printDiagnosticPayload(payload) {
+  console.log(JSON.stringify(payload, null, 2))
 }
 
 function logProvenance(event) {
@@ -411,8 +451,9 @@ function runInit(argv) {
   return 0
 }
 
-function runSessions(argv) {
+function runSessions(argv, jsonMode = false) {
   const filters = parseFilterArgs(argv)
+  if (jsonMode) filters.json = true
   const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew })
   if (filters.json) {
     console.log(JSON.stringify({ sessions: rows }, null, 2))
@@ -428,12 +469,227 @@ function runSessions(argv) {
   return 0
 }
 
-function runGraph(argv) {
+function mermaidNodeId(value) {
+  return `${value || "unknown"}`.replace(/[^a-zA-Z0-9_]/g, "_")
+}
+
+function renderMermaidBasic(topology) {
+  const lines = ["flowchart LR", `subgraph crew_${mermaidNodeId(topology.crew || "default")}[Crew ${topology.crew || "default"}]`]
+  lines.push("  direction TB")
+  lines.push(`  m_orchestrator["orchestrator"]`)
+  lines.push(`  m_leads["leads"]`)
+  lines.push(`  m_workers["workers"]`)
+  lines.push("end")
+  lines.push("m_orchestrator -->|can delegate| m_leads")
+  lines.push("m_leads -->|can delegate| m_workers")
+  return `${lines.join("\n")}\n`
+}
+
+function renderMermaidGroup(topology) {
+  const lines = ["flowchart LR", `subgraph crew_${mermaidNodeId(topology.crew || "default")}[Crew ${topology.crew || "default"}]`]
+  lines.push("  direction TB")
+  const nodeById = new Map((topology.nodes || []).map((node) => [node.id, node]))
+  const orchestrators = (topology.nodes || []).filter((node) => node.role === "orchestrator")
+  const teamSet = new Set((topology.nodes || []).filter((node) => node.role === "lead").map((node) => node.team || "unassigned"))
+
+  lines.push("  subgraph tier_1[Teams]")
+  for (const team of teamSet) {
+    lines.push(`    grp_${mermaidNodeId(team)}["${team} team"]`)
+  }
+  lines.push("  end")
+  lines.push("  subgraph tier_0[Orchestrator]")
+  for (const node of orchestrators) {
+    lines.push(`    ${mermaidNodeId(`topo_${node.id}`)}["${node.id} (orchestrator)"]`)
+  }
+  lines.push("  end")
+  lines.push("end")
+
+  const seen = new Set()
+  for (const edge of topology.edges || []) {
+    const from = nodeById.get(edge.from)
+    const to = nodeById.get(edge.to)
+    if (from?.role === "orchestrator" && to?.role === "lead") {
+      const fromId = mermaidNodeId(`topo_${from.id}`)
+      const teamId = `grp_${mermaidNodeId(to.team || "unassigned")}`
+      const key = `${fromId}:${teamId}`
+      if (!seen.has(key)) {
+        lines.push(`${fromId} -->|can delegate| ${teamId}`)
+        seen.add(key)
+      }
+    }
+  }
+  return `${lines.join("\n")}\n`
+}
+
+function renderMermaidDetailed(topology, runGraph) {
+  return renderMermaidDetailedWithOptions(topology, runGraph, { includeCapabilities: false, teamCapabilities: {} })
+}
+
+function buildRoleCapabilitySummary(meta, crewId) {
+  const crew = (meta.crews || []).find((item) => item.id === crewId) || (meta.crews || [])[0]
+  const skillsByRole = {
+    orchestrator: new Set(),
+    lead: new Set(),
+    worker: new Set()
+  }
+  const configuredMcp = readConfiguredMcpServers()
+  if (!crew) {
+    return {
+      skills: { orchestrator: [], lead: [], worker: [] },
+      mcp: {
+        orchestrator: configuredMcp,
+        lead: configuredMcp,
+        worker: configuredMcp
+      }
+    }
+  }
+  for (const agent of crew.agents || []) {
+    const roleKey = agent.role === "orchestrator" ? "orchestrator" : agent.role === "lead" ? "lead" : "worker"
+    for (const skillRef of agent.skills || []) {
+      skillsByRole[roleKey].add(skillRef)
+    }
+  }
+  return {
+    skills: {
+      orchestrator: Array.from(skillsByRole.orchestrator).sort(),
+      lead: Array.from(skillsByRole.lead).sort(),
+      worker: Array.from(skillsByRole.worker).sort()
+    },
+    mcp: {
+      orchestrator: configuredMcp,
+      lead: configuredMcp,
+      worker: configuredMcp
+    }
+  }
+}
+
+function renderMermaidDetailedWithOptions(topology, runGraph, options = {}) {
+  const lines = ["flowchart LR", `subgraph crew_${mermaidNodeId(topology.crew || "default")}[Crew ${topology.crew || "default"}]`]
+  lines.push("  direction TB")
+  const orchestrators = (topology.nodes || []).filter((node) => node.role === "orchestrator")
+  const leads = (topology.nodes || []).filter((node) => node.role === "lead")
+  const workers = (topology.nodes || []).filter((node) => node.role !== "orchestrator" && node.role !== "lead")
+  const orchestratorIds = orchestrators.map((node) => mermaidNodeId(`topo_${node.id}`))
+  const leadIds = leads.map((node) => mermaidNodeId(`topo_${node.id}`))
+  const workerIds = workers.map((node) => mermaidNodeId(`topo_${node.id}`))
+
+  lines.push("  subgraph tier_1[Leads]")
+  for (const node of leads) {
+    lines.push(`    ${mermaidNodeId(`topo_${node.id}`)}["${node.id} (lead · ${node.team})"]`)
+  }
+  if (options.includeCapabilities) {
+    const leadSkills = (options.capabilitySummary?.skills?.lead || []).join(", ") || "none"
+    const leadMcp = (options.capabilitySummary?.mcp?.lead || []).join(", ") || "none"
+    lines.push("    subgraph lead_skill[Skills]")
+    lines.push(`      cap_skill_leads["${leadSkills}"]`)
+    lines.push("    end")
+    lines.push("    subgraph lead_mcp[MCPs]")
+    lines.push(`      cap_mcp_leads["${leadMcp}"]`)
+    lines.push("    end")
+  }
+  lines.push("  end")
+
+  lines.push("  subgraph tier_2[Workers]")
+  for (const node of workers) {
+    lines.push(`    ${mermaidNodeId(`topo_${node.id}`)}["${node.id} (worker · ${node.team})"]`)
+  }
+  if (options.includeCapabilities) {
+    const workerSkills = (options.capabilitySummary?.skills?.worker || []).join(", ") || "none"
+    const workerMcp = (options.capabilitySummary?.mcp?.worker || []).join(", ") || "none"
+    lines.push("    subgraph worker_skill[Skills]")
+    lines.push("      direction TB")
+    lines.push(`      cap_skill_workers["${workerSkills}"]`)
+    lines.push("    end")
+    lines.push("    subgraph workers_mcp[MCPs]")
+    lines.push(`      cap_mcp_workers["${workerMcp}"]`)
+    lines.push("    end")
+  }
+  lines.push("  end")
+
+  lines.push("  subgraph tier_0[Orchestrator]")
+  for (const node of orchestrators) {
+    lines.push(`    ${mermaidNodeId(`topo_${node.id}`)}["${node.id} (orchestrator)"]`)
+  }
+  lines.push("  end")
+  lines.push("end")
+  for (const edge of topology.edges || []) {
+    const fromId = mermaidNodeId(`topo_${edge.from}`)
+    const toId = mermaidNodeId(`topo_${edge.to}`)
+    lines.push(`${fromId} -->|can delegate| ${toId}`)
+  }
+  if ((runGraph.edges || []).length > 0) {
+    lines.push("subgraph run_graph[Run Graph]")
+    for (const node of runGraph.nodes || []) {
+      lines.push(`  ${mermaidNodeId(`run_${node.id}`)}["${node.id}"]`)
+    }
+    lines.push("end")
+    for (const edge of runGraph.edges || []) {
+      lines.push(`${mermaidNodeId(`run_${edge.from}`)} -.-> ${mermaidNodeId(`run_${edge.to}`)}`)
+    }
+  }
+
+  lines.push("classDef orchestrator fill:#fff3e0,stroke:#ef6c00,stroke-width:2px,color:#1a1a1a")
+  lines.push("classDef lead fill:#e3f2fd,stroke:#1976d2,stroke-width:1.5px,color:#1a1a1a")
+  lines.push("classDef worker fill:#f5f5f5,stroke:#757575,stroke-width:1px,color:#1a1a1a")
+  if (options.includeCapabilities) {
+    lines.push("classDef skillNode fill:#ede7f6,stroke:#5e35b1,stroke-width:1px,color:#1a1a1a")
+    lines.push("classDef mcpNode fill:#e8f5e9,stroke:#2e7d32,stroke-width:1px,color:#1a1a1a")
+  }
+  if (orchestratorIds.length > 0) lines.push(`class ${orchestratorIds.join(",")} orchestrator`)
+  if (leadIds.length > 0) lines.push(`class ${leadIds.join(",")} lead`)
+  if (workerIds.length > 0) lines.push(`class ${workerIds.join(",")} worker`)
+  if (options.includeCapabilities) {
+    const skillNodes = ["cap_skill_leads", "cap_skill_workers"]
+    const mcpNodes = ["cap_mcp_leads", "cap_mcp_workers"]
+    if (skillNodes.length > 0) lines.push(`class ${skillNodes.join(",")} skillNode`)
+    if (mcpNodes.length > 0) lines.push(`class ${mcpNodes.join(",")} mcpNode`)
+    lines.push("subgraph legend[Legend]")
+    lines.push("  lg_orch[Orchestrator]")
+    lines.push("  lg_lead[Lead]")
+    lines.push("  lg_worker[Worker]")
+    lines.push("  lg_skill[Skills]")
+    lines.push("  lg_mcp[MCP]")
+    lines.push("end")
+    lines.push("class lg_orch orchestrator")
+    lines.push("class lg_lead lead")
+    lines.push("class lg_worker worker")
+    lines.push("class lg_skill skillNode")
+    lines.push("class lg_mcp mcpNode")
+  }
+  return `${lines.join("\n")}\n`
+}
+
+function renderMermaidGraph(topology, runGraph, level = "detailed", options = {}) {
+  if (level === "basic") return renderMermaidBasic(topology)
+  if (level === "group") return renderMermaidGroup(topology)
+  return renderMermaidDetailedWithOptions(topology, runGraph, options)
+}
+
+function runGraph(argv, jsonMode = false, mermaidMode = false) {
   const filters = parseFilterArgs(argv)
+  const mermaidLevel = filters.mermaidLevel || "detailed"
+  if (jsonMode) filters.json = true
+  if (mermaidMode || filters.mermaid || filters.mermaidLevel) filters.mermaid = true
+  if (filters.json && filters.mermaid) {
+    console.error("ERROR: --json and --mermaid are mutually exclusive for graph")
+    return 1
+  }
+  if (!["basic", "group", "detailed"].includes(mermaidLevel)) {
+    console.error("ERROR: invalid --mermaid-level. Use basic, group, or detailed")
+    return 1
+  }
   const meta = readMetaConfig(repoRoot)
   const topology = buildCrewGraph(meta, filters.crew)
   const provenance = readProvenance(repoRoot, { run: filters.run, limit: 1000 })
   const runGraph = buildRunGraphFromProvenance(provenance, { run: filters.run })
+  const capabilitySummary = buildRoleCapabilitySummary(meta, topology.crew)
+  if (filters.mermaid) {
+    process.stdout.write(renderMermaidGraph(topology, runGraph, mermaidLevel, {
+      includeCapabilities: filters.mermaidCapabilities,
+      capabilitySummary
+    }))
+    return 0
+  }
   if (filters.json) {
     console.log(JSON.stringify({ topology, run: runGraph }, null, 2))
     return 0
@@ -507,7 +763,8 @@ function main() {
   const argv = process.argv.slice(2)
   const traceMode = hasFlag(argv, "--trace")
   const jsonMode = hasFlag(argv, "--json")
-  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"))
+  const mermaidMode = hasFlag(argv, "--mermaid")
+  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"), "--mermaid"))
   const first = normalizedArgv[0]
 
   if (!first || first === "--help" || first === "-h" || first === "help") {
@@ -532,7 +789,12 @@ function main() {
   if (first === "detect") {
     if (!runtimeResult.runtime) {
       if (jsonMode) {
-        console.log(JSON.stringify({ runtime: "unknown", reason: runtimeResult.reason }, null, 2))
+        printDiagnosticPayload(createDiagnosticPayload("detect", {
+          status: 1,
+          reason: runtimeResult.reason,
+          data: { runtime: "unknown" },
+          errors: ["no-runtime-detected"]
+        }))
       } else {
         console.log("runtime=unknown")
       }
@@ -540,7 +802,12 @@ function main() {
       return
     }
     if (jsonMode) {
-      console.log(JSON.stringify({ runtime: runtimeResult.runtime, reason: runtimeResult.reason }, null, 2))
+      printDiagnosticPayload(createDiagnosticPayload("detect", {
+        status: 0,
+        runtime: runtimeResult.runtime,
+        reason: runtimeResult.reason,
+        data: { runtime: runtimeResult.runtime }
+      }))
     } else {
       console.log(`runtime=${runtimeResult.runtime}`)
       console.log(`reason=${runtimeResult.reason}`)
@@ -554,12 +821,12 @@ function main() {
   }
 
   if (first === "sessions") {
-    process.exitCode = runSessions(normalizedArgv.slice(1))
+    process.exitCode = runSessions(normalizedArgv.slice(1), jsonMode)
     return
   }
 
   if (first === "graph") {
-    process.exitCode = runGraph(normalizedArgv.slice(1))
+    process.exitCode = runGraph(normalizedArgv.slice(1), jsonMode, mermaidMode)
     return
   }
 
@@ -570,20 +837,34 @@ function main() {
 
   if (first === "plan" || first === "diff") {
     const modeFlag = first === "plan" ? "--plan" : "--diff"
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), jsonMode ? [modeFlag, "--json"] : [modeFlag])
+    if (jsonMode) {
+      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), [modeFlag, "--json"])
+      let report = {}
+      try {
+        report = JSON.parse(captured.stdout || "{}")
+      } catch {
+        report = {}
+      }
+      printDiagnosticPayload(createDiagnosticPayload(first, {
+        status: captured.status,
+        data: report,
+        errors: captured.status === 0 ? [] : ["sync-report-not-clean"]
+      }))
+      process.exitCode = captured.status
+      return
+    }
+    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), [modeFlag])
     return
   }
 
   if (first === "validate:config") {
     if (jsonMode) {
       const captured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
-      console.log(JSON.stringify({
-        command: "validate:config",
+      printDiagnosticPayload(createDiagnosticPayload("validate:config", {
         status: captured.status,
-        ok: captured.status === 0,
-        stdout: captured.stdout.trim(),
-        stderr: captured.stderr.trim()
-      }, null, 2))
+        data: { stdout: captured.stdout.trim(), stderr: captured.stderr.trim() },
+        errors: captured.status === 0 ? [] : ["config-validation-failed"]
+      }))
       process.exitCode = captured.status
       return
     }
@@ -594,8 +875,17 @@ function main() {
   if (first === "validate:sync") {
     if (jsonMode) {
       const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
-      process.stdout.write(captured.stdout)
-      if (captured.stderr.trim()) process.stderr.write(captured.stderr)
+      let report = {}
+      try {
+        report = JSON.parse(captured.stdout || "{}")
+      } catch {
+        report = {}
+      }
+      printDiagnosticPayload(createDiagnosticPayload("validate:sync", {
+        status: captured.status,
+        data: report,
+        errors: captured.status === 0 ? [] : ["sync-validation-failed"]
+      }))
       process.exitCode = captured.status
       return
     }
@@ -614,17 +904,15 @@ function main() {
     if (jsonMode) {
       const captured = dispatchCapture(runtimeResult.runtime, "check:runtime", [])
       const precheck = runtimeValidationReport(runtimeResult.runtime)
-      console.log(JSON.stringify({
-        command: "validate:runtime",
+      const status = precheck.ok ? captured.status : 1
+      printDiagnosticPayload(createDiagnosticPayload("validate:runtime", {
         runtime: runtimeResult.runtime,
         reason: runtimeResult.reason,
-        status: precheck.ok ? captured.status : 1,
-        ok: precheck.ok && captured.status === 0,
-        precheck,
-        stdout: captured.stdout.trim(),
-        stderr: captured.stderr.trim()
-      }, null, 2))
-      process.exitCode = precheck.ok ? captured.status : 1
+        status,
+        data: { precheck, stdout: captured.stdout.trim(), stderr: captured.stderr.trim() },
+        errors: status === 0 ? [] : ["runtime-validation-failed"]
+      }))
+      process.exitCode = status
       return
     }
     const precheck = runtimeValidationReport(runtimeResult.runtime)
@@ -650,18 +938,19 @@ function main() {
       const status = config.status !== 0 ? config.status : sync.status !== 0 ? sync.status : runtime.status
       let syncJson = null
       try { syncJson = JSON.parse(sync.stdout || "{}") } catch { syncJson = null }
-      console.log(JSON.stringify({
-        command: "validate:all",
+      printDiagnosticPayload(createDiagnosticPayload("validate:all", {
         status,
-        ok: status === 0,
         runtime: runtimeResult.runtime || "",
         reason: runtimeResult.reason,
-        checks: {
-          config: { status: config.status, stdout: config.stdout.trim(), stderr: config.stderr.trim() },
-          sync: { status: sync.status, report: syncJson, stdout: sync.stdout.trim(), stderr: sync.stderr.trim() },
-          runtime: { status: runtime.status, stdout: runtime.stdout.trim(), stderr: runtime.stderr.trim() }
-        }
-      }, null, 2))
+        data: {
+          checks: {
+            config: { status: config.status, stdout: config.stdout.trim(), stderr: config.stderr.trim() },
+            sync: { status: sync.status, report: syncJson, stdout: sync.stdout.trim(), stderr: sync.stderr.trim() },
+            runtime: { status: runtime.status, stdout: runtime.stdout.trim(), stderr: runtime.stderr.trim() }
+          }
+        },
+        errors: status === 0 ? [] : ["composed-validation-failed"]
+      }))
       process.exitCode = status
       return
     }
@@ -687,7 +976,17 @@ function main() {
   if (first === "explain") {
     const explainCommand = normalizedArgv[1] || "detect"
     if (explainCommand === "detect") {
-      printExplain(traceMode, { runtime: runtimeResult.runtime, reason: runtimeResult.reason, command: "detect" })
+      if (jsonMode) {
+        printDiagnosticPayload(createDiagnosticPayload("explain", {
+          status: runtimeResult.runtime ? 0 : 1,
+          runtime: runtimeResult.runtime || "",
+          reason: runtimeResult.reason,
+          data: { target: "detect", runtime: runtimeResult.runtime || "" },
+          errors: runtimeResult.runtime ? [] : ["no-runtime-detected"]
+        }))
+      } else {
+        printExplain(traceMode, { runtime: runtimeResult.runtime, reason: runtimeResult.reason, command: "detect" })
+      }
       process.exitCode = runtimeResult.runtime ? 0 : 1
       return
     }
@@ -704,7 +1003,16 @@ function main() {
         resolved_exec: process.execPath,
         resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"]
       }
-      printExplain(traceMode, payload)
+      if (jsonMode) {
+        printDiagnosticPayload(createDiagnosticPayload("explain", {
+          status: 0,
+          runtime: runtimeResult.runtime,
+          reason: runtimeResult.reason,
+          data: { target: "sync", payload }
+        }))
+      } else {
+        printExplain(traceMode, payload)
+      }
       return
     }
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
@@ -726,7 +1034,16 @@ function main() {
         warnings: plan.warnings || [],
         candidates: plan.candidates || []
       }
-      printExplain(traceMode, payload)
+      if (jsonMode) {
+        printDiagnosticPayload(createDiagnosticPayload("explain", {
+          status: 0,
+          runtime: runtimeResult.runtime,
+          reason: runtimeResult.reason,
+          data: { target: explainCommand, payload }
+        }))
+      } else {
+        printExplain(traceMode, payload)
+      }
       return
     }
     console.error(`ERROR: unsupported explain target '${explainCommand}'`)
@@ -736,23 +1053,25 @@ function main() {
 
   if (first === "doctor" && jsonMode) {
     if (!runtimeResult.runtime) {
-      console.log(JSON.stringify({ command: "doctor", ok: false, reason: "no-runtime-detected", status: 1 }, null, 2))
+      printDiagnosticPayload(createDiagnosticPayload("doctor", {
+        status: 1,
+        reason: "no-runtime-detected",
+        errors: ["no-runtime-detected"]
+      }))
       process.exitCode = 1
       return
     }
     const captured = dispatchCapture(runtimeResult.runtime, "check:runtime", [])
     const precheck = runtimeValidationReport(runtimeResult.runtime)
-    console.log(JSON.stringify({
-      command: "doctor",
+    const status = precheck.ok ? captured.status : 1
+    printDiagnosticPayload(createDiagnosticPayload("doctor", {
       runtime: runtimeResult.runtime,
       reason: runtimeResult.reason,
-      status: precheck.ok ? captured.status : 1,
-      ok: precheck.ok && captured.status === 0,
-      precheck,
-      stdout: captured.stdout.trim(),
-      stderr: captured.stderr.trim()
-    }, null, 2))
-    process.exitCode = precheck.ok ? captured.status : 1
+      status,
+      data: { precheck, stdout: captured.stdout.trim(), stderr: captured.stderr.trim() },
+      errors: status === 0 ? [] : ["doctor-check-failed"]
+    }))
+    process.exitCode = status
     return
   }
 
@@ -760,40 +1079,39 @@ function main() {
     if (jsonMode) {
       const configCaptured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
       if (configCaptured.status !== 0) {
-        console.log(JSON.stringify({
-          command: "validate",
+        printDiagnosticPayload(createDiagnosticPayload("validate", {
           status: configCaptured.status,
-          ok: false,
-          config: { status: configCaptured.status, stdout: configCaptured.stdout.trim(), stderr: configCaptured.stderr.trim() }
-        }, null, 2))
+          data: { config: { status: configCaptured.status, stdout: configCaptured.stdout.trim(), stderr: configCaptured.stderr.trim() } },
+          errors: ["config-validation-failed"]
+        }))
         process.exitCode = configCaptured.status
         return
       }
       if (!runtimeResult.runtime) {
-        console.log(JSON.stringify({
-          command: "validate",
+        printDiagnosticPayload(createDiagnosticPayload("validate", {
           status: 1,
-          ok: false,
-          config: { status: 0 },
-          runtime: { status: 1, reason: "no-runtime-detected" }
-        }, null, 2))
+          reason: "no-runtime-detected",
+          data: { config: { status: 0 }, runtime: { status: 1, reason: "no-runtime-detected" } },
+          errors: ["no-runtime-detected"]
+        }))
         process.exitCode = 1
         return
       }
       const runtimeCaptured = dispatchCapture(runtimeResult.runtime, "check:runtime", [])
-      console.log(JSON.stringify({
-        command: "validate",
+      printDiagnosticPayload(createDiagnosticPayload("validate", {
         status: runtimeCaptured.status,
-        ok: runtimeCaptured.status === 0,
         runtime: runtimeResult.runtime,
         reason: runtimeResult.reason,
-        config: { status: 0 },
-        runtime_check: {
-          status: runtimeCaptured.status,
-          stdout: runtimeCaptured.stdout.trim(),
-          stderr: runtimeCaptured.stderr.trim()
-        }
-      }, null, 2))
+        data: {
+          config: { status: 0 },
+          runtime_check: {
+            status: runtimeCaptured.status,
+            stdout: runtimeCaptured.stdout.trim(),
+            stderr: runtimeCaptured.stderr.trim()
+          }
+        },
+        errors: runtimeCaptured.status === 0 ? [] : ["runtime-check-failed"]
+      }))
       process.exitCode = runtimeCaptured.status
       return
     } else {

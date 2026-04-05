@@ -4,7 +4,7 @@ model: zai/glm-4.7
 role: worker
 team: Planning
 expertise:
-  path: .claude/crew/dev/expertise/repo-analyst-mental-model.yaml
+  path: .claude/crew/dev/expertise/repo-analyst-expertise-model.yaml
   use-when: Track stable repository patterns, frontend/backend boundaries, and recurring structural constraints in Hivehue.
   updatable: true
   max-lines: 10000
@@ -13,14 +13,14 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Preserve the exact user question and any prior findings while exploring.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after learning durable structural patterns about Hivehue.
   - path: .claude/skills/web-research/SKILL.md
     use-when: Use when repository analysis depends on external documentation or current references.

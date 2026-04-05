@@ -91,7 +91,34 @@ export function appendProvenance(repoRoot, event) {
   mkdirSync(root, { recursive: true })
   const payload = { ...event, at: new Date().toISOString() }
   writeFileSync(filePath, `${JSON.stringify(payload)}\n`, { flag: "a" })
+  const maxLinesValue = Number.parseInt(process.env.MAH_PROVENANCE_MAX_LINES || "5000", 10)
+  const maxLines = Number.isFinite(maxLinesValue) && maxLinesValue > 0 ? maxLinesValue : 5000
+  const maxDaysValue = Number.parseInt(process.env.MAH_PROVENANCE_MAX_DAYS || "30", 10)
+  const maxDays = Number.isFinite(maxDaysValue) && maxDaysValue > 0 ? maxDaysValue : 30
+  compactProvenanceFile(filePath, { maxLines, maxDays })
   return filePath
+}
+
+function compactProvenanceFile(filePath, { maxLines, maxDays }) {
+  if (!existsSync(filePath)) return
+  const now = Date.now()
+  const maxAgeMs = maxDays * 24 * 60 * 60 * 1000
+  const filtered = readFileSync(filePath, "utf-8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => {
+      try {
+        const parsed = JSON.parse(line)
+        const at = new Date(parsed.at || 0).getTime()
+        return Number.isFinite(at) && at > 0 && now - at <= maxAgeMs
+      } catch {
+        return false
+      }
+    })
+  const compacted = filtered.slice(Math.max(0, filtered.length - maxLines))
+  const content = compacted.length > 0 ? `${compacted.join("\n")}\n` : ""
+  writeFileSync(filePath, content, "utf-8")
 }
 
 export function readProvenance(repoRoot, { limit = 200, run = "" } = {}) {

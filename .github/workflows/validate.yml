@@ -29,6 +29,9 @@ jobs:
       - name: Run runtime contract tests
         run: npm run test:contract
 
+      - name: Run diagnostics and platform reliability tests
+        run: npm run test:diagnostics
+
       - name: Validate canonical config
         run: npm run validate:config
 

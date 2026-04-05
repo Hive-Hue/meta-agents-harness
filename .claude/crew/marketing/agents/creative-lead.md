@@ -24,20 +24,20 @@ Model: `openai-codex/gpt-5.2`
 Creative lead responsible for delegation, synthesis, and team-level coordination.
 
 ## Expertise
-- path: `.claude/crew/marketing/expertise/creative-lead-mental-model.yaml`
+- path: `.claude/crew/marketing/expertise/creative-lead-expertise-model.yaml`
 - use-when: Track narrative direction, production tradeoffs, and delivery quality.
 
 ## Skills
 - path: `.claude/skills/active-listener/SKILL.md` | use-when: Always. Preserve user constraints and prior context before acting.
 - path: `.claude/skills/delegate-bounded/SKILL.md` | use-when: For every creative assignment.
 - path: `.claude/skills/zero-micromanagement/SKILL.md` | use-when: While assigning copy and creative production.
-- path: `.claude/skills/mental-model/SKILL.md` | use-when: Start and end of creative rounds.
+- path: `.claude/skills/expertise-model/SKILL.md` | use-when: Start and end of creative rounds.
 - path: `.claude/skills/web-research/SKILL.md` | use-when: When creative direction depends on current platform and market evidence.
 - path: `.claude/skills/zeplin-mcp-ops/SKILL.md` | use-when: When creative execution depends on Zeplin screens, components, or assets.
 
 ## Tools
 - delegate_agent
-- update_mental_model
+- update_expertise_model
 - mcp_servers
 - mcp_tools
 - mcp_call
@@ -60,7 +60,7 @@ Creative lead responsible for delegation, synthesis, and team-level coordination
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update_mental_model` after meaningful work.
+- Persist durable learnings using `update_expertise_model` after meaningful work.
 
 ## Response Contract
 1. delegation summary

@@ -11,10 +11,10 @@ shared:
       use-when: Use when relevant to current task.
     - path: .opencode/skills/zero-micromanagement/SKILL.md
       use-when: Use when relevant to current task.
-    - path: .opencode/skills/mental-model/SKILL.md
+    - path: .opencode/skills/expertise-model/SKILL.md
       use-when: Use when relevant to current task.
   tools:
-    - update-mental-model
+    - update-expertise-model
   mcp:
     - clickup
     - github
@@ -28,18 +28,18 @@ orchestrator:
     - zai/glm-4.5-air
   agent_file: .opencode/crew/marketing/agents/orchestrator.md
   expertise:
-    path: .opencode/crew/marketing/expertise/orchestrator-mental-model.yaml
+    path: .opencode/crew/marketing/expertise/orchestrator-expertise-model.yaml
     use-when: Track durable learnings for orchestrator.
   skills:
     - path: .opencode/skills/delegate-bounded/SKILL.md
       use-when: Use when relevant to current task.
     - path: .opencode/skills/zero-micromanagement/SKILL.md
       use-when: Use when relevant to current task.
-    - path: .opencode/skills/mental-model/SKILL.md
+    - path: .opencode/skills/expertise-model/SKILL.md
       use-when: Use when relevant to current task.
   tools:
     - task
-    - update-mental-model
+    - update-expertise-model
   mcp_access:
     - clickup
     - github
@@ -64,18 +64,18 @@ teams:
         - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/planning-lead.md
       expertise:
-        path: .opencode/crew/marketing/expertise/planning-lead-mental-model.yaml
+        path: .opencode/crew/marketing/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
       skills:
         - path: .opencode/skills/delegate-bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: .opencode/skills/zero-micromanagement/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/mental-model/SKILL.md
+        - path: .opencode/skills/expertise-model/SKILL.md
           use-when: Use when relevant to current task.
       tools:
         - task
-        - update-mental-model
+        - update-expertise-model
       mcp_access:
         - clickup
         - github
@@ -105,17 +105,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/market-researcher.md
         expertise:
-          path: .opencode/crew/marketing/expertise/market-researcher-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/market-researcher-expertise-model.yaml
           use-when: Track durable learnings for market-researcher.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github
@@ -141,17 +141,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/campaign-strategist.md
         expertise:
-          path: .opencode/crew/marketing/expertise/campaign-strategist-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/campaign-strategist-expertise-model.yaml
           use-when: Track durable learnings for campaign-strategist.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github
@@ -179,18 +179,18 @@ teams:
         - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/creative-lead.md
       expertise:
-        path: .opencode/crew/marketing/expertise/creative-lead-mental-model.yaml
+        path: .opencode/crew/marketing/expertise/creative-lead-expertise-model.yaml
         use-when: Track durable learnings for creative-lead.
       skills:
         - path: .opencode/skills/delegate-bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: .opencode/skills/zero-micromanagement/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/mental-model/SKILL.md
+        - path: .opencode/skills/expertise-model/SKILL.md
           use-when: Use when relevant to current task.
       tools:
         - task
-        - update-mental-model
+        - update-expertise-model
       mcp_access:
         - clickup
         - github
@@ -221,17 +221,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/copywriter.md
         expertise:
-          path: .opencode/crew/marketing/expertise/copywriter-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/copywriter-expertise-model.yaml
           use-when: Track durable learnings for copywriter.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github
@@ -257,17 +257,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/creative-strategist.md
         expertise:
-          path: .opencode/crew/marketing/expertise/creative-strategist-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/creative-strategist-expertise-model.yaml
           use-when: Track durable learnings for creative-strategist.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github
@@ -293,17 +293,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/media-operator.md
         expertise:
-          path: .opencode/crew/marketing/expertise/media-operator-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/media-operator-expertise-model.yaml
           use-when: Track durable learnings for media-operator.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github
@@ -331,18 +331,18 @@ teams:
         - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/validation-lead.md
       expertise:
-        path: .opencode/crew/marketing/expertise/validation-lead-mental-model.yaml
+        path: .opencode/crew/marketing/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
       skills:
         - path: .opencode/skills/delegate-bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: .opencode/skills/zero-micromanagement/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/mental-model/SKILL.md
+        - path: .opencode/skills/expertise-model/SKILL.md
           use-when: Use when relevant to current task.
       tools:
         - task
-        - update-mental-model
+        - update-expertise-model
       mcp_access:
         - clickup
         - github
@@ -372,17 +372,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/performance-analyst.md
         expertise:
-          path: .opencode/crew/marketing/expertise/performance-analyst-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/performance-analyst-expertise-model.yaml
           use-when: Track durable learnings for performance-analyst.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github
@@ -408,17 +408,17 @@ teams:
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/brand-safety-reviewer.md
         expertise:
-          path: .opencode/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml
+          path: .opencode/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml
           use-when: Track durable learnings for brand-safety-reviewer.
         skills:
-          - path: .opencode/skills/mental-model/SKILL.md
+          - path: .opencode/skills/expertise-model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
           - grep
           - glob
           - list
-          - update-mental-model
+          - update-expertise-model
         mcp_access:
           - clickup
           - github

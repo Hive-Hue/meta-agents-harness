@@ -2,14 +2,14 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { updateMentalModel } from "./lib/mental-model.mjs";
+import { updateMentalModel } from "./lib/expertise-model.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const runtimeRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(runtimeRoot, "..");
 const serverVersion = "0.1.0";
-const toolName = "update_mental_model";
+const toolName = "update_expertise_model";
 
 let inputBuffer = Buffer.alloc(0);
 
@@ -42,7 +42,7 @@ function sendError(id, code, message, data) {
 function toolDefinition() {
   return {
     name: toolName,
-    description: "Append a durable note to an agent mental-model YAML file resolved from the active Claude multi-team config.",
+    description: "Append a durable note to an agent expertise-model YAML file resolved from the active Claude multi-team config.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -101,7 +101,7 @@ function handleInitialize(message) {
       tools: {},
     },
     serverInfo: {
-      name: "mental-model",
+      name: "expertise-model",
       version: serverVersion,
     },
   });

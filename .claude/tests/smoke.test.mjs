@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { validateRouteMapObject } from "../scripts/lib/route-map.mjs";
-import { updateMentalModel } from "../scripts/lib/mental-model.mjs";
+import { updateMentalModel } from "../scripts/lib/expertise-model.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,7 +17,7 @@ const ccmhPath = path.join(runtimeRoot, "bin", "ccmh");
 const doctorPath = path.join(runtimeRoot, "scripts", "doctor.mjs");
 const runCrewPath = path.join(runtimeRoot, "scripts", "run-crew-claude.mjs");
 const validateRouteMapPath = path.join(runtimeRoot, "scripts", "validate-ccr-route-map.mjs");
-const mentalModelMcpPath = path.join(runtimeRoot, "scripts", "update-mental-model-mcp.mjs");
+const mentalModelMcpPath = path.join(runtimeRoot, "scripts", "update-expertise-model-mcp.mjs");
 
 function createFixture(t) {
   const tempRoot = mkdtempSync(path.join(os.tmpdir(), "ccmh-smoke-"));
@@ -197,7 +197,7 @@ test("updateMentalModel writes to the active crew expertise path for the selecte
     },
   );
 
-  const expertisePath = path.join(fixture.fixtureRuntimeRoot, "crew", "marketing", "expertise", "planning-lead-mental-model.yaml");
+  const expertisePath = path.join(fixture.fixtureRuntimeRoot, "crew", "marketing", "expertise", "planning-lead-expertise-model.yaml");
   const expertiseText = readFileSync(expertisePath, "utf-8");
 
   assert.equal(path.resolve(result.path), expertisePath);
@@ -226,7 +226,7 @@ test("updateMentalModel rejects ambiguous agent ids when no active crew is selec
 
 test("updateMentalModel rejects malformed existing expertise YAML", (t) => {
   const fixture = createFixture(t);
-  const expertisePath = path.join(fixture.fixtureRuntimeRoot, "crew", "dev", "expertise", "orchestrator-mental-model.yaml");
+  const expertisePath = path.join(fixture.fixtureRuntimeRoot, "crew", "dev", "expertise", "orchestrator-expertise-model.yaml");
   writeFileSync(expertisePath, "agent: [broken\n", "utf-8");
 
   assert.throws(
@@ -245,10 +245,10 @@ test("updateMentalModel rejects malformed existing expertise YAML", (t) => {
   );
 });
 
-test("mental-model MCP server lists update_mental_model", (t) => {
+test("expertise-model MCP server lists update_expertise_model", (t) => {
   const fixture = createFixture(t);
   const result = runMcpServer(
-    path.join(fixture.fixtureRuntimeRoot, "scripts", "update-mental-model-mcp.mjs"),
+    path.join(fixture.fixtureRuntimeRoot, "scripts", "update-expertise-model-mcp.mjs"),
     [
       {
         jsonrpc: "2.0",
@@ -277,10 +277,10 @@ test("mental-model MCP server lists update_mental_model", (t) => {
   assert.equal(result.status, 0, result.stderr);
   const toolsList = result.messages.find((message) => message.id === 2);
   assert.ok(toolsList);
-  assert.equal(toolsList.result.tools[0].name, "update_mental_model");
+  assert.equal(toolsList.result.tools[0].name, "update_expertise_model");
 });
 
-test("mental-model MCP server updates expertise files through tools/call", (t) => {
+test("expertise-model MCP server updates expertise files through tools/call", (t) => {
   const fixture = createFixture(t);
   const useResult = runCcmh(["use", "dev"], {
     MULTI_HOME: fixture.fixtureRuntimeRoot,
@@ -289,7 +289,7 @@ test("mental-model MCP server updates expertise files through tools/call", (t) =
   assert.equal(useResult.status, 0, useResult.stderr);
 
   const result = runMcpServer(
-    path.join(fixture.fixtureRuntimeRoot, "scripts", "update-mental-model-mcp.mjs"),
+    path.join(fixture.fixtureRuntimeRoot, "scripts", "update-expertise-model-mcp.mjs"),
     [
       {
         jsonrpc: "2.0",
@@ -306,7 +306,7 @@ test("mental-model MCP server updates expertise files through tools/call", (t) =
         id: 2,
         method: "tools/call",
         params: {
-          name: "update_mental_model",
+          name: "update_expertise_model",
           arguments: {
             agent: "ceo-orchestrator",
             category: "decisions",
@@ -328,7 +328,7 @@ test("mental-model MCP server updates expertise files through tools/call", (t) =
   assert.equal(toolCall.result.isError, undefined);
   assert.equal(toolCall.result.structuredContent.status, "ok");
 
-  const expertisePath = path.join(fixture.fixtureRuntimeRoot, "crew", "dev", "expertise", "orchestrator-mental-model.yaml");
+  const expertisePath = path.join(fixture.fixtureRuntimeRoot, "crew", "dev", "expertise", "orchestrator-expertise-model.yaml");
   const expertiseText = readFileSync(expertisePath, "utf-8");
   assert.match(expertiseText, /Route implementation work through leads before escalating\./);
   assert.match(expertiseText, /decisions:/);

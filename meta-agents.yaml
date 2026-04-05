@@ -85,10 +85,10 @@ catalog:
       opencode: ".opencode/skills/zero-micromanagement/SKILL.md"
       claude: ".claude/skills/zero-micromanagement/SKILL.md"
       pi: ".pi/skills/zero-micromanagement/SKILL.md"
-    mental_model:
-      opencode: ".opencode/skills/mental-model/SKILL.md"
-      claude: ".claude/skills/mental-model/SKILL.md"
-      pi: ".pi/skills/mental-model/SKILL.md"
+    expertise_model:
+      opencode: ".opencode/skills/expertise-model/SKILL.md"
+      claude: ".claude/skills/expertise-model/SKILL.md"
+      pi: ".pi/skills/expertise-model/SKILL.md"
   domain_profiles:
     read_only_repo:
       - path: "."
@@ -174,71 +174,71 @@ crews:
         role: "orchestrator"
         team: "orchestration"
         model_ref: "orchestrator_default"
-        expertise: "orchestrator-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "orchestrator-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "planning-lead"
         role: "lead"
         team: "planning"
         model_ref: "lead_default"
-        expertise: "planning-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "planning-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "engineering-lead"
         role: "lead"
         team: "engineering"
         model_ref: "lead_default"
-        expertise: "engineering-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "engineering-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
-        expertise: "validation-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "validation-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "repo-analyst"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
-        expertise: "repo-analyst-mental-model"
-        skills: ["mental_model"]
+        expertise: "repo-analyst-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "read_only_repo"
       - id: "solution-architect"
         role: "worker"
         team: "planning"
         model_ref: "lead_default"
-        expertise: "solution-architect-mental-model"
-        skills: ["mental_model"]
+        expertise: "solution-architect-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "specs_writer"
       - id: "frontend-dev"
         role: "worker"
         team: "engineering"
         model_ref: "worker_default"
-        expertise: "frontend-dev-mental-model"
-        skills: ["mental_model"]
+        expertise: "frontend-dev-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "frontend_impl"
       - id: "backend-dev"
         role: "worker"
         team: "engineering"
         model_ref: "worker_default"
-        expertise: "backend-dev-mental-model"
-        skills: ["mental_model"]
+        expertise: "backend-dev-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "backend_impl"
       - id: "qa-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "qa-reviewer-mental-model"
-        skills: ["mental_model"]
+        expertise: "qa-reviewer-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "qa_security"
       - id: "security-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "security-reviewer-mental-model"
-        skills: ["mental_model"]
+        expertise: "security-reviewer-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "qa_security"
     runtime_overrides:
       opencode:
@@ -282,78 +282,78 @@ crews:
         role: "orchestrator"
         team: "orchestration"
         model_ref: "orchestrator_default"
-        expertise: "orchestrator-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "orchestrator-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "planning-lead"
         role: "lead"
         team: "planning"
         model_ref: "lead_default"
-        expertise: "planning-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "planning-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "marketing_assets"
       - id: "creative-lead"
         role: "lead"
         team: "creative"
         model_ref: "lead_default"
-        expertise: "creative-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "creative-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "marketing_assets"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
-        expertise: "validation-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "validation-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "marketing_assets"
       - id: "market-researcher"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
-        expertise: "market-researcher-mental-model"
-        skills: ["mental_model"]
+        expertise: "market-researcher-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "campaign-strategist"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
-        expertise: "campaign-strategist-mental-model"
-        skills: ["mental_model"]
+        expertise: "campaign-strategist-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "copywriter"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
-        expertise: "copywriter-mental-model"
-        skills: ["mental_model"]
+        expertise: "copywriter-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "creative-strategist"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
-        expertise: "creative-strategist-mental-model"
-        skills: ["mental_model"]
+        expertise: "creative-strategist-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "media-operator"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
-        expertise: "media-operator-mental-model"
-        skills: ["mental_model"]
+        expertise: "media-operator-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "performance-analyst"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "performance-analyst-mental-model"
-        skills: ["mental_model"]
+        expertise: "performance-analyst-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "brand-safety-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "brand-safety-reviewer-mental-model"
-        skills: ["mental_model"]
+        expertise: "brand-safety-reviewer-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
     runtime_overrides:
       opencode:
@@ -381,9 +381,9 @@ adapters:
       claude: "agent files + CCR route map + .mcp.json"
       pi: "crew multi-team.yaml + extensions/multi-team.ts"
     expertise_to_runtime:
-      opencode: ".opencode/crew/<crew>/expertise/<agent>-mental-model.yaml"
-      claude: ".claude/crew/<crew>/expertise/<agent>-mental-model.yaml"
-      pi: ".pi/crew/<crew>/expertise/<agent>-mental-model.yaml"
+      opencode: ".opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml"
+      claude: ".claude/crew/<crew>/expertise/<agent>-expertise-model.yaml"
+      pi: ".pi/crew/<crew>/expertise/<agent>-expertise-model.yaml"
     skills_to_runtime:
       opencode: ".opencode/skills/*/SKILL.md"
       claude: ".claude/skills/*/SKILL.md"

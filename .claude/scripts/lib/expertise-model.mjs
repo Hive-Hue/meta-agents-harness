@@ -242,7 +242,7 @@ export function updateMentalModel(args, options = {}) {
     ? resolveFromRepo(repoRoot, explicitPath)
     : record?.expertise?.path
       ? resolveFromRepo(repoRoot, record.expertise.path)
-      : path.join(runtimeRoot, "expertise", `${agent}-mental-model.yaml`);
+      : path.join(runtimeRoot, "expertise", `${agent}-expertise-model.yaml`);
 
   if (explicitPath && !isAllowedExplicitExpertisePath(runtimeRoot, expertisePath)) {
     throw new Error(`expertise_path must stay within ${path.relative(repoRoot, runtimeRoot) || runtimeRoot} expertise directories`);

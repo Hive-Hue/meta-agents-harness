@@ -1,6 +1,6 @@
 ---
-name: mental-model
-description: Keep a durable YAML mental model per agent and update it with stable learnings after meaningful work.
+name: expertise-model
+description: Keep a durable YAML expertise model per agent and update it with stable learnings after meaningful work.
 ---
 
 # Mental Model
@@ -26,4 +26,4 @@ What not to store:
 - noisy command output
 - whole file copies
 
-When there is a durable new lesson, call `update-mental-model` with a concise `note`.
+When there is a durable new lesson, call `update-expertise-model` with a concise `note`.

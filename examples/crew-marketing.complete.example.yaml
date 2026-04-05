@@ -26,78 +26,78 @@ crews:
         role: "orchestrator"
         team: "orchestration"
         model_ref: "orchestrator_default"
-        expertise: "orchestrator-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "orchestrator-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
       - id: "planning-lead"
         role: "lead"
         team: "planning"
         model_ref: "lead_default"
-        expertise: "planning-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "planning-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "marketing_assets"
       - id: "creative-lead"
         role: "lead"
         team: "creative"
         model_ref: "lead_default"
-        expertise: "creative-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "creative-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "marketing_assets"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
-        expertise: "validation-lead-mental-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "mental_model"]
+        expertise: "validation-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "marketing_assets"
       - id: "market-researcher"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
-        expertise: "market-researcher-mental-model"
-        skills: ["mental_model"]
+        expertise: "market-researcher-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "campaign-strategist"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
-        expertise: "campaign-strategist-mental-model"
-        skills: ["mental_model"]
+        expertise: "campaign-strategist-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "copywriter"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
-        expertise: "copywriter-mental-model"
-        skills: ["mental_model"]
+        expertise: "copywriter-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "creative-strategist"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
-        expertise: "creative-strategist-mental-model"
-        skills: ["mental_model"]
+        expertise: "creative-strategist-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "media-operator"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
-        expertise: "media-operator-mental-model"
-        skills: ["mental_model"]
+        expertise: "media-operator-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "performance-analyst"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "performance-analyst-mental-model"
-        skills: ["mental_model"]
+        expertise: "performance-analyst-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
       - id: "brand-safety-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
-        expertise: "brand-safety-reviewer-mental-model"
-        skills: ["mental_model"]
+        expertise: "brand-safety-reviewer-expertise-model"
+        skills: ["expertise_model"]
         domain_profile: "marketing_assets"
     runtime_overrides:
       opencode:

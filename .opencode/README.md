@@ -8,8 +8,8 @@ This directory contains an OpenCode-native scaffold for a three-layer multi-team
 - `opencode.json`: OpenCode config (permissions + MCP servers)
 - `agents/`: active runtime agent links/materialization for the selected crew
 - `skills/`: reusable behavior skills in `SKILL.md` format
-- `tools/`: custom tools callable by the model (`update-mental-model`)
-- `expertise/`: persistent YAML mental-model files per agent
+- `tools/`: custom tools callable by the model (`update-expertise-model`)
+- `expertise/`: persistent YAML expertise-model files per agent
 - `scripts/validate-multi-team.mjs`: validates topology + file references
 
 ClickUp MCP is configured via local `mcp-remote` (`https://mcp.clickup.com/mcp`, callback port `19876`).
@@ -102,8 +102,8 @@ Optional hierarchy override:
 Expertise behavior:
 
 - expertise remains per crew in `.opencode/crew/<crew>/expertise`
-- `update-mental-model` resolves path by active crew metadata first, then active agent prompt metadata
-- fallback legacy path `.opencode/expertise/<agent>-mental-model.yaml` remains only for compatibility
+- `update-expertise-model` resolves path by active crew metadata first, then active agent prompt metadata
+- fallback legacy path `.opencode/expertise/<agent>-expertise-model.yaml` remains only for compatibility
 
 `ocmh clear` removes these symlinks.
 

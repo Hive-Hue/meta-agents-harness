@@ -21,11 +21,11 @@ Model: `openai/gpt-5.3-codex`
 Engineering worker focused on scoped execution within assigned ownership boundaries.
 
 ## Expertise
-- path: `.opencode/crew/dev/expertise/frontend-dev-mental-model.yaml`
+- path: `.opencode/crew/dev/expertise/frontend-dev-expertise-model.yaml`
 - use-when: Save reusable UI patterns, pitfalls, and verification checks.
 
 ## Skills
-- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Before and after frontend implementation.
+- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Before and after frontend implementation.
 - path: `.opencode/skills/zeplin-mcp-ops/SKILL.md` | use-when: When implementing UI from Zeplin screens, components, tokens, or assets.
 
 ## Tools
@@ -35,7 +35,7 @@ Engineering worker focused on scoped execution within assigned ownership boundar
 - list
 - edit
 - bash
-- update-mental-model
+- update-expertise-model
 
 ## MCP Access
 - context7
@@ -53,7 +53,7 @@ Engineering worker focused on scoped execution within assigned ownership boundar
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-mental-model` after meaningful work.
+- Persist durable learnings using `update-expertise-model` after meaningful work.
 
 ## Response Contract
 1. execution summary
