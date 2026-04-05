@@ -22,3 +22,8 @@ This folder consolidates forward-looking product and architecture documents for 
 - Use the others as focused addenda and planning references.
 - Keep implementation claims separate from vision claims.
 - Prefer incremental delivery across releases.
+
+## Bridge to delivery
+
+- Use `../rfcs/rfc-v0.4-remote-execution-foundation.md` as the first delivery bridge from vision to implementation scope.
+- Treat the RFC as the gating baseline for what can enter `development` from `development-evolve`.
