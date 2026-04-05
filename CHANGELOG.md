@@ -57,7 +57,6 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - This release continues the pre-1.0 stabilization path and should be treated as hardening, not final API stability.
 - Runtime adapter contract and platform features remain under incremental maturation in `0.x`.
 - Expertise Model is consolidated as a foundation concept in this release; orchestration intelligence capabilities are deferred.
-
 ## [0.2.0] - 2026-04-04
 
 ### Added
@@ -71,10 +70,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - CI validation expanded with smoke, contract, config, sync, and runtime checks.
 
 ### Notes
-- Product-grade foundation milestone in pre-1.0 phase.
+- Product-grade foundation milestone in pre-1.0 phase (`0.x`).
 - Runtime adapter model remains evolutive.
-- Platform capabilities (`sessions`, `provenance`, `graph`, `demo`) are initial support.
-- Structured diagnostics are expanded, with normalization still in progress.
+- Platform capabilities (`sessions`, provenance, graph, demo) are initial support.
+- Diagnostic structured output is expanded but still maturing in normalization.
 
 ## [0.1.0] - 2026-04-04
 
