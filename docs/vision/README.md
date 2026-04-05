@@ -25,5 +25,5 @@ This folder consolidates forward-looking product and architecture documents for 
 
 ## Bridge to delivery
 
-- Use `../rfcs/rfc-v0.4-remote-execution-foundation.md` as the first delivery bridge from vision to implementation scope.
+- Use `../rfcs/rfc-v0.5-plus-remote-execution-foundation.md` as the delivery bridge for the post-`v0.4.0` remote execution phase.
 - Treat the RFC as the gating baseline for what can enter `development` from `development-evolve`.

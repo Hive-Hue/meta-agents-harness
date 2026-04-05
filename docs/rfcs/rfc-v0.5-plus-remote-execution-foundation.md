@@ -1,12 +1,17 @@
-# RFC: v0.4.0 — Remote Execution Foundation
+# RFC: v0.5.0+ — Remote Execution Foundation
 
 ## Status
 
 Draft for `development-evolve`.
 
+## Positioning
+
+`v0.4.0` is reserved for Hermes-agent runtime support in `development`.  
+This RFC is intentionally moved to `v0.5.0+` to preserve release discipline.
+
 ## Scope
 
-This RFC defines the smallest shippable slice for `v0.4.0` to start remote execution support without introducing policy/federation/confidential execution complexity.
+This RFC defines the smallest shippable slice for `v0.5.0+` to start remote execution support without introducing policy/federation/confidential execution complexity.
 
 ## Goals
 
@@ -35,7 +40,7 @@ Each node must declare:
 - `display_name`
 - `transport` (`local`, `ssh`)
 - `endpoint` (only for remote transport)
-- `runtime_support` (e.g. `pi`, `claude`, `opencode`)
+- `runtime_support` (e.g. `pi`, `claude`, `opencode`, `hermes`)
 - `status` (`unknown`, `healthy`, `unhealthy`)
 - `capabilities` (lightweight tags, e.g. `bash`, `filesystem`, `docker`)
 
@@ -76,7 +81,7 @@ Minimum additions:
 - `mah targets` for listing target registry entries
 - optional `--target <id>` for selected commands in experimental mode
 
-No new complex workflow UI in `v0.4.0`.
+No new complex workflow UI in this phase.
 
 ## Validation and Testing
 
@@ -91,7 +96,7 @@ Required acceptance tests:
 
 ## Release Acceptance Criteria
 
-`v0.4.0` is acceptable only if:
+The first remote-execution release is acceptable only if:
 
 - implementation stays inside goals/non-goals above
 - all new commands have stable `--json` output
@@ -106,11 +111,11 @@ Required acceptance tests:
 - **Risk:** connector behavior drift across runtimes.  
   **Mitigation:** contract tests for connector envelope.
 - **Risk:** unstable target model churn.  
-  **Mitigation:** keep model intentionally minimal in `v0.4.0`.
+  **Mitigation:** keep model intentionally minimal in this phase.
 
 ## Out of Scope for Next Wave
 
-Candidates for `v0.5.0+`:
+Candidates for later waves:
 
 - policy/guardrail engine
 - federation/interconnect
