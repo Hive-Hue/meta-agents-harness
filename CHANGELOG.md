@@ -15,7 +15,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Notes
 - Continue with conservative pre-1.0 SemVer (`0.x`) and disciplined minor releases.
 
-## [0.3.0] - TBD
+## [0.3.0] - 2026-04-05
 
 ### Added
 - Mermaid architecture output for `mah graph` with selectable detail levels:

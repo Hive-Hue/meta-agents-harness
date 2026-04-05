@@ -1,6 +1,6 @@
 {
   "name": "meta-agents-harness",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Unified multi-agent harness that detects OpenCode, Claude, or PI runtime and adapts commands dynamically.",
   "type": "module",
   "bin": {
