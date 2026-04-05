@@ -103,6 +103,7 @@ function printHelp() {
   console.log("  explain [detect|use|run|sync] [args]")
   console.log("  init [--runtime <name>] [--crew <name>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json]")
+  console.log("  targets [--runtime <name>] [--status <unknown|healthy|unhealthy>] [--json]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -133,6 +134,7 @@ function printHelp() {
   console.log("  --mermaid")
   console.log("  --mermaid-level <basic|group|detailed>")
   console.log("  --mermaid-capabilities")
+  console.log("  --status <unknown|healthy|unhealthy>")
   console.log("  --crew <name>")
   console.log("  --run <id>")
   console.log("  --strict-markers")
@@ -161,11 +163,92 @@ function parseFilterArgs(argv) {
     runtime: parseValueArg(argv, "--runtime", "-r"),
     crew: parseValueArg(argv, "--crew"),
     run: parseValueArg(argv, "--run"),
+    status: parseValueArg(argv, "--status"),
     json: hasFlag(argv, "--json"),
     mermaid: hasFlag(argv, "--mermaid"),
     mermaidLevel: parseValueArg(argv, "--mermaid-level"),
     mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities")
   }
+}
+
+function loadTargetRegistry() {
+  const filePath = path.join(repoRoot, "targets.registry.json")
+  if (!existsSync(filePath)) {
+    return { ok: false, errors: ["targets-registry-missing"], nodes: [] }
+  }
+  let payload = {}
+  try {
+    payload = JSON.parse(readFileSync(filePath, "utf-8"))
+  } catch {
+    return { ok: false, errors: ["targets-registry-invalid-json"], nodes: [] }
+  }
+  const nodes = Array.isArray(payload?.nodes) ? payload.nodes : []
+  const errors = []
+  const normalized = nodes.map((node, index) => {
+    const id = `${node?.id || ""}`.trim()
+    const displayName = `${node?.display_name || ""}`.trim()
+    const transport = `${node?.transport || ""}`.trim()
+    const endpoint = `${node?.endpoint || ""}`.trim()
+    const runtimeSupport = Array.isArray(node?.runtime_support) ? node.runtime_support.filter(Boolean) : []
+    const capabilities = Array.isArray(node?.capabilities) ? node.capabilities.filter(Boolean) : []
+    const status = `${node?.status || ""}`.trim()
+    if (!id) errors.push(`node[${index}].id-required`)
+    if (!displayName) errors.push(`node[${index}].display_name-required`)
+    if (!["local", "ssh"].includes(transport)) errors.push(`node[${index}].transport-invalid`)
+    if (transport === "ssh" && !endpoint) errors.push(`node[${index}].endpoint-required-for-ssh`)
+    if (runtimeSupport.length === 0) errors.push(`node[${index}].runtime_support-required`)
+    if (!["unknown", "healthy", "unhealthy"].includes(status)) errors.push(`node[${index}].status-invalid`)
+    return {
+      id,
+      display_name: displayName,
+      transport,
+      endpoint: endpoint || (transport === "local" ? "localhost" : ""),
+      runtime_support: runtimeSupport,
+      status,
+      capabilities
+    }
+  })
+  if (errors.length > 0) return { ok: false, errors, nodes: [] }
+  return { ok: true, errors: [], nodes: normalized }
+}
+
+function runTargets(argv, jsonMode = false) {
+  const filters = parseFilterArgs(argv)
+  if (jsonMode) filters.json = true
+  const registry = loadTargetRegistry()
+  if (!registry.ok) {
+    if (filters.json) {
+      console.log(JSON.stringify({
+        schema: "mah.targets.v1",
+        ok: false,
+        errors: registry.errors,
+        nodes: []
+      }, null, 2))
+    } else {
+      for (const error of registry.errors) console.error(`ERROR: ${error}`)
+    }
+    return 1
+  }
+  let rows = [...registry.nodes]
+  if (filters.runtime) rows = rows.filter((node) => node.runtime_support.includes(filters.runtime))
+  if (filters.status) rows = rows.filter((node) => node.status === filters.status)
+  if (filters.json) {
+    console.log(JSON.stringify({
+      schema: "mah.targets.v1",
+      ok: true,
+      filters: { runtime: filters.runtime || "", status: filters.status || "" },
+      nodes: rows
+    }, null, 2))
+    return 0
+  }
+  if (rows.length === 0) {
+    console.log("targets=none")
+    return 0
+  }
+  for (const row of rows) {
+    console.log(`${row.id} transport=${row.transport} status=${row.status} runtimes=${row.runtime_support.join(",")} capabilities=${row.capabilities.join(",")} endpoint=${row.endpoint}`)
+  }
+  return 0
 }
 
 function runLocalScript(scriptPath, scriptArgs = []) {
@@ -822,6 +905,11 @@ function main() {
 
   if (first === "sessions") {
     process.exitCode = runSessions(normalizedArgv.slice(1), jsonMode)
+    return
+  }
+
+  if (first === "targets") {
+    process.exitCode = runTargets(normalizedArgv.slice(1), jsonMode)
     return
   }
 

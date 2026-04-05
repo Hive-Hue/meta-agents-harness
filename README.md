@@ -107,6 +107,8 @@ mah init --runtime opencode --crew dev
 mah plan
 mah diff
 mah sessions --json
+mah targets --json
+mah targets --runtime opencode --status healthy
 mah graph --crew dev --json
 mah graph --crew dev --mermaid
 mah graph --crew dev --mermaid --mermaid-level group
@@ -267,6 +269,15 @@ mah explain run --trace
 mah list:crews
 mah use <crew>
 mah clear
+```
+
+### Target visibility
+
+```bash
+mah targets
+mah targets --json
+mah targets --runtime opencode
+mah targets --status healthy
 ```
 
 ### Interactive runtime execution

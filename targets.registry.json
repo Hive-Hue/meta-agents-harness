@@ -1,0 +1,22 @@
+{
+  "nodes": [
+    {
+      "id": "local-dev",
+      "display_name": "Local Development Node",
+      "transport": "local",
+      "endpoint": "localhost",
+      "runtime_support": ["pi", "claude", "opencode"],
+      "status": "healthy",
+      "capabilities": ["filesystem", "bash", "mcp"]
+    },
+    {
+      "id": "edge-lab-01",
+      "display_name": "Edge Lab Node 01",
+      "transport": "ssh",
+      "endpoint": "edge-lab-01.internal",
+      "runtime_support": ["opencode"],
+      "status": "unknown",
+      "capabilities": ["filesystem", "bash"]
+    }
+  ]
+}

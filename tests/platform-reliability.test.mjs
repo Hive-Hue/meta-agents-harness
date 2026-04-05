@@ -32,6 +32,15 @@ test("sessions --json returns stable shape", () => {
   assert.ok(Array.isArray(result.json.sessions))
 })
 
+test("targets --json returns stable shape and node entries", () => {
+  const result = runJson(["targets", "--json"])
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.json.schema, "mah.targets.v1")
+  assert.equal(result.json.ok, true)
+  assert.ok(Array.isArray(result.json.nodes))
+  assert.ok(result.json.nodes.length > 0)
+})
+
 test("graph --json returns topology and run graph shape", () => {
   const result = runJson(["graph", "--json"])
   assert.equal(result.status, 0, result.stderr)

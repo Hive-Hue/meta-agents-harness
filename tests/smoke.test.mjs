@@ -46,3 +46,8 @@ test("sessions command returns successfully", () => {
   const result = run(["sessions"])
   assert.equal(result.status, 0, result.stderr)
 })
+
+test("targets command returns successfully", () => {
+  const result = run(["targets"])
+  assert.equal(result.status, 0, result.stderr)
+})
