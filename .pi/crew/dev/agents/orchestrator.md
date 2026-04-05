@@ -4,13 +4,13 @@ model: zai/glm-4.7
 role: orchestrator
 team: Orchestration
 expertise:
-  path: .pi/crew/dev/expertise/orchestrator-mental-model.yaml
+  path: .pi/crew/dev/expertise/orchestrator-expertise-model.yaml
   use-when: Track routing quality, team sequencing, and cross-team coordination risks.
   updatable: true
   max-lines: 10000
 tools:
   - delegate_agent
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
@@ -19,7 +19,7 @@ skills:
     use-when: Always. Route work by delegation instead of executing directly.
   - path: .pi/skills/zero-micromanagement/SKILL.md
     use-when: Always. Ask for outcomes and ownership, not keystroke-level instructions.
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after meaningful routing or
       coordination learnings.
 domain:

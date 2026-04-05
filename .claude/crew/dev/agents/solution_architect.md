@@ -4,7 +4,7 @@ model: openai-codex/gpt-5.3-codex
 role: worker
 team: Planning
 expertise:
-  path: .claude/crew/dev/expertise/solution-architect-mental-model.yaml
+  path: .claude/crew/dev/expertise/solution-architect-expertise-model.yaml
   use-when: Track planning templates, implementation tradeoffs, and hand-off patterns that help Hivehue Engineering execute cleanly.
   updatable: true
   max-lines: 10000
@@ -15,14 +15,14 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Keep the latest findings, risks, and ownership constraints visible while drafting specs.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering repeatable design or planning patterns.
   - path: .claude/skills/web-research/SKILL.md
     use-when: Use when architecture choices require current external references.

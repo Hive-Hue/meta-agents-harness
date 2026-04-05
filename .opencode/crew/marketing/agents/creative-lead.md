@@ -24,17 +24,17 @@ Model: `openai/gpt-5.2`
 Creative lead responsible for delegation, synthesis, and team-level coordination.
 
 ## Expertise
-- path: `.opencode/crew/marketing/expertise/creative-lead-mental-model.yaml`
+- path: `.opencode/crew/marketing/expertise/creative-lead-expertise-model.yaml`
 - use-when: Track narrative direction, production tradeoffs, and delivery quality.
 
 ## Skills
 - path: `.opencode/skills/delegate-bounded/SKILL.md` | use-when: For every creative assignment.
 - path: `.opencode/skills/zero-micromanagement/SKILL.md` | use-when: While assigning copy and creative production.
-- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Start and end of creative rounds.
+- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Start and end of creative rounds.
 
 ## Tools
 - task
-- update-mental-model
+- update-expertise-model
 
 ## MCP Access
 - context7
@@ -52,7 +52,7 @@ Creative lead responsible for delegation, synthesis, and team-level coordination
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-mental-model` after meaningful work.
+- Persist durable learnings using `update-expertise-model` after meaningful work.
 
 ## Response Contract
 1. delegation summary

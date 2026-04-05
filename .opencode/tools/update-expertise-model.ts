@@ -63,7 +63,7 @@ function resolveExpertisePath(root: string, agent: string): string {
       const active = JSON.parse(readFileSync(activeMetaPath, "utf-8")) as { crew?: string }
       const crew = `${active?.crew || ""}`.trim()
       if (crew) {
-        return path.join(root, ".opencode", "crew", crew, "expertise", `${agent}-mental-model.yaml`)
+        return path.join(root, ".opencode", "crew", crew, "expertise", `${agent}-expertise-model.yaml`)
       }
     } catch {}
   }
@@ -71,17 +71,17 @@ function resolveExpertisePath(root: string, agent: string): string {
   const activeAgentPrompt = path.join(root, ".opencode", "agents", `${agent}.md`)
   if (existsSync(activeAgentPrompt)) {
     const body = readFileSync(activeAgentPrompt, "utf-8")
-    const match = body.match(/\.opencode\/crew\/[^/\s]+\/expertise\/[a-z0-9_-]+-mental-model\.yaml/i)
+    const match = body.match(/\.opencode\/crew\/[^/\s]+\/expertise\/[a-z0-9_-]+-expertise-model\.yaml/i)
     if (match?.[0]) {
       return path.join(root, match[0])
     }
   }
 
-  return path.join(root, ".opencode", "expertise", `${agent}-mental-model.yaml`)
+  return path.join(root, ".opencode", "expertise", `${agent}-expertise-model.yaml`)
 }
 
 export default tool({
-  description: "Append a durable note to the current OpenCode agent mental model YAML file.",
+  description: "Append a durable note to the current OpenCode agent expertise model YAML file.",
   args: {
     note: tool.schema.string().describe("Durable insight, risk, pattern, or lesson learned."),
     category: tool.schema.string().optional().describe("Optional category (observations, risks, tools, open_questions, etc)."),

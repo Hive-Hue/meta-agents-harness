@@ -4,7 +4,7 @@ model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
 role: worker
 team: Planning
 expertise:
-  path: .pi/crew/dev/expertise/solution-architect-mental-model.yaml
+  path: .pi/crew/dev/expertise/solution-architect-expertise-model.yaml
   use-when: Track planning templates, implementation tradeoffs, and hand-off
     patterns that help Hivehue Engineering execute cleanly.
   updatable: true
@@ -16,12 +16,12 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering repeatable
       design or planning patterns.
 domain:

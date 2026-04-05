@@ -4,7 +4,7 @@ model: zai/glm-5
 role: worker
 team: Validation
 expertise:
-  path: .claude/crew/dev/expertise/qa-reviewer-mental-model.yaml
+  path: .claude/crew/dev/expertise/qa-reviewer-expertise-model.yaml
   use-when: Track recurring regressions, weak verification patterns, and lightweight checks that produce useful signal for Hivehue.
   updatable: true
   max-lines: 10000
@@ -14,14 +14,14 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Preserve the target change scope and stated verification expectations while reviewing.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering durable validation gaps or test heuristics.
   - path: .claude/skills/web-research/SKILL.md
     use-when: Use when validation requires up-to-date references or benchmark evidence.

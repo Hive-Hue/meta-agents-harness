@@ -4,37 +4,47 @@
 
 ### Diagnostics and Output Stability
 
-- [ ] Normalize `--json` payload shape across `detect`, `doctor`, `validate:*`, `plan`, `diff`, and `explain`.
-- [ ] Define a small stable schema contract for diagnostic JSON output.
-- [ ] Add regression tests for JSON schema shape in core diagnostic commands.
+- [x] Normalize `--json` payload shape across `detect`, `doctor`, `validate:*`, `plan`, `diff`, and `explain`.
+- [x] Define a small stable schema contract for diagnostic JSON output.
+- [x] Add regression tests for JSON schema shape in core diagnostic commands.
 
 ### Validation Semantics Consolidation
 
-- [ ] Document and lock semantics for `validate:config`, `validate:runtime`, `validate:sync`, and `validate:all`.
-- [ ] Reduce overlap between validation levels to keep errors attributable to one primary level.
-- [ ] Add dedicated docs examples for expected failures per validation level.
+- [x] Document and lock semantics for `validate:config`, `validate:runtime`, `validate:sync`, and `validate:all`.
+- [x] Reduce overlap between validation levels to keep errors attributable to one primary level.
+- [x] Add dedicated docs examples for expected failures per validation level.
 
 ### YAML vs Adapter Boundary
 
-- [ ] Finalize and document canonical boundary:
+- [x] Finalize and document canonical boundary:
   - YAML as canonical source for crews/config content.
   - runtime adapters as canonical source for runtime behavior.
-- [ ] Review `meta-agents.yaml` adapter metadata scope to prevent behavior duplication.
-- [ ] Add explicit boundary statement in README and architecture docs.
+- [x] Review `meta-agents.yaml` adapter metadata scope to prevent behavior duplication.
+- [x] Add explicit boundary statement in README and architecture docs.
 
 ### plan/diff Maturity
 
-- [ ] Improve `plan` and `diff` UX with clearer preview semantics and deterministic output.
-- [ ] Add tests for no-change, create, update, and drift scenarios.
-- [ ] Decide whether plan/diff should remain sync-report oriented or become first-class operation planners.
+- [x] Improve `plan` and `diff` UX with clearer preview semantics and deterministic output.
+- [x] Add tests for no-change, create, update, and drift scenarios.
+- [x] Decide whether plan/diff should remain sync-report oriented or become first-class operation planners.
+
+Decision:
+
+- keep `plan`/`diff` sync-report oriented for current cycle
+- revisit first-class planner semantics in `v0.3.x` only after diagnostics schema stabilization
 
 ### Platform Capability Maturity
 
-- [ ] Decide capability status for `sessions`, `graph`, and `demo`:
+- [x] Decide capability status for `sessions`, `graph`, and `demo`:
   - remain experimental
   - or graduate to stable operator surface
-- [ ] Define provenance retention/rotation policy.
-- [ ] Add minimum reliability tests for sessions indexing and graph generation.
+- [x] Define provenance retention/rotation policy.
+- [x] Add minimum reliability tests for sessions indexing and graph generation.
+
+Decision:
+
+- keep `sessions`, `graph`, `demo`, and provenance as experimental in the current release line
+- graduate status only after additional reliability coverage and output schema stabilization
 
 ## v0.3.0 Narrative Options
 

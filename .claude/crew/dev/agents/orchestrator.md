@@ -4,13 +4,13 @@ model: openai-codex/gpt-5.2
 role: orchestrator
 team: global
 expertise:
-  path: .claude/crew/dev/expertise/orchestrator-mental-model.yaml
+  path: .claude/crew/dev/expertise/orchestrator-expertise-model.yaml
   use-when: Track routing quality, team sequencing, and cross-team coordination risks.
   updatable: true
   max-lines: 10000
 tools:
   - delegate_agent
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
@@ -19,7 +19,7 @@ skills:
     use-when: Always. Route work by delegation instead of executing directly.
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Preserve the latest user constraints and prior team findings before responding.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after meaningful routing or coordination learnings.
   - path: .claude/skills/zero-micromanagement/SKILL.md
     use-when: Always. Ask for outcomes and ownership, not keystroke-level instructions.

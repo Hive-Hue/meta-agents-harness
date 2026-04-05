@@ -162,7 +162,7 @@ const SPAWNABLE_TOOL_NAMES = new Set([
 	"ls",
 	"delegate_agent",
 	"delegate_agents_parallel",
-	"update_mental_model",
+	"update_expertise_model",
 	"mcp_servers",
 	"mcp_tools",
 	"mcp_call",
@@ -1304,20 +1304,20 @@ export default function (pi: ExtensionAPI) {
 		const expertise = effectiveExpertise(config, agent);
 		return expertise?.path
 			? resolveArtifact(config.baseDir, expertise.path)
-			: resolve(config.expertiseDirAbs, `${slugify(agent.name)}-mental-model.yaml`);
+			: resolve(config.expertiseDirAbs, `${slugify(agent.name)}-expertise-model.yaml`);
 	}
 
 	function expertiseMeta(agent: AgentConfig): ExpertiseReference {
 		if (!config) {
 			return {
-				path: `.pi/crew/dev/expertise/${slugify(agent.name)}-mental-model.yaml`,
+				path: `.pi/crew/dev/expertise/${slugify(agent.name)}-expertise-model.yaml`,
 				updatable: true,
 				maxLines: DEFAULT_EXPERTISE_MAX_LINES,
 			};
 		}
 		const expertise = effectiveExpertise(config, agent);
 		return {
-			path: expertise?.path || toConfigRelative(config, resolve(config.expertiseDirAbs, `${slugify(agent.name)}-mental-model.yaml`)),
+			path: expertise?.path || toConfigRelative(config, resolve(config.expertiseDirAbs, `${slugify(agent.name)}-expertise-model.yaml`)),
 			useWhen: expertise?.useWhen,
 			updatable: expertise?.updatable ?? true,
 			maxLines: expertise?.maxLines || DEFAULT_EXPERTISE_MAX_LINES,
@@ -1518,7 +1518,7 @@ export default function (pi: ExtensionAPI) {
 			note: normalizedNote,
 		});
 		saveExpertiseDocument(agent, doc);
-		appendEvent("mental_model_update", {
+		appendEvent("expertise_model_update", {
 			target: agent.name,
 			path: expertisePathFor(agent),
 			category: category || null,
@@ -1969,7 +1969,7 @@ function dispatchChild(
 			"--thinking", "off",
 			"--session", sessionFile,
 		];
-		// Important: custom extension tools (delegate_agent, mcp_*, update_mental_model)
+		// Important: custom extension tools (delegate_agent, mcp_*, update_expertise_model)
 		// are not recognized by the CLI --tools validator when spawning a child process.
 		// If we pass them for leads, they get stripped and leads lose delegation capability.
 		// Keep --tools only for workers (builtin repo tools restriction), and let leads
@@ -2114,7 +2114,7 @@ function dispatchChild(
 				const stderrOutput = stderrChunks.join("").trim();
 				const outputTrimmed = output.trim();
 				const childExitCode = code ?? 1;
-				const realToolCalls = toolCalls.filter((tool) => tool && tool !== "update_mental_model");
+				const realToolCalls = toolCalls.filter((tool) => tool && tool !== "update_expertise_model");
 				// Only enforce execution posture when the worker process itself exited successfully.
 				// If the process already failed (for example invalid model/auth/tool bootstrap),
 				// preserve the real runtime error instead of masking it as "did not execute".
@@ -2293,7 +2293,7 @@ function dispatchChild(
 	}
 
 	pi.registerTool({
-		name: "update_mental_model",
+		name: "update_expertise_model",
 		label: "Update Mental Model",
 		description: "Append a durable note to the current agent's expertise file.",
 		parameters: Type.Object({
@@ -2310,7 +2310,7 @@ function dispatchChild(
 			}
 			if (!expertiseMeta(runtime.agent).updatable) {
 				return {
-					content: [{ type: "text", text: `Mental model is not updatable for ${runtime.agent.name}.` }],
+					content: [{ type: "text", text: `Expertise model is not updatable for ${runtime.agent.name}.` }],
 					details: { status: "error", agent: runtime.agent.name },
 				};
 			}
@@ -2319,7 +2319,7 @@ function dispatchChild(
 			appendMentalModelNote(runtime.agent, note, category);
 			const path = config ? expertisePathFor(runtime.agent) : "";
 			return {
-				content: [{ type: "text", text: `Mental model updated for ${runtime.agent.name}\n${path}` }],
+				content: [{ type: "text", text: `Expertise model updated for ${runtime.agent.name}\n${path}` }],
 				details: {
 					status: "done",
 					agent: runtime.agent.name,
@@ -2334,7 +2334,7 @@ function dispatchChild(
 			const category = (args as any).category ? `[${(args as any).category}] ` : "";
 			const note = shortText((args as any).note || "", 60);
 			return new Text(
-				theme.fg("toolTitle", theme.bold("update_mental_model ")) +
+				theme.fg("toolTitle", theme.bold("update_expertise_model ")) +
 				theme.fg("accent", category) +
 				theme.fg("muted", note),
 				0,

@@ -4,7 +4,7 @@ model: zai/glm-5-turbo
 role: worker
 team: Validation
 expertise:
-  path: .pi/crew/dev/expertise/qa-reviewer-mental-model.yaml
+  path: .pi/crew/dev/expertise/qa-reviewer-expertise-model.yaml
   use-when: Track recurring regressions, weak verification patterns, and
     lightweight checks that produce useful signal for Hivehue.
   updatable: true
@@ -14,13 +14,13 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
   - bash
 skills:
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering durable
       validation gaps or test heuristics.
 domain:

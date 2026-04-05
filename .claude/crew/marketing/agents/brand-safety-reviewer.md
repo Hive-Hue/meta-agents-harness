@@ -20,12 +20,12 @@ Model: `inherit (runtime default)`
 Validation worker focused on validation findings with evidence and risk rating.
 
 ## Expertise
-- path: `.claude/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml`
+- path: `.claude/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml`
 - use-when: Store brand risk patterns, compliance checks, and escalation cues.
 
 ## Skills
 - path: `.claude/skills/active-listener/SKILL.md` | use-when: Always. Preserve user constraints and prior context before acting.
-- path: `.claude/skills/mental-model/SKILL.md` | use-when: Before and after brand safety review.
+- path: `.claude/skills/expertise-model/SKILL.md` | use-when: Before and after brand safety review.
 - path: `.claude/skills/web-research/SKILL.md` | use-when: When checks need current policy, benchmark, or regulatory references.
 
 ## Tools
@@ -33,7 +33,7 @@ Validation worker focused on validation findings with evidence and risk rating.
 - grep
 - find
 - ls
-- update_mental_model
+- update_expertise_model
 - mcp_servers
 - mcp_tools
 - mcp_call
@@ -53,7 +53,7 @@ Validation worker focused on validation findings with evidence and risk rating.
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update_mental_model` after meaningful work.
+- Persist durable learnings using `update_expertise_model` after meaningful work.
 
 ## Response Contract
 1. execution summary

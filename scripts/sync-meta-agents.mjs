@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
+import { determineAction } from "./sync-utils.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -121,7 +122,7 @@ function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
     const relativePromptPath = resolvePromptPath("pi", crew.id, agent.id)
     const promptPath = path.resolve(repoRoot, relativePromptPath)
     if (checkOnly && !existsSync(promptPath)) {
-      pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "missing", crew: crew.id, agent: agent.id })
+      pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
       if (!jsonOutput) {
         if (mode === "plan") console.log(`plan: create ${rel(promptPath)}`)
         else console.log(`drift: missing ${rel(promptPath)}`)
@@ -135,7 +136,7 @@ function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
     if (checkOnly) {
       if (currentRaw !== nextRaw) {
         const preview = mode === "diff" ? diffPreview(currentRaw, nextRaw) : []
-        pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "out_of_sync", crew: crew.id, agent: agent.id, preview })
+        pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id, preview })
         if (!jsonOutput) {
           if (mode === "plan") console.log(`plan: update ${rel(promptPath)}`)
           else {
@@ -145,7 +146,7 @@ function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
         }
         ok = false
       } else {
-        pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "ok", crew: crew.id, agent: agent.id })
+        pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
         if (!jsonOutput) {
           if (mode === "plan") console.log(`plan: no-change ${rel(promptPath)}`)
           else console.log(`ok: ${rel(promptPath)}`)
@@ -158,7 +159,7 @@ function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
       mkdirSync(path.dirname(promptPath), { recursive: true })
       writeFileSync(promptPath, nextRaw, "utf-8")
       console.log(`synced: ${rel(promptPath)}`)
-      pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "synced", crew: crew.id, agent: agent.id })
+      pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "synced", action: determineAction("synced"), crew: crew.id, agent: agent.id })
     }
   }
   return ok
@@ -231,9 +232,9 @@ function domainFromProfile(meta, profileName, runtime) {
 
 function runtimeTools(agent, runtime) {
   if (agent.role === "orchestrator" || agent.role === "lead") {
-    return ["delegate_agent", "update_mental_model", "mcp_servers", "mcp_tools", "mcp_call"]
+    return ["delegate_agent", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
   }
-  const base = ["read", "grep", "find", "ls", "update_mental_model", "mcp_servers", "mcp_tools", "mcp_call"]
+  const base = ["read", "grep", "find", "ls", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
   const domain = domainFromProfile(metaDoc, agent.domain_profile, runtime)
   if (domain.some((item) => item.upsert || item.edit)) base.unshift("write", "edit")
   if (domain.some((item) => item.delete || item.bash)) base.push("bash")
@@ -333,7 +334,7 @@ function buildOpencodeCrewDoc(meta, crew) {
           use_when: `Track durable learnings for ${member.id}.`
         },
         skills: runtimeSkillEntries(meta, member.skills, "opencode"),
-        tools: ["read", "grep", "glob", "list", "update-mental-model"],
+        tools: ["read", "grep", "glob", "list", "update-expertise-model"],
         mcp_access: runtimeMcpAccess(),
         domain: domainFromProfile(meta, member.domain_profile, "opencode")
       }))
@@ -351,7 +352,7 @@ function buildOpencodeCrewDoc(meta, crew) {
           use_when: `Track durable learnings for ${lead.id}.`
         },
         skills: runtimeSkillEntries(meta, lead.skills, "opencode"),
-        tools: ["task", "update-mental-model"],
+        tools: ["task", "update-expertise-model"],
         mcp_access: runtimeMcpAccess(),
         routes_to: memberIds,
         domain: domainFromProfile(meta, lead.domain_profile, "opencode")
@@ -376,8 +377,8 @@ function buildOpencodeCrewDoc(meta, crew) {
       validation_command: "npm --prefix .opencode run validate:multi-team"
     },
     shared: {
-      skills: runtimeSkillEntries(meta, ["delegate_bounded", "zero_micromanagement", "mental_model"], "opencode"),
-      tools: ["update-mental-model"],
+      skills: runtimeSkillEntries(meta, ["delegate_bounded", "zero_micromanagement", "expertise_model"], "opencode"),
+      tools: ["update-expertise-model"],
       mcp: runtimeMcpAccess()
     },
     orchestrator: {
@@ -391,7 +392,7 @@ function buildOpencodeCrewDoc(meta, crew) {
         use_when: `Track durable learnings for ${orchestrator.id}.`
       },
       skills: runtimeSkillEntries(meta, orchestrator.skills, "opencode"),
-      tools: ["task", "update-mental-model"],
+      tools: ["task", "update-expertise-model"],
       mcp_access: runtimeMcpAccess(),
       routes_to: leadIds,
       domain: domainFromProfile(meta, orchestrator.domain_profile, "opencode")
@@ -506,7 +507,7 @@ function writeOrCheck(targetPath, content, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
   if (checkOnly) {
     if (!existsSync(targetPath)) {
-      pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "missing" })
+      pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "missing", action: determineAction("missing") })
       if (!jsonOutput) {
         if (mode === "plan") console.log(`plan: create ${rel(targetPath)}`)
         else console.log(`drift: missing ${rel(targetPath)}`)
@@ -516,7 +517,7 @@ function writeOrCheck(targetPath, content, mode, records, jsonOutput) {
     const current = readFileSync(targetPath, "utf-8")
     if (current !== content) {
       const preview = mode === "diff" ? diffPreview(current, content) : []
-      pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "out_of_sync", preview })
+      pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "out_of_sync", action: determineAction("out_of_sync"), preview })
       if (!jsonOutput) {
         if (mode === "plan") console.log(`plan: update ${rel(targetPath)}`)
         else {
@@ -526,7 +527,7 @@ function writeOrCheck(targetPath, content, mode, records, jsonOutput) {
       }
       return false
     }
-    pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "ok" })
+    pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "ok", action: determineAction("ok") })
     if (!jsonOutput) {
       if (mode === "plan") console.log(`plan: no-change ${rel(targetPath)}`)
       else console.log(`ok: ${rel(targetPath)}`)
@@ -537,7 +538,7 @@ function writeOrCheck(targetPath, content, mode, records, jsonOutput) {
   mkdirSync(path.dirname(targetPath), { recursive: true })
   writeFileSync(targetPath, content, "utf-8")
   console.log(`synced: ${rel(targetPath)}`)
-  pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "synced" })
+  pushRecord(records, { kind: "artifact", path: rel(targetPath), status: "synced", action: determineAction("synced") })
   return true
 }
 

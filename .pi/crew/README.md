@@ -35,7 +35,7 @@ The file has five important areas:
 
 - `name`: display name shown by the harness
 - `session_dir`: where run artifacts and session transcripts are stored
-- `expertise_dir`: base folder for updatable mental models
+- `expertise_dir`: base folder for updatable expertise models
 - `orchestrator`: root agent that delegates across teams
 - `teams`: one or more teams, each with a lead and members
 
@@ -54,7 +54,7 @@ Every `orchestrator`, `lead`, and `member` block follows the same shape:
 - `name`: stable agent identifier
 - `description`: short operational purpose
 - `prompt`: path to the agent prompt markdown file
-- `expertise`: mental-model file and update policy (`path`, `use-when`, `updatable`, `max-lines`)
+- `expertise`: expertise-model file and update policy (`path`, `use-when`, `updatable`, `max-lines`)
 - `model`: usually `inherit`, unless intentionally pinned
 - `tools`: allowed tools for that agent
 - `skills`: reusable skill files loaded by the agent
@@ -69,7 +69,7 @@ The most important fields are:
 
 Practical defaults:
 
-- orchestrator and leads: `delegate_agent`, `update_mental_model`, usually read-only domain
+- orchestrator and leads: `delegate_agent`, `update_expertise_model`, usually read-only domain
 - planning/research workers: read-only tools plus MCP tools as needed
 - implementation workers: add `write` / `edit` and scoped `upsert` permissions
 - validation workers: add `bash` for checks, usually keep write disabled

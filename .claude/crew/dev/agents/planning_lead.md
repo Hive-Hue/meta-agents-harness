@@ -4,13 +4,13 @@ model: openai-codex/gpt-5.2
 role: lead
 team: Planning
 expertise:
-  path: .claude/crew/dev/expertise/planning-lead-mental-model.yaml
+  path: .claude/crew/dev/expertise/planning-lead-expertise-model.yaml
   use-when: Track which discovery and planning patterns produce executable, ownership-aware plans for Hivehue.
   updatable: true
   max-lines: 10000
 tools:
   - delegate_agent
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
@@ -19,7 +19,7 @@ skills:
     use-when: Always. Delegate one bounded planning outcome per worker.
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Re-read the user request and prior planning findings before replying.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after learning new product or repo patterns.
   - path: .claude/skills/zero-micromanagement/SKILL.md
     use-when: Always. Define outputs and constraints, not keystroke-level worker steps.

@@ -4,7 +4,7 @@ model: zai/glm-5
 role: worker
 team: Validation
 expertise:
-  path: .claude/crew/dev/expertise/security-reviewer-mental-model.yaml
+  path: .claude/crew/dev/expertise/security-reviewer-expertise-model.yaml
   use-when: Track auth, data exposure, blast-radius risks, and recurring security review patterns in Hivehue.
   updatable: true
   max-lines: 10000
@@ -14,14 +14,14 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Preserve explicit risk concerns, ownership boundaries, and review context while analyzing.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering durable guardrail or security lessons.
   - path: .claude/skills/web-research/SKILL.md
     use-when: Use when security review depends on current CVE, advisory, or policy sources.

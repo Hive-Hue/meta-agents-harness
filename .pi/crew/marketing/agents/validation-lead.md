@@ -16,10 +16,10 @@ model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
 role: lead
 team: Validation
 expertise:
-  path: .pi/crew/marketing/expertise/validation-lead-mental-model.yaml
+  path: .pi/crew/marketing/expertise/validation-lead-expertise-model.yaml
 tools:
   - delegate_agent
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
@@ -28,7 +28,7 @@ skills:
     use-when: Use when relevant to current task.
   - path: .pi/skills/zero-micromanagement/SKILL.md
     use-when: Use when relevant to current task.
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Use when relevant to current task.
 domain:
   - path: .
@@ -55,19 +55,19 @@ Model: `openai-codex/gpt-5.2`
 Validation lead responsible for delegation, synthesis, and team-level coordination.
 
 ## Expertise
-- path: `.pi/crew/marketing/expertise/validation-lead-mental-model.yaml`
+- path: `.pi/crew/marketing/expertise/validation-lead-expertise-model.yaml`
 - use-when: Track performance risks, brand safety issues, and rollout readiness.
 
 ## Skills
 - path: `.pi/skills/active-listener/SKILL.md` | use-when: Always. Preserve user constraints and prior context before acting.
 - path: `.pi/skills/delegate-bounded/SKILL.md` | use-when: For QA and risk review task splitting.
 - path: `.pi/skills/zero-micromanagement/SKILL.md` | use-when: While defining validation criteria.
-- path: `.pi/skills/mental-model/SKILL.md` | use-when: Start and end of validation rounds.
+- path: `.pi/skills/expertise-model/SKILL.md` | use-when: Start and end of validation rounds.
 - path: `.pi/skills/web-research/SKILL.md` | use-when: When validation requires external benchmark or policy checks.
 
 ## Tools
 - delegate_agent
-- update_mental_model
+- update_expertise_model
 - mcp_servers
 - mcp_tools
 - mcp_call
@@ -89,7 +89,7 @@ Validation lead responsible for delegation, synthesis, and team-level coordinati
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update_mental_model` after meaningful work.
+- Persist durable learnings using `update_expertise_model` after meaningful work.
 
 ## Response Contract
 1. delegation summary

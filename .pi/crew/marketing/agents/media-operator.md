@@ -14,7 +14,7 @@ model: zai/glm-5-turbo
 role: worker
 team: Creative
 expertise:
-  path: .pi/crew/marketing/expertise/media-operator-mental-model.yaml
+  path: .pi/crew/marketing/expertise/media-operator-expertise-model.yaml
 tools:
   - write
   - edit
@@ -22,12 +22,12 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Use when relevant to current task.
 domain:
   - path: .
@@ -54,12 +54,12 @@ Model: `inherit (runtime default)`
 Creative worker focused on scoped execution within assigned ownership boundaries.
 
 ## Expertise
-- path: `.pi/crew/marketing/expertise/media-operator-mental-model.yaml`
+- path: `.pi/crew/marketing/expertise/media-operator-expertise-model.yaml`
 - use-when: Record publishing workflows, channel notes, and operational constraints.
 
 ## Skills
 - path: `.pi/skills/active-listener/SKILL.md` | use-when: Always. Preserve user constraints and prior context before acting.
-- path: `.pi/skills/mental-model/SKILL.md` | use-when: Before and after media operations tasks.
+- path: `.pi/skills/expertise-model/SKILL.md` | use-when: Before and after media operations tasks.
 - path: `.pi/skills/web-research/SKILL.md` | use-when: When distribution choices need current platform constraints or benchmarks.
 - path: `.pi/skills/zeplin-mcp-ops/SKILL.md` | use-when: When publishing assets must be extracted or validated from Zeplin.
 
@@ -70,7 +70,7 @@ Creative worker focused on scoped execution within assigned ownership boundaries
 - ls
 - write
 - edit
-- update_mental_model
+- update_expertise_model
 - mcp_servers
 - mcp_tools
 - mcp_call
@@ -92,7 +92,7 @@ Creative worker focused on scoped execution within assigned ownership boundaries
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update_mental_model` after meaningful work.
+- Persist durable learnings using `update_expertise_model` after meaningful work.
 
 ## Response Contract
 1. execution summary

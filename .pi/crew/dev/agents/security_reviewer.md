@@ -4,7 +4,7 @@ model: zai/glm-5-turbo
 role: worker
 team: Validation
 expertise:
-  path: .pi/crew/dev/expertise/security-reviewer-mental-model.yaml
+  path: .pi/crew/dev/expertise/security-reviewer-expertise-model.yaml
   use-when: Track auth, data exposure, blast-radius risks, and recurring security
     review patterns in Hivehue.
   updatable: true
@@ -14,13 +14,13 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
   - bash
 skills:
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after discovering durable
       guardrail or security lessons.
 domain:

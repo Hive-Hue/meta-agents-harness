@@ -4,7 +4,7 @@ model: zai/glm-5-turbo
 role: worker
 team: Planning
 expertise:
-  path: .pi/crew/dev/expertise/repo-analyst-mental-model.yaml
+  path: .pi/crew/dev/expertise/repo-analyst-expertise-model.yaml
   use-when: Track stable repository patterns, frontend/backend boundaries, and
     recurring structural constraints in Hivehue.
   updatable: true
@@ -14,12 +14,12 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after learning durable
       structural patterns about Hivehue.
 domain:

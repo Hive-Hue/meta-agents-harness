@@ -1,13 +1,13 @@
 ---
-name: mental-model
-description: Manage structured YAML expertise files as personal mental models. Use when starting tasks (read for context), completing work (capture learnings), or when your understanding of the system needs updating.
+name: expertise-model
+description: Manage structured YAML expertise files as personal expertise models. Use when starting tasks (read for context), completing work (capture learnings), or when your understanding of the system needs updating.
 ---
 
 # Mental Model
 
 ## Instructions
 
-You have personal expertise files: structured YAML documents that represent your mental model of the system you work on. These are your files. You own them.
+You have personal expertise files: structured YAML documents that represent your expertise model of the system you work on. These are your files. You own them.
 
 Treat them as durable, high-signal memory, not as a transcript or scratchpad.
 
@@ -24,7 +24,7 @@ Treat them as durable, high-signal memory, not as a transcript or scratchpad.
 - **When your understanding changes**: revise stale assumptions rather than only appending.
 - **When you observe team dynamics**: note what delegation patterns work, what fails, and where responsibilities are sharpest.
 
-Use `update_mental_model` to persist durable notes during or after the task.
+Use `update_expertise_model` to persist durable notes during or after the task.
 
 ## How To Structure
 
@@ -111,4 +111,4 @@ python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1], 'r', encoding='ut
 
 ## Operational Rule
 
-Do not finish meaningful work without deciding whether the mental model should be updated. If the task taught you something durable, persist it.
+Do not finish meaningful work without deciding whether the expertise model should be updated. If the task taught you something durable, persist it.

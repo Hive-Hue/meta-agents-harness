@@ -4,7 +4,7 @@ model: zai/glm-5-turbo
 role: worker
 team: Engineering
 expertise:
-  path: .pi/crew/dev/expertise/backend-dev-mental-model.yaml
+  path: .pi/crew/dev/expertise/backend-dev-expertise-model.yaml
   use-when: Track service architecture, API contract risks, and safe backend
     implementation approaches in Hivehue.
   updatable: true
@@ -16,13 +16,13 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
   - bash
 skills:
-  - path: .pi/skills/mental-model/SKILL.md
+  - path: .pi/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after learning durable backend
       patterns.
 domain:

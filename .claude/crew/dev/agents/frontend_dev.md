@@ -4,7 +4,7 @@ model: openai-codex/gpt-5.3-codex
 role: worker
 team: Engineering
 expertise:
-  path: .claude/crew/dev/expertise/frontend-dev-mental-model.yaml
+  path: .claude/crew/dev/expertise/frontend-dev-expertise-model.yaml
   use-when: Track UI architecture, component patterns, and safe frontend implementation approaches in Hivehue.
   updatable: true
   max-lines: 10000
@@ -16,14 +16,14 @@ tools:
   - grep
   - find
   - ls
-  - update_mental_model
+  - update_expertise_model
   - mcp_servers
   - mcp_tools
   - mcp_call
 skills:
   - path: .claude/skills/active-listener/SKILL.md
     use-when: Always. Preserve the latest implementation constraints, acceptance criteria, and domain limits.
-  - path: .claude/skills/mental-model/SKILL.md
+  - path: .claude/skills/expertise-model/SKILL.md
     use-when: Read at task start for context. Update after learning durable frontend patterns.
   - path: .claude/skills/web-research/SKILL.md
     use-when: Use when frontend decisions depend on current framework or ecosystem references.

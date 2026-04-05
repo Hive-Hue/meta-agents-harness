@@ -108,6 +108,10 @@ mah plan
 mah diff
 mah sessions --json
 mah graph --crew dev --json
+mah graph --crew dev --mermaid
+mah graph --crew dev --mermaid --mermaid-level group
+mah graph --crew dev --mermaid --mermaid-level detailed
+mah graph --crew dev --mermaid --mermaid-level detailed --mermaid-capabilities
 mah demo dev
 MAH_AUDIT=1 mah run --session-mode continue
 mah validate:runtime
@@ -348,6 +352,7 @@ The `development` branch is focused on turning the project into a more mature pl
   - runtime
   - sync
   - full validation
+- semantics and ownership are defined in `docs/validate-semantics.md`
 
 #### Operator UX
 - improved diagnostics
@@ -360,6 +365,7 @@ The `development` branch is focused on turning the project into a more mature pl
 - initial provenance and execution audit trails
 - initial execution graph visibility
 - runtime adapter foundation (still evolving, not a final external plugin API)
+- capability status and policy details are documented in `docs/platform-capabilities.md`
 
 This branch is therefore useful both as a working branch and as a public-facing signal of the product roadmap.
 
@@ -367,12 +373,20 @@ Current maturity note:
 
 - diagnostics include expanded structured outputs, but output schemas are still being normalized
 - `plan` and `diff` are currently lightweight operator workflows around sync reporting
+- `sessions`, `provenance`, `graph`, and `demo` remain initial support in this release line
 
 ---
 
 ## Architectural direction
 
 The long-term direction is to move toward an adapter model for runtimes.
+
+Canonical boundary in this repository:
+
+- `meta-agents.yaml` is the source of truth for crews/config content
+- `runtime-adapters.mjs` is the source of truth for runtime operational behavior
+
+Boundary details are documented in `docs/runtime-boundary.md`.
 
 A runtime should be represented as an explicit contract rather than implicit command branching scattered through the dispatcher.
 

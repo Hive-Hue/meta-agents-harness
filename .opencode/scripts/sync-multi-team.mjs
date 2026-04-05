@@ -136,8 +136,8 @@ function sectionLines(agent, context) {
   lines.push("- Stay within ownership boundaries declared in `Domain`.")
   lines.push("- Return evidence with explicit file paths and concrete outcomes.")
   lines.push("- Avoid speculative claims; state assumptions clearly when needed.")
-  if (tools.includes("update-mental-model")) {
-    lines.push("- Persist durable learnings using `update-mental-model` after meaningful work.")
+  if (tools.includes("update-expertise-model")) {
+    lines.push("- Persist durable learnings using `update-expertise-model` after meaningful work.")
   }
   lines.push("")
   lines.push("## Response Contract")
