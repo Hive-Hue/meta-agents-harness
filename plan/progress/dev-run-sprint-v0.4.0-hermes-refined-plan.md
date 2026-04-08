@@ -348,7 +348,7 @@ Do not promise behavior the runtime does not actually support.
 
 ---
 
-## Phase 5 — Implementation Slice 3 [partial]
+## Phase 5 — Implementation Slice 3 [done]
 
 ### Goal
 Establish minimum `meta-agents.yaml` compatibility and runtime-aware projection.
@@ -421,7 +421,7 @@ appears, cut scope immediately.
 - `mah doctor`
 - `mah validate:runtime`
 
-### Slice 3 — Config compatibility [partial]
+### Slice 3 — Config compatibility [done]
 - additive config support
 - root/pattern compatibility
 - sync/check alignment notes
