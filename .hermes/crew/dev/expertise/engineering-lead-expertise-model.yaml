@@ -3,16 +3,14 @@ agent:
   role: "agent"
   team: "dev"
 meta:
-  version: "1"
-  max_lines: "120"
-  last_updated: "2026-04-07T19:47:23.918Z"
+  version: 1
+  max_lines: 120
+  last_updated: "2026-04-08T01:44:27Z"
 patterns: []
 risks: []
 tools: []
 workflows: []
 decisions: []
 lessons: []
-observations:
-  - date: "2026-04-07"
-    note: "Investigate why the pi runtime /model and /scoped-models commands don't show MiniMax-M2.5, only M2.7 -> I'll investigate the pi runtime model discovery mechanism. Let me first check what we're working with in this session."
+observations: []
 open_questions: []

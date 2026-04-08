@@ -1,11 +1,11 @@
 agent:
   name: "docs-reviewer"
-  role: "worker"
-  team: "Validation"
+  role: "agent"
+  team: "bootstrap-config"
 meta:
-  version: "1"
-  max_lines: "120"
-  last_updated: "2026-04-07T02:05:11.770Z"
+  version: 1
+  max_lines: 120
+  last_updated: "2026-04-08T01:44:27Z"
 patterns: []
 risks: []
 tools: []

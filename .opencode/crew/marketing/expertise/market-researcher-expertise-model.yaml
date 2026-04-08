@@ -1,2 +1,16 @@
-agent: market-researcher
-summary: []
+agent:
+  name: "market-researcher"
+  role: "agent"
+  team: "marketing"
+meta:
+  version: 1
+  max_lines: 120
+  last_updated: "2026-04-08T01:44:27Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

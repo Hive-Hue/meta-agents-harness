@@ -5,7 +5,7 @@ agent:
 meta:
   version: 1
   max_lines: 120
-  last_updated: "2026-04-07T02:00:00.000Z"
+  last_updated: "2026-04-08T01:44:27Z"
 patterns: []
 risks: []
 tools: []

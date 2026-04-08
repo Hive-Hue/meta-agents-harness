@@ -3,9 +3,9 @@ agent:
   role: "agent"
   team: "bootstrap-config"
 meta:
-  version: "1"
-  max_lines: "120"
-  last_updated: "2026-04-07T14:11:15.644Z"
+  version: 1
+  max_lines: 120
+  last_updated: "2026-04-08T01:44:27Z"
 patterns: []
 risks: []
 tools: []
