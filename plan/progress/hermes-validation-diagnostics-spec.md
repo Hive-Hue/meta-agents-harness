@@ -3,7 +3,7 @@
 
 **Document type:** Technical specification — validation and diagnostics contract  
 **Target release:** `v0.4.0`  
-**Status:** Implementation-ready  
+**Status:** Implementation-ready [partial — tests for Hermes-aware diagnostics TBD; smoke and contract tests done]  
 **Audience:** Engineering, Validation, QA  
 **Complements:** `hermes-runtime-config-design.md`, `hermes-implementation-checklist.md`  
 **Date:** 2026-04-05

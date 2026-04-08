@@ -249,7 +249,7 @@ Do not transform `v0.4.0` into a broader architecture wave. Hermes support must 
 
 ## 8. Sprint Phases
 
-## Phase 1 — Analysis / Discovery
+## Phase 1 — Analysis / Discovery [done]
 
 ### Primary owners
 - `planning-lead`
@@ -280,7 +280,7 @@ Do not begin implementation before closing:
 
 ---
 
-## Phase 2 — Sprint Architecture Decision
+## Phase 2 — Sprint Architecture Decision [done]
 
 ### Primary owners
 - `solution-architect`
@@ -304,7 +304,7 @@ Nothing starts if:
 
 ---
 
-## Phase 3 — Implementation Slice 1
+## Phase 3 — Implementation Slice 1 [done]
 
 ### Goal
 Create the minimum Hermes runtime foundation inside the runtime portfolio.
@@ -327,7 +327,7 @@ No Hermes logic should spread outside the necessary boundary.
 
 ---
 
-## Phase 4 — Implementation Slice 2
+## Phase 4 — Implementation Slice 2 [done]
 
 ### Goal
 Make Hermes operationally visible and explainable.
@@ -348,7 +348,7 @@ Do not promise behavior the runtime does not actually support.
 
 ---
 
-## Phase 5 — Implementation Slice 3
+## Phase 5 — Implementation Slice 3 [partial]
 
 ### Goal
 Establish minimum `meta-agents.yaml` compatibility and runtime-aware projection.
@@ -368,7 +368,7 @@ Do not reinvent the canonical config model.
 
 ---
 
-## Phase 6 — Validation and Review
+## Phase 6 — Validation and Review [done]
 
 ### Owners
 - `validation-lead`
@@ -397,7 +397,7 @@ appears, cut scope immediately.
 
 ## 9. Refined Initial Backlog
 
-### Slice 0 — Hermes Discovery
+### Slice 0 — Hermes Discovery [done]
 - confirm CLI
 - confirm wrapper
 - confirm root/marker
@@ -409,29 +409,29 @@ appears, cut scope immediately.
   - `doctor`
   - `check:runtime`
 
-### Slice 1 — Adapter foundation
+### Slice 1 — Adapter foundation [done]
 - add runtime `hermes`
 - minimum contract
 - forced detection
 - marker/CLI detection
 
-### Slice 2 — Diagnostics and explainability
+### Slice 2 — Diagnostics and explainability [done]
 - `mah explain detect`
 - `mah explain run`
 - `mah doctor`
 - `mah validate:runtime`
 
-### Slice 3 — Config compatibility
+### Slice 3 — Config compatibility [partial]
 - additive config support
 - root/pattern compatibility
 - sync/check alignment notes
 
-### Slice 4 — Tests
+### Slice 4 — Tests [partial]
 - Hermes smoke
 - Hermes contract
 - Hermes-aware diagnostics
 
-### Slice 5 — Release boundary review
+### Slice 5 — Release boundary review [done]
 - explicitly confirm what stays out
 - prepare changelog draft
 - record deferred list
