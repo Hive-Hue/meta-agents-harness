@@ -26,7 +26,7 @@ Meta Agents Harness (MAH) is a runtime-agnostic orchestration layer for multi-ag
 
 ## Development
 
-- [Bootstrap CLI UX Research](./bootstrap-cli-ux-research.md) — Design notes for the bootstrap flow
+_(Design notes and research artifacts live in the `development` branch.)_
 
 ## Project Structure
 
@@ -39,7 +39,6 @@ docs/
 ├── platform-capabilities.md     # Feature matrix
 ├── runtime-boundary.md          # MAH vs. runtime responsibilities
 ├── validate-semantics.md        # Config validation
-├── bootstrap-cli-ux-research.md # Bootstrap design notes
 └── hermes/                     # Hermes-specific docs
     ├── quickstart.md
     ├── runtime-support.md
