@@ -69,3 +69,43 @@ test("doctor and explain detect support json envelope", () => {
   assert.equal(explain.json.command, "explain")
   assert.equal(explain.json.data?.crew_context?.crew_id, "dev")
 })
+
+test("detect --json --runtime hermes follows diagnostics schema", () => {
+  const result = runJson(["detect", "--json", "--runtime", "hermes"])
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.json.schema, "mah.diagnostics.v1")
+  assert.equal(result.json.command, "detect")
+  assert.equal(result.json.runtime, "hermes")
+  assert.equal(typeof result.json.ok, "boolean")
+  assert.equal(typeof result.json.status, "number")
+  assert.equal(typeof result.json.reason, "string")
+})
+
+test("validate:runtime --json --runtime hermes follows diagnostics schema", () => {
+  const result = runJson(["validate:runtime", "--json", "--runtime", "hermes"])
+  // status may be 0 or 1 depending on hermes availability, but schema must be correct
+  assert.equal(result.json.schema, "mah.diagnostics.v1")
+  assert.equal(result.json.command, "validate:runtime")
+  assert.equal(result.json.runtime, "hermes")
+  assert.equal(typeof result.json.ok, "boolean")
+  assert.equal(typeof result.json.status, "number")
+  assert.equal(typeof result.json.reason, "string")
+})
+
+test("doctor --json --runtime hermes follows diagnostics schema", () => {
+  const result = runJson(["doctor", "--json", "--runtime", "hermes"])
+  // status may be 0 or 1 depending on hermes availability
+  assert.equal(result.json.schema, "mah.diagnostics.v1")
+  assert.equal(result.json.command, "doctor")
+  assert.equal(typeof result.json.ok, "boolean")
+  assert.equal(typeof result.json.status, "number")
+})
+
+test("validate:all --json --runtime hermes follows diagnostics schema", () => {
+  const result = runJson(["validate:all", "--json", "--runtime", "hermes"])
+  // validate:all may skip runtime if none detected
+  assert.equal(result.json.schema, "mah.diagnostics.v1")
+  assert.equal(result.json.command, "validate:all")
+  assert.equal(typeof result.json.ok, "boolean")
+  assert.equal(typeof result.json.status, "number")
+})
