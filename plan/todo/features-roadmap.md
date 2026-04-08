@@ -263,38 +263,39 @@ Antes de implementar M1B, três decisões precisam ser fechadas:
 
 ### M1A — Segurança Mínima de Config
 
-- [done] schema inicial implementado para `meta-agents.yaml`
-- [done] validação de versão ativa (`version: 1`)
-- [done] `mah validate:config` implementado
-- [done] `check:meta-sync` obrigatório na CI
+- [done] schema inicial implementado para `meta-agents.yaml` — `scripts/validate-meta-config.mjs` com Zod
+- [done] validação de versão ativa (`version: 1`) — `z.literal(1)` no schema Zod; rejeita configs sem `version: 1`
+- [done] `mah validate:config` implementado — `npm run validate:config` / `mah validate:config`; valida schema + cross-refs (skills, domain_profiles, topology)
+- [done] `check:meta-sync` obrigatório na CI — `npm run check:meta-sync` existe em package.json; Zod valida referências cruzadas em validate:config
 
 ### M1B — Arquitetura Canônica de Runtime
 
-- [done] adapter layer extraída para `runtime-adapters.mjs`
-- [done] camada canônica de comportamento formalizada em `runtime-adapters.mjs` (YAML permanece canônico para conteúdo)
-- [done] capability matrix estruturada em código
-- [done] `validate:runtime`, `validate:sync`, `validate:all` disponíveis
-- [done] `RuntimeAdapter` com interface operacional mínima por métodos (`detect`, `supports`, `resolveCommandPlan`, `validateRuntime`)
+- [done] adapter layer extraída para `runtime-adapters.mjs` — 4 runtimes (pi, claude, opencode, hermes)
+- [done] capacidade canônica de comportamento formalizada em `runtime-adapters.mjs` (YAML permanece canônico para conteúdo)
+- [done] capability matrix estruturada em código — `capabilities.sessionModeNew/Continue`, `supportsSessions`, `sessionListCommand`, etc. por adapter
+- [done] `validate:runtime`, `validate:sync`, `validate:all` disponíveis — `mah validate:runtime/sync/all` + `npm run validate:*`
+- [done] `RuntimeAdapter` com interface operacional mínima por métodos — `detect`, `supports`, `resolveCommandPlan`, `validateRuntime` validados por `runtime-adapter-contract.mjs`
 - [done] `validate:runtime` com precheck semântico próprio via adapter + execução de runtime check
-- [done] `--json` uniforme em `detect`, `doctor` e `validate:*`
+- [done] `--json` uniforme em `detect`, `doctor` e `validate:*` — `jsonMode` propagates through all diagnostic commands
+- [done] `contract:runtime` / `test:contract` — `scripts/runtime-adapter-contract.mjs` + `tests/runtime-contract.test.mjs` com validação de campos, métodos e comandos obrigatórios por runtime
 
 ### M2 — UX Operacional e Explainability
 
 - [done] `mah explain` com targets `detect/use/run/sync`
 - [done] `mah explain --trace` com saída estruturada
-- [done] `mah init` com bootstrap mínimo
+- [done] `mah init` com bootstrap mínimo — output é `"mah init completed"`; bootstrap completo via `npm run bootstrap:meta`
 - [done] tratamento de múltiplos markers com modo estrito (`--strict-markers` / `MAH_STRICT_MARKERS=1`)
 - [done] `mah plan` e `mah diff` com modos dedicados (`--plan` e `--diff`) e relatórios próprios
 
 ### M3 — Plataforma e Diferenciação
 
-- [done] `mah sessions` com filtros e `--json`
+- [done] `mah sessions` com filtros e `--json` — list/resume/new/export/delete com `--runtime`, `--crew`, `--json`, `--dry-run`, `--yes`
 - [done] provenance opcional (`MAH_AUDIT=1` / `MAH_PROVENANCE=1`) em `.mah/provenance.jsonl`
-- [done] `mah graph` para topologia e run graph
-- [done] contrato mínimo de adapter formalizado + `test:contract`
-- [done] `mah demo` implementado
-- [partial] plugin API ainda está em contrato interno; falta mecanismo explícito de carregamento externo de plugins
-- [missing] `mah resume <id>` ainda não implementado
+- [done] `mah graph` para topologia e run graph — `mah graph [--crew <name>] [--run <id>] [--json] [--mermaid]`
+- [done] contrato mínimo de adapter formalizado + `contract:runtime` — `runtime-adapter-contract.mjs` valida campos, métodos e comandos por runtime
+- [done] `mah demo` implementado — `mah demo` é alias de `mah run --demo`
+- [done] `mah resume <id>` implementado como `mah sessions resume <id>` — ID format: `runtime:crew:sessionId`
+- [deferred] plugin API — contrato interno existe (`RuntimeAdapter`), mas mecanismo de carregamento externo de plugins não implementado (v0.5.0+)
 
 ### Ações Recomendadas para Fechar Gaps
 
@@ -302,3 +303,4 @@ Antes de implementar M1B, três decisões precisam ser fechadas:
 - [done] desacoplar `validate:runtime` com precheck semântico próprio e relatório estruturado
 - [done] uniformização de `--json` em comandos de diagnóstico
 - [done] semântica diferenciada de `plan` e `diff` com relatórios dedicados
+- [pending] mecanismo de carregamento externo de plugins (v0.5.0+)
