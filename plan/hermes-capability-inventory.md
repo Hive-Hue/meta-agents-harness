@@ -176,3 +176,48 @@ The following are identified but explicitly deferred beyond v0.4.0. Adding any o
 ---
 
 *Inventory produced for v0.4.0-runtime-evolution sprint. All deferred items are explicitly out-of-scope for the current release.*
+
+---
+
+## Engineering Review
+
+**Reviewed against:** `scripts/runtime-adapter-contract.mjs`, `scripts/runtime-adapters.mjs`
+**Adapter contract compliance:** Hermes adapter passes all `REQUIRED_RUNTIME_ADAPTER_FIELDS` and `REQUIRED_RUNTIME_COMMANDS` checks. All 8 required commands present and correctly routed.
+**Deferred list:** 9 items confirmed; all are correctly scoped to v0.5.0+ and do not conflict with the "no full Hermes parity" sprint directive.
+
+### Command Mapping Corrections / Notes
+
+- **`hermesh chat` → `mah run`:** Correctly mapped. `hermesh chat` is an alias for `hermesh run` (routes to `hermes chat` in hermesh.mjs), so the Hermes adapter's `run` command variant `[hermes, [chat]]` is the correct resolution. No separate `chat` entry needed in the adapter.
+- **`mah explain`:** Listed as "Supported" with Hermes mapping. Confirmed: `mah explain run` / `mah explain use` etc. call `resolveDispatchPlan` with the Hermes adapter, showing which variant would execute. Hermes expertise model files (`.hermes/crew/<crew>/expertise/*.yaml`) and skill files are not operator-accessible through MAH; `mah explain` surfaces dispatch resolution, not file contents. Inventory correctly notes these as gaps.
+- **`mah check:runtime` → `hermes doctor`:** Mapping confirmed correct in adapter. `check:runtime` variant list routes to `hermesh doctor` which forwards to `hermes doctor`.
+- **`mah sessions`:** Correctly marked as "Not Hermes-specific." MAH sessions is a MAH-native collection. Hermes session enumeration (`hermes sessions list`) has no MAH equivalent.
+
+### Severity Rating Notes
+
+- **Bootstrap query injection (`-Q -q`):** Rated **High** in Section 6.1. Engineering note: the actual operator-facing exposure is **Low** (no MAH flag exposes this; it is internal to hermesh.mjs). The High rating is appropriate as a forward-looking architectural concern — if MAH ever considered a `--bootstrap-query` flag, Hermes would need to be the reference implementation, creating a capture risk. The rating reflects the gravity of that decision path, not current exploitability.
+- **Hermes session pinning:** Rated **High** — appropriate. `.active-crew.json` stores `orchestrator_session_id` with no MAH surface to inspect or clear it. This is Hermes-specific session state leaking into MAH infrastructure.
+- **Hermes capabilities as MAH features:** Rated **Medium** — appropriate. Currently no Hermes capability (`persistentMemory`, `gatewayAware`, etc.) is exposed as a MAH CLI flag. The Medium rating reflects the capture risk if those capabilities were ever surfaced, not current exposure.
+- **Hermes adapter 4-variant asymmetry:** Correctly flagged as **Medium** capture risk in Section 6.1. The adapter contract imposes no variant-count limit, so this is technically compliant. However, pi/claude/opencode each have 3 variants per command while hermes has 4 — this is real asymmetry worth monitoring. Engineering assessment: no immediate contract change needed, but the anti-capture guidance in Section 6.2 applies.
+
+### Adapter Contract Gaps
+
+None discovered. The Hermes adapter fully satisfies `REQUIRED_RUNTIME_ADAPTER_FIELDS` and `REQUIRED_RUNTIME_COMMANDS`. Variant-count asymmetry is a capture risk, not a contract violation.
+
+### Deferred List Confirmation
+
+All 9 deferred items confirmed correctly scoped to v0.5.0+:
+1. Full Hermes feature parity
+2. Hermes native session store enumeration via `mah sessions`
+3. Policy engine integration
+4. Federation / interconnect
+5. Confidential / secure execution mode
+6. Hermes background operation (`mah run --background`)
+7. Multi-backend execution visualization or control
+8. Gateway-aware routing in MAH dispatcher
+9. MAH becoming Hermes-shaped
+
+No items in the deferred list fall within v0.4.0 scope.
+
+### Summary
+
+**Confirmed:** Document accurately reflects Hermes CLI surface and MAH coverage. No command mappings are incorrect. No runtime-capture severity ratings require adjustment. The 9 deferred items are correctly scoped. One minor clarification: `hermes chat -Q -q` is correctly listed as having no MAH equivalent (Section 4); the High severity in Section 6.1 reflects architectural gravity of a potential future decision path, not current exploitability, and is therefore appropriate as written.
