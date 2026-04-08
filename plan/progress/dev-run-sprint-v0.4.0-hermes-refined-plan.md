@@ -426,7 +426,7 @@ appears, cut scope immediately.
 - root/pattern compatibility
 - sync/check alignment notes
 
-### Slice 4 — Tests [partial]
+### Slice 4 — Tests [done]
 - Hermes smoke
 - Hermes contract
 - Hermes-aware diagnostics
