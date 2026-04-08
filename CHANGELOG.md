@@ -18,6 +18,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
   - Runtime adapter contract extended with `supportsSessions`, `sessionListCommand`, `sessionExportCommand`, `sessionDeleteCommand`, `supportsSessionNew` fields
   - 56 tests covering all session operations and adapter contract
   - Bug fix: `--runtime` flag now works correctly in `mah sessions` commands
+  - Bug fix: `mah sessions --help` now prints full help to stdout (exit 0) instead of error to stderr; also handles `-h` and `help` as aliases
 - **Bootstrap CLI test suite** — 99 tests across 4 test files:
   - `tests/bootstrap/schema-validation.test.mjs` — 39 tests for schema structure, required fields, optional defaults, data types, reference integrity (SV-*, RF-*, OF-*, DT-*, RI-*).
   - `tests/bootstrap/edge-cases.test.mjs` — 23 tests for overwrite, merge, partial input, invalid input, file system edge cases (OB-*, MB-*, PI-*, II-*, FS-*).
