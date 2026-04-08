@@ -584,6 +584,37 @@ function runInit(argv) {
   return bootstrapResult.status !== null ? bootstrapResult.status : 1
 }
 
+function printSessionsHelp() {
+  console.log("")
+  console.log("mah sessions — Unified session operations across all runtimes")
+  console.log("")
+  console.log("Usage:")
+  console.log("  mah sessions list                    # List active sessions for current runtime")
+  console.log("  mah sessions list --runtime <name>   # List sessions for a specific runtime")
+  console.log("  mah sessions list --crew <name>      # Filter sessions by crew")
+  console.log("  mah sessions list --json             # JSON output")
+  console.log("  mah sessions resume <id>             # Resume a session (format: runtime:crew:sessionId)")
+  console.log("  mah sessions resume <id> --dry-run   # Preview resume command without spawning")
+  console.log("  mah sessions new --runtime <name>    # Start a new session (PI and Hermes only)")
+  console.log("  mah sessions new --runtime <name> --dry-run  # Preview without spawning")
+  console.log("  mah sessions export <id>             # Export session to $MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz")
+  console.log("  mah sessions delete <id> --yes       # Delete session (requires --yes confirmation)")
+  console.log("  mah sessions --help                  # Show this help")
+  console.log("")
+  console.log("Global flags:")
+  console.log("  --runtime <name>  Target a specific runtime (pi, claude, opencode, hermes)")
+  console.log("  --json            Output results as JSON")
+  console.log("  --dry-run         Preview the command that would be run without executing it")
+  console.log("")
+  console.log("Session ID format: runtime:crew:sessionId  (e.g., hermes:dev:2026-04-08T13-00-00-abc123)")
+  console.log("")
+  console.log("'mah sessions new' support per runtime:")
+  console.log("  PI, Hermes     — supported")
+  console.log("  Claude Code    — not supported (use 'mah sessions resume' instead)")
+  console.log("  OpenCode      — not supported (use 'mah sessions resume' instead)")
+  console.log("")
+}
+
 function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const subcommand = argv[0] || "list"
   const filters = parseFilterArgs(argv)
@@ -750,9 +781,13 @@ function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     return 0
   }
 
-  // Unknown subcommand
+  // Unknown subcommand — also handles --help, -h
+  if (["--help", "-h", "help"].includes(subcommand)) {
+    printSessionsHelp()
+    return 0
+  }
   console.error(`ERROR: unknown sessions subcommand '${subcommand}'`)
-  console.error("Usage: mah sessions [list|resume|new|export|delete] [args]")
+  printSessionsHelp()
   return 1
 }
 
