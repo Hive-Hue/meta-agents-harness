@@ -5,6 +5,8 @@
  * - Ctrl+X        open navigator overlay immediately
  * - Left/Right    switch between agent sessions
  * - Up/Down       scroll inside the overlay
+ * - G / End       jump to the end of the transcript
+ * - g / Home      jump to the top of the transcript
  * - Mouse wheel   scroll inside the overlay
  * - Esc/Q         close overlay
  *
@@ -428,13 +430,37 @@ class AgentSessionNavigator {
 			return;
 		}
 
+		if (matchesKey(data, "alt+up")) {
+			this.scrollBy(-1);
+			tui.requestRender();
+			return;
+		}
+
+		if (matchesKey(data, "alt+down")) {
+			this.scrollBy(1);
+			tui.requestRender();
+			return;
+		}
+
 		if (matchesKey(data, Key.home)) {
 			this.setScrollOffset(0);
 			tui.requestRender();
 			return;
 		}
 
+		if (matchesKey(data, "g")) {
+			this.setScrollOffset(0);
+			tui.requestRender();
+			return;
+		}
+
 		if (matchesKey(data, Key.end)) {
+			this.setScrollOffset(this.getMaxScrollOffset());
+			tui.requestRender();
+			return;
+		}
+
+		if (matchesKey(data, "G") || matchesKey(data, "shift+g")) {
 			this.setScrollOffset(this.getMaxScrollOffset());
 			tui.requestRender();
 			return;
@@ -459,7 +485,7 @@ class AgentSessionNavigator {
 		lines.push(
 			truncateToWidth(
 				theme.fg("accent", " Agent Session Navigator ") +
-				theme.fg("muted", "←/→ switch  ↑/↓ scroll  PgUp/PgDn page  r refresh  esc close"),
+				theme.fg("muted", "←/→ switch  ↑/↓ scroll  Alt+↑/↓ line  PgUp/PgDn page  g/G jump  r refresh  esc close"),
 				width,
 			),
 		);
@@ -536,8 +562,8 @@ class AgentSessionNavigator {
 		const hasOverflow = allLines.length > this.lastViewportLines;
 
 		const footer = hasOverflow
-			? `scroll ${start + 1}-${end}/${allLines.length} · ↑/↓ · PgUp/PgDn · Home/End · ←/→ · esc`
-			: "↑/↓ · PgUp/PgDn · Home/End · ←/→ · esc";
+			? `scroll ${start + 1}-${end}/${allLines.length} · ↑/↓ (Alt) · PgUp/PgDn · g/G · Home/End · ←/→ · esc`
+			: "↑/↓ (Alt) · PgUp/PgDn · g/G · Home/End · ←/→ · esc";
 		visibleLines.push(truncateToWidth(theme.fg("dim", footer), width));
 
 		return visibleLines.map((line) => truncateToWidth(line, width));
@@ -546,27 +572,11 @@ class AgentSessionNavigator {
 
 export default function (pi: ExtensionAPI) {
 	let isOpening = false;
-	let mouseTrackingEnabled = false;
-
-	const setMouseTracking = (enabled: boolean) => {
-		if (!process.stdout?.isTTY) return;
-		if (enabled && !mouseTrackingEnabled) {
-			// Enable button-event + SGR mouse reporting (captures wheel events).
-			process.stdout.write("\u001b[?1002h\u001b[?1006h");
-			mouseTrackingEnabled = true;
-			return;
-		}
-		if (!enabled && mouseTrackingEnabled) {
-			process.stdout.write("\u001b[?1002l\u001b[?1006l");
-			mouseTrackingEnabled = false;
-		}
-	};
 
 	const openNavigator = async (ctx: ExtensionContext) => {
 		if (isOpening) return;
 		isOpening = true;
 		try {
-			setMouseTracking(true);
 			await ctx.ui.custom(
 				(tui, theme, _kb, done) => {
 					const viewer = new AgentSessionNavigator(
@@ -597,7 +607,6 @@ export default function (pi: ExtensionAPI) {
 				},
 			);
 		} finally {
-			setMouseTracking(false);
 			isOpening = false;
 		}
 	};
@@ -612,14 +621,22 @@ export default function (pi: ExtensionAPI) {
 	pi.registerShortcut("ctrl+x", {
 		description: "Open Agent Session Navigator",
 		handler: async (ctx) => {
-			await openNavigator(ctx);
+			try {
+				await openNavigator(ctx);
+			} catch (err) {
+				console.error("Agent Session Navigator error:", err?.message || err);
+			}
 		},
 	});
 
 	pi.registerShortcut("alt+o", {
 		description: "Open Agent Session Navigator",
 		handler: async (ctx) => {
-			await openNavigator(ctx);
+			try {
+				await openNavigator(ctx);
+			} catch (err) {
+				console.error("Agent Session Navigator error:", err?.message || err);
+			}
 		},
 	});
 
@@ -629,7 +646,6 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_shutdown", async () => {
-		setMouseTracking(false);
 		isOpening = false;
 	});
 }

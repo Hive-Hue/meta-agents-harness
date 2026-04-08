@@ -1,0 +1,5 @@
+description: "test description without version or name fields"
+
+runtime_detection:
+  order:
+    - forced

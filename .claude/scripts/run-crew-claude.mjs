@@ -301,6 +301,10 @@ function parseYamlBlock(lines, startIndex, indent) {
     while (index < lines.length) {
       const line = lines[index];
       if (line.indent < indent) break;
+      if (line.indent > indent) {
+        index += 1;
+        continue;
+      }
       if (line.indent !== indent || !line.content.startsWith("- ")) break;
 
       const rest = line.content.slice(2).trim();
@@ -387,6 +391,10 @@ function parseYamlBlock(lines, startIndex, indent) {
   while (index < lines.length) {
     const line = lines[index];
     if (line.indent < indent) break;
+    if (line.indent > indent) {
+      index += 1;
+      continue;
+    }
     if (line.indent !== indent) break;
     if (line.content.startsWith("- ")) break;
 

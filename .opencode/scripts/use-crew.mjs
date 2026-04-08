@@ -1,10 +1,10 @@
 import { ensureCrewSelected, listCrews } from "./lib/crew-runtime.mjs"
 
 const argv = process.argv.slice(2)
-let noHierarchy = false
+let hierarchy = false
 for (const token of argv) {
-  if (token === "--no-hierarchy") noHierarchy = true
-  if (token === "--hierarchy") noHierarchy = false
+  if (token === "--hierarchy") hierarchy = true
+  if (token === "--no-hierarchy") hierarchy = false
 }
 const crew = `${argv.find((item) => !item.startsWith("--")) || ""}`.trim()
 if (!crew) {
@@ -17,10 +17,10 @@ if (!crew) {
     console.log("Available crews:")
     for (const item of crews) console.log(`- ${item}`)
     process.exitCode = 1
-  } else if (!ensureCrewSelected(crew, { noHierarchy })) {
+  } else if (!ensureCrewSelected(crew, { hierarchy })) {
     console.error(`ERROR: failed to activate crew: ${crew}`)
     process.exitCode = 1
   } else {
-    console.log(`Active OpenCode crew: ${crew}${noHierarchy ? " (no-hierarchy)" : ""}`)
+    console.log(`Active OpenCode crew: ${crew}${hierarchy ? " (hierarchy)" : " (no-hierarchy)"}`)
   }
 }

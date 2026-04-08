@@ -63,6 +63,7 @@ export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}) {
   collectCrewRuntime("pi", ".pi")
   collectCrewRuntime("claude", ".claude")
   collectCrewRuntime("opencode", ".opencode")
+  collectCrewRuntime("hermes", ".hermes")
 
   const ocGlobal = path.join(repoRoot, ".opencode", "sessions")
   if (existsSync(ocGlobal)) {

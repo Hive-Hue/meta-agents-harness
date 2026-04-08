@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/repo-analyst-expertise-model.yaml
   use-when: Track stable repository patterns, frontend/backend boundaries, and recurring structural constraints in Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - read
   - grep

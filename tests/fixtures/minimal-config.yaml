@@ -1,0 +1,130 @@
+version: 1
+name: "test-project"
+description: "Test project description"
+
+runtime_detection:
+  order:
+    - forced
+    - marker
+    - cli
+  forced:
+    args:
+      - "--runtime=<name>"
+      - "--runtime <name>"
+      - "-r <name>"
+      - "-f <name>"
+    env:
+      - MAH_RUNTIME
+  marker:
+    pi: ".pi"
+    claude: ".claude"
+    opencode: ".opencode"
+    hermes: ".hermes"
+  cli:
+    pi:
+      direct_cli: "pi"
+      wrapper: "pimh"
+    claude:
+      direct_cli: "claude"
+      wrapper: "ccmh"
+    opencode:
+      direct_cli: "opencode"
+      wrapper: "ocmh"
+    hermes:
+      direct_cli: "hermes"
+      wrapper: "hermesh"
+
+runtimes:
+  pi:
+    wrapper: "pimh"
+    config_root: ".pi"
+    config_pattern: ".pi/crew/<crew>/multi-team.yaml"
+  claude:
+    wrapper: "ccmh"
+    config_root: ".claude"
+    config_pattern: ".claude/crew/<crew>/multi-team.yaml"
+  opencode:
+    wrapper: "ocmh"
+    config_root: ".opencode"
+    config_pattern: ".opencode/crew/<crew>/multi-team.yaml"
+  hermes:
+    wrapper: "hermesh"
+    config_root: ".hermes"
+    config_pattern: ".hermes/crew/<crew>/config.yaml"
+
+catalog:
+  models:
+    orchestrator_default: "zai/glm-4.7"
+    lead_default: "zai/glm-4.7"
+    worker_default: "zai/glm-5-turbo"
+  skills:
+    delegate_bounded:
+      pi: ".pi/skills/delegate-bounded/SKILL.md"
+      claude: ".claude/skills/delegate-bounded/SKILL.md"
+      opencode: ".opencode/skills/delegate-bounded/SKILL.md"
+      hermes: ".hermes/skills/delegate-bounded/SKILL.md"
+    zero_micromanagement:
+      pi: ".pi/skills/zero-micromanagement/SKILL.md"
+      claude: ".claude/skills/zero-micromanagement/SKILL.md"
+      opencode: ".opencode/skills/zero-micromanagement/SKILL.md"
+      hermes: ".hermes/skills/zero-micromanagement/SKILL.md"
+    expertise_model:
+      pi: ".pi/skills/expertise-model/SKILL.md"
+      claude: ".claude/skills/expertise-model/SKILL.md"
+      opencode: ".opencode/skills/expertise-model/SKILL.md"
+      hermes: ".hermes/skills/expertise-model/SKILL.md"
+  domain_profiles:
+    read_only_repo:
+      - path: "."
+        read: true
+        edit: false
+        bash: false
+
+crews:
+  - id: "test-crew"
+    display_name: "Test Crew"
+    mission: "Test mission for validation"
+    source_configs:
+      pi: ".pi/crew/test-crew/multi-team.yaml"
+      claude: ".claude/crew/test-crew/multi-team.yaml"
+      opencode: ".opencode/crew/test-crew/multi-team.yaml"
+    session:
+      pi_root: ".pi/crew/test-crew/sessions"
+      claude_mirror_root: ".claude/crew/test-crew/sessions"
+      hermes_root: ".hermes/crew/test-crew/sessions"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        planning: "planning-lead"
+      workers:
+        planning:
+          - "repo-analyst"
+    agents:
+      - id: "orchestrator"
+        role: "orchestrator"
+        team: "orchestration"
+        model_ref: "orchestrator_default"
+        expertise: "orchestrator-expertise-model"
+        skills:
+          - "delegate_bounded"
+          - "zero_micromanagement"
+          - "expertise_model"
+        domain_profile: "read_only_repo"
+      - id: "planning-lead"
+        role: "lead"
+        team: "planning"
+        model_ref: "lead_default"
+        expertise: "planning-lead-expertise-model"
+        skills:
+          - "delegate_bounded"
+          - "zero_micromanagement"
+          - "expertise_model"
+        domain_profile: "read_only_repo"
+      - id: "repo-analyst"
+        role: "worker"
+        team: "planning"
+        model_ref: "worker_default"
+        expertise: "repo-analyst-expertise-model"
+        skills:
+          - "expertise_model"
+        domain_profile: "read_only_repo"

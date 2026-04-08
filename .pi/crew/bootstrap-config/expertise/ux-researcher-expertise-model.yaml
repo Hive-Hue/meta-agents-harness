@@ -1,0 +1,16 @@
+agent:
+  name: "ux-researcher"
+  role: "agent"
+  team: "bootstrap-config"
+meta:
+  version: "1"
+  max_lines: "120"
+  last_updated: "2026-04-07T15:57:53.333Z"
+patterns: []
+risks: []
+workflows: []
+decisions: []
+lessons: []
+observations: [] 
+open_questions: []
+tools: []

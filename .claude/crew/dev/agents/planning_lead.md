@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/planning-lead-expertise-model.yaml
   use-when: Track which discovery and planning patterns produce executable, ownership-aware plans for Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - delegate_agent
   - update_expertise_model

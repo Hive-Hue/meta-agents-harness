@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename)
 export const opencodeRoot = path.resolve(__dirname, "..", "..")
 export const repoRoot = path.resolve(opencodeRoot, "..")
 export const crewRoot = path.join(opencodeRoot, "crew")
+export const metaAgentsPath = path.join(repoRoot, "meta-agents.yaml")
 export const activeMetaPath = path.join(opencodeRoot, ".active-crew.json")
 export const activeConfigPath = path.join(opencodeRoot, "multi-team.yaml")
 export const activeAgentsPath = path.join(opencodeRoot, "agents")
@@ -63,7 +64,18 @@ function forceSymlink(targetPath, linkPath) {
   symlinkSync(relativeTarget, linkPath)
 }
 
-function patchOrchestratorNoHierarchy(promptContent, agentIds) {
+function getAllowDelegateForCrew(crew) {
+  if (!existsSync(metaAgentsPath)) return null
+  try {
+    const meta = YAML.parse(readFileSync(metaAgentsPath, "utf-8"))
+    const crewConfig = meta?.crews?.find((c) => c.id === crew)
+    return crewConfig?.runtime_overrides?.opencode?.permission?.task?.allow_delegate || null
+  } catch {
+    return null
+  }
+}
+
+function patchOrchestratorNoHierarchy(promptContent, agentIds, crew) {
   const match = promptContent.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   if (!match) return promptContent
   let frontmatter = {}
@@ -85,7 +97,40 @@ function patchOrchestratorNoHierarchy(promptContent, agentIds) {
   return `---\n${updatedFrontmatter}\n---\n${match[2]}`
 }
 
-function materializeActiveAgents(crew, noHierarchy) {
+function patchOrchestratorWithHierarchy(promptContent, crew) {
+  const match = promptContent.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  if (!match) return promptContent
+  let frontmatter = {}
+  try {
+    frontmatter = YAML.parse(match[1]) || {}
+  } catch {
+    return promptContent
+  }
+
+  const allowDelegate = getAllowDelegateForCrew(crew)
+  const taskPermission = { "*": "deny" }
+  
+  if (allowDelegate) {
+    for (const [agent, allowedTargets] of Object.entries(allowDelegate)) {
+      if (agent === "orchestrator") {
+        for (const target of allowedTargets) {
+          taskPermission[target] = "allow"
+        }
+      }
+    }
+  } else {
+    taskPermission["planning-lead"] = "allow"
+    taskPermission["engineering-lead"] = "allow"
+    taskPermission["validation-lead"] = "allow"
+  }
+
+  frontmatter.permission = frontmatter.permission || {}
+  frontmatter.permission.task = taskPermission
+  const updatedFrontmatter = YAML.stringify(frontmatter).trimEnd()
+  return `---\n${updatedFrontmatter}\n---\n${match[2]}`
+}
+
+function materializeActiveAgents(crew, hierarchy) {
   const sourceAgents = sourceAgentsForCrew(crew)
   removeIfExists(activeAgentsPath)
   mkdirSync(activeAgentsPath, { recursive: true })
@@ -99,8 +144,8 @@ function materializeActiveAgents(crew, noHierarchy) {
   for (const file of files) {
     const sourcePath = path.join(sourceAgents, file)
     const targetPath = path.join(activeAgentsPath, file)
-    if (noHierarchy && file === "orchestrator.md") {
-      const patched = patchOrchestratorNoHierarchy(readFileSync(sourcePath, "utf-8"), agentIds)
+    if (hierarchy && file === "orchestrator.md") {
+      const patched = patchOrchestratorWithHierarchy(readFileSync(sourcePath, "utf-8"), crew)
       writeFileSync(targetPath, patched, "utf-8")
     } else {
       const relativeTarget = path.relative(path.dirname(targetPath), sourcePath)
@@ -113,18 +158,18 @@ export function ensureCrewSelected(crew, options = {}) {
   const sourceConfig = sourceConfigForCrew(crew)
   const sourceAgents = sourceAgentsForCrew(crew)
   const sourceExpertise = sourceExpertiseForCrew(crew)
-  const noHierarchy = Boolean(options?.noHierarchy)
+  const hierarchy = Boolean(options?.hierarchy)
   if (!existsSync(sourceConfig)) return false
   if (!existsSync(sourceAgents)) return false
   if (!existsSync(sourceExpertise)) return false
   forceSymlink(sourceConfig, activeConfigPath)
-  materializeActiveAgents(crew, noHierarchy)
+  materializeActiveAgents(crew, hierarchy)
   const meta = {
     crew,
     source_config: rel(sourceConfig),
     source_agents: rel(sourceAgents),
     source_expertise: rel(sourceExpertise),
-    no_hierarchy: noHierarchy,
+    hierarchy,
     selected_at: new Date().toISOString()
   }
   writeFileSync(activeMetaPath, `${JSON.stringify(meta, null, 2)}\n`, "utf-8")

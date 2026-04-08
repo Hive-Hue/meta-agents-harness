@@ -1,5 +1,10 @@
 version: 1
 name: marketing-multi-team-harness
+mission: Plan, produce, refine, and validate communication assets, launch
+  narratives, campaign collateral, and supporting media for Meta Agents Harness.
+instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+  communication assets, launch narratives, campaign collateral, and supporting
+  media for Meta Agents Harness.
 runtime:
   harness: opencode
   source_of_truth: meta-agents.yaml
@@ -19,12 +24,209 @@ shared:
     - clickup
     - github
     - context7
+  domain_profiles:
+    read_only_repo:
+      - path: .
+        read: true
+    planning_delivery:
+      - path: .
+        read: true
+      - path: plan/*
+        read: true
+        edit: true
+      - path: specs/*
+        read: true
+        edit: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: README.md
+        read: true
+        edit: true
+      - path: CHANGELOG.md
+        read: true
+        edit: true
+    cli_operator_surface:
+      - path: .
+        read: true
+      - path: README.md
+        read: true
+        edit: true
+      - path: CHANGELOG.md
+        read: true
+        edit: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: assets/*
+        read: true
+        edit: true
+      - path: bin/*
+        read: true
+        edit: true
+        bash: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+    runtime_impl:
+      - path: .
+        read: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
+      - path: package.json
+        read: true
+        edit: true
+      - path: package-lock.json
+        read: true
+        edit: true
+      - path: bin/*
+        read: true
+        edit: true
+        bash: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+      - path: types/*
+        read: true
+        edit: true
+      - path: tests/*
+        read: true
+        edit: true
+        bash: true
+      - path: extensions/*
+        read: true
+        edit: true
+        bash: true
+      - path: .claude/*
+        read: true
+        edit: true
+        bash: true
+      - path: .opencode/*
+        read: true
+        edit: true
+        bash: true
+      - path: .pi/*
+        read: true
+        edit: true
+        bash: true
+      - path: .hermes/*
+        read: true
+        edit: true
+        bash: true
+      - path: .mcp.example.json
+        read: true
+        edit: true
+      - path: .env.sample
+        read: true
+        edit: true
+    validation_runtime:
+      - path: .
+        read: true
+        bash: true
+      - path: tests/*
+        read: true
+        edit: true
+        bash: true
+      - path: .github/workflows/*
+        read: true
+        edit: true
+        bash: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: specs/*
+        read: true
+        edit: true
+    bootstrap_generation:
+      - path: .
+        read: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+      - path: bin/*
+        read: true
+        edit: true
+        bash: true
+      - path: types/*
+        read: true
+        edit: true
+      - path: specs/*
+        read: true
+        edit: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: tests/*
+        read: true
+        edit: true
+        bash: true
+    runtime_assets_sync:
+      - path: .claude/*
+        read: true
+        edit: true
+      - path: .opencode/*
+        read: true
+        edit: true
+      - path: .pi/*
+        read: true
+        edit: true
+      - path: .hermes/*
+        read: true
+        edit: true
+      - path: extensions/*
+        read: true
+        edit: true
+        bash: true
+      - path: .mcp.example.json
+        read: true
+        edit: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
+    docs_authoring:
+      - path: .
+        read: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: README.md
+        read: true
+        edit: true
+      - path: CHANGELOG.md
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: assets/*
+        read: true
+        edit: true
 orchestrator:
   id: orchestrator
   role: ceo
+  instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+    communication assets, launch narratives, campaign collateral, and supporting
+    media for Meta Agents Harness.
   model: zai/glm-4.7
   model_fallbacks:
-    - zai/glm-5-turbo
+    - nvidia/nemotron-3-super-120b-a12b:free
+    - zai/glm-5
     - zai/glm-4.5-air
   agent_file: .opencode/crew/marketing/agents/orchestrator.md
   expertise:
@@ -58,9 +260,12 @@ teams:
     lead:
       id: planning-lead
       role: lead
+      instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+        communication assets, launch narratives, campaign collateral, and
+        supporting media for Meta Agents Harness.
       model: zai/glm-4.7
       model_fallbacks:
-        - zai/glm-5-turbo
+        - zai/glm-5
         - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/planning-lead.md
       expertise:
@@ -88,19 +293,38 @@ teams:
           read: true
           edit: false
           bash: false
-        - path: campaigns/
+        - path: docs/*
           read: true
           edit: true
           bash: false
-        - path: assets/
+          recursive: true
+        - path: README.md
           read: true
           edit: true
           bash: false
+        - path: CHANGELOG.md
+          read: true
+          edit: true
+          bash: false
+        - path: examples/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: assets/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
     members:
       - id: market-researcher
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/market-researcher.md
@@ -125,18 +349,37 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
       - id: campaign-strategist
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/campaign-strategist.md
@@ -161,21 +404,39 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
   - name: Creative
     lead:
       id: creative-lead
       role: lead
+      instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+        communication assets, launch narratives, campaign collateral, and
+        supporting media for Meta Agents Harness.
       model: zai/glm-4.7
       model_fallbacks:
-        - zai/glm-5-turbo
+        - zai/glm-5
         - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/creative-lead.md
       expertise:
@@ -204,19 +465,38 @@ teams:
           read: true
           edit: false
           bash: false
-        - path: campaigns/
+        - path: docs/*
           read: true
           edit: true
           bash: false
-        - path: assets/
+          recursive: true
+        - path: README.md
           read: true
           edit: true
           bash: false
+        - path: CHANGELOG.md
+          read: true
+          edit: true
+          bash: false
+        - path: examples/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: assets/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
     members:
       - id: copywriter
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/copywriter.md
@@ -241,18 +521,37 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
       - id: creative-strategist
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/creative-strategist.md
@@ -277,18 +576,37 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
       - id: media-operator
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/media-operator.md
@@ -313,21 +631,39 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
   - name: Validation
     lead:
       id: validation-lead
       role: lead
+      instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+        communication assets, launch narratives, campaign collateral, and
+        supporting media for Meta Agents Harness.
       model: zai/glm-4.7
       model_fallbacks:
-        - zai/glm-5-turbo
+        - zai/glm-5
         - zai/glm-4.5-air
       agent_file: .opencode/crew/marketing/agents/validation-lead.md
       expertise:
@@ -355,19 +691,38 @@ teams:
           read: true
           edit: false
           bash: false
-        - path: campaigns/
+        - path: docs/*
           read: true
           edit: true
           bash: false
-        - path: assets/
+          recursive: true
+        - path: README.md
           read: true
           edit: true
           bash: false
+        - path: CHANGELOG.md
+          read: true
+          edit: true
+          bash: false
+        - path: examples/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: assets/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
     members:
       - id: performance-analyst
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/performance-analyst.md
@@ -392,18 +747,37 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
       - id: brand-safety-reviewer
         role: worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/marketing/agents/brand-safety-reviewer.md
@@ -428,11 +802,26 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: campaigns/
+          - path: docs/*
             read: true
             edit: true
             bash: false
-          - path: assets/
+            recursive: true
+          - path: README.md
             read: true
             edit: true
             bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true

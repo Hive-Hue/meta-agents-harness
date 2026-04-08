@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/orchestrator-expertise-model.yaml
   use-when: Track routing quality, team sequencing, and cross-team coordination risks.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - delegate_agent
   - update_expertise_model

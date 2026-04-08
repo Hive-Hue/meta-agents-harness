@@ -20,3 +20,4 @@
 
 - Adapter model is stable enough for current harness usage, but still evolutive in `0.x`.
 - External plugin API guarantees are not declared yet.
+- Hermes runtime added as first-class adapter in v0.4.0 — see `docs/hermes/runtime-support.md` for details.

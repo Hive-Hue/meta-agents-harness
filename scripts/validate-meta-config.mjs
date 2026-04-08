@@ -29,6 +29,17 @@ const domainRuleSchema = z.object({
   bash: z.boolean().optional()
 }).passthrough()
 
+const sprintModeSchema = z.object({
+  name: z.string().min(1).optional(),
+  active: z.boolean().optional(),
+  target_release: z.string().min(1).optional(),
+  objective: z.string().min(1).optional(),
+  execution_mode: z.string().min(1).optional(),
+  directives: z.array(z.string()).optional(),
+  must_deliver: z.array(z.string()).optional(),
+  must_not_deliver: z.array(z.string()).optional()
+}).passthrough()
+
 const agentSchema = z.object({
   id: z.string().min(1),
   role: z.enum(["orchestrator", "lead", "worker"]),
@@ -38,12 +49,15 @@ const agentSchema = z.object({
   model_fallbacks: z.array(z.string()).optional(),
   expertise: z.string().optional(),
   skills: z.array(z.string()).optional(),
-  domain_profile: z.string().optional()
+  domain_profile: z.union([z.string(), z.array(z.string())]).optional(),
+  sprint_responsibilities: z.array(z.string()).optional()
 }).passthrough()
 
 const crewSchema = z.object({
   id: z.string().min(1),
   display_name: z.string().optional(),
+  mission: z.string().optional(),
+  sprint_mode: sprintModeSchema.optional(),
   source_configs: z.record(z.string(), z.string()).optional(),
   session: z.record(z.string(), z.any()).optional(),
   topology: z.object({
@@ -66,9 +80,9 @@ const schema = z.object({
   catalog: z.object({
     models: z.record(z.string(), z.string()).default({}),
     model_fallbacks: z.record(z.string(), z.array(z.string())).optional(),
-    skills: z.record(z.string(), z.record(z.string(), z.string())).default({}),
-    domain_profiles: z.record(z.string(), z.array(domainRuleSchema)).default({})
+    skills: z.record(z.string(), z.record(z.string(), z.string())).default({})
   }).passthrough(),
+  domain_profiles: z.record(z.string(), z.array(domainRuleSchema)).optional(),
   crews: z.array(crewSchema).min(1)
 }).passthrough()
 
@@ -87,7 +101,7 @@ function validateCrossRefs(config) {
 
   const modelRefs = new Set(Object.keys(config.catalog?.models || {}))
   const skillRefs = new Set(Object.keys(config.catalog?.skills || {}))
-  const domainRefs = new Set(Object.keys(config.catalog?.domain_profiles || {}))
+  const domainRefs = new Set(Object.keys(config.domain_profiles || {}))
 
   for (const crew of config.crews || []) {
     const agentMap = new Map()
@@ -104,8 +118,15 @@ function validateCrossRefs(config) {
           issues.push(`crew '${crew.id}' agent '${agent.id}' references unknown skill '${skill}'`)
         }
       }
-      if (agent.domain_profile && !domainRefs.has(agent.domain_profile)) {
-        issues.push(`crew '${crew.id}' agent '${agent.id}' references unknown domain_profile '${agent.domain_profile}'`)
+      const domainProfiles = Array.isArray(agent.domain_profile)
+        ? agent.domain_profile
+        : agent.domain_profile
+          ? [agent.domain_profile]
+          : []
+      for (const dp of domainProfiles) {
+        if (!domainRefs.has(dp)) {
+          issues.push(`crew '${crew.id}' agent '${agent.id}' references unknown domain_profile '${dp}'`)
+        }
       }
     }
 

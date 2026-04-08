@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/validation-lead-expertise-model.yaml
   use-when: Track regression patterns, review heuristics, and which validation combinations catch the highest-risk issues in Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - delegate_agent
   - update_expertise_model

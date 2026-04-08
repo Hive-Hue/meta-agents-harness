@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/qa-reviewer-expertise-model.yaml
   use-when: Track recurring regressions, weak verification patterns, and lightweight checks that produce useful signal for Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - read
   - bash

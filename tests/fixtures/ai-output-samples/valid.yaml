@@ -1,0 +1,86 @@
+version: 1
+name: "ai-generated"
+description: "AI-generated configuration for testing"
+
+runtime_detection:
+  order:
+    - forced
+    - marker
+    - cli
+  forced:
+    args:
+      - "--runtime=<name>"
+    env:
+      - MAH_RUNTIME
+  marker:
+    pi: ".pi"
+    claude: ".claude"
+    opencode: ".opencode"
+    hermes: ".hermes"
+  cli:
+    pi:
+      direct_cli: "pi"
+      wrapper: "pimh"
+    claude:
+      direct_cli: "claude"
+      wrapper: "ccmh"
+    opencode:
+      direct_cli: "opencode"
+      wrapper: "ocmh"
+    hermes:
+      direct_cli: "hermes"
+      wrapper: "hermesh"
+
+runtimes:
+  pi:
+    wrapper: "pimh"
+    config_root: ".pi"
+    config_pattern: ".pi/crew/<crew>/multi-team.yaml"
+  claude:
+    wrapper: "ccmh"
+    config_root: ".claude"
+    config_pattern: ".claude/crew/<crew>/multi-team.yaml"
+  opencode:
+    wrapper: "ocmh"
+    config_root: ".opencode"
+    config_pattern: ".opencode/crew/<crew>/multi-team.yaml"
+  hermes:
+    wrapper: "hermesh"
+    config_root: ".hermes"
+    config_pattern: ".hermes/crew/<crew>/config.yaml"
+
+catalog:
+  models:
+    orchestrator_default: "zai/glm-4.7"
+    lead_default: "zai/glm-4.7"
+    worker_default: "zai/glm-5-turbo"
+  skills:
+    delegate_bounded:
+      pi: ".pi/skills/delegate-bounded/SKILL.md"
+    zero_micromanagement:
+      pi: ".pi/skills/zero-micromanagement/SKILL.md"
+    expertise_model:
+      pi: ".pi/skills/expertise-model/SKILL.md"
+  domain_profiles:
+    read_only_repo:
+      - path: "."
+        read: true
+        edit: false
+        bash: false
+
+crews:
+  - id: "ai-crew"
+    display_name: "AI Crew"
+    mission: "AI-generated crew for testing"
+    topology:
+      orchestrator: "orchestrator"
+      leads: {}
+      workers: {}
+    agents:
+      - id: "orchestrator"
+        role: "orchestrator"
+        team: "orchestration"
+        model_ref: "orchestrator_default"
+        skills:
+          - "delegate_bounded"
+        domain_profile: "read_only_repo"

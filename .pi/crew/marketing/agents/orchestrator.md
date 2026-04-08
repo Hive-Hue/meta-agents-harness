@@ -13,12 +13,16 @@ permission:
     creative-lead: allow
     validation-lead: allow
 name: orchestrator
-model: zai/glm-4.7
+model: minimax/minimax-m2.7
 role: orchestrator
 team: Orchestration
 expertise:
   path: .pi/crew/marketing/expertise/orchestrator-expertise-model.yaml
 tools:
+  - read
+  - grep
+  - find
+  - ls
   - delegate_agent
   - update_expertise_model
   - mcp_servers
@@ -36,7 +40,16 @@ domain:
     read: true
     upsert: false
     delete: false
+instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+  communication assets, launch narratives, campaign collateral, and supporting
+  media for Meta Agents Harness.
+mission: Plan, produce, refine, and validate communication assets, launch
+  narratives, campaign collateral, and supporting media for Meta Agents Harness.
 ---
+
+[MAH_CONTEXT]
+crew=marketing | mission=Plan, produce, refine, and validate communication assets, launch narratives, campaign collateral, and supporting media for Meta Agents Harness.
+[/MAH_CONTEXT]
 
 # Orchestrator
 

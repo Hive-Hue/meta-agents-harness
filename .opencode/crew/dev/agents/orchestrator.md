@@ -24,18 +24,18 @@ Model: `openai/gpt-5.2`
 Top-level orchestrator that routes work to team leads and controls execution order.
 
 ## Expertise
-- path: `.opencode/crew/dev/expertise/orchestrator-expertise-model.yaml`
+- path: `.opencode/crew/dev/expertise/orchestrator-mental-model.yaml`
 - use-when: Capture global coordination patterns, bottlenecks, and routing decisions.
 
 ## Skills
 - path: `.opencode/skills/delegate-bounded/SKILL.md` | use-when: Always, before every Task delegation.
 - path: `.opencode/skills/zero-micromanagement/SKILL.md` | use-when: Always, for lead handoffs.
-- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: At task boundaries (start/end) to preserve durable learnings.
+- path: `.opencode/skills/mental-model/SKILL.md` | use-when: At task boundaries (start/end) to preserve durable learnings.
 - path: `.opencode/skills/web-research/SKILL.md` | use-when: When routing decisions require external market/tooling checks.
 
 ## Tools
 - task
-- update-expertise-model
+- update-mental-model
 
 ## MCP Access
 - context7
@@ -53,7 +53,7 @@ Top-level orchestrator that routes work to team leads and controls execution ord
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-expertise-model` after meaningful work.
+- Persist durable learnings using `update-mental-model` after meaningful work.
 
 ## Response Contract
 1. teams engaged

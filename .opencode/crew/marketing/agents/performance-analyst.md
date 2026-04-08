@@ -21,11 +21,11 @@ Model: `zai/glm-5-turbo`
 Validation worker focused on scoped execution within assigned ownership boundaries.
 
 ## Expertise
-- path: `.opencode/crew/marketing/expertise/performance-analyst-expertise-model.yaml`
+- path: `.opencode/crew/marketing/expertise/performance-analyst-mental-model.yaml`
 - use-when: Save metrics interpretation patterns and optimization hypotheses.
 
 ## Skills
-- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Before and after performance review.
+- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Before and after performance review.
 - path: `.opencode/skills/web-research/SKILL.md` | use-when: For external benchmark and distribution performance baselines.
 
 ## Tools
@@ -33,7 +33,7 @@ Validation worker focused on scoped execution within assigned ownership boundari
 - grep
 - glob
 - list
-- update-expertise-model
+- update-mental-model
 
 ## MCP Access
 - context7
@@ -50,7 +50,7 @@ Validation worker focused on scoped execution within assigned ownership boundari
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-expertise-model` after meaningful work.
+- Persist durable learnings using `update-mental-model` after meaningful work.
 
 ## Response Contract
 1. execution summary

@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/engineering-lead-expertise-model.yaml
   use-when: Track architecture decisions, implementation sequencing, risk patterns, and which worker allocations reduce blast radius for Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - delegate_agent
   - update_expertise_model

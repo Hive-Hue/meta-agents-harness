@@ -1,5 +1,50 @@
 version: 1
 name: dev-multi-team-harness
+mission: Setup and evolve runtime support, validation, projection, and
+  operator-facing architecture for Meta Agents Harness while preserving bounded
+  scope and runtime-agnostic design.
+sprint_mode:
+  name: v0.4.0-runtime-evolution
+  active: true
+  target_release: v0.4.0
+  objective: Finalize the current runtime support roadmap with bounded adapter and
+    validation improvements.
+  execution_mode: spec-bound-slice-driven
+  directives:
+    - spec-bound execution
+    - no architecture-wave expansion
+    - no v0.5.0+ scope
+    - PR-sized slices
+    - mandatory validation at each slice
+    - explicit deferred list for anything outside v0.4.0
+  must_deliver:
+    - Hermes command and capability discovery
+    - runtime compatibility matrix
+    - adapter skeleton
+    - bounded dispatcher and config integration plan
+    - diagnostics and explainability impact plan
+    - test plan
+    - small implementation-ready slices
+  must_not_deliver:
+    - full Hermes parity
+    - remote execution foundation
+    - policy engine
+    - federation/interconnect
+    - confidential execution
+    - runtime contract redesign driven by Hermes
+    - MAH becoming Hermes-shaped
+instruction_block: crew=dev | mission=Setup and evolve runtime support,
+  validation, projection, and operator-facing architecture for Meta Agents
+  Harness while preserving bounded scope and runtime-agnostic design. |
+  sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+  | directives=spec-bound execution; no architecture-wave expansion; no v0.5.0+
+  scope; PR-sized slices; mandatory validation at each slice; explicit deferred
+  list for anything outside v0.4.0 | do=Hermes command and capability discovery;
+  runtime compatibility matrix; adapter skeleton; bounded dispatcher and config
+  integration plan; diagnostics and explainability impact plan; test plan; small
+  implementation-ready slices | avoid=full Hermes parity; remote execution
+  foundation; policy engine; federation/interconnect; confidential execution;
+  runtime contract redesign driven by Hermes; MAH becoming Hermes-shaped
 runtime:
   harness: opencode
   source_of_truth: meta-agents.yaml
@@ -19,12 +64,227 @@ shared:
     - clickup
     - github
     - context7
+  domain_profiles:
+    read_only_repo:
+      - path: .
+        read: true
+    planning_delivery:
+      - path: .
+        read: true
+      - path: plan/*
+        read: true
+        edit: true
+      - path: specs/*
+        read: true
+        edit: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: README.md
+        read: true
+        edit: true
+      - path: CHANGELOG.md
+        read: true
+        edit: true
+    cli_operator_surface:
+      - path: .
+        read: true
+      - path: README.md
+        read: true
+        edit: true
+      - path: CHANGELOG.md
+        read: true
+        edit: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: assets/*
+        read: true
+        edit: true
+      - path: bin/*
+        read: true
+        edit: true
+        bash: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+    runtime_impl:
+      - path: .
+        read: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
+      - path: package.json
+        read: true
+        edit: true
+      - path: package-lock.json
+        read: true
+        edit: true
+      - path: bin/*
+        read: true
+        edit: true
+        bash: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+      - path: types/*
+        read: true
+        edit: true
+      - path: tests/*
+        read: true
+        edit: true
+        bash: true
+      - path: extensions/*
+        read: true
+        edit: true
+        bash: true
+      - path: .claude/*
+        read: true
+        edit: true
+        bash: true
+      - path: .opencode/*
+        read: true
+        edit: true
+        bash: true
+      - path: .pi/*
+        read: true
+        edit: true
+        bash: true
+      - path: .hermes/*
+        read: true
+        edit: true
+        bash: true
+      - path: .mcp.example.json
+        read: true
+        edit: true
+      - path: .env.sample
+        read: true
+        edit: true
+    validation_runtime:
+      - path: .
+        read: true
+        bash: true
+      - path: tests/*
+        read: true
+        edit: true
+        bash: true
+      - path: .github/workflows/*
+        read: true
+        edit: true
+        bash: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: specs/*
+        read: true
+        edit: true
+    bootstrap_generation:
+      - path: .
+        read: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+      - path: bin/*
+        read: true
+        edit: true
+        bash: true
+      - path: types/*
+        read: true
+        edit: true
+      - path: specs/*
+        read: true
+        edit: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: tests/*
+        read: true
+        edit: true
+        bash: true
+    runtime_assets_sync:
+      - path: .claude/*
+        read: true
+        edit: true
+      - path: .opencode/*
+        read: true
+        edit: true
+      - path: .pi/*
+        read: true
+        edit: true
+      - path: .hermes/*
+        read: true
+        edit: true
+      - path: extensions/*
+        read: true
+        edit: true
+        bash: true
+      - path: .mcp.example.json
+        read: true
+        edit: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
+    docs_authoring:
+      - path: .
+        read: true
+      - path: docs/*
+        read: true
+        edit: true
+      - path: README.md
+        read: true
+        edit: true
+      - path: CHANGELOG.md
+        read: true
+        edit: true
+      - path: examples/*
+        read: true
+        edit: true
+      - path: assets/*
+        read: true
+        edit: true
 orchestrator:
   id: orchestrator
   role: ceo
+  sprint_responsibilities:
+    - control sprint scope
+    - distribute slices
+    - consolidate decisions
+    - prevent runtime capture by Hermes
+    - defer anything outside v0.4.0
+  instruction_block: crew=dev | mission=Setup and evolve runtime support,
+    validation, projection, and operator-facing architecture for Meta Agents
+    Harness while preserving bounded scope and runtime-agnostic design. |
+    sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+    | directives=spec-bound execution; no architecture-wave expansion; no
+    v0.5.0+ scope; PR-sized slices; mandatory validation at each slice; explicit
+    deferred list for anything outside v0.4.0 | do=Hermes command and capability
+    discovery; runtime compatibility matrix; adapter skeleton; bounded
+    dispatcher and config integration plan; diagnostics and explainability
+    impact plan; test plan; small implementation-ready slices | avoid=full
+    Hermes parity; remote execution foundation; policy engine;
+    federation/interconnect; confidential execution; runtime contract redesign
+    driven by Hermes; MAH becoming Hermes-shaped | role=control sprint scope;
+    distribute slices; consolidate decisions; prevent runtime capture by Hermes;
+    defer anything outside v0.4.0
   model: zai/glm-4.7
   model_fallbacks:
-    - zai/glm-5-turbo
+    - nvidia/nemotron-3-super-120b-a12b:free
+    - zai/glm-5
     - zai/glm-4.5-air
   agent_file: .opencode/crew/dev/agents/orchestrator.md
   expertise:
@@ -58,9 +318,28 @@ teams:
     lead:
       id: planning-lead
       role: lead
+      sprint_responsibilities:
+        - translate spec into executable backlog
+        - order slices
+        - prevent backlog inflation
+      instruction_block: crew=dev | mission=Setup and evolve runtime support,
+        validation, projection, and operator-facing architecture for Meta Agents
+        Harness while preserving bounded scope and runtime-agnostic design. |
+        sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        | directives=spec-bound execution; no architecture-wave expansion; no
+        v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.4.0 | do=Hermes command
+        and capability discovery; runtime compatibility matrix; adapter
+        skeleton; bounded dispatcher and config integration plan; diagnostics
+        and explainability impact plan; test plan; small implementation-ready
+        slices | avoid=full Hermes parity; remote execution foundation; policy
+        engine; federation/interconnect; confidential execution; runtime
+        contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+        role=translate spec into executable backlog; order slices; prevent
+        backlog inflation
       model: zai/glm-4.7
       model_fallbacks:
-        - zai/glm-5-turbo
+        - zai/glm-5
         - zai/glm-4.5-air
       agent_file: .opencode/crew/dev/agents/planning-lead.md
       expertise:
@@ -88,11 +367,60 @@ teams:
           read: true
           edit: false
           bash: false
+        - path: plan/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: specs/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: docs/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: examples/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: README.md
+          read: true
+          edit: true
+          bash: false
+        - path: CHANGELOG.md
+          read: true
+          edit: true
+          bash: false
     members:
       - id: repo-analyst
         role: worker
+        sprint_responsibilities:
+          - map real codebase integration points
+          - locate affected files
+          - surface regression and coupling risks
+        instruction_block: crew=dev | mission=Setup and evolve runtime support,
+          validation, projection, and operator-facing architecture for Meta
+          Agents Harness while preserving bounded scope and runtime-agnostic
+          design. |
+          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; no architecture-wave expansion; no
+          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.4.0 | do=Hermes command
+          and capability discovery; runtime compatibility matrix; adapter
+          skeleton; bounded dispatcher and config integration plan; diagnostics
+          and explainability impact plan; test plan; small implementation-ready
+          slices | avoid=full Hermes parity; remote execution foundation; policy
+          engine; federation/interconnect; confidential execution; runtime
+          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          role=map real codebase integration points; locate affected files;
+          surface regression and coupling risks
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/repo-analyst.md
@@ -119,9 +447,29 @@ teams:
             bash: false
       - id: solution-architect
         role: worker
+        sprint_responsibilities:
+          - define the adapter approach
+          - define minimal meta-agents.yaml compatibility
+          - identify the smallest technically correct slice
+        instruction_block: crew=dev | mission=Setup and evolve runtime support,
+          validation, projection, and operator-facing architecture for Meta
+          Agents Harness while preserving bounded scope and runtime-agnostic
+          design. |
+          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; no architecture-wave expansion; no
+          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.4.0 | do=Hermes command
+          and capability discovery; runtime compatibility matrix; adapter
+          skeleton; bounded dispatcher and config integration plan; diagnostics
+          and explainability impact plan; test plan; small implementation-ready
+          slices | avoid=full Hermes parity; remote execution foundation; policy
+          engine; federation/interconnect; confidential execution; runtime
+          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          role=define the adapter approach; define minimal meta-agents.yaml
+          compatibility; identify the smallest technically correct slice
         model: zai/glm-4.7
         model_fallbacks:
-          - zai/glm-5-turbo
+          - zai/glm-5
           - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/solution-architect.md
         expertise:
@@ -145,7 +493,31 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: specs/
+          - path: plan/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: specs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: docs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: README.md
+            read: true
+            edit: true
+            bash: false
+          - path: CHANGELOG.md
             read: true
             edit: true
             bash: false
@@ -153,9 +525,28 @@ teams:
     lead:
       id: engineering-lead
       role: lead
+      sprint_responsibilities:
+        - coordinate implementation
+        - split work into reviewable changesets
+        - preserve adapter and dispatcher boundaries
+      instruction_block: crew=dev | mission=Setup and evolve runtime support,
+        validation, projection, and operator-facing architecture for Meta Agents
+        Harness while preserving bounded scope and runtime-agnostic design. |
+        sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        | directives=spec-bound execution; no architecture-wave expansion; no
+        v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.4.0 | do=Hermes command
+        and capability discovery; runtime compatibility matrix; adapter
+        skeleton; bounded dispatcher and config integration plan; diagnostics
+        and explainability impact plan; test plan; small implementation-ready
+        slices | avoid=full Hermes parity; remote execution foundation; policy
+        engine; federation/interconnect; confidential execution; runtime
+        contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+        role=coordinate implementation; split work into reviewable changesets;
+        preserve adapter and dispatcher boundaries
       model: zai/glm-4.7
       model_fallbacks:
-        - zai/glm-5-turbo
+        - zai/glm-5
         - zai/glm-4.5-air
       agent_file: .opencode/crew/dev/agents/engineering-lead.md
       expertise:
@@ -183,11 +574,96 @@ teams:
           read: true
           edit: false
           bash: false
+        - path: meta-agents.yaml
+          read: true
+          edit: true
+          bash: false
+        - path: package.json
+          read: true
+          edit: true
+          bash: false
+        - path: package-lock.json
+          read: true
+          edit: true
+          bash: false
+        - path: bin/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: scripts/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: types/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
+        - path: tests/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: extensions/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: .claude/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: .opencode/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: .pi/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: .hermes/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: .mcp.example.json
+          read: true
+          edit: true
+          bash: false
+        - path: .env.sample
+          read: true
+          edit: true
+          bash: false
     members:
       - id: frontend-dev
         role: worker
+        sprint_responsibilities:
+          - update CLI and help surfaces
+          - handle operator-facing explainability and docs changes
+        instruction_block: crew=dev | mission=Setup and evolve runtime support,
+          validation, projection, and operator-facing architecture for Meta
+          Agents Harness while preserving bounded scope and runtime-agnostic
+          design. |
+          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; no architecture-wave expansion; no
+          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.4.0 | do=Hermes command
+          and capability discovery; runtime compatibility matrix; adapter
+          skeleton; bounded dispatcher and config integration plan; diagnostics
+          and explainability impact plan; test plan; small implementation-ready
+          slices | avoid=full Hermes parity; remote execution foundation; policy
+          engine; federation/interconnect; confidential execution; runtime
+          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          role=update CLI and help surfaces; handle operator-facing
+          explainability and docs changes
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/frontend-dev.md
@@ -212,18 +688,133 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: src/frontend/
+          - path: README.md
+            read: true
+            edit: true
+            bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: docs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: bin/*
             read: true
             edit: true
             bash: true
-          - path: web/
+            recursive: true
+          - path: scripts/*
             read: true
             edit: true
             bash: true
+            recursive: true
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: meta-agents.yaml
+            read: true
+            edit: true
+            bash: false
+          - path: package.json
+            read: true
+            edit: true
+            bash: false
+          - path: package-lock.json
+            read: true
+            edit: true
+            bash: false
+          - path: bin/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: scripts/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: types/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: tests/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: extensions/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .claude/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .opencode/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .pi/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .hermes/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .mcp.example.json
+            read: true
+            edit: true
+            bash: false
+          - path: .env.sample
+            read: true
+            edit: true
+            bash: false
       - id: backend-dev
         role: worker
+        sprint_responsibilities:
+          - implement runtime adapter behavior
+          - integrate dispatcher and config changes
+          - own Hermes-aware runtime projection and tests
+        instruction_block: crew=dev | mission=Setup and evolve runtime support,
+          validation, projection, and operator-facing architecture for Meta
+          Agents Harness while preserving bounded scope and runtime-agnostic
+          design. |
+          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; no architecture-wave expansion; no
+          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.4.0 | do=Hermes command
+          and capability discovery; runtime compatibility matrix; adapter
+          skeleton; bounded dispatcher and config integration plan; diagnostics
+          and explainability impact plan; test plan; small implementation-ready
+          slices | avoid=full Hermes parity; remote execution foundation; policy
+          engine; federation/interconnect; confidential execution; runtime
+          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          role=implement runtime adapter behavior; integrate dispatcher and
+          config changes; own Hermes-aware runtime projection and tests
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/backend-dev.md
@@ -248,21 +839,134 @@ teams:
             read: true
             edit: false
             bash: false
-          - path: src/backend/
+          - path: README.md
+            read: true
+            edit: true
+            bash: false
+          - path: CHANGELOG.md
+            read: true
+            edit: true
+            bash: false
+          - path: docs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: examples/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: assets/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: bin/*
             read: true
             edit: true
             bash: true
-          - path: api/
+            recursive: true
+          - path: scripts/*
             read: true
             edit: true
             bash: true
+            recursive: true
+          - path: .
+            read: true
+            edit: false
+            bash: false
+          - path: meta-agents.yaml
+            read: true
+            edit: true
+            bash: false
+          - path: package.json
+            read: true
+            edit: true
+            bash: false
+          - path: package-lock.json
+            read: true
+            edit: true
+            bash: false
+          - path: bin/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: scripts/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: types/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: tests/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: extensions/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .claude/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .opencode/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .pi/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .hermes/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .mcp.example.json
+            read: true
+            edit: true
+            bash: false
+          - path: .env.sample
+            read: true
+            edit: true
+            bash: false
   - name: Validation
     lead:
       id: validation-lead
       role: lead
+      sprint_responsibilities:
+        - define phase gates
+        - validate spec adherence
+        - block scope escape from the release boundary
+      instruction_block: crew=dev | mission=Setup and evolve runtime support,
+        validation, projection, and operator-facing architecture for Meta Agents
+        Harness while preserving bounded scope and runtime-agnostic design. |
+        sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        | directives=spec-bound execution; no architecture-wave expansion; no
+        v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.4.0 | do=Hermes command
+        and capability discovery; runtime compatibility matrix; adapter
+        skeleton; bounded dispatcher and config integration plan; diagnostics
+        and explainability impact plan; test plan; small implementation-ready
+        slices | avoid=full Hermes parity; remote execution foundation; policy
+        engine; federation/interconnect; confidential execution; runtime
+        contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+        role=define phase gates; validate spec adherence; block scope escape
+        from the release boundary
       model: zai/glm-4.7
       model_fallbacks:
-        - zai/glm-5-turbo
+        - zai/glm-5
         - zai/glm-4.5-air
       agent_file: .opencode/crew/dev/agents/validation-lead.md
       expertise:
@@ -289,12 +993,52 @@ teams:
         - path: .
           read: true
           edit: false
+          bash: true
+        - path: tests/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: .github/workflows/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
+        - path: docs/*
+          read: true
+          edit: true
           bash: false
+          recursive: true
+        - path: specs/*
+          read: true
+          edit: true
+          bash: false
+          recursive: true
     members:
       - id: qa-reviewer
         role: worker
+        sprint_responsibilities:
+          - run smoke tests
+          - run diagnostics tests
+          - verify sync consistency
+        instruction_block: crew=dev | mission=Setup and evolve runtime support,
+          validation, projection, and operator-facing architecture for Meta
+          Agents Harness while preserving bounded scope and runtime-agnostic
+          design. |
+          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; no architecture-wave expansion; no
+          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.4.0 | do=Hermes command
+          and capability discovery; runtime compatibility matrix; adapter
+          skeleton; bounded dispatcher and config integration plan; diagnostics
+          and explainability impact plan; test plan; small implementation-ready
+          slices | avoid=full Hermes parity; remote execution foundation; policy
+          engine; federation/interconnect; confidential execution; runtime
+          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          role=run smoke tests; run diagnostics tests; verify sync consistency
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/qa-reviewer.md
@@ -319,10 +1063,52 @@ teams:
             read: true
             edit: false
             bash: true
+          - path: tests/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .github/workflows/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: docs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: specs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
       - id: security-reviewer
         role: worker
+        sprint_responsibilities:
+          - review runtime boundary and unsafe coupling
+          - flag Hermes architecture capture risks
+          - cut future-wave contamination from the sprint
+        instruction_block: crew=dev | mission=Setup and evolve runtime support,
+          validation, projection, and operator-facing architecture for Meta
+          Agents Harness while preserving bounded scope and runtime-agnostic
+          design. |
+          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; no architecture-wave expansion; no
+          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.4.0 | do=Hermes command
+          and capability discovery; runtime compatibility matrix; adapter
+          skeleton; bounded dispatcher and config integration plan; diagnostics
+          and explainability impact plan; test plan; small implementation-ready
+          slices | avoid=full Hermes parity; remote execution foundation; policy
+          engine; federation/interconnect; confidential execution; runtime
+          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          role=review runtime boundary and unsafe coupling; flag Hermes
+          architecture capture risks; cut future-wave contamination from the
+          sprint
         model: zai/glm-4.7
         model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
           - zai/glm-4.5-air
         agent_file: .opencode/crew/dev/agents/security-reviewer.md
@@ -347,3 +1133,23 @@ teams:
             read: true
             edit: false
             bash: true
+          - path: tests/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: .github/workflows/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
+          - path: docs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true
+          - path: specs/*
+            read: true
+            edit: true
+            bash: false
+            recursive: true

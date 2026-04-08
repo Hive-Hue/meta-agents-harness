@@ -1,10 +1,2 @@
-agent:
-  name: security-reviewer
-  role: worker
-  team: Validation
-meta:
-  version: 1
-  max_lines: 10000
-  last_updated: "2026-04-02T02:02:07Z"
-observations: []
-open_questions: []
+agent: security-reviewer
+summary: []

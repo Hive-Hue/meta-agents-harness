@@ -15,6 +15,11 @@ __pycache__/
 .opencode/multi-team.yaml
 .claude/.active-crew.json
 .pi/.active-crew.json
+.hermes/.active-crew.json
+.pi/crew/*/sessions/
+.claude/crew/*/sessions/
+.opencode/crew/*/sessions/
+.hermes/crew/*/sessions/
 
 tmp/
 .playwright-cli/
