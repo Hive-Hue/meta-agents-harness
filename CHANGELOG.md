@@ -7,6 +7,17 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ## [Unreleased]
 
 ### Added
+- **Unified Session Operations** — Single `mah sessions` CLI surface across all runtimes:
+  - `mah sessions list` — list active sessions per runtime with unified output
+  - `mah sessions resume <id>` — resume session by ID (format: `runtime:crew:sessionId`)
+  - `mah sessions new --runtime <name>` — start new session (PI and Hermes only)
+  - `mah sessions export <id>` — export session artefacts to `$MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz`
+  - `mah sessions delete <id>` — delete session with explicit confirmation (`--yes` required)
+  - `--dry-run` flag for `mah sessions new` and `mah sessions resume` to preview without spawning
+  - `--runtime` and `--json` flags for all subcommands
+  - Runtime adapter contract extended with `supportsSessions`, `sessionListCommand`, `sessionExportCommand`, `sessionDeleteCommand`, `supportsSessionNew` fields
+  - 56 tests covering all session operations and adapter contract
+  - Bug fix: `--runtime` flag now works correctly in `mah sessions` commands
 - **Bootstrap CLI test suite** — 99 tests across 4 test files:
   - `tests/bootstrap/schema-validation.test.mjs` — 39 tests for schema structure, required fields, optional defaults, data types, reference integrity (SV-*, RF-*, OF-*, DT-*, RI-*).
   - `tests/bootstrap/edge-cases.test.mjs` — 23 tests for overwrite, merge, partial input, invalid input, file system edge cases (OB-*, MB-*, PI-*, II-*, FS-*).
