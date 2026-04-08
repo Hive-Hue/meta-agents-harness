@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { RUNTIME_ADAPTERS, RUNTIME_ORDER } from "./runtime-adapters.mjs"
 import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
-import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, readMetaConfig, readProvenance } from "./m3-ops.mjs"
+import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./m3-ops.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -102,7 +102,7 @@ function printHelp() {
   console.log("  doctor")
   console.log("  explain [detect|use|run|sync] [args]")
   console.log("  init [--yes] [--force] [--crew <name>] [--runtime <name>]")
-  console.log("  sessions [--runtime <name>] [--crew <name>] [--json]")
+  console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -165,7 +165,8 @@ function parseFilterArgs(argv) {
     json: hasFlag(argv, "--json"),
     mermaid: hasFlag(argv, "--mermaid"),
     mermaidLevel: parseValueArg(argv, "--mermaid-level"),
-    mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities")
+    mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities"),
+    dryRun: hasFlag(argv, "--dry-run")
   }
 }
 
@@ -583,22 +584,176 @@ function runInit(argv) {
   return bootstrapResult.status !== null ? bootstrapResult.status : 1
 }
 
-function runSessions(argv, jsonMode = false) {
+function runSessions(argv, jsonMode = false, detectedRuntime = "") {
+  const subcommand = argv[0] || "list"
   const filters = parseFilterArgs(argv)
+  // Use explicitly forced runtime (from --runtime flag) or auto-detected runtime
+  const effectiveRuntime = filters.runtime || detectedRuntime || ""
   if (jsonMode) filters.json = true
-  const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew })
-  if (filters.json) {
-    console.log(JSON.stringify({ sessions: rows }, null, 2))
+
+  // Handle subcommands
+  if (subcommand === "list") {
+    const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew })
+    if (filters.json) {
+      console.log(JSON.stringify({ sessions: rows }, null, 2))
+      return 0
+    }
+    if (rows.length === 0) {
+      console.log("sessions=none")
+      return 0
+    }
+    for (const row of rows) {
+      console.log(`${row.id} runtime=${row.runtime} crew=${row.crew} last_active_at=${row.last_active_at} path=${row.source_path}`)
+    }
     return 0
   }
-  if (rows.length === 0) {
-    console.log("sessions=none")
+
+  if (subcommand === "resume") {
+    const sessionId = argv[1]
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions resume <id>' requires a session ID")
+      return 1
+    }
+    // Detect runtime from session ID or use forced runtime
+    const parsedSessionId = parseSessionId(sessionId)
+    if (!parsedSessionId) {
+      console.error(`ERROR: invalid session ID format: ${sessionId} (expected runtime:crew:sessionId)`)
+      return 1
+    }
+    const targetRuntime = effectiveRuntime || parsedSessionId.runtime
+    const sessions = collectSessions(repoRoot, { runtime: targetRuntime })
+    const session = sessions.find((s) => s.id === sessionId)
+    if (!session) {
+      console.error(`ERROR: session not found: ${sessionId}`)
+      return 1
+    }
+    const resumeResult = resumeSessionFn(repoRoot, sessionId, targetRuntime, argv.slice(2))
+    if (!resumeResult.ok) {
+      console.error(`ERROR: ${resumeResult.error}`)
+      return 1
+    }
+    // Dry-run: print the command plan without dispatching
+    if (filters.dryRun) {
+      const plan = resolveDispatchPlan(targetRuntime, "run", resumeResult.args)
+      if (plan.error) {
+        console.error(`ERROR: ${plan.error}`)
+        return 1
+      }
+      console.log(`[dry-run] Would resume session '${sessionId}' with runtime '${targetRuntime}'`)
+      console.log(`[dry-run] exec=${plan.exec}`)
+      console.log(`[dry-run] args=${[...plan.args, ...plan.passthrough].join(" ")}`)
+      return 0
+    }
+    // Dispatch the run command with session context
+    return dispatch(targetRuntime, "run", resumeResult.args)
+  }
+
+  if (subcommand === "new") {
+    const targetRuntime = effectiveRuntime
+    if (!targetRuntime) {
+      // Try to detect runtime
+      const detected = detectRuntime(repoRoot, "")
+      if (!detected.runtime) {
+        console.error("ERROR: could not detect runtime. Use --runtime to specify a runtime")
+        return 1
+      }
+      if (!RUNTIME_ADAPTERS[detected.runtime]?.supportsSessionNew) {
+        console.error(`ERROR: runtime '${detected.runtime}' does not support starting new sessions`)
+        return 1
+      }
+    } else {
+      if (!RUNTIME_ADAPTERS[targetRuntime]?.supportsSessionNew) {
+        console.error(`ERROR: runtime '${targetRuntime}' does not support starting new sessions`)
+        return 1
+      }
+    }
+    const runtimeToUse = targetRuntime || detectRuntime(repoRoot, "").runtime
+    const startResult = startSessionFn(repoRoot, runtimeToUse, argv.slice(1))
+    if (!startResult.ok) {
+      console.error(`ERROR: ${startResult.error}`)
+      return 1
+    }
+    // Dry-run: print the command plan without dispatching
+    if (filters.dryRun) {
+      const plan = resolveDispatchPlan(runtimeToUse, "run", startResult.args)
+      if (plan.error) {
+        console.error(`ERROR: ${plan.error}`)
+        return 1
+      }
+      console.log(`[dry-run] Would start new session with runtime '${runtimeToUse}'`)
+      console.log(`[dry-run] exec=${plan.exec}`)
+      console.log(`[dry-run] args=${[...plan.args, ...plan.passthrough].join(" ")}`)
+      return 0
+    }
+    return dispatch(runtimeToUse, "run", startResult.args)
+  }
+
+  if (subcommand === "export") {
+    const sessionId = argv[1]
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions export <id>' requires a session ID")
+      return 1
+    }
+    const exportResult = exportSessionFn(repoRoot, sessionId)
+    if (!exportResult.ok) {
+      console.error(`ERROR: ${exportResult.error}`)
+      return 1
+    }
+    if (filters.json) {
+      console.log(JSON.stringify({ ok: true, path: exportResult.path }, null, 2))
+    } else {
+      console.log(`exported=${exportResult.path}`)
+    }
     return 0
   }
-  for (const row of rows) {
-    console.log(`${row.id} runtime=${row.runtime} crew=${row.crew} last_active_at=${row.last_active_at} path=${row.source_path}`)
+
+  if (subcommand === "delete") {
+    const sessionId = argv[1]
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions delete <id>' requires a session ID")
+      return 1
+    }
+    const parsed = parseSessionId(sessionId)
+    if (!parsed) {
+      console.error(`ERROR: invalid session ID format: ${sessionId} (expected runtime:crew:sessionId)`)
+      return 1
+    }
+    // Read confirmation from stdin (for non-interactive use)
+    // In CLI context, we require the user to confirm explicitly
+    // Check if stdin has data for non-interactive confirmation
+    let confirmed = ""
+    if (process.stdin.isTTY) {
+      // Interactive mode - prompt not supported in this context, require --yes flag
+      // For safety, require explicit y/Y from argv check
+    }
+    // Check for --yes flag
+    const yesFlag = argv.includes("--yes") || argv.includes("-y")
+    if (yesFlag) {
+      confirmed = "y"
+    } else {
+      console.log(`Delete session '${sessionId}' on '${parsed.runtime}'? [y/N]`)
+      // In test/CI context, confirmation comes from the caller passing "y" or reading from stdin
+      // For now, we require --yes flag for non-interactive deletion
+      console.error("ERROR: deletion requires explicit confirmation. Use --yes flag or pipe 'y' to stdin")
+      return 1
+    }
+    const deleteResult = deleteSessionFn(repoRoot, sessionId, confirmed)
+    if (!deleteResult.ok) {
+      console.error(`ERROR: ${deleteResult.error}`)
+      return 1
+    }
+    if (filters.json) {
+      console.log(JSON.stringify({ ok: true, deleted: sessionId }, null, 2))
+    } else {
+      console.log(`deleted=${sessionId}`)
+    }
+    return 0
   }
-  return 0
+
+  // Unknown subcommand
+  console.error(`ERROR: unknown sessions subcommand '${subcommand}'`)
+  console.error("Usage: mah sessions [list|resume|new|export|delete] [args]")
+  return 1
 }
 
 function mermaidNodeId(value) {
@@ -953,7 +1108,7 @@ function main() {
   }
 
   if (first === "sessions") {
-    process.exitCode = runSessions(normalizedArgv.slice(1), jsonMode)
+    process.exitCode = runSessions(normalizedArgv.slice(1), jsonMode, runtimeResult.runtime)
     return
   }
 

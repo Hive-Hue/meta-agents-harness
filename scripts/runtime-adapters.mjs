@@ -77,6 +77,11 @@ export const RUNTIME_ADAPTERS = {
       sessionRootFlag: "--session-root",
       sessionMirrorFlag: false
     },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: true,
     commands: {
       "list:crews": [["node", [".pi/bin/pimh", "list:crews"]], ["pimh", ["list:crews"]], ["npm", ["--prefix", ".pi", "run", "list:crews"]]],
       use: [["node", [".pi/bin/pimh", "use"]], ["pimh", ["use"]], ["npm", ["--prefix", ".pi", "run", "use:crew", "--"]]],
@@ -101,6 +106,11 @@ export const RUNTIME_ADAPTERS = {
       sessionRootFlag: false,
       sessionMirrorFlag: true
     },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: false,
     commands: {
       "list:crews": [["node", [".claude/bin/ccmh", "list:crews"]], ["ccmh", ["list:crews"]], ["npm", ["--prefix", ".claude", "run", "list:crews"]]],
       use: [["node", [".claude/bin/ccmh", "use"]], ["ccmh", ["use"]], ["npm", ["--prefix", ".claude", "run", "use:crew", "--"]]],
@@ -125,6 +135,11 @@ export const RUNTIME_ADAPTERS = {
       sessionRootFlag: false,
       sessionMirrorFlag: false
     },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: false,
     commands: {
       "list:crews": [["node", [".opencode/bin/ocmh", "list:crews"]], ["ocmh", ["list:crews"]], ["npm", ["--prefix", ".opencode", "run", "list:crews"]]],
       use: [["node", [".opencode/bin/ocmh", "use"]], ["ocmh", ["use"]], ["npm", ["--prefix", ".opencode", "run", "use:crew", "--"]]],
@@ -153,6 +168,11 @@ export const RUNTIME_ADAPTERS = {
       supportsMultiBackendExecution: true,
       gatewayAware: true
     },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: true,
     commands: {
       "list:crews": [["node", [".hermes/bin/hermesh", "list:crews"]], ["hermesh", ["list:crews"]], ["hermes", ["list:crews"]], ["npm", ["--prefix", ".hermes", "run", "list:crews"]]],
       use: [["node", [".hermes/bin/hermesh", "use"]], ["hermesh", ["use"]], ["hermes", ["use"]], ["npm", ["--prefix", ".hermes", "run", "use:crew", "--"]]],
