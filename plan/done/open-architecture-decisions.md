@@ -131,7 +131,7 @@ Com isso:
 - os adapters e o dispatcher preservam a responsabilidade pelo **comportamento operacional**
 - evitamos transformar o YAML em uma camada indireta demais para regras de execução
 
-### Decisão proposta
+### Decisão — D1 Fechada
 
 - `meta-agents.yaml` permanece canônico para definição de crews e artefatos.
 - o YAML pode incluir apenas metadata estável, paths, capabilities de alto nível e configuração não-executável.
@@ -217,7 +217,7 @@ Com expansão planejada após M2 para:
 
 É suficiente para tirar o dispatcher do hardcode sem inflar o contrato cedo demais.
 
-### Decisão proposta
+### Decisão — D2 Fechada
 
 - contrato inicial mínimo e estável em M1B
 - extensão formal do contrato apenas após estabilização de M2
@@ -283,7 +283,7 @@ Cada runtime decide livremente o que validar em cada comando.
 
 Essa separação é clara para operador, para CI e para evolução interna.
 
-### Decisão proposta
+### Decisão — D3 Fechada
 
 - `validate:config` é sempre semântico/declarativo
 - `validate:runtime` é sempre operacional/ambiental
@@ -297,23 +297,19 @@ Essa separação é clara para operador, para CI e para evolução interna.
 - wrapper ausente ou binário indisponível → `validate:runtime`
 - artefato gerado fora de sync → `validate:sync`
 
-## Impacto nas próximas fases
+## Impacto — Decisões Aplicadas
 
-### Se essas decisões forem aceitas
+As decisões D1, D2 e D3 foram incorporadas na implementação de M1A, M1B, M2 e M3:
 
-- M1A pode seguir com schema/versionamento sem risco de retrabalho conceitual.
-- M1B ganha fronteiras arquiteturais claras sem tentar deslocar comportamento demais para YAML.
-- M2 pode construir `explain`, `init` e `plan/diff` sobre um core previsível.
-- M3 herda um contrato extensível e validável.
+- M1A segue com schema/versionamento sem risco de retrabalho conceitual.
+- M1B respeita frontreira arquiteturais claras — YAML como fonte canônica de conteúdo, adapters/dispatcher para comportamento operacional.
+- M2 constrói `explain`, `init` e `plan/diff` sobre core previsível — `validate:*` com fronteiras fixas.
+- M3 herda contrato extensível e validável — `RuntimeAdapter` mínimo evolutivo com contract tests.
 
-### Se ficarem em aberto
-
-- o dispatcher pode continuar acoplado a exceções específicas
-- `validate:*` pode nascer redundante
-- a futura plugin API pode precisar ser redesenhada cedo demais
-
-## Resumo Executivo
+## Resumo Executivo — DECIDIDO
 
 - **D1:** adotar híbrido conservador, com YAML canônico para conteúdo e metadata estável, e comportamento operacional em código
 - **D2:** adotar contrato mínimo evolutivo para `RuntimeAdapter`
 - **D3:** adotar fronteiras fixas para `validate:*`
+
+**Status:** D1, D2, D3 fechadas e aplicadas em M1A, M1B, M2 e M3.
