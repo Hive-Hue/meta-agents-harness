@@ -179,6 +179,36 @@ The following are identified but explicitly deferred beyond v0.4.0. Adding any o
 
 ---
 
+## Validation Sign-off
+
+**Validator:** Validation Lead, MAH v0.4.0-runtime-evolution sprint
+**Review stage:** Final gate (pre-merge)
+**Document:** `plan/hermes-capability-inventory.md`
+
+### Checklist — Pass/Fail
+
+| # | Item | Verdict | Notes |
+|---|---|---|---|
+| 1 | Document stays within Hermes command/capability discovery (NOT solution design) | **PASS** | Pure inventory/compendium; no solution proposals |
+| 2 | Bounded output — single, focused doc (NOT a spec expansion) | **PASS** | 223-line single document with clear scope boundaries |
+| 3 | "Deferred" list explicitly excludes all v0.5.0+ items | **PASS** | 9 items all correctly scoped to v0.5.0+ |
+| 4 | "Runtime Capture Risk" section serves as genuine scope guard | **PASS** | Identifies 6 capture risks with anti-capture guidance; not a feature backlog |
+| 5 | Engineering Review section accurate, no new scope introduced | **PASS** | Confirms adapter compliance, validates mappings, defers appropriately |
+| 6 | No proposals for remote execution, policy engine, federation, confidential execution | **PASS** | All four explicitly listed in Deferred with "Not in v0.4.0 scope" |
+| 7 | Document does NOT push MAH toward being "Hermes-shaped" | **PASS** | Explicitly flags Hermes-shaped alignment as Deferred anti-goal |
+
+### Blockers
+
+**None.** No items would prevent merge.
+
+### Validation Verdict
+
+**APPROVED**
+
+Document is scope-compliant and approved for merge.
+
+---
+
 ## Engineering Review
 
 **Reviewed against:** `scripts/runtime-adapter-contract.mjs`, `scripts/runtime-adapters.mjs`
