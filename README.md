@@ -75,6 +75,7 @@ Current focus areas include:
 - improving validation and diagnostics
 - preparing an adapter model for future runtime extensibility
 - improving operator UX with explainability and safer sync flows
+- unified session operations across all runtimes (list, resume, new, export, delete)
 
 This branch is the right place to evaluate the **direction**, **architecture**, and **product positioning** of the project.
 
@@ -142,7 +143,13 @@ mah init --runtime opencode --crew dev
 mah init --yes --force --crew bootstrap-config
 mah plan
 mah diff
-mah sessions --json
+mah sessions list
+mah sessions list --runtime hermes --json
+mah sessions resume pi:dev:abc123
+mah sessions new --runtime hermes
+mah sessions export pi:dev:abc123
+mah sessions delete pi:dev:abc123 --yes
+mah sessions new --runtime hermes --dry-run
 mah graph --crew dev --json
 mah graph --crew dev --mermaid
 mah graph --crew dev --mermaid --mermaid-level group

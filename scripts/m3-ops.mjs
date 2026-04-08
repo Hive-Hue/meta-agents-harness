@@ -1,6 +1,8 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmSync } from "node:fs"
 import path from "node:path"
+import { execSync } from "node:child_process"
 import YAML from "yaml"
+import { RUNTIME_ADAPTERS } from "./runtime-adapters.mjs"
 
 function safeStat(targetPath) {
   try {
@@ -84,6 +86,189 @@ export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}) {
 
   rows.sort((a, b) => `${b.last_active_at}`.localeCompare(`${a.last_active_at}`))
   return rows
+}
+
+/**
+ * Parse a session ID in format "runtime:crew:sessionId"
+ * @param {string} sessionIdFull
+ * @returns {{ runtime: string, crew: string, sessionId: string } | null}
+ */
+export function parseSessionId(sessionIdFull) {
+  if (!sessionIdFull || typeof sessionIdFull !== "string") return null
+  const parts = sessionIdFull.split(":")
+  if (parts.length !== 3) return null
+  const [runtime, crew, sessionId] = parts
+  if (!runtime || !crew || !sessionId) return null
+  return { runtime, crew, sessionId }
+}
+
+/**
+ * List sessions (alias for collectSessions with filtering)
+ * @param {string} repoRoot
+ * @param {{ runtime?: string, crew?: string }} options
+ * @returns {Array}
+ */
+export function listSessions(repoRoot, options = {}) {
+  return collectSessions(repoRoot, options)
+}
+
+/**
+ * Export session artefacts to $MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz
+ * @param {string} repoRoot
+ * @param {string} sessionIdFull - session ID in format "runtime:crew:sessionId"
+ * @returns {{ ok: boolean, path?: string, error?: string }}
+ */
+export function exportSession(repoRoot, sessionIdFull) {
+  const parsed = parseSessionId(sessionIdFull)
+  if (!parsed) {
+    return { ok: false, error: `invalid session ID format: ${sessionIdFull} (expected runtime:crew:sessionId)` }
+  }
+
+  const sessionsDir = process.env.MAH_SESSIONS_DIR || path.join(repoRoot, ".mah", "sessions")
+  const targetDir = path.join(sessionsDir, parsed.runtime)
+  const targetFile = path.join(targetDir, `${sessionIdFull}.tar.gz`)
+
+  // Check if source exists
+  const sourcePath = path.join(repoRoot, `.${parsed.runtime}`, "crew", parsed.crew, "sessions", parsed.sessionId)
+  if (!existsSync(sourcePath)) {
+    return { ok: false, error: `session not found: ${sessionIdFull}` }
+  }
+
+  // Create target directory
+  mkdirSync(targetDir, { recursive: true })
+
+  // Create tar.gz archive
+  try {
+    execSync(`tar -czf "${targetFile}" -C "${path.dirname(sourcePath)}" "${parsed.sessionId}"`, { cwd: repoRoot })
+    return { ok: true, path: targetFile }
+  } catch (err) {
+    return { ok: false, error: `failed to create archive: ${err.message}` }
+  }
+}
+
+/**
+ * Delete a session with explicit confirmation
+ * @param {string} repoRoot
+ * @param {string} sessionIdFull - session ID in format "runtime:crew:sessionId"
+ * @param {string} confirmed - confirmation string ('y' or 'Y')
+ * @returns {{ ok: boolean, error?: string }}
+ */
+export function deleteSession(repoRoot, sessionIdFull, confirmed) {
+  const parsed = parseSessionId(sessionIdFull)
+  if (!parsed) {
+    return { ok: false, error: `invalid session ID format: ${sessionIdFull} (expected runtime:crew:sessionId)` }
+  }
+
+  // Require explicit y or Y confirmation
+  if (confirmed !== "y" && confirmed !== "Y") {
+    return { ok: false, error: "confirmation required: enter 'y' or 'Y' to delete" }
+  }
+
+  const sourcePath = path.join(repoRoot, `.${parsed.runtime}`, "crew", parsed.crew, "sessions", parsed.sessionId)
+  if (!existsSync(sourcePath)) {
+    return { ok: false, error: `session not found: ${sessionIdFull}` }
+  }
+
+  // Remove the session directory
+  try {
+    rmSync(sourcePath, { recursive: true, force: true })
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: `failed to delete session: ${err.message}` }
+  }
+}
+
+/**
+ * Resume a session by ID - sets session ID env/flag per runtime, then invokes run
+ * @param {string} repoRoot
+ * @param {string} sessionIdFull - session ID in format "runtime:crew:sessionId"
+ * @param {string} runtime
+ * @param {Array} passthroughArgs - additional args to pass to run
+ * @returns {{ ok: boolean, envOverrides?: object, args?: string[], error?: string }}
+ */
+export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs = []) {
+  const parsed = parseSessionId(sessionIdFull)
+  if (!parsed) {
+    return { ok: false, error: `invalid session ID format: ${sessionIdFull} (expected runtime:crew:sessionId)` }
+  }
+
+  // Validate runtime matches
+  if (parsed.runtime !== runtime) {
+    return { ok: false, error: `session runtime '${parsed.runtime}' does not match requested runtime '${runtime}'` }
+  }
+
+  // Find the session
+  const sessions = collectSessions(repoRoot, { runtime })
+  const session = sessions.find((s) => s.id === sessionIdFull)
+  if (!session) {
+    return { ok: false, error: `session not found: ${sessionIdFull}` }
+  }
+
+  const adapter = RUNTIME_ADAPTERS[runtime]
+  const capabilities = adapter?.capabilities || {}
+
+  const envOverrides = {}
+  const args = [...passthroughArgs]
+
+  if (runtime === "pi") {
+    if (capabilities.sessionIdViaEnv) {
+      envOverrides[capabilities.sessionIdViaEnv] = parsed.sessionId
+    }
+    if (capabilities.sessionRootFlag) {
+      args.unshift(capabilities.sessionRootFlag, session.source_path)
+    }
+    args.push("-c") // continue mode
+  } else if (runtime === "claude") {
+    if (capabilities.sessionIdFlag) {
+      args.push(capabilities.sessionIdFlag, parsed.sessionId)
+    }
+    args.push("--continue")
+  } else if (runtime === "opencode") {
+    if (capabilities.sessionIdFlag) {
+      args.push(capabilities.sessionIdFlag, parsed.sessionId)
+    }
+    args.push("-c")
+  } else if (runtime === "hermes") {
+    if (capabilities.sessionIdViaEnv) {
+      envOverrides[capabilities.sessionIdViaEnv] = parsed.sessionId
+    }
+    if (capabilities.sessionRootFlag) {
+      args.unshift(capabilities.sessionRootFlag, session.source_path)
+    }
+    args.push("-c")
+  }
+
+  return { ok: true, envOverrides, args }
+}
+
+/**
+ * Start a new session - only on runtimes that support it (PI, Hermes)
+ * @param {string} repoRoot
+ * @param {string} runtime
+ * @param {Array} passthroughArgs
+ * @returns {{ ok: boolean, error?: string, envOverrides?: object, args?: string[] }}
+ */
+export function startSession(repoRoot, runtime, passthroughArgs = []) {
+  const adapter = RUNTIME_ADAPTERS[runtime]
+  const capabilities = adapter?.capabilities || {}
+
+  if (!capabilities.sessionModeNew) {
+    return {
+      ok: false,
+      error: `runtime '${runtime}' does not support starting new sessions (sessionModeNew is false)`
+    }
+  }
+
+  const envOverrides = {}
+  const args = [...passthroughArgs]
+
+  if (runtime === "pi") {
+    args.unshift("--new-session")
+  } else if (runtime === "hermes") {
+    args.unshift("--new-session")
+  }
+
+  return { ok: true, envOverrides, args }
 }
 
 export function appendProvenance(repoRoot, event) {

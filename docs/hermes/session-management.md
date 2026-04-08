@@ -6,6 +6,32 @@ MAH provides unified session controls that are translated through the repo-local
 
 ---
 
+## Unified Session Operations
+
+All MAH runtimes (PI, Claude Code, OpenCode, Hermes) support unified session management via `mah sessions`:
+
+```bash
+mah sessions list                       # List all sessions (current runtime)
+mah sessions list --runtime hermes      # List sessions for a specific runtime
+mah sessions list --json                # JSON output
+mah sessions list --crew dev            # Filter by crew
+mah sessions resume <id>                # Resume session by ID (format: runtime:crew:sessionId)
+mah sessions new --runtime hermes        # Start a new session (PI and Hermes only)
+mah sessions new --runtime hermes --dry-run  # Preview new-session command without spawning
+mah sessions export <id>                # Export session to $MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz
+mah sessions delete <id> --yes          # Delete session (requires --yes confirmation)
+```
+
+**Session ID format**: `runtime:crew:sessionId` (e.g., `hermes:dev:2026-04-08T13-00-00-abc123`)
+
+**Per-runtime support for `mah sessions new`**:
+- PI and Hermes: supported
+- Claude Code and OpenCode: not supported — emits clear error
+
+Use `mah sessions --help` for full usage information.
+
+---
+
 ## Session controls
 
 All session controls are accessed through the `mah run` command:

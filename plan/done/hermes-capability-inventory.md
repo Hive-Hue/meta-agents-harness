@@ -1,0 +1,253 @@
+# Hermes Capability Inventory — v0.4.0 Runtime Evolution
+
+**Branch:** development
+**Sprint:** v0.4.0-runtime-evolution
+**Purpose:** Bounded inventory of Hermes CLI surface, MAH exposure, gaps, and runtime-capture risks.
+
+---
+
+## 1. Hermes CLI Commands (hermesh wrapper)
+
+Source: `.hermes/scripts/hermesh.mjs`, `docs/hermes/runtime-support.md`
+
+### 1.1 hermesh Commands
+
+| Hermes Command | Flags / Args | Description |
+|---|---|---|
+| `list:crews` | `[--json]` | List available crews from `meta-agents.yaml` |
+| `use <crew>` | `--crew <crew>` | Set active crew; persists to `.hermes/.active-crew.json` |
+| `clear` | — | Remove active crew selection |
+| `run` | `--crew <crew>`, `--new-session`, `--session-root <path>`, `[-- ...passthrough]` | Run Hermes interactively (delegates to `hermes chat`) |
+| `chat` | `--crew <crew>`, `--new-session`, `--session-root <path>`, `[-- ...passthrough]` | Alias for `run` (both route to `hermes chat`) |
+| `doctor` | `--crew <crew>`, `--json`, `[-- ...passthrough]` | Health-check crew config + forward to `hermes doctor` |
+| `check:runtime` | `--crew <crew>`, `--json` | Check `.hermes/` artifact completeness |
+
+### 1.2 Internal Hermes CLI Calls (from hermesh.mjs)
+
+| Internal Call | Context |
+|---|---|
+| `hermes sessions list --limit 1` | Used by `latestSessionId()` to pin/resume sessions |
+| `hermes chat -Q -q <query>` | Bootstrap query injection before interactive session |
+| `hermes doctor` | Forwarded passthrough in `hermesh doctor` |
+
+---
+
+## 2. MAH `mah` CLI Surface — Hermes Coverage
+
+Source: `scripts/meta-agents-harness.mjs`, `scripts/runtime-adapters.mjs`
+
+### 2.1 MAH Commands with Hermes Mapping
+
+| MAH Command | Hermes Equivalent | Adapter Status | Notes |
+|---|---|---|---|
+| `mah detect` | runtime detection via `.hermes/` marker or `hermes`/`hermesh` in PATH | Supported | Detection reason: `forced`, `marker`, or `cli` |
+| `mah list:crews` | `hermesh list:crews` | Supported | Via `node .hermes/bin/hermesh list:crews` (variant chain) |
+| `mah use <crew>` | `hermesh use <crew>` | Supported | Persists to `.hermes/.active-crew.json` |
+| `mah clear` | `hermesh clear` | Supported | Removes active-crew state |
+| `mah run` | `hermesh run` → `hermes chat` | Supported | `--session-mode new/continue`, `--session-id`, `--session-root` passed through |
+| `mah doctor` | `hermesh doctor` → `hermes doctor` | Supported | |
+| `mah check:runtime` | `hermesh doctor` (via `check:runtime` alias) | Supported | |
+| `mah validate:runtime` | `hermesh doctor` | Supported | |
+| `mah validate` | `hermesh doctor` | Supported | |
+| `mah validate:config` | — | Supported | Not Hermes-specific |
+| `mah validate:sync` | — | Supported | Not Hermes-specific |
+| `mah validate:all` | — | Supported | Not Hermes-specific |
+| `mah sessions` | — | **Not Hermes-specific** | MAH sessions collection; Hermes native sessions not enumerated |
+| `mah graph` | — | Partial | Uses MAH provenance data, not Hermes session graph |
+| `mah explain` | — | Supported | Shows Hermes dispatch resolution |
+| `mah init` | — | Partial | Creates `.hermes/` marker if `--runtime hermes` |
+| `mah plan` | — | Supported | Not Hermes-specific |
+| `mah diff` | — | Supported | Not Hermes-specific |
+
+### 2.2 Hermes Runtime Capabilities (from meta-agents.yaml / runtime-adapters.mjs)
+
+| Capability | Value | MAH Surface |
+|---|---|---|
+| `persistent_memory` | `true` | Not operator-facing in MAH |
+| `supports_background_operation` | `true` | Not surfaced in MAH CLI |
+| `supports_multi_backend_execution` | `true` | Not surfaced in MAH CLI |
+| `gateway_aware` | `true` | Not surfaced in MAH CLI |
+| `sessionModeNew` | `true` | `--session-mode new` on `mah run` |
+| `sessionModeContinue` | `true` | `--session-mode continue` on `mah run` |
+| `sessionModeNone` | `false` | Warning emitted; session persists |
+| `sessionIdViaEnv` | `HERMES_SESSION_ID` | `--session-id` passed through |
+| `sessionRootFlag` | `--session-root` | Passed through to wrapper |
+
+---
+
+## 3. Runtime Capture Risk — Hermes Capabilities Without MAH Equivalents
+
+These are points where Hermes functionality exists but MAH does not surface or manage it. Each represents a potential gravity point pulling MAH toward Hermes-specific behavior.
+
+| Hermes Capability / Feature | MAH Gap | Risk Level |
+|---|---|---|
+| `hermes sessions list` — native session enumeration | MAH `sessions` command does not read Hermes session store; only MAH-projected provenance | **Medium** |
+| Hermes session pinning per crew (`orchestrator_session_id` in `.active-crew.json`) | No MAH command to inspect, clear, or manage pinned sessions; internal only | **Medium** |
+| Bootstrap query injection (`hermes chat -Q -q`) | No MAH flag to trigger or disable bootstrap context load; implicit on fresh `mah run` | **Low** |
+| Hermes prompt/frontmatter loading from `.hermes/crew/<crew>/agents/` | Not operator-accessible via MAH; purely internal bootstrap | **Low** |
+| Multi-backend execution (`supports_multi_backend_execution: true`) | Not exposed; no MAH flag to select or visualize backend targets | **Medium** |
+| Background operation (`supports_background_operation: true`) | No MAH command for background Hermes runs; `mah run` is always blocking | **Medium** |
+| Gateway awareness (`gateway_aware: true`) | Not exposed; no MAH control over gateway integration | **Medium** |
+| Persistent memory (`persistent_memory: true`) | Not configurable or observable via MAH; Hermes-native behavior only | **Low** |
+| Crew-level multi-team topology from `multi-team.yaml` | MAH projects this but does not render Hermes team topology as a first-class view | **Low** |
+| Hermes-native `doctor` passthrough args | `-- ...passthrough` forwarded but not validated or documented in MAH help | **Low** |
+
+---
+
+## 4. Hermes Commands / Flags with NO MAH Equivalent
+
+These are Hermes CLI features that exist in the codebase but have no corresponding `mah` command, flag, or path.
+
+| Hermes Command / Flag | Location | MAH Gap |
+|---|---|---|
+| `hermes sessions list [--limit N]` | `hermesh.mjs` line 215 | No `mah sessions --runtime hermes --list` equivalent |
+| `hermes chat -Q -q <query>` (quiet bootstrap) | `hermesh.mjs` line 415 | No MAH flag to trigger quiet/headless bootstrap query |
+| `--new-session` on `hermesh run` | `hermesh.mjs` line 399 | Supported via `--session-mode new`; functionally equivalent |
+| `--session-root <path>` passthrough | `hermesh.mjs` line 398 | Stored as wrapper metadata; Hermes does not natively honor this |
+| `--json` on `hermesh list:crews` | `hermesh.mjs` line 333 | `mah list:crews --json` works (via adapter) |
+| `--json` on `hermesh doctor` | `hermesh.mjs` line 373 | `mah doctor --json` works (via adapter) |
+| `--json` on `hermesh check:runtime` | `hermesh.mjs` line 361 | `mah check:runtime --json` works (via adapter) |
+| Hermes expertise model files (`.hermes/crew/<crew>/expertise/*.yaml`) | `hermesh.mjs` line 276 | Not readable via MAH |
+| Hermes skill files (`.hermes/skills/<skill>/SKILL.md`) | `hermesh.mjs` line 276 | Not operator-accessible via MAH |
+| `MAH_HERMES_CONFIG`, `MAH_HERMES_MULTI_TEAM`, `MAH_HERMES_SESSION_ROOT` env vars | `hermesh.mjs` lines 314–318 | Internal only; not documented as operator surface |
+| `HERMES_SESSION_ID` env var for resume | `hermesh.mjs` line 402 | Captured by wrapper; not a user-facing MAH flag |
+
+---
+
+## 5. Deferred — Out of v0.4.0 Scope
+
+The following are identified but explicitly deferred beyond v0.4.0. Adding any of these would constitute v0.5.0+ work.
+
+| Deferred Item | Rationale |
+|---|---|
+| Full Hermes feature parity | Against sprint "no full Hermes parity" directive |
+| Hermes native session store enumeration via `mah sessions` | Would require Hermes session store integration; remote-session foundation |
+| Policy engine integration | Not in v0.4.0 scope |
+| Federation / interconnect between Hermes and other runtimes | Not in v0.4.0 scope |
+| Confidential / secure execution mode for Hermes | Not in v0.4.0 scope |
+| Hermes background operation (`mah run --background`) | Blocking-only run model; background requires separate infrastructure |
+| Multi-backend execution visualization or control | No MAH surface for backend routing; would require runtime contract expansion |
+| Gateway-aware routing in MAH dispatcher | `gateway_aware: true` capability exists in config but no MAH control surface |
+| MAH becoming Hermes-shaped product alignment | Anti-goal explicitly flagged in sprint must_not_deliver |
+
+---
+
+## 6. Runtime Capture Risk Section
+
+**Definition:** A runtime-capture risk is any Hermes feature that, if added to MAH, would pull the product toward being "Hermes-shaped" instead of remaining runtime-agnostic.
+
+### 6.1 Active Capture Risk Points
+
+| Risk | Description | Severity |
+|---|---|---|
+| **Hermes bootstrap query injection** | `hermesh.mjs` injects crew context via `hermes chat -Q -q`. If MAH adopts this as the default session-start model, other runtimes must replicate it or Hermes becomes the "correct" runtime. | **High** |
+| **Hermes session pinning** | `.active-crew.json` stores `orchestrator_session_id` per crew. This is Hermes-specific session management leaking into MAH state. If other runtimes get analogous state, MAH becomes a session-state aggregator rather than an orchestrator. | **High** |
+| **Hermes capabilities as MAH features** | `persistent_memory`, `multi_backend_execution`, `gateway_aware` are Hermes-native features declared in `meta-agents.yaml`. If MAH surfaces these as first-class features (e.g., `mah run --enable-persistent-memory`), Hermes semantics become MAH semantics. | **Medium** |
+| **Hermes adapter command variants** | The Hermes adapter in `runtime-adapters.mjs` has more command variants than other runtimes (4 per command vs 3 for others). This asymmetry signals Hermes is getting preferential adapter coverage. | **Medium** |
+| **Hermes-only session env vars** | `MAH_HERMES_CONFIG`, `MAH_HERMES_MULTI_TEAM`, `MAH_HERMES_SESSION_ROOT` are Hermes-specific. If new env vars are added per-runtime, MAH becomes a runtime-specific env var store. | **Low** |
+| **Hermes prompt projection** | MAH generates `.hermes/crew/<crew>/agents/*.md` from `meta-agents.yaml`. If Hermes agent prompts are the most feature-complete, teams will treat Hermes as the canonical runtime and migrate toward it. | **Low** |
+
+### 6.2 Anti-Capture Guidance
+
+- MAH's session model must remain runtime-agnostic. The `.active-crew.json` pinning mechanism is Hermes-specific and should be evaluated for removal or abstraction in v0.5.0.
+- Bootstrap context injection (`-Q -q`) must be evaluated as a general pattern, not a Hermes-specific one. If it is valuable, it should be runtime-general.
+- Hermes capabilities (`persistent_memory`, `gateway_aware`, etc.) must not become MAH CLI flags without a cross-runtime capability agreement.
+- The Hermes adapter should have feature parity with other adapters, not exceed them.
+
+---
+
+## 7. Summary Table — Command Coverage Map
+
+| Hermes Command | MAH Command | Covered? |
+|---|---|---|
+| `hermesh list:crews` | `mah list:crews` | Yes |
+| `hermesh use <crew>` | `mah use <crew>` | Yes |
+| `hermesh clear` | `mah clear` | Yes |
+| `hermesh run` | `mah run` | Yes |
+| `hermesh chat` | `mah run` | Yes |
+| `hermesh doctor` | `mah doctor` | Yes |
+| `hermesh check:runtime` | `mah check:runtime` | Yes |
+| `hermes sessions list` | `mah sessions` | **Partial** (MAH provenance only, not Hermes native) |
+| `hermes chat -Q -q <query>` | — | **No MAH equivalent** |
+| Hermes env vars (internal) | — | **Internal only** |
+| Hermes expertise model files | — | **No MAH equivalent** |
+| Hermes skill files | — | **No MAH equivalent** |
+
+---
+
+*Inventory produced for v0.4.0-runtime-evolution sprint. All deferred items are explicitly out-of-scope for the current release.*
+
+---
+
+## Validation Sign-off
+
+**Validator:** Validation Lead, MAH v0.4.0-runtime-evolution sprint
+**Review stage:** Final gate (pre-merge)
+**Document:** `plan/hermes-capability-inventory.md`
+
+### Checklist — Pass/Fail
+
+| # | Item | Verdict | Notes |
+|---|---|---|---|
+| 1 | Document stays within Hermes command/capability discovery (NOT solution design) | **PASS** | Pure inventory/compendium; no solution proposals |
+| 2 | Bounded output — single, focused doc (NOT a spec expansion) | **PASS** | 223-line single document with clear scope boundaries |
+| 3 | "Deferred" list explicitly excludes all v0.5.0+ items | **PASS** | 9 items all correctly scoped to v0.5.0+ |
+| 4 | "Runtime Capture Risk" section serves as genuine scope guard | **PASS** | Identifies 6 capture risks with anti-capture guidance; not a feature backlog |
+| 5 | Engineering Review section accurate, no new scope introduced | **PASS** | Confirms adapter compliance, validates mappings, defers appropriately |
+| 6 | No proposals for remote execution, policy engine, federation, confidential execution | **PASS** | All four explicitly listed in Deferred with "Not in v0.4.0 scope" |
+| 7 | Document does NOT push MAH toward being "Hermes-shaped" | **PASS** | Explicitly flags Hermes-shaped alignment as Deferred anti-goal |
+
+### Blockers
+
+**None.** No items would prevent merge.
+
+### Validation Verdict
+
+**APPROVED**
+
+Document is scope-compliant and approved for merge.
+
+---
+
+## Engineering Review
+
+**Reviewed against:** `scripts/runtime-adapter-contract.mjs`, `scripts/runtime-adapters.mjs`
+**Adapter contract compliance:** Hermes adapter passes all `REQUIRED_RUNTIME_ADAPTER_FIELDS` and `REQUIRED_RUNTIME_COMMANDS` checks. All 8 required commands present and correctly routed.
+**Deferred list:** 9 items confirmed; all are correctly scoped to v0.5.0+ and do not conflict with the "no full Hermes parity" sprint directive.
+
+### Command Mapping Corrections / Notes
+
+- **`hermesh chat` → `mah run`:** Correctly mapped. `hermesh chat` is an alias for `hermesh run` (routes to `hermes chat` in hermesh.mjs), so the Hermes adapter's `run` command variant `[hermes, [chat]]` is the correct resolution. No separate `chat` entry needed in the adapter.
+- **`mah explain`:** Listed as "Supported" with Hermes mapping. Confirmed: `mah explain run` / `mah explain use` etc. call `resolveDispatchPlan` with the Hermes adapter, showing which variant would execute. Hermes expertise model files (`.hermes/crew/<crew>/expertise/*.yaml`) and skill files are not operator-accessible through MAH; `mah explain` surfaces dispatch resolution, not file contents. Inventory correctly notes these as gaps.
+- **`mah check:runtime` → `hermes doctor`:** Mapping confirmed correct in adapter. `check:runtime` variant list routes to `hermesh doctor` which forwards to `hermes doctor`.
+- **`mah sessions`:** Correctly marked as "Not Hermes-specific." MAH sessions is a MAH-native collection. Hermes session enumeration (`hermes sessions list`) has no MAH equivalent.
+
+### Severity Rating Notes
+
+- **Bootstrap query injection (`-Q -q`):** Rated **High** in Section 6.1. Engineering note: the actual operator-facing exposure is **Low** (no MAH flag exposes this; it is internal to hermesh.mjs). The High rating is appropriate as a forward-looking architectural concern — if MAH ever considered a `--bootstrap-query` flag, Hermes would need to be the reference implementation, creating a capture risk. The rating reflects the gravity of that decision path, not current exploitability.
+- **Hermes session pinning:** Rated **High** — appropriate. `.active-crew.json` stores `orchestrator_session_id` with no MAH surface to inspect or clear it. This is Hermes-specific session state leaking into MAH infrastructure.
+- **Hermes capabilities as MAH features:** Rated **Medium** — appropriate. Currently no Hermes capability (`persistentMemory`, `gatewayAware`, etc.) is exposed as a MAH CLI flag. The Medium rating reflects the capture risk if those capabilities were ever surfaced, not current exposure.
+- **Hermes adapter 4-variant asymmetry:** Correctly flagged as **Medium** capture risk in Section 6.1. The adapter contract imposes no variant-count limit, so this is technically compliant. However, pi/claude/opencode each have 3 variants per command while hermes has 4 — this is real asymmetry worth monitoring. Engineering assessment: no immediate contract change needed, but the anti-capture guidance in Section 6.2 applies.
+
+### Adapter Contract Gaps
+
+None discovered. The Hermes adapter fully satisfies `REQUIRED_RUNTIME_ADAPTER_FIELDS` and `REQUIRED_RUNTIME_COMMANDS`. Variant-count asymmetry is a capture risk, not a contract violation.
+
+### Deferred List Confirmation
+
+All 9 deferred items confirmed correctly scoped to v0.5.0+:
+1. Full Hermes feature parity
+2. Hermes native session store enumeration via `mah sessions`
+3. Policy engine integration
+4. Federation / interconnect
+5. Confidential / secure execution mode
+6. Hermes background operation (`mah run --background`)
+7. Multi-backend execution visualization or control
+8. Gateway-aware routing in MAH dispatcher
+9. MAH becoming Hermes-shaped
+
+No items in the deferred list fall within v0.4.0 scope.
+
+### Summary
+
+**Confirmed:** Document accurately reflects Hermes CLI surface and MAH coverage. No command mappings are incorrect. No runtime-capture severity ratings require adjustment. The 9 deferred items are correctly scoped. One minor clarification: `hermes chat -Q -q` is correctly listed as having no MAH equivalent (Section 4); the High severity in Section 6.1 reflects architectural gravity of a potential future decision path, not current exploitability, and is therefore appropriate as written.
