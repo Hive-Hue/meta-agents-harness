@@ -1,16 +1,2 @@
-agent:
-  name: "frontend-dev"
-  role: "agent"
-  team: "dev"
-meta:
-  version: 1
-  max_lines: 120
-  last_updated: "2026-04-08T01:44:27Z"
-patterns: []
-risks: []
-tools: []
-workflows: []
-decisions: []
-lessons: []
-observations: []
-open_questions: []
+agent: frontend-dev
+summary: []
