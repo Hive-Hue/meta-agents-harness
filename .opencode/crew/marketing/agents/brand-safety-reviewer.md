@@ -20,18 +20,18 @@ Model: `zai/glm-5-turbo`
 Validation worker focused on validation findings with evidence and risk rating.
 
 ## Expertise
-- path: `.opencode/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml`
+- path: `.opencode/crew/marketing/expertise/brand-safety-reviewer-mental-model.yaml`
 - use-when: Store brand risk patterns, compliance checks, and escalation cues.
 
 ## Skills
-- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Before and after brand safety review.
+- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Before and after brand safety review.
 
 ## Tools
 - read
 - grep
 - glob
 - list
-- update-expertise-model
+- update-mental-model
 
 ## MCP Access
 - none
@@ -46,7 +46,7 @@ Validation worker focused on validation findings with evidence and risk rating.
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-expertise-model` after meaningful work.
+- Persist durable learnings using `update-mental-model` after meaningful work.
 
 ## Response Contract
 1. execution summary

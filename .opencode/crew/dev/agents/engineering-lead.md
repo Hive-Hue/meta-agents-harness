@@ -23,18 +23,18 @@ Model: `openai/gpt-5.2`
 Engineering lead responsible for delegation, synthesis, and team-level coordination.
 
 ## Expertise
-- path: `.opencode/crew/dev/expertise/engineering-lead-expertise-model.yaml`
+- path: `.opencode/crew/dev/expertise/engineering-lead-mental-model.yaml`
 - use-when: Track implementation risks, quality gates, and worker strengths.
 
 ## Skills
 - path: `.opencode/skills/delegate-bounded/SKILL.md` | use-when: For each frontend/backend split.
 - path: `.opencode/skills/zero-micromanagement/SKILL.md` | use-when: Always while assigning implementation scope.
-- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Before/after implementation rounds.
+- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Before/after implementation rounds.
 - path: `.opencode/skills/zeplin-mcp-ops/SKILL.md` | use-when: When assigning implementation that must match Zeplin design artifacts.
 
 ## Tools
 - task
-- update-expertise-model
+- update-mental-model
 
 ## MCP Access
 - context7
@@ -53,7 +53,7 @@ Engineering lead responsible for delegation, synthesis, and team-level coordinat
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-expertise-model` after meaningful work.
+- Persist durable learnings using `update-mental-model` after meaningful work.
 
 ## Response Contract
 1. delegation summary

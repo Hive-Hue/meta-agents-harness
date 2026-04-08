@@ -1,0 +1,73 @@
+# Simple Hermes Crew Configuration Example
+#
+# Minimal crew definition for a single Hermes team.
+# This is the simplest starting point for Hermes runtime integration.
+#
+# Usage:
+#   1. Copy this content into your meta-agents.yaml
+#   2. Run: mah init --runtime hermes
+#   3. Run: npm run sync:meta
+#   4. Run: mah --runtime hermes run
+
+version: 1
+name: "hermes-simple-crew"
+description: "Minimal Hermes crew configuration"
+
+runtime_detection:
+  order: [forced, marker, cli]
+  forced:
+    args: ["--runtime=<name>", "--runtime <name>"]
+    env: ["MAH_RUNTIME"]
+  marker:
+    hermes: ".hermes"
+  cli:
+    hermes:
+      direct_cli: "hermes"
+      wrapper: "hermesh"
+
+runtimes:
+  hermes:
+    wrapper: "hermesh"
+    direct_cli: "hermes"
+    config_root: ".hermes"
+    config_pattern: ".hermes/crew/<crew>/config.yaml"
+    capabilities:
+      persistent_memory: true
+      supports_background_operation: true
+
+catalog:
+  models:
+    orchestrator_default: "hermes/default"
+    worker_default: "hermes/default"
+
+crews:
+  - id: "dev"
+    display_name: "Dev Crew"
+    mission: "Simple development crew powered by Hermes."
+    session:
+      hermes_root: ".hermes/crew/dev/sessions"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        engineering: "lead"
+      workers:
+        engineering: ["implementer"]
+    agents:
+      - id: "orchestrator"
+        role: "orchestrator"
+        team: "orchestration"
+        model_ref: "orchestrator_default"
+        expertise: "orchestrator-expertise-model"
+        domain_profile: "read_only_repo"
+      - id: "lead"
+        role: "lead"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "lead-expertise-model"
+        domain_profile: "cli_operator_surface"
+      - id: "implementer"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "implementer-expertise-model"
+        domain_profile: "runtime_impl"

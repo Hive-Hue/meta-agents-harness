@@ -59,10 +59,13 @@ test("plan --json and diff --json expose deterministic command envelope", () => 
 })
 
 test("doctor and explain detect support json envelope", () => {
-  const doctor = runJson(["doctor", "--json"])
+  const doctor = runJson(["doctor", "--json", "--crew", "dev"])
   assert.equal(doctor.json.schema, "mah.diagnostics.v1")
   assert.equal(doctor.json.command, "doctor")
-  const explain = runJson(["explain", "detect", "--json"])
+  assert.equal(doctor.json.data?.crew_context?.crew_id, "dev")
+  assert.equal(doctor.json.data?.crew_context?.sprint_mode?.target_release, "v0.4.0")
+  const explain = runJson(["explain", "detect", "--json", "--crew", "dev"])
   assert.equal(explain.json.schema, "mah.diagnostics.v1")
   assert.equal(explain.json.command, "explain")
+  assert.equal(explain.json.data?.crew_context?.crew_id, "dev")
 })

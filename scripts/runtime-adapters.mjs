@@ -1,6 +1,31 @@
-export const RUNTIME_ORDER = ["pi", "claude", "opencode"]
+import { existsSync } from "node:fs"
+import path from "node:path"
 
-function createAdapter(definition) {
+export const RUNTIME_ORDER = ["pi", "claude", "opencode", "hermes"]
+
+function variantPathExists(candidatePath) {
+  if (!candidatePath || typeof candidatePath !== "string") return false
+  const absolutePath = path.isAbsolute(candidatePath)
+    ? candidatePath
+    : path.resolve(process.cwd(), candidatePath)
+  return existsSync(absolutePath)
+}
+
+function variantExecutableAvailable(exec, args, commandExistsFn) {
+  if (!commandExistsFn(exec)) return false
+  if (exec === "node") {
+    return variantPathExists(args?.[0])
+  }
+  if (exec === "npm") {
+    const prefixIndex = Array.isArray(args) ? args.indexOf("--prefix") : -1
+    if (prefixIndex === -1 || !args?.[prefixIndex + 1]) return true
+    const prefixDir = args[prefixIndex + 1]
+    return variantPathExists(prefixDir) && variantPathExists(path.join(prefixDir, "package.json"))
+  }
+  return true
+}
+
+export function createAdapter(definition) {
   return {
     ...definition,
     detect(cwd, existsFn) {
@@ -12,8 +37,13 @@ function createAdapter(definition) {
     resolveCommandPlan(command, commandExistsFn) {
       const variants = this.commands?.[command] || []
       if (variants.length === 0) return { ok: false, error: `command not supported: ${command}`, variants: [] }
-      const candidates = variants.map(([exec, args]) => ({ exec, args, exists: commandExistsFn(exec) }))
-      const selected = candidates.find((item) => item.exists)
+      const candidates = variants.map(([exec, args]) => ({
+        exec,
+        args,
+        exists: commandExistsFn(exec),
+        usable: variantExecutableAvailable(exec, args, commandExistsFn)
+      }))
+      const selected = candidates.find((item) => item.usable)
       if (!selected) return { ok: false, error: `no executable available for ${command}`, variants: candidates }
       return { ok: true, exec: selected.exec, args: selected.args, variants: candidates }
     },
@@ -42,6 +72,7 @@ export const RUNTIME_ADAPTERS = {
     capabilities: {
       sessionModeNew: true,
       sessionModeContinue: true,
+      sessionModeNone: true,
       sessionIdViaEnv: "PI_MULTI_SESSION_ID",
       sessionRootFlag: "--session-root",
       sessionMirrorFlag: false
@@ -65,6 +96,7 @@ export const RUNTIME_ADAPTERS = {
     capabilities: {
       sessionModeNew: false,
       sessionModeContinue: true,
+      sessionModeNone: true,
       sessionIdFlag: "--session-id",
       sessionRootFlag: false,
       sessionMirrorFlag: true
@@ -88,6 +120,7 @@ export const RUNTIME_ADAPTERS = {
     capabilities: {
       sessionModeNew: false,
       sessionModeContinue: true,
+      sessionModeNone: false,
       sessionIdFlag: "--session-id",
       sessionRootFlag: false,
       sessionMirrorFlag: false
@@ -101,6 +134,34 @@ export const RUNTIME_ADAPTERS = {
       "check:runtime": [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
       validate: [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
       "validate:runtime": [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]]
+    }
+  }),
+  hermes: createAdapter({
+    name: "hermes",
+    markerDir: ".hermes",
+    wrapper: "hermesh",
+    directCli: "hermes",
+    capabilities: {
+      sessionModeNew: true,
+      sessionModeContinue: true,
+      sessionModeNone: false,
+      sessionIdViaEnv: "HERMES_SESSION_ID",
+      sessionRootFlag: "--session-root",
+      sessionMirrorFlag: false,
+      persistentMemory: true,
+      supportsBackgroundOperation: true,
+      supportsMultiBackendExecution: true,
+      gatewayAware: true
+    },
+    commands: {
+      "list:crews": [["node", [".hermes/bin/hermesh", "list:crews"]], ["hermesh", ["list:crews"]], ["hermes", ["list:crews"]], ["npm", ["--prefix", ".hermes", "run", "list:crews"]]],
+      use: [["node", [".hermes/bin/hermesh", "use"]], ["hermesh", ["use"]], ["hermes", ["use"]], ["npm", ["--prefix", ".hermes", "run", "use:crew", "--"]]],
+      clear: [["node", [".hermes/bin/hermesh", "clear"]], ["hermesh", ["clear"]], ["hermes", ["clear"]], ["npm", ["--prefix", ".hermes", "run", "clear:crew"]]],
+      run: [["node", [".hermes/bin/hermesh", "run"]], ["hermesh", ["run"]], ["hermes", ["chat"]], ["npm", ["--prefix", ".hermes", "run", "run:crew", "--"]]],
+      doctor: [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]],
+      "check:runtime": [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]],
+      validate: [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]],
+      "validate:runtime": [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]]
     }
   })
 }

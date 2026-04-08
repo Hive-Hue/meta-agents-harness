@@ -101,7 +101,7 @@ function printHelp() {
   console.log("  detect")
   console.log("  doctor")
   console.log("  explain [detect|use|run|sync] [args]")
-  console.log("  init [--runtime <name>] [--crew <name>]")
+  console.log("  init [--yes] [--force] [--crew <name>] [--runtime <name>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
@@ -135,6 +135,7 @@ function printHelp() {
   console.log("  --mermaid-capabilities")
   console.log("  --crew <name>")
   console.log("  --run <id>")
+  console.log("  --agent <name>")
   console.log("  --strict-markers")
 }
 
@@ -209,6 +210,75 @@ function readConfiguredMcpServers() {
   return ["context7", "github"]
 }
 
+function normalizeStringList(value) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim()) : []
+}
+
+function normalizeSprintMode(value) {
+  if (!value || typeof value !== "object") return null
+  const next = {
+    name: `${value.name || ""}`.trim(),
+    active: Boolean(value.active),
+    target_release: `${value.target_release || ""}`.trim(),
+    objective: `${value.objective || ""}`.trim(),
+    execution_mode: `${value.execution_mode || ""}`.trim(),
+    directives: normalizeStringList(value.directives),
+    must_deliver: normalizeStringList(value.must_deliver),
+    must_not_deliver: normalizeStringList(value.must_not_deliver)
+  }
+  const compact = Object.fromEntries(
+    Object.entries(next).filter(([, item]) => {
+      if (Array.isArray(item)) return item.length > 0
+      if (typeof item === "boolean") return true
+      return Boolean(item)
+    })
+  )
+  return Object.keys(compact).length > 0 ? compact : null
+}
+
+function normalizeAgentCrewContext(agent) {
+  if (!agent || typeof agent !== "object") return null
+  const context = {
+    id: `${agent.id || ""}`.trim(),
+    role: `${agent.role || ""}`.trim(),
+    team: `${agent.team || ""}`.trim(),
+    sprint_responsibilities: normalizeStringList(agent.sprint_responsibilities)
+  }
+  const compact = Object.fromEntries(
+    Object.entries(context).filter(([, item]) => {
+      if (Array.isArray(item)) return item.length > 0
+      return Boolean(item)
+    })
+  )
+  return Object.keys(compact).length > 0 ? compact : null
+}
+
+function resolveCrewExecutionContext(crewId) {
+  const requested = `${crewId || ""}`.trim()
+  if (!requested) return null
+  const meta = readMetaConfig(repoRoot)
+  const crew = (meta.crews || []).find((item) => item.id === requested)
+  if (!crew) {
+    return { requested_crew: requested, found: false }
+  }
+  const agents = (crew.agents || [])
+    .map((agent) => normalizeAgentCrewContext(agent))
+    .filter(Boolean)
+  return {
+    crew_id: crew.id,
+    display_name: `${crew.display_name || ""}`.trim(),
+    found: true,
+    mission: `${crew.mission || ""}`.trim(),
+    sprint_mode: normalizeSprintMode(crew.sprint_mode),
+    topology: {
+      orchestrator: `${crew.topology?.orchestrator || ""}`.trim(),
+      leads: Object.entries(crew.topology?.leads || {}).map(([team, lead]) => ({ team, lead })),
+      worker_teams: Object.entries(crew.topology?.workers || {}).map(([team, members]) => ({ team, members }))
+    },
+    agents
+  }
+}
+
 function createDiagnosticPayload(command, values = {}) {
   const status = Number.isInteger(values.status) ? values.status : 0
   const errors = Array.isArray(values.errors) ? values.errors : []
@@ -239,7 +309,9 @@ function extractSessionOptions(argv) {
     mode: "",
     sessionId: "",
     sessionRoot: "",
-    sessionMirror: null
+    sessionMirror: null,
+    agent: "",
+    hierarchy: null
   }
   const remaining = []
 
@@ -250,26 +322,14 @@ function extractSessionOptions(argv) {
       i += 1
       continue
     }
-    if (token.startsWith("--session-mode=")) {
-      options.mode = token.slice("--session-mode=".length)
-      continue
-    }
     if (token === "--session-id" && argv[i + 1]) {
       options.sessionId = argv[i + 1]
       i += 1
       continue
     }
-    if (token.startsWith("--session-id=")) {
-      options.sessionId = token.slice("--session-id=".length)
-      continue
-    }
     if (token === "--session-root" && argv[i + 1]) {
       options.sessionRoot = argv[i + 1]
       i += 1
-      continue
-    }
-    if (token.startsWith("--session-root=")) {
-      options.sessionRoot = token.slice("--session-root=".length)
       continue
     }
     if (token === "--session-mirror") {
@@ -280,10 +340,23 @@ function extractSessionOptions(argv) {
       options.sessionMirror = false
       continue
     }
+    if (token === "--agent" && argv[i + 1]) {
+      options.agent = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (token === "--hierarchy") {
+      options.hierarchy = true
+      continue
+    }
+    if (token === "--no-hierarchy") {
+      options.hierarchy = false
+      continue
+    }
     remaining.push(token)
   }
 
-  return { options, remaining }
+  return { options, remaining: remaining.filter(Boolean) }
 }
 
 function hasContinueFlag(argv) {
@@ -299,6 +372,27 @@ function normalizeRunArgs(runtime, passthrough) {
   const args = [...remaining]
 
   if (!options.mode && !options.sessionId && !options.sessionRoot && options.sessionMirror === null) {
+    return { args, envOverrides, warnings }
+  }
+
+  if (options.mode && !options.mode.match(/^(new|continue|none)$/)) {
+    warnings.push(`invalid --session-mode value: ${options.mode} (expected new, continue, or none)`)
+  }
+
+  if (options.mode === "none") {
+    if (runtime === "pi") {
+      args.unshift("--no-session")
+    } else if (runtime === "claude") {
+      args.unshift("--print", "--no-session-persistence")
+      warnings.push("claude: --session-mode none uses --print mode (non-interactive)")
+    } else if (runtime === "hermes") {
+      warnings.push("hermes: --session-mode none is not supported, sessions will persist")
+    } else if (runtime === "opencode") {
+      warnings.push("opencode: --session-mode none is not supported, sessions will persist")
+    }
+    if (options.sessionId) warnings.push("--session-id is ignored with --session-mode none")
+    if (options.sessionRoot) warnings.push("--session-root is ignored with --session-mode none")
+    if (options.sessionMirror === true) warnings.push("--session-mirror is ignored with --session-mode none")
     return { args, envOverrides, warnings }
   }
 
@@ -322,8 +416,17 @@ function normalizeRunArgs(runtime, passthrough) {
   } else if (runtime === "opencode") {
     if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
     if (options.sessionId && capabilities.sessionIdFlag) args.push(capabilities.sessionIdFlag, options.sessionId)
+    if (options.agent) args.push("--agent", options.agent)
+    if (options.hierarchy === true) args.push("--hierarchy")
+    if (options.hierarchy === false) args.push("--no-hierarchy")
     if (options.sessionRoot) warnings.push("--session-root is ignored for opencode runtime")
     if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for opencode runtime")
+  } else if (runtime === "hermes") {
+    if (options.mode === "new" && capabilities.sessionModeNew) args.unshift("--new-session")
+    if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
+    if (options.sessionRoot && capabilities.sessionRootFlag) args.unshift(capabilities.sessionRootFlag, options.sessionRoot)
+    if (options.sessionId && capabilities.sessionIdViaEnv) envOverrides[capabilities.sessionIdViaEnv] = options.sessionId
+    if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for hermes runtime")
   }
 
   return { args, envOverrides, warnings }
@@ -408,21 +511,50 @@ function printExplain(traceMode, payload) {
       console.log(`warning=${warning}`)
     }
   }
+  if (payload.crewContext?.crew_id) {
+    console.log(`crew_context=${payload.crewContext.crew_id}`)
+    if (payload.crewContext.mission) console.log(`crew_mission=${payload.crewContext.mission}`)
+    if (payload.crewContext.sprint_mode?.name) console.log(`crew_sprint=${payload.crewContext.sprint_mode.name}`)
+    if (payload.crewContext.sprint_mode?.target_release) {
+      console.log(`crew_target_release=${payload.crewContext.sprint_mode.target_release}`)
+    }
+  } else if (payload.crewContext?.requested_crew && payload.crewContext?.found === false) {
+    console.log(`crew_context_missing=${payload.crewContext.requested_crew}`)
+  }
 }
 
 function runInit(argv) {
   const runtime = parseValueArg(argv, "--runtime")
   const crew = parseValueArg(argv, "--crew")
+  const yesFlag = argv.includes("--yes")
+  const forceFlag = argv.includes("--force")
   const created = []
   const skipped = []
-  const metaTarget = path.join(repoRoot, "meta-agents.yaml")
-  const metaExample = path.join(repoRoot, "examples", "meta-agents.yaml.example")
-  if (!existsSync(metaTarget) && existsSync(metaExample)) {
-    copyFileSync(metaExample, metaTarget)
+
+  const bootstrapArgs = [path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")]
+  if (!process.stdin.isTTY || yesFlag) {
+    bootstrapArgs.push("--non-interactive")
+  }
+  if (forceFlag) {
+    bootstrapArgs.push("--force")
+  }
+  if (crew) {
+    bootstrapArgs.push("--crew", crew)
+  }
+
+  const bootstrapResult = spawnSync("node", bootstrapArgs, {
+    cwd: process.cwd(),
+    stdio: "inherit",
+    env: process.env
+  })
+
+  const metaTarget = path.join(process.cwd(), "meta-agents.yaml")
+  if (bootstrapResult.status === 0 && existsSync(metaTarget)) {
     created.push("meta-agents.yaml")
   } else {
     skipped.push("meta-agents.yaml")
   }
+
   const mcpTarget = path.join(repoRoot, ".mcp.json")
   const mcpExample = path.join(repoRoot, ".mcp.example.json")
   if (!existsSync(mcpTarget) && existsSync(mcpExample)) {
@@ -448,7 +580,7 @@ function runInit(argv) {
     console.log(`next=mah use ${crew}`)
   }
   console.log("next=npm run sync:meta")
-  return 0
+  return bootstrapResult.status !== null ? bootstrapResult.status : 1
 }
 
 function runSessions(argv, jsonMode = false) {
@@ -975,17 +1107,19 @@ function main() {
 
   if (first === "explain") {
     const explainCommand = normalizedArgv[1] || "detect"
+    const explainFilters = parseFilterArgs(normalizedArgv.slice(2))
+    const crewContext = resolveCrewExecutionContext(explainFilters.crew)
     if (explainCommand === "detect") {
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
           status: runtimeResult.runtime ? 0 : 1,
           runtime: runtimeResult.runtime || "",
           reason: runtimeResult.reason,
-          data: { target: "detect", runtime: runtimeResult.runtime || "" },
+          data: { target: "detect", runtime: runtimeResult.runtime || "", crew_context: crewContext },
           errors: runtimeResult.runtime ? [] : ["no-runtime-detected"]
         }))
       } else {
-        printExplain(traceMode, { runtime: runtimeResult.runtime, reason: runtimeResult.reason, command: "detect" })
+        printExplain(traceMode, { runtime: runtimeResult.runtime, reason: runtimeResult.reason, command: "detect", crewContext })
       }
       process.exitCode = runtimeResult.runtime ? 0 : 1
       return
@@ -1001,7 +1135,8 @@ function main() {
         reason: runtimeResult.reason,
         command: "sync",
         resolved_exec: process.execPath,
-        resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"]
+        resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"],
+        crewContext
       }
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
@@ -1032,7 +1167,8 @@ function main() {
         passthrough: plan.passthrough || [],
         env: plan.envOverrides || {},
         warnings: plan.warnings || [],
-        candidates: plan.candidates || []
+        candidates: plan.candidates || [],
+        crewContext
       }
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
@@ -1052,10 +1188,13 @@ function main() {
   }
 
   if (first === "doctor" && jsonMode) {
+    const doctorFilters = parseFilterArgs(normalizedArgv.slice(1))
+    const crewContext = resolveCrewExecutionContext(doctorFilters.crew)
     if (!runtimeResult.runtime) {
       printDiagnosticPayload(createDiagnosticPayload("doctor", {
         status: 1,
         reason: "no-runtime-detected",
+        data: { crew_context: crewContext },
         errors: ["no-runtime-detected"]
       }))
       process.exitCode = 1
@@ -1068,7 +1207,7 @@ function main() {
       runtime: runtimeResult.runtime,
       reason: runtimeResult.reason,
       status,
-      data: { precheck, stdout: captured.stdout.trim(), stderr: captured.stderr.trim() },
+      data: { precheck, stdout: captured.stdout.trim(), stderr: captured.stderr.trim(), crew_context: crewContext },
       errors: status === 0 ? [] : ["doctor-check-failed"]
     }))
     process.exitCode = status
@@ -1076,12 +1215,14 @@ function main() {
   }
 
   if (first === "validate") {
+    const validateFilters = parseFilterArgs(normalizedArgv.slice(1))
+    const crewContext = resolveCrewExecutionContext(validateFilters.crew)
     if (jsonMode) {
       const configCaptured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
       if (configCaptured.status !== 0) {
         printDiagnosticPayload(createDiagnosticPayload("validate", {
           status: configCaptured.status,
-          data: { config: { status: configCaptured.status, stdout: configCaptured.stdout.trim(), stderr: configCaptured.stderr.trim() } },
+          data: { config: { status: configCaptured.status, stdout: configCaptured.stdout.trim(), stderr: configCaptured.stderr.trim() }, crew_context: crewContext },
           errors: ["config-validation-failed"]
         }))
         process.exitCode = configCaptured.status
@@ -1091,7 +1232,7 @@ function main() {
         printDiagnosticPayload(createDiagnosticPayload("validate", {
           status: 1,
           reason: "no-runtime-detected",
-          data: { config: { status: 0 }, runtime: { status: 1, reason: "no-runtime-detected" } },
+          data: { config: { status: 0 }, runtime: { status: 1, reason: "no-runtime-detected" }, crew_context: crewContext },
           errors: ["no-runtime-detected"]
         }))
         process.exitCode = 1
@@ -1104,6 +1245,7 @@ function main() {
         reason: runtimeResult.reason,
         data: {
           config: { status: 0 },
+          crew_context: crewContext,
           runtime_check: {
             status: runtimeCaptured.status,
             stdout: runtimeCaptured.stdout.trim(),
@@ -1130,8 +1272,17 @@ function main() {
   }
 
   if (first === "doctor") {
+    const doctorFilters = parseFilterArgs(normalizedArgv.slice(1))
+    const crewContext = resolveCrewExecutionContext(doctorFilters.crew)
     console.log(`meta-agents-harness runtime: ${runtimeResult.runtime}`)
     console.log(`detection reason: ${runtimeResult.reason}`)
+    if (crewContext?.crew_id) {
+      console.log(`crew context: ${crewContext.crew_id}`)
+      if (crewContext.mission) console.log(`crew mission: ${crewContext.mission}`)
+      if (crewContext.sprint_mode?.name) console.log(`crew sprint: ${crewContext.sprint_mode.name}`)
+    } else if (crewContext?.requested_crew && crewContext?.found === false) {
+      console.log(`crew context not found: ${crewContext.requested_crew}`)
+    }
     const status = dispatch(runtimeResult.runtime, "check:runtime", [])
     process.exitCode = status
     return

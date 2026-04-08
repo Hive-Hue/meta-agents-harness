@@ -8,7 +8,7 @@
 
 # Meta Agents Harness
 
-**Meta Agents Harness** is a unified multi-agent control layer for **OpenCode**, **Claude Code**, and **PI**.
+**Meta Agents Harness** is a unified multi-agent control layer for **OpenCode**, **Claude Code**, **PI**, and **Hermes**.
 
 Instead of maintaining separate operator flows, wrappers, and team topologies for each runtime, this project exposes a **single command surface** — `mah` — and dispatches to the correct runtime automatically.
 
@@ -29,6 +29,38 @@ Meta Agents Harness solves that by providing:
 - **incremental migration path** from runtime-specific harnesses to a unified entrypoint
 
 This makes it easier to standardize operations without forcing teams to abandon the runtime they already use.
+
+---
+
+## Getting Started
+
+New to Meta Agents Harness? Get up and running quickly:
+
+### Quick Bootstrap Examples
+
+```bash
+# Interactive mode (prompts for configuration)
+npm run setup
+
+# Non-interactive with defaults
+mah init --yes
+
+# Custom project details
+mah init --yes --crew my-team --name "My Project" --description "Project description"
+
+# Force overwrite existing config
+mah init --yes --force
+```
+
+### Verify Your Setup
+
+```bash
+mah detect          # Check runtime detection
+mah validate:config # Validate configuration
+mah doctor          # Run diagnostics
+```
+
+📖 **For detailed bootstrap documentation, see [`docs/getting-started.md`](./docs/getting-started.md)**
 
 ---
 
@@ -71,7 +103,7 @@ And let the harness resolve:
 Detection currently follows this priority:
 
 1. forced runtime via `--runtime`, `-r`, `-f`, or `MAH_RUNTIME`
-2. runtime marker directory in the repository (`.pi`, `.claude`, `.opencode`)
+2. runtime marker directory in the repository (`.pi`, `.claude`, `.opencode`, `.hermes`)
 3. installed executable or wrapper available in the environment
 
 This allows the same repository to remain runtime-aware while preserving explicit overrides for CI, local debugging, or controlled execution.
@@ -85,8 +117,11 @@ Meta Agents Harness currently targets:
 - **OpenCode**
 - **Claude Code**
 - **PI**
+- **Hermes**
 
-The repository ships runtime assets for all three, while presenting a single operator entrypoint.
+The repository ships runtime assets for all four runtimes, while presenting a single operator entrypoint.
+
+Hermes support is deep but intentionally bounded — it strengthens the runtime portfolio without compromising MAH's runtime-agnostic product identity. See [`docs/hermes/runtime-support.md`](./docs/hermes/runtime-support.md) for details on what is supported and what remains intentionally out of scope.
 
 ---
 
@@ -104,6 +139,7 @@ mah explain
 mah explain run --trace
 mah doctor
 mah init --runtime opencode --crew dev
+mah init --yes --force --crew bootstrap-config
 mah plan
 mah diff
 mah sessions --json
@@ -114,6 +150,7 @@ mah graph --crew dev --mermaid --mermaid-level detailed
 mah graph --crew dev --mermaid --mermaid-level detailed --mermaid-capabilities
 mah demo dev
 MAH_AUDIT=1 mah run --session-mode continue
+mah run --session-mode none "quick task"
 mah validate:runtime
 mah validate:config
 mah validate:sync
@@ -146,6 +183,7 @@ From the canonical config, the project materializes runtime-specific files under
 - `.pi/`
 - `.claude/`
 - `.opencode/`
+- `.hermes/`
 
 This preserves runtime-native structures while reducing duplicated authoring effort.
 
@@ -159,7 +197,33 @@ The common abstraction is:
 
 This structure is translated into each runtime’s expected configuration model.
 
-### 5. Expertise model foundation
+### 5. Hermes runtime support
+
+Hermes is integrated as a first-class runtime through MAH's adapter model.
+
+Key characteristics:
+
+- **Adapter-driven**: Hermes uses the same `createAdapter()` factory pattern as PI, Claude, and OpenCode
+- **Bounded integration**: Support is deep enough to be useful, but does not turn MAH into a Hermes fork
+- **Honest limitations**: Commands or semantics that cannot be cleanly mapped fail with clear, explainable errors
+- **Selective absorption**: Selected Hermes-compatible patterns (persistence metadata, backend hints, capability flags) are adopted where they strengthen MAH's orchestration layer
+
+Quick start with Hermes:
+
+```bash
+npm run sync:meta
+mah use dev
+mah --runtime hermes detect
+mah --runtime hermes doctor
+mah --runtime hermes explain run --trace
+mah --runtime hermes run
+```
+
+On `mah --runtime hermes run`, the repo-local wrapper bootstraps the active crew's orchestrator context before continuing the interactive Hermes session.
+
+See [`docs/hermes/`](./docs/hermes/) for the complete Hermes integration guide.
+
+### 6. Expertise model foundation
 
 In `v0.3.0`, expertise model is treated as a normalized foundation concept:
 
@@ -176,7 +240,9 @@ See: `docs/expertise-model-foundation.md`
 
 ## Installation
 
-Clone the repository and install dependencies:
+### Quick Start
+
+Clone and install dependencies:
 
 ```bash
 git clone https://github.com/Hive-Hue/meta-agents-harness.git
@@ -184,13 +250,74 @@ cd meta-agents-harness
 npm run setup
 ```
 
-Optional local environment setup:
+### Bootstrap / Initial Setup
+
+The first time you run `npm run setup`, MAH automatically creates a `meta-agents.yaml` configuration file if one doesn't exist.
+
+#### Interactive Mode (default)
+
+When running in an interactive terminal, MAH prompts for basic configuration:
+
+```bash
+npm run setup
+```
+
+You'll be asked for:
+1. Bootstrap mode: `1` (logical defaults) or `2` (AI-assisted - requires API key)
+2. Project name
+3. Project description  
+4. Primary crew ID
+5. Crew mission
+
+#### Non-Interactive Mode
+
+In CI/CD or non-TTY environments, MAH uses logical defaults automatically
+
+```bash
+npm run setup  # Runs with defaults
+```
+
+#### Manual Bootstrap
+
+You can also run the bootstrap command directly:
+
+```bash
+npm run bootstrap:meta
+```
+
+Or use the `mah init` command for more control:
+
+```bash
+# Create with defaults
+mah init --yes
+
+# Force overwrite existing config
+mah init --yes --force
+
+# Specify project details
+mah init --yes --crew my-team --name "My Project" --description "Project description"
+
+# Interactive mode (prompts for input)
+mah init
+```
+
+#### Environment Variables
+
+You can override defaults via environment variables:
+
+```bash
+MAH_INIT_NAME="my-project" mah init --yes
+MAH_INIT_DESCRIPTION="Custom description" mah init --yes
+MAH_INIT_CREW="custom-crew" mah init --yes
+```
+
+### Optional Local Environment Setup
 
 ```bash
 cp .env.sample .env
 ```
 
-The setup script installs root dependencies and runtime dependencies used by the repository.
+For detailed onboarding documentation, see [`docs/onboarding.md`](./docs/onboarding.md).
 
 ---
 
@@ -281,6 +408,10 @@ mah run
 mah --runtime opencode validate
 mah --runtime claude check:runtime
 mah --runtime pi run -c
+mah use dev
+mah --runtime hermes detect
+mah --runtime hermes doctor
+mah --runtime hermes run
 ```
 
 ---
@@ -292,14 +423,32 @@ The CLI normalizes session-related controls across runtimes.
 Examples:
 
 ```bash
-mah run --session-mode continue
 mah run --session-mode new
+mah run --session-mode continue
+mah run --session-mode none             # ephemeral (no session persistence)
 mah run --session-id 11111111-1111-1111-1111-111111111111
 mah run --session-root .pi/crew/dev/sessions
 mah run --session-mirror
 ```
 
+### Session modes
+
+| Mode | pi | claude | opencode | hermes |
+|------|----|--------|----------|--------|
+| `new` | `--new-session` | — | — | `--new-session` |
+| `continue` | `-c` | `--continue` | `-c` | `-c` |
+| `none` | `--no-session` | `--print --no-session-persistence` | Not supported (warning) | Not supported (warning) |
+
+When `--session-mode none` is set, `--session-id`, `--session-root`, and `--session-mirror` are ignored with warnings.
+
 These are translated to runtime-native behavior internally.
+
+For Hermes specifically:
+
+- `--session-mode continue` maps to Hermes resume/continue semantics
+- `--session-id` is bridged by the repo-local Hermes wrapper
+- `--session-root` is captured by the wrapper as MAH session metadata, but Hermes still uses its own global session store/layout
+- `--session-mirror` is ignored
 
 ---
 
@@ -341,6 +490,7 @@ The repository currently contains runtime-specific assets such as:
 - `.opencode/` — OpenCode harness topology and scripts
 - `.claude/` — Claude runtime wrappers and crew structure
 - `.pi/` — PI runtime wrappers and crew structure
+- `.hermes/` — Hermes runtime configuration and crew structure
 - `extensions/` — PI runtime extensions and entrypoints
 
 The purpose of the unified CLI is not to remove those assets, but to make them easier to manage from a single operational layer.
@@ -440,7 +590,7 @@ It is the best branch to inspect for **roadmap**, **direction**, and **product a
 
 Possible causes:
 
-- the repository has no `.pi`, `.claude`, or `.opencode` marker
+- the repository has no `.pi`, `.claude`, `.opencode`, or `.hermes` marker
 - no relevant runtime executable is available
 - no explicit `--runtime` was passed
 

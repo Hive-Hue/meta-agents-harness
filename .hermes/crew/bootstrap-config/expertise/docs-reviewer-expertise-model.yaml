@@ -1,0 +1,16 @@
+agent:
+  name: "docs-reviewer"
+  role: "worker"
+  team: "Validation"
+meta:
+  version: "1"
+  max_lines: "120"
+  last_updated: "2026-04-07T02:05:11.770Z"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

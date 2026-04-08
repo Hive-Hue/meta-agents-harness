@@ -1,6 +1,6 @@
 {
   "name": "meta-agents-harness",
-  "version": "0.3.0",
+  "version": "0.2.0",
   "description": "Unified multi-agent harness that detects OpenCode, Claude, or PI runtime and adapts commands dynamically.",
   "type": "module",
   "bin": {
@@ -8,6 +8,7 @@
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "bootstrap:meta": "node scripts/bootstrap-meta-agents.mjs",
     "sync:meta": "node scripts/sync-meta-agents.mjs",
     "check:meta-sync": "node scripts/sync-meta-agents.mjs --check",
     "validate:config": "node scripts/validate-meta-config.mjs",
@@ -38,5 +39,8 @@
     "yaml": "^2.8.1",
     "zod": "^3.23.8"
   },
-  "license": "SEE LICENSE IN LICENSE"
+  "license": "SEE LICENSE IN LICENSE",
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  }
 }

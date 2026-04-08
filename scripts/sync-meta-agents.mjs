@@ -59,7 +59,87 @@ function parsePromptFrontmatter(raw) {
   return { frontmatter, body: match[2] || "" }
 }
 
-function buildPiPromptFromMeta(meta, crew, agent, currentRaw) {
+function normalizeSprintMode(sprintMode) {
+  if (!sprintMode || typeof sprintMode !== "object") return null
+  const next = {
+    name: `${sprintMode.name || ""}`.trim(),
+    active: Boolean(sprintMode.active),
+    target_release: `${sprintMode.target_release || ""}`.trim(),
+    objective: `${sprintMode.objective || ""}`.trim(),
+    execution_mode: `${sprintMode.execution_mode || ""}`.trim(),
+    directives: Array.isArray(sprintMode.directives) ? sprintMode.directives.filter(Boolean) : [],
+    must_deliver: Array.isArray(sprintMode.must_deliver) ? sprintMode.must_deliver.filter(Boolean) : [],
+    must_not_deliver: Array.isArray(sprintMode.must_not_deliver) ? sprintMode.must_not_deliver.filter(Boolean) : []
+  }
+  return Object.fromEntries(
+    Object.entries(next).filter(([, value]) => {
+      if (Array.isArray(value)) return value.length > 0
+      if (typeof value === "boolean") return true
+      return Boolean(value)
+    })
+  )
+}
+
+function crewRuntimeMetadata(crew) {
+  const sprintMode = normalizeSprintMode(crew?.sprint_mode)
+  const metadata = {
+    mission: `${crew?.mission || ""}`.trim(),
+    sprint_mode: sprintMode
+  }
+  return Object.fromEntries(Object.entries(metadata).filter(([, value]) => value))
+}
+
+function agentRuntimeMetadata(agent) {
+  const responsibilities = Array.isArray(agent?.sprint_responsibilities)
+    ? agent.sprint_responsibilities.filter(Boolean)
+    : []
+  if (responsibilities.length === 0) return {}
+  return { sprint_responsibilities: responsibilities }
+}
+
+function compactInstructionList(items) {
+  return (Array.isArray(items) ? items : [])
+    .map((item) => `${item || ""}`.trim())
+    .filter(Boolean)
+    .join("; ")
+}
+
+function buildCrewInstructionBlock(crew, agent) {
+  const mission = `${crew?.mission || ""}`.trim()
+  const sprintMode = normalizeSprintMode(crew?.sprint_mode)
+  const responsibilities = Array.isArray(agent?.sprint_responsibilities)
+    ? agent.sprint_responsibilities.map((item) => `${item || ""}`.trim()).filter(Boolean)
+    : []
+  const parts = []
+  if (crew?.id) parts.push(`crew=${crew.id}`)
+  if (mission) parts.push(`mission=${mission}`)
+  if (sprintMode) {
+    const sprintParts = []
+    if (sprintMode.name) sprintParts.push(sprintMode.name)
+    if (sprintMode.target_release) sprintParts.push(`release=${sprintMode.target_release}`)
+    if (sprintMode.execution_mode) sprintParts.push(`mode=${sprintMode.execution_mode}`)
+    if (sprintMode.active) sprintParts.push("active=true")
+    if (sprintParts.length > 0) parts.push(`sprint=${sprintParts.join(",")}`)
+    if (sprintMode.directives?.length > 0) parts.push(`directives=${compactInstructionList(sprintMode.directives)}`)
+    if (sprintMode.must_deliver?.length > 0) parts.push(`do=${compactInstructionList(sprintMode.must_deliver)}`)
+    if (sprintMode.must_not_deliver?.length > 0) parts.push(`avoid=${compactInstructionList(sprintMode.must_not_deliver)}`)
+  }
+  if (responsibilities.length > 0) parts.push(`role=${compactInstructionList(responsibilities)}`)
+  return parts.join(" | ").trim()
+}
+
+function applyInstructionBlock(body, block) {
+  const content = `${body || ""}`.replace(/^\n+/, "")
+  if (!block) return content || ""
+  const nextBlock = `[MAH_CONTEXT]\n${block}\n[/MAH_CONTEXT]`
+  const pattern = /^\[MAH_CONTEXT\]\n[\s\S]*?\n\[\/MAH_CONTEXT\]\n*/m
+  if (pattern.test(content)) {
+    return content.replace(pattern, `${nextBlock}\n\n`)
+  }
+  return content ? `${nextBlock}\n\n${content}` : `${nextBlock}\n`
+}
+
+function buildAgentPromptFromMeta(meta, crew, agent, currentRaw, runtime) {
   const parsed = parsePromptFrontmatter(currentRaw)
   const existing = parsed.frontmatter && typeof parsed.frontmatter === "object" ? parsed.frontmatter : {}
   const skillsByPath = new Map(
@@ -73,25 +153,29 @@ function buildPiPromptFromMeta(meta, crew, agent, currentRaw) {
   const next = {
     ...existing,
     name: agent.id,
-    model: resolveAgentModel(meta, "pi", agent),
+    model: resolveAgentModel(meta, runtime, agent),
     role: agent.role,
     team: titleCase(agent.team),
+    ...crewRuntimeMetadata(crew),
+    ...agentRuntimeMetadata(agent),
+    instruction_block: buildCrewInstructionBlock(crew, agent),
     expertise: {
       ...(existing.expertise && typeof existing.expertise === "object" ? existing.expertise : {}),
-      path: resolveExpertisePath("pi", crew.id, agent.expertise)
+      path: resolveExpertisePath(runtime, crew.id, agent.expertise)
     },
-    tools: runtimeTools(agent, "pi"),
-    skills: runtimeSkillPaths(meta, agent.skills, "pi").map((item) => ({
+    tools: runtimeTools(agent, runtime),
+    skills: runtimeSkillPaths(meta, agent.skills, runtime).map((item) => ({
       path: item,
       "use-when": skillsByPath.get(item) || "Use when relevant to current task."
     })),
-    domain: domainFromProfile(meta, agent.domain_profile, "pi")
+    domain: domainFromProfile(meta, agent.domain_profile, runtime)
   }
 
   const frontmatterText = YAML.stringify(next, { indent: 2 }).trimEnd()
-  const body = parsed.body && parsed.body.trim().length > 0
+  const baseBody = parsed.body && parsed.body.trim().length > 0
     ? parsed.body.replace(/^\n+/, "")
     : `# ${titleCase(agent.id)}\n`
+  const body = applyInstructionBlock(baseBody, buildCrewInstructionBlock(crew, agent))
   return `---\n${frontmatterText}\n---\n\n${body}`
 }
 
@@ -115,11 +199,11 @@ function diffPreview(currentRaw, nextRaw, maxLines = 40) {
   return lines
 }
 
-function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
+function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
   let ok = true
   for (const agent of crew.agents || []) {
-    const relativePromptPath = resolvePromptPath("pi", crew.id, agent.id)
+    const relativePromptPath = resolvePromptPath(runtime, crew.id, agent.id)
     const promptPath = path.resolve(repoRoot, relativePromptPath)
     if (checkOnly && !existsSync(promptPath)) {
       pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
@@ -132,7 +216,11 @@ function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
     }
 
     const currentRaw = existsSync(promptPath) ? readFileSync(promptPath, "utf-8") : ""
-    const nextRaw = buildPiPromptFromMeta(meta, crew, agent, currentRaw)
+    const sourcePromptPath = runtime === "hermes" ? path.resolve(repoRoot, resolvePromptPath("pi", crew.id, agent.id)) : ""
+    const sourceRaw = !currentRaw && sourcePromptPath && existsSync(sourcePromptPath)
+      ? readFileSync(sourcePromptPath, "utf-8")
+      : currentRaw
+    const nextRaw = buildAgentPromptFromMeta(meta, crew, agent, sourceRaw, runtime)
     if (checkOnly) {
       if (currentRaw !== nextRaw) {
         const preview = mode === "diff" ? diffPreview(currentRaw, nextRaw) : []
@@ -165,6 +253,88 @@ function syncPiPrompts(meta, crew, mode, records, jsonOutput) {
   return ok
 }
 
+function buildHermesRuntimeConfig(meta, crew) {
+  const orchestrator = crew.agents.find((agent) => agent.id === crew.topology?.orchestrator) || crew.agents[0]
+  const sessionDir = crew.session?.hermes_root || `.hermes/crew/${crew.id}/sessions`
+  const doc = {
+    version: 1,
+    runtime: "hermes",
+    crew: crew.id,
+    name: `${crew.id}-hermes-runtime`,
+    ...crewRuntimeMetadata(crew),
+    instruction_block: buildCrewInstructionBlock(crew, orchestrator),
+    source_of_truth: "meta-agents.yaml",
+    active_crew_file: ".hermes/.active-crew.json",
+    multi_team: `.hermes/crew/${crew.id}/multi-team.yaml`,
+    agents_dir: `.hermes/crew/${crew.id}/agents`,
+    expertise_dir: `.hermes/crew/${crew.id}/expertise`,
+    skills_dir: ".hermes/skills",
+    session_dir: sessionDir,
+    orchestrator: {
+      name: orchestrator?.id || "",
+      model: orchestrator ? resolveAgentModel(meta, "hermes", orchestrator) : "",
+      prompt: orchestrator ? resolvePromptPath("hermes", crew.id, orchestrator.id) : ""
+    }
+  }
+  return YAML.stringify(doc, { indent: 2 }).trimEnd()
+}
+
+function ensureHermesArtifacts(crew) {
+  const crewRoot = path.join(repoRoot, ".hermes", "crew", crew.id)
+  const agentsDir = path.join(crewRoot, "agents")
+  const expertiseDir = path.join(crewRoot, "expertise")
+  const sessionsDir = path.join(crewRoot, "sessions")
+  const piExpertiseDir = path.join(repoRoot, ".pi", "crew", crew.id, "expertise")
+  mkdirSync(agentsDir, { recursive: true })
+  mkdirSync(expertiseDir, { recursive: true })
+  mkdirSync(sessionsDir, { recursive: true })
+
+  for (const agent of crew.agents || []) {
+    const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
+    const piExpertiseFile = path.join(piExpertiseDir, `${agent.expertise}.yaml`)
+    const hadExpertiseFile = existsSync(expertiseFile)
+    const expertiseContent = existsSync(piExpertiseFile)
+      ? readFileSync(piExpertiseFile, "utf-8")
+      : `agent: ${agent.id}\nsummary: []\n`
+    const currentExpertise = hadExpertiseFile ? readFileSync(expertiseFile, "utf-8") : ""
+    if (currentExpertise !== expertiseContent) {
+      writeFileSync(expertiseFile, expertiseContent, "utf-8")
+      console.log(`${hadExpertiseFile ? "synced" : "generated"}: ${rel(expertiseFile)}`)
+    }
+  }
+}
+
+let globalOpencodeNeedsValidateDelegationPermission = false
+
+function ensureValidateDelegationTool() {
+  const toolsDir = path.join(repoRoot, ".opencode", "tools")
+  const toolFile = path.join(toolsDir, "validate-delegation.ts")
+  mkdirSync(toolsDir, { recursive: true })
+  if (!existsSync(toolFile)) {
+    const templatePath = path.join(repoRoot, ".opencode", "tools", "validate-delegation.ts")
+    if (existsSync(templatePath)) {
+      const content = readFileSync(templatePath, "utf-8")
+      writeFileSync(toolFile, content, "utf-8")
+      console.log("generated: " + rel(toolFile))
+    }
+  }
+}
+
+function ensureValidateDelegationPermission() {
+  if (!globalOpencodeNeedsValidateDelegationPermission) return
+  const opencodeJsonPath = path.join(repoRoot, ".opencode", "opencode.json")
+  if (!existsSync(opencodeJsonPath)) return
+  const current = readFileSync(opencodeJsonPath, "utf-8")
+  let doc
+  try { doc = JSON.parse(current) } catch { return }
+  if (!doc.permission) doc.permission = {}
+  if (!doc.permission["validate-delegation"]) {
+    doc.permission["validate-delegation"] = "allow"
+    writeFileSync(opencodeJsonPath, JSON.stringify(doc, null, 2), "utf-8")
+    console.log("updated: " + rel(opencodeJsonPath) + " (added validate-delegation permission)")
+  }
+}
+
 function ensureOpencodeArtifacts(crew) {
   const agentsDir = path.join(repoRoot, ".opencode", "crew", crew.id, "agents")
   const expertiseDir = path.join(repoRoot, ".opencode", "crew", crew.id, "expertise")
@@ -176,16 +346,29 @@ function ensureOpencodeArtifacts(crew) {
   mkdirSync(agentsDir, { recursive: true })
   mkdirSync(expertiseDir, { recursive: true })
 
+  const hasAllowDelegate = Boolean(crew.runtime_overrides?.opencode?.permission?.task?.allow_delegate)
+  if (hasAllowDelegate) globalOpencodeNeedsValidateDelegationPermission = true
+  ensureValidateDelegationTool()
+
+  const allowDelegate = crew.runtime_overrides?.opencode?.permission?.task?.allow_delegate || {}
+  const byId = new Map((crew.agents || []).map((a) => [a.id, a]))
+
   for (const agent of crew.agents || []) {
     const agentFile = path.join(agentsDir, `${agent.id}.md`)
     const referenceAgentFile = path.join(referenceAgentsDir, `${agent.id}.md`)
     const legacyAgentFile = path.join(legacyAgentsDir, `${agent.id}.md`)
     const hadAgentFile = existsSync(agentFile)
-    const content = existsSync(referenceAgentFile)
-      ? readFileSync(referenceAgentFile, "utf-8")
-      : existsSync(legacyAgentFile)
-        ? readFileSync(legacyAgentFile, "utf-8")
-        : `# ${titleCase(agent.id)}\n\nRole: ${agent.role}\nTeam: ${agent.team}\n\nUse this file as the runtime prompt source for ${agent.id}.\n`
+
+    let baseContent = ""
+    if (existsSync(referenceAgentFile)) {
+      baseContent = readFileSync(referenceAgentFile, "utf-8")
+    } else if (existsSync(legacyAgentFile)) {
+      baseContent = readFileSync(legacyAgentFile, "utf-8")
+    } else {
+      baseContent = `# ${titleCase(agent.id)}\n\nRole: ${agent.role}\nTeam: ${agent.team}\n\nUse this file as the runtime prompt source for ${agent.id}.\n`
+    }
+
+    const content = injectAgentPermissions(baseContent, agent, allowDelegate, byId)
     const current = hadAgentFile ? readFileSync(agentFile, "utf-8") : ""
     if (current !== content) {
       writeFileSync(agentFile, content, "utf-8")
@@ -209,30 +392,77 @@ function ensureOpencodeArtifacts(crew) {
   }
 }
 
-function domainFromProfile(meta, profileName, runtime) {
-  const rules = meta.catalog?.domain_profiles?.[profileName]
-  if (!Array.isArray(rules)) return []
+function injectAgentPermissions(content, agent, allowDelegate, byId) {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
+  let frontmatter = {}
+  let body = content
+
+  if (match) {
+    try {
+      frontmatter = YAML.parse(match[1]) || {}
+    } catch {
+      frontmatter = {}
+    }
+    body = match[2]
+  }
+
+  const role = agent.role
+  let taskPermissions = null
+
+  if (role === "orchestrator") {
+    const allowed = allowDelegate["orchestrator"] || []
+    taskPermissions = { "*": "deny", ...Object.fromEntries(allowed.map((a) => [a, "allow"])) }
+  } else if (role === "lead") {
+    const allowed = allowDelegate[agent.id] || []
+    taskPermissions = { "*": "deny", ...Object.fromEntries(allowed.map((a) => [a, "allow"])) }
+  }
+
+  if (taskPermissions) {
+    frontmatter.permission = frontmatter.permission || {}
+    frontmatter.permission.task = taskPermissions
+  }
+
+  if (Object.keys(frontmatter).length > 0) {
+    const fmYaml = YAML.stringify(frontmatter).trimEnd().replaceAll("use_when", "use-when")
+    return `---\n${fmYaml}\n---\n${body}`
+  }
+  return content
+}
+
+function domainFromProfile(meta, profileNameOrNames, runtime) {
+  const profiles = Array.isArray(profileNameOrNames) ? profileNameOrNames : [profileNameOrNames]
+  const rules = profiles.flatMap((name) => {
+    const profile = meta.domain_profiles?.[name]
+    return Array.isArray(profile) ? profile : []
+  })
+  if (rules.length === 0) return []
   return rules.map((rule) => {
+    const isRecursive = /\/\*$/.test(rule.path)
     if (runtime === "opencode") {
-      return {
+      const mapped = {
         path: rule.path,
         read: Boolean(rule.read),
         edit: Boolean(rule.edit),
         bash: Boolean(rule.bash)
       }
+      if (isRecursive) mapped.recursive = true
+      return mapped
     }
-    return {
+    const mapped = {
       path: rule.path,
       read: Boolean(rule.read),
       upsert: Boolean(rule.edit),
       delete: Boolean(rule.bash)
     }
+    if (isRecursive) mapped.recursive = true
+    return mapped
   })
 }
 
 function runtimeTools(agent, runtime) {
+  const safeTools = ["read", "grep", "find", "ls"]
   if (agent.role === "orchestrator" || agent.role === "lead") {
-    return ["delegate_agent", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
+    return [...safeTools, "delegate_agent", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
   }
   const base = ["read", "grep", "find", "ls", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
   const domain = domainFromProfile(metaDoc, agent.domain_profile, runtime)
@@ -326,6 +556,8 @@ function buildOpencodeCrewDoc(meta, crew) {
       .map((member) => ({
         id: member.id,
         role: "worker",
+        ...agentRuntimeMetadata(member),
+        instruction_block: buildCrewInstructionBlock(crew, member),
         model: resolveAgentModel(meta, "opencode", member),
         model_fallbacks: resolveAgentFallbacks(meta, "opencode", member),
         agent_file: `.opencode/crew/${crew.id}/agents/${member.id}.md`,
@@ -344,6 +576,8 @@ function buildOpencodeCrewDoc(meta, crew) {
       lead: {
         id: lead.id,
         role: "lead",
+        ...agentRuntimeMetadata(lead),
+        instruction_block: buildCrewInstructionBlock(crew, lead),
         model: resolveAgentModel(meta, "opencode", lead),
         model_fallbacks: resolveAgentFallbacks(meta, "opencode", lead),
         agent_file: `.opencode/crew/${crew.id}/agents/${lead.id}.md`,
@@ -370,6 +604,8 @@ function buildOpencodeCrewDoc(meta, crew) {
   const doc = {
     version: 1,
     name: `${crew.id}-multi-team-harness`,
+    ...crewRuntimeMetadata(crew),
+    instruction_block: buildCrewInstructionBlock(crew, null),
     runtime: {
       harness: "opencode",
       source_of_truth: "meta-agents.yaml",
@@ -379,11 +615,14 @@ function buildOpencodeCrewDoc(meta, crew) {
     shared: {
       skills: runtimeSkillEntries(meta, ["delegate_bounded", "zero_micromanagement", "expertise_model"], "opencode"),
       tools: ["update-expertise-model"],
-      mcp: runtimeMcpAccess()
+      mcp: runtimeMcpAccess(),
+      domain_profiles: meta.domain_profiles || {}
     },
     orchestrator: {
       id: orchestrator.id,
       role: "ceo",
+      ...agentRuntimeMetadata(orchestrator),
+      instruction_block: buildCrewInstructionBlock(crew, orchestrator),
       model: resolveAgentModel(meta, "opencode", orchestrator),
       model_fallbacks: resolveAgentFallbacks(meta, "opencode", orchestrator),
       agent_file: `.opencode/crew/${crew.id}/agents/${orchestrator.id}.md`,
@@ -425,6 +664,8 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
       .map((member) => ({
         name: member.id,
         description: `${titleCase(member.id)} ${teamName} worker`,
+        ...agentRuntimeMetadata(member),
+        instruction_block: buildCrewInstructionBlock(crew, member),
         prompt: resolvePromptPath(runtime, crew.id, member.id),
         expertise: {
           path: resolveExpertisePath(runtime, crew.id, member.expertise),
@@ -444,6 +685,8 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
       lead: {
         name: lead.id,
         description: `${titleCase(lead.id)} ${teamName} lead`,
+        ...agentRuntimeMetadata(lead),
+        instruction_block: buildCrewInstructionBlock(crew, lead),
         prompt: resolvePromptPath(runtime, crew.id, lead.id),
         expertise: {
           path: resolveExpertisePath(runtime, crew.id, lead.expertise),
@@ -468,21 +711,28 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
     throw new Error(`crew ${crew.id} missing orchestrator agent definition`)
   }
 
-  const sessionDir =
+  const configDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id)
+  const sessionDirRoot =
     runtime === "pi"
       ? crew.session?.pi_root || `.${runtime}/crew/${crew.id}/sessions`
       : runtime === "claude"
         ? crew.session?.claude_mirror_root || `.${runtime}/crew/${crew.id}/sessions`
       : crew.session?.opencode_root || `.opencode/crew/${crew.id}/sessions`
 
-  const expertiseDir = `.${runtime}/crew/${crew.id}/expertise`
+  const sessionDir = path.relative(configDir, path.resolve(repoRoot, sessionDirRoot))
+  const expertiseDir = path.relative(configDir, path.resolve(repoRoot, `.${runtime}/crew/${crew.id}/expertise`))
   const doc = {
     name: `${titleCase(crew.id)}MultiTeam`,
+    ...crewRuntimeMetadata(crew),
+    instruction_block: buildCrewInstructionBlock(crew, null),
     session_dir: sessionDir,
     expertise_dir: expertiseDir,
+    domain_profiles: meta.domain_profiles || {},
     orchestrator: {
       name: orchestrator.id,
       description: `${titleCase(orchestrator.id)} coordinator`,
+      ...agentRuntimeMetadata(orchestrator),
+      instruction_block: buildCrewInstructionBlock(crew, orchestrator),
       prompt: resolvePromptPath(runtime, crew.id, orchestrator.id),
       expertise: {
         path: resolveExpertisePath(runtime, crew.id, orchestrator.expertise),
@@ -559,19 +809,31 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
     const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
     const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
     const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
+    const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
+    const hermesConfig = buildHermesRuntimeConfig(metaDoc, crew)
 
     const piPath = path.join(repoRoot, ".pi", "crew", crew.id, "multi-team.yaml")
     const claudePath = path.join(repoRoot, ".claude", "crew", crew.id, "multi-team.yaml")
     const opencodeCrewPath = path.join(repoRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
+    const hermesCrewPath = path.join(repoRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
+    const hermesConfigPath = path.join(repoRoot, ".hermes", "crew", crew.id, "config.yaml")
 
     allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
-    allGood = syncPiPrompts(metaDoc, crew, mode, records, jsonOutput) && allGood
+    allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
+    allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
+    allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
+    allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
 
     if (!checkOnly) {
       ensureOpencodeArtifacts(crew)
+      ensureHermesArtifacts(crew)
     }
+  }
+
+  if (!checkOnly) {
+    ensureValidateDelegationPermission()
   }
 
   const summary = {

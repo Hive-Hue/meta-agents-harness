@@ -1,0 +1,101 @@
+# Example Hermes Configuration for Meta Agents Harness
+#
+# This file shows a minimal meta-agents.yaml with Hermes runtime support.
+# Copy to meta-agents.yaml and adjust for your project.
+#
+# Usage:
+#   cp examples/hermes/meta-agents.hermes.example.yaml meta-agents.yaml
+#   mah init --runtime hermes
+#   npm run sync:meta
+
+version: 1
+name: "my-project"
+description: "Example project using Hermes runtime via Meta Agents Harness"
+
+runtime_detection:
+  order:
+    - forced
+    - marker
+    - cli
+  forced:
+    args:
+      - "--runtime=<name>"
+      - "--runtime <name>"
+      - "-r <name>"
+      - "-f <name>"
+    env:
+      - MAH_RUNTIME
+  marker:
+    pi: ".pi"
+    claude: ".claude"
+    opencode: ".opencode"
+    hermes: ".hermes"
+  cli:
+    pi:
+      direct_cli: "pi"
+      wrapper: "pimh"
+    claude:
+      direct_cli: "claude"
+      wrapper: "ccmh"
+    opencode:
+      direct_cli: "opencode"
+      wrapper: "ocmh"
+    hermes:
+      direct_cli: "hermes"
+      wrapper: "hermesh"
+
+runtimes:
+  hermes:
+    wrapper: "hermesh"
+    direct_cli: "hermes"
+    config_root: ".hermes"
+    config_pattern: ".hermes/crew/<crew>/config.yaml"
+    capabilities:
+      persistent_memory: true
+      supports_background_operation: true
+      supports_multi_backend_execution: true
+      gateway_aware: true
+
+catalog:
+  models:
+    orchestrator_default: "hermes/default"
+    lead_default: "hermes/default"
+    worker_default: "hermes/default"
+
+crews:
+  - id: "dev"
+    display_name: "Development Crew"
+    mission: "Execute development tasks with Hermes runtime."
+    session:
+      hermes_root: ".hermes/crew/dev/sessions"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        engineering: "lead"
+      workers:
+        engineering: ["worker-1", "worker-2"]
+    agents:
+      - id: "orchestrator"
+        role: "orchestrator"
+        team: "orchestration"
+        model_ref: "orchestrator_default"
+        expertise: "orchestrator-expertise-model"
+        domain_profile: "read_only_repo"
+      - id: "lead"
+        role: "lead"
+        team: "engineering"
+        model_ref: "lead_default"
+        expertise: "lead-expertise-model"
+        domain_profile: "cli_operator_surface"
+      - id: "worker-1"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "worker-1-expertise-model"
+        domain_profile: "runtime_impl"
+      - id: "worker-2"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "worker-2-expertise-model"
+        domain_profile: "runtime_impl"

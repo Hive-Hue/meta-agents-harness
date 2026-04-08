@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/backend-dev-expertise-model.yaml
   use-when: Track service architecture, API contract risks, and safe backend implementation approaches in Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - read
   - write

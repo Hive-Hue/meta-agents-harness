@@ -1,10 +1,2 @@
-agent:
-  name: orchestrator
-  role: orchestrator
-  team: Global
-meta:
-  version: 1
-  max_lines: 10000
-  last_updated: "2026-04-02T02:02:07Z"
-observations: []
-open_questions: []
+agent: orchestrator
+summary: []

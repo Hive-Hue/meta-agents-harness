@@ -12,12 +12,16 @@ permission:
     market-researcher: allow
     campaign-strategist: allow
 name: planning-lead
-model: openrouter/nvidia/nemotron-3-super-120b-a12b:free
+model: minimax/minimax-m2.7
 role: lead
 team: Planning
 expertise:
   path: .pi/crew/marketing/expertise/planning-lead-expertise-model.yaml
 tools:
+  - read
+  - grep
+  - find
+  - ls
   - delegate_agent
   - update_expertise_model
   - mcp_servers
@@ -35,15 +39,39 @@ domain:
     read: true
     upsert: false
     delete: false
-  - path: campaigns/
+  - path: docs/*
     read: true
     upsert: true
     delete: false
-  - path: assets/
+    recursive: true
+  - path: README.md
     read: true
     upsert: true
     delete: false
+  - path: CHANGELOG.md
+    read: true
+    upsert: true
+    delete: false
+  - path: examples/*
+    read: true
+    upsert: true
+    delete: false
+    recursive: true
+  - path: assets/*
+    read: true
+    upsert: true
+    delete: false
+    recursive: true
+instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+  communication assets, launch narratives, campaign collateral, and supporting
+  media for Meta Agents Harness.
+mission: Plan, produce, refine, and validate communication assets, launch
+  narratives, campaign collateral, and supporting media for Meta Agents Harness.
 ---
+
+[MAH_CONTEXT]
+crew=marketing | mission=Plan, produce, refine, and validate communication assets, launch narratives, campaign collateral, and supporting media for Meta Agents Harness.
+[/MAH_CONTEXT]
 
 # Planning Lead
 

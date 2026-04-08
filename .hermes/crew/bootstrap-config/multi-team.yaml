@@ -1,0 +1,1144 @@
+name: Bootstrap ConfigMultiTeam
+mission: Design and implement an initial bootstrap CLI that creates a minimally
+  valid meta-agents.yaml with low operator friction. In interactive terminals it
+  prompts for required fields and selected optional fields. In non-interactive
+  environments it applies logical defaults or accepts explicit flags. It may
+  also support an AI-assisted bootstrap mode using API key or OAuth.
+sprint_mode:
+  name: v0.4.0-bootstrap-cli-onboarding
+  active: true
+  target_release: v0.4.0
+  objective: Deliver a first-run bootstrap flow that generates a minimally valid
+    meta-agents.yaml and reduces configuration resistance for new users.
+  execution_mode: spec-bound-slice-driven
+  directives:
+    - spec-bound execution
+    - onboarding-first UX
+    - required-fields-first
+    - interactive and non-interactive parity
+    - AI-assisted mode optional, never mandatory
+    - safe defaults over config sprawl
+    - PR-sized slices
+    - mandatory validation at each slice
+  must_deliver:
+    - bootstrap command design
+    - interactive terminal questionnaire
+    - non-interactive fallback behavior
+    - minimal required schema generation
+    - logical defaults for required fields
+    - AI-assisted bootstrap option design
+    - API key and/or OAuth input flow contract
+    - post-generation validate step
+    - overwrite/merge safety behavior
+    - docs and examples
+    - test plan
+  must_not_deliver:
+    - full AI orchestration engine
+    - remote bootstrap service dependency
+    - expansion of unrelated runtime features
+    - schema redesign outside bootstrap needs
+    - v0.5.0+ onboarding wizard scope
+instruction_block: crew=bootstrap-config | mission=Design and implement an
+  initial bootstrap CLI that creates a minimally valid meta-agents.yaml with low
+  operator friction. In interactive terminals it prompts for required fields and
+  selected optional fields. In non-interactive environments it applies logical
+  defaults or accepts explicit flags. It may also support an AI-assisted
+  bootstrap mode using API key or OAuth. |
+  sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+  | directives=spec-bound execution; onboarding-first UX; required-fields-first;
+  interactive and non-interactive parity; AI-assisted mode optional, never
+  mandatory; safe defaults over config sprawl; PR-sized slices; mandatory
+  validation at each slice | do=bootstrap command design; interactive terminal
+  questionnaire; non-interactive fallback behavior; minimal required schema
+  generation; logical defaults for required fields; AI-assisted bootstrap option
+  design; API key and/or OAuth input flow contract; post-generation validate
+  step; overwrite/merge safety behavior; docs and examples; test plan |
+  avoid=full AI orchestration engine; remote bootstrap service dependency;
+  expansion of unrelated runtime features; schema redesign outside bootstrap
+  needs; v0.5.0+ onboarding wizard scope
+session_dir: ../../../.opencode/crew/bootstrap-config/sessions
+expertise_dir: expertise
+domain_profiles:
+  read_only_repo:
+    - path: .
+      read: true
+  planning_delivery:
+    - path: .
+      read: true
+    - path: plan/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+  cli_operator_surface:
+    - path: .
+      read: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: assets/*
+      read: true
+      edit: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+  runtime_impl:
+    - path: .
+      read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+    - path: package.json
+      read: true
+      edit: true
+    - path: package-lock.json
+      read: true
+      edit: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: extensions/*
+      read: true
+      edit: true
+      bash: true
+    - path: .claude/*
+      read: true
+      edit: true
+      bash: true
+    - path: .opencode/*
+      read: true
+      edit: true
+      bash: true
+    - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: .hermes/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mcp.example.json
+      read: true
+      edit: true
+    - path: .env.sample
+      read: true
+      edit: true
+  validation_runtime:
+    - path: .
+      read: true
+      bash: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: .github/workflows/*
+      read: true
+      edit: true
+      bash: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+  bootstrap_generation:
+    - path: .
+      read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+  runtime_assets_sync:
+    - path: .claude/*
+      read: true
+      edit: true
+    - path: .opencode/*
+      read: true
+      edit: true
+    - path: .pi/*
+      read: true
+      edit: true
+    - path: .hermes/*
+      read: true
+      edit: true
+    - path: extensions/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mcp.example.json
+      read: true
+      edit: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+  docs_authoring:
+    - path: .
+      read: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: assets/*
+      read: true
+      edit: true
+orchestrator:
+  name: orchestrator
+  description: Orchestrator coordinator
+  sprint_responsibilities:
+    - control bootstrap scope
+    - keep focus on low-friction onboarding
+    - prevent scope expansion into unrelated runtime work
+    - consolidate final bootstrap contract
+  instruction_block: crew=bootstrap-config | mission=Design and implement an
+    initial bootstrap CLI that creates a minimally valid meta-agents.yaml with
+    low operator friction. In interactive terminals it prompts for required
+    fields and selected optional fields. In non-interactive environments it
+    applies logical defaults or accepts explicit flags. It may also support an
+    AI-assisted bootstrap mode using API key or OAuth. |
+    sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+    | directives=spec-bound execution; onboarding-first UX;
+    required-fields-first; interactive and non-interactive parity; AI-assisted
+    mode optional, never mandatory; safe defaults over config sprawl; PR-sized
+    slices; mandatory validation at each slice | do=bootstrap command design;
+    interactive terminal questionnaire; non-interactive fallback behavior;
+    minimal required schema generation; logical defaults for required fields;
+    AI-assisted bootstrap option design; API key and/or OAuth input flow
+    contract; post-generation validate step; overwrite/merge safety behavior;
+    docs and examples; test plan | avoid=full AI orchestration engine; remote
+    bootstrap service dependency; expansion of unrelated runtime features;
+    schema redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+    role=control bootstrap scope; keep focus on low-friction onboarding; prevent
+    scope expansion into unrelated runtime work; consolidate final bootstrap
+    contract
+  prompt: .hermes/crew/bootstrap-config/agents/orchestrator.md
+  expertise:
+    path: .hermes/crew/bootstrap-config/expertise/orchestrator-expertise-model.yaml
+    use-when: Track durable learnings for orchestrator.
+    updatable: true
+    max-lines: 10000
+  model: minimax/minimax-m2.7
+  model_fallbacks:
+    - nvidia/nemotron-3-super-120b-a12b:free
+    - zai/glm-5
+    - zai/glm-4.5-air
+  tools:
+    - read
+    - grep
+    - find
+    - ls
+    - delegate_agent
+    - update_expertise_model
+    - mcp_servers
+    - mcp_tools
+    - mcp_call
+  skills:
+    - .hermes/skills/delegate-bounded/SKILL.md
+    - .hermes/skills/zero-micromanagement/SKILL.md
+    - .hermes/skills/expertise-model/SKILL.md
+  routes_to:
+    - product-lead
+    - engineering-lead
+    - validation-lead
+  domain:
+    - path: .
+      read: true
+      upsert: false
+      delete: false
+teams:
+  - name: Product
+    lead:
+      name: product-lead
+      description: Product Lead product lead
+      sprint_responsibilities:
+        - define onboarding flow
+        - decide required vs optional prompts
+        - define AI-assisted UX boundaries
+        - minimize operator friction
+      instruction_block: crew=bootstrap-config | mission=Design and implement an
+        initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+        with low operator friction. In interactive terminals it prompts for
+        required fields and selected optional fields. In non-interactive
+        environments it applies logical defaults or accepts explicit flags. It
+        may also support an AI-assisted bootstrap mode using API key or OAuth. |
+        sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        | directives=spec-bound execution; onboarding-first UX;
+        required-fields-first; interactive and non-interactive parity;
+        AI-assisted mode optional, never mandatory; safe defaults over config
+        sprawl; PR-sized slices; mandatory validation at each slice |
+        do=bootstrap command design; interactive terminal questionnaire;
+        non-interactive fallback behavior; minimal required schema generation;
+        logical defaults for required fields; AI-assisted bootstrap option
+        design; API key and/or OAuth input flow contract; post-generation
+        validate step; overwrite/merge safety behavior; docs and examples; test
+        plan | avoid=full AI orchestration engine; remote bootstrap service
+        dependency; expansion of unrelated runtime features; schema redesign
+        outside bootstrap needs; v0.5.0+ onboarding wizard scope | role=define
+        onboarding flow; decide required vs optional prompts; define AI-assisted
+        UX boundaries; minimize operator friction
+      prompt: .hermes/crew/bootstrap-config/agents/product_lead.md
+      expertise:
+        path: .hermes/crew/bootstrap-config/expertise/product-lead-expertise-model.yaml
+        use-when: Track durable learnings for product-lead.
+        updatable: true
+        max-lines: 10000
+      model: minimax/minimax-m2.7
+      model_fallbacks:
+        - zai/glm-5
+        - zai/glm-4.5-air
+      tools:
+        - read
+        - grep
+        - find
+        - ls
+        - delegate_agent
+        - update_expertise_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
+      skills:
+        - .hermes/skills/delegate-bounded/SKILL.md
+        - .hermes/skills/zero-micromanagement/SKILL.md
+        - .hermes/skills/expertise-model/SKILL.md
+        - .hermes/skills/bootstrap-config-architect/SKILL.md
+      routes_to:
+        - ux-researcher
+        - schema-planner
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+        - path: plan/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: specs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: docs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: examples/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: README.md
+          read: true
+          upsert: true
+          delete: false
+        - path: CHANGELOG.md
+          read: true
+          upsert: true
+          delete: false
+    members:
+      - name: ux-researcher
+        description: Ux Researcher product worker
+        sprint_responsibilities:
+          - design first-run questionnaire
+          - define prompt wording
+          - reduce decision fatigue
+          - propose smart defaults
+        instruction_block: crew=bootstrap-config | mission=Design and implement an
+          initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+          with low operator friction. In interactive terminals it prompts for
+          required fields and selected optional fields. In non-interactive
+          environments it applies logical defaults or accepts explicit flags. It
+          may also support an AI-assisted bootstrap mode using API key or OAuth.
+          |
+          sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; onboarding-first UX;
+          required-fields-first; interactive and non-interactive parity;
+          AI-assisted mode optional, never mandatory; safe defaults over config
+          sprawl; PR-sized slices; mandatory validation at each slice |
+          do=bootstrap command design; interactive terminal questionnaire;
+          non-interactive fallback behavior; minimal required schema generation;
+          logical defaults for required fields; AI-assisted bootstrap option
+          design; API key and/or OAuth input flow contract; post-generation
+          validate step; overwrite/merge safety behavior; docs and examples;
+          test plan | avoid=full AI orchestration engine; remote bootstrap
+          service dependency; expansion of unrelated runtime features; schema
+          redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+          role=design first-run questionnaire; define prompt wording; reduce
+          decision fatigue; propose smart defaults
+        prompt: .hermes/crew/bootstrap-config/agents/ux_researcher.md
+        expertise:
+          path: .hermes/crew/bootstrap-config/expertise/ux-researcher-expertise-model.yaml
+          use-when: Track durable learnings for ux-researcher.
+          updatable: true
+          max-lines: 10000
+        model: minimax/minimax-m2.7
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - .hermes/skills/expertise-model/SKILL.md
+          - .hermes/skills/bootstrap-config-architect/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: plan/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+      - name: schema-planner
+        description: Schema Planner product worker
+        sprint_responsibilities:
+          - identify minimally required fields
+          - define generated config skeleton
+          - map required fields to validation rules
+        instruction_block: crew=bootstrap-config | mission=Design and implement an
+          initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+          with low operator friction. In interactive terminals it prompts for
+          required fields and selected optional fields. In non-interactive
+          environments it applies logical defaults or accepts explicit flags. It
+          may also support an AI-assisted bootstrap mode using API key or OAuth.
+          |
+          sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; onboarding-first UX;
+          required-fields-first; interactive and non-interactive parity;
+          AI-assisted mode optional, never mandatory; safe defaults over config
+          sprawl; PR-sized slices; mandatory validation at each slice |
+          do=bootstrap command design; interactive terminal questionnaire;
+          non-interactive fallback behavior; minimal required schema generation;
+          logical defaults for required fields; AI-assisted bootstrap option
+          design; API key and/or OAuth input flow contract; post-generation
+          validate step; overwrite/merge safety behavior; docs and examples;
+          test plan | avoid=full AI orchestration engine; remote bootstrap
+          service dependency; expansion of unrelated runtime features; schema
+          redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+          role=identify minimally required fields; define generated config
+          skeleton; map required fields to validation rules
+        prompt: .hermes/crew/bootstrap-config/agents/schema_planner.md
+        expertise:
+          path: .hermes/crew/bootstrap-config/expertise/schema-planner-expertise-model.yaml
+          use-when: Track durable learnings for schema-planner.
+          updatable: true
+          max-lines: 10000
+        model: minimax/minimax-m2.7
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - .hermes/skills/expertise-model/SKILL.md
+          - .hermes/skills/bootstrap-config-architect/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: plan/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+  - name: Engineering
+    lead:
+      name: engineering-lead
+      description: Engineering Lead engineering lead
+      sprint_responsibilities:
+        - coordinate CLI implementation
+        - preserve config and adapter boundaries
+        - split bootstrap into implementation slices
+      instruction_block: crew=bootstrap-config | mission=Design and implement an
+        initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+        with low operator friction. In interactive terminals it prompts for
+        required fields and selected optional fields. In non-interactive
+        environments it applies logical defaults or accepts explicit flags. It
+        may also support an AI-assisted bootstrap mode using API key or OAuth. |
+        sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        | directives=spec-bound execution; onboarding-first UX;
+        required-fields-first; interactive and non-interactive parity;
+        AI-assisted mode optional, never mandatory; safe defaults over config
+        sprawl; PR-sized slices; mandatory validation at each slice |
+        do=bootstrap command design; interactive terminal questionnaire;
+        non-interactive fallback behavior; minimal required schema generation;
+        logical defaults for required fields; AI-assisted bootstrap option
+        design; API key and/or OAuth input flow contract; post-generation
+        validate step; overwrite/merge safety behavior; docs and examples; test
+        plan | avoid=full AI orchestration engine; remote bootstrap service
+        dependency; expansion of unrelated runtime features; schema redesign
+        outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+        role=coordinate CLI implementation; preserve config and adapter
+        boundaries; split bootstrap into implementation slices
+      prompt: .hermes/crew/bootstrap-config/agents/engineering_lead.md
+      expertise:
+        path: .hermes/crew/bootstrap-config/expertise/engineering-lead-expertise-model.yaml
+        use-when: Track durable learnings for engineering-lead.
+        updatable: true
+        max-lines: 10000
+      model: minimax/minimax-m2.7
+      model_fallbacks:
+        - zai/glm-5
+        - zai/glm-4.5-air
+      tools:
+        - read
+        - grep
+        - find
+        - ls
+        - delegate_agent
+        - update_expertise_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
+      skills:
+        - .hermes/skills/delegate-bounded/SKILL.md
+        - .hermes/skills/zero-micromanagement/SKILL.md
+        - .hermes/skills/expertise-model/SKILL.md
+      routes_to:
+        - cli-dev
+        - runtime-dev
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+        - path: meta-agents.yaml
+          read: true
+          upsert: true
+          delete: false
+        - path: package.json
+          read: true
+          upsert: true
+          delete: false
+        - path: package-lock.json
+          read: true
+          upsert: true
+          delete: false
+        - path: bin/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: scripts/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: types/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: tests/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: extensions/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .claude/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .opencode/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .pi/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .hermes/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .mcp.example.json
+          read: true
+          upsert: true
+          delete: false
+        - path: .env.sample
+          read: true
+          upsert: true
+          delete: false
+    members:
+      - name: cli-dev
+        description: Cli Dev engineering worker
+        sprint_responsibilities:
+          - implement bootstrap command
+          - implement interactive prompts
+          - handle non-interactive mode and flags
+          - improve help and explain surfaces
+        instruction_block: crew=bootstrap-config | mission=Design and implement an
+          initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+          with low operator friction. In interactive terminals it prompts for
+          required fields and selected optional fields. In non-interactive
+          environments it applies logical defaults or accepts explicit flags. It
+          may also support an AI-assisted bootstrap mode using API key or OAuth.
+          |
+          sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; onboarding-first UX;
+          required-fields-first; interactive and non-interactive parity;
+          AI-assisted mode optional, never mandatory; safe defaults over config
+          sprawl; PR-sized slices; mandatory validation at each slice |
+          do=bootstrap command design; interactive terminal questionnaire;
+          non-interactive fallback behavior; minimal required schema generation;
+          logical defaults for required fields; AI-assisted bootstrap option
+          design; API key and/or OAuth input flow contract; post-generation
+          validate step; overwrite/merge safety behavior; docs and examples;
+          test plan | avoid=full AI orchestration engine; remote bootstrap
+          service dependency; expansion of unrelated runtime features; schema
+          redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+          role=implement bootstrap command; implement interactive prompts;
+          handle non-interactive mode and flags; improve help and explain
+          surfaces
+        prompt: .hermes/crew/bootstrap-config/agents/cli_dev.md
+        expertise:
+          path: .hermes/crew/bootstrap-config/expertise/cli-dev-expertise-model.yaml
+          use-when: Track durable learnings for cli-dev.
+          updatable: true
+          max-lines: 10000
+        model: minimax/minimax-m2.7
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
+        skills:
+          - .hermes/skills/expertise-model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: bin/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: scripts/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+      - name: runtime-dev
+        description: Runtime Dev engineering worker
+        sprint_responsibilities:
+          - generate meta-agents.yaml
+          - integrate with validate:config
+          - support AI-assisted config completion contract
+          - add safe merge/overwrite behavior
+        instruction_block: crew=bootstrap-config | mission=Design and implement an
+          initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+          with low operator friction. In interactive terminals it prompts for
+          required fields and selected optional fields. In non-interactive
+          environments it applies logical defaults or accepts explicit flags. It
+          may also support an AI-assisted bootstrap mode using API key or OAuth.
+          |
+          sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; onboarding-first UX;
+          required-fields-first; interactive and non-interactive parity;
+          AI-assisted mode optional, never mandatory; safe defaults over config
+          sprawl; PR-sized slices; mandatory validation at each slice |
+          do=bootstrap command design; interactive terminal questionnaire;
+          non-interactive fallback behavior; minimal required schema generation;
+          logical defaults for required fields; AI-assisted bootstrap option
+          design; API key and/or OAuth input flow contract; post-generation
+          validate step; overwrite/merge safety behavior; docs and examples;
+          test plan | avoid=full AI orchestration engine; remote bootstrap
+          service dependency; expansion of unrelated runtime features; schema
+          redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+          role=generate meta-agents.yaml; integrate with validate:config;
+          support AI-assisted config completion contract; add safe
+          merge/overwrite behavior
+        prompt: .hermes/crew/bootstrap-config/agents/runtime_dev.md
+        expertise:
+          path: .hermes/crew/bootstrap-config/expertise/runtime-dev-expertise-model.yaml
+          use-when: Track durable learnings for runtime-dev.
+          updatable: true
+          max-lines: 10000
+        model: minimax/minimax-m2.7
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
+        skills:
+          - .hermes/skills/expertise-model/SKILL.md
+          - .hermes/skills/bootstrap-config-architect/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: meta-agents.yaml
+            read: true
+            upsert: true
+            delete: false
+          - path: scripts/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: bin/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: types/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: tests/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+  - name: Validation
+    lead:
+      name: validation-lead
+      description: Validation Lead validation lead
+      sprint_responsibilities:
+        - define validation gates
+        - ensure generated config is minimally valid
+        - block unsafe overwrite behavior
+      instruction_block: crew=bootstrap-config | mission=Design and implement an
+        initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+        with low operator friction. In interactive terminals it prompts for
+        required fields and selected optional fields. In non-interactive
+        environments it applies logical defaults or accepts explicit flags. It
+        may also support an AI-assisted bootstrap mode using API key or OAuth. |
+        sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        | directives=spec-bound execution; onboarding-first UX;
+        required-fields-first; interactive and non-interactive parity;
+        AI-assisted mode optional, never mandatory; safe defaults over config
+        sprawl; PR-sized slices; mandatory validation at each slice |
+        do=bootstrap command design; interactive terminal questionnaire;
+        non-interactive fallback behavior; minimal required schema generation;
+        logical defaults for required fields; AI-assisted bootstrap option
+        design; API key and/or OAuth input flow contract; post-generation
+        validate step; overwrite/merge safety behavior; docs and examples; test
+        plan | avoid=full AI orchestration engine; remote bootstrap service
+        dependency; expansion of unrelated runtime features; schema redesign
+        outside bootstrap needs; v0.5.0+ onboarding wizard scope | role=define
+        validation gates; ensure generated config is minimally valid; block
+        unsafe overwrite behavior
+      prompt: .hermes/crew/bootstrap-config/agents/validation_lead.md
+      expertise:
+        path: .hermes/crew/bootstrap-config/expertise/validation-lead-expertise-model.yaml
+        use-when: Track durable learnings for validation-lead.
+        updatable: true
+        max-lines: 10000
+      model: minimax/minimax-m2.7
+      model_fallbacks:
+        - zai/glm-5
+        - zai/glm-4.5-air
+      tools:
+        - read
+        - grep
+        - find
+        - ls
+        - delegate_agent
+        - update_expertise_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
+      skills:
+        - .hermes/skills/delegate-bounded/SKILL.md
+        - .hermes/skills/zero-micromanagement/SKILL.md
+        - .hermes/skills/expertise-model/SKILL.md
+      routes_to:
+        - qa-reviewer
+        - docs-reviewer
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: true
+        - path: tests/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .github/workflows/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: docs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: specs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+    members:
+      - name: qa-reviewer
+        description: Qa Reviewer validation worker
+        sprint_responsibilities:
+          - test interactive flow
+          - test non-interactive flow
+          - test partial input recovery
+          - test invalid and overwrite scenarios
+        instruction_block: crew=bootstrap-config | mission=Design and implement an
+          initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+          with low operator friction. In interactive terminals it prompts for
+          required fields and selected optional fields. In non-interactive
+          environments it applies logical defaults or accepts explicit flags. It
+          may also support an AI-assisted bootstrap mode using API key or OAuth.
+          |
+          sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; onboarding-first UX;
+          required-fields-first; interactive and non-interactive parity;
+          AI-assisted mode optional, never mandatory; safe defaults over config
+          sprawl; PR-sized slices; mandatory validation at each slice |
+          do=bootstrap command design; interactive terminal questionnaire;
+          non-interactive fallback behavior; minimal required schema generation;
+          logical defaults for required fields; AI-assisted bootstrap option
+          design; API key and/or OAuth input flow contract; post-generation
+          validate step; overwrite/merge safety behavior; docs and examples;
+          test plan | avoid=full AI orchestration engine; remote bootstrap
+          service dependency; expansion of unrelated runtime features; schema
+          redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+          role=test interactive flow; test non-interactive flow; test partial
+          input recovery; test invalid and overwrite scenarios
+        prompt: .hermes/crew/bootstrap-config/agents/qa_reviewer.md
+        expertise:
+          path: .hermes/crew/bootstrap-config/expertise/qa-reviewer-expertise-model.yaml
+          use-when: Track durable learnings for qa-reviewer.
+          updatable: true
+          max-lines: 10000
+        model: minimax/minimax-m2.7
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+          - bash
+        skills:
+          - .hermes/skills/expertise-model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: true
+          - path: tests/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .github/workflows/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+      - name: docs-reviewer
+        description: Docs Reviewer validation worker
+        sprint_responsibilities:
+          - document bootstrap examples
+          - document AI-assisted mode
+          - document defaults and required fields
+          - document CI/non-interactive usage
+        instruction_block: crew=bootstrap-config | mission=Design and implement an
+          initial bootstrap CLI that creates a minimally valid meta-agents.yaml
+          with low operator friction. In interactive terminals it prompts for
+          required fields and selected optional fields. In non-interactive
+          environments it applies logical defaults or accepts explicit flags. It
+          may also support an AI-assisted bootstrap mode using API key or OAuth.
+          |
+          sprint=v0.4.0-bootstrap-cli-onboarding,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+          | directives=spec-bound execution; onboarding-first UX;
+          required-fields-first; interactive and non-interactive parity;
+          AI-assisted mode optional, never mandatory; safe defaults over config
+          sprawl; PR-sized slices; mandatory validation at each slice |
+          do=bootstrap command design; interactive terminal questionnaire;
+          non-interactive fallback behavior; minimal required schema generation;
+          logical defaults for required fields; AI-assisted bootstrap option
+          design; API key and/or OAuth input flow contract; post-generation
+          validate step; overwrite/merge safety behavior; docs and examples;
+          test plan | avoid=full AI orchestration engine; remote bootstrap
+          service dependency; expansion of unrelated runtime features; schema
+          redesign outside bootstrap needs; v0.5.0+ onboarding wizard scope |
+          role=document bootstrap examples; document AI-assisted mode; document
+          defaults and required fields; document CI/non-interactive usage
+        prompt: .hermes/crew/bootstrap-config/agents/docs_reviewer.md
+        expertise:
+          path: .hermes/crew/bootstrap-config/expertise/docs-reviewer-expertise-model.yaml
+          use-when: Track durable learnings for docs-reviewer.
+          updatable: true
+          max-lines: 10000
+        model: minimax/minimax-m2.7
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - .hermes/skills/expertise-model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true

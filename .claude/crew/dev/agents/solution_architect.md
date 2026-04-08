@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/solution-architect-expertise-model.yaml
   use-when: Track planning templates, implementation tradeoffs, and hand-off patterns that help Hivehue Engineering execute cleanly.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - read
   - write

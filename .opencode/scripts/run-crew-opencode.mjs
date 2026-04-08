@@ -7,7 +7,7 @@ function parseArgs(argv) {
   const args = {
     crew: "",
     config: "",
-    noHierarchy: false,
+    hierarchy: false,
     passthrough: []
   }
 
@@ -23,12 +23,12 @@ function parseArgs(argv) {
       i += 1
       continue
     }
-    if (token === "--no-hierarchy") {
-      args.noHierarchy = true
+    if (token === "--hierarchy") {
+      args.hierarchy = true
       continue
     }
-    if (token === "--hierarchy") {
-      args.noHierarchy = false
+    if (token === "--no-hierarchy") {
+      args.hierarchy = false
       continue
     }
     args.passthrough.push(token)
@@ -64,7 +64,7 @@ if (!selection) {
   }
 } else {
   if (selection.crew) {
-    ensureCrewSelected(selection.crew, { noHierarchy: args.noHierarchy })
+    ensureCrewSelected(selection.crew, { hierarchy: args.hierarchy })
   } else if (args.config) {
     fail("custom --config is not supported in crew mode. Use `ocmh use <crew>` first.")
     process.exit()
@@ -73,7 +73,7 @@ if (!selection) {
   console.log("Running OpenCode with selected crew config")
   console.log(`- config=${path.relative(repoRoot, selection.configPath)}`)
   if (selection.crew) console.log(`- crew=${selection.crew}`)
-  if (args.noHierarchy) console.log("- hierarchy=disabled")
+  if (args.hierarchy) console.log("- hierarchy=enabled")
   if (args.passthrough.length > 0) console.log(`- args=${args.passthrough.join(" ")}`)
   console.log("")
 

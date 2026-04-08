@@ -1,0 +1,6 @@
+not valid yaml at all
+this is just garbage text
+{{{broken syntax}}}
+- unclosed list
+  missing colon value
+    indentation wrong

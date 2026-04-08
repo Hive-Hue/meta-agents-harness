@@ -13,7 +13,7 @@
  *   pi -e extensions/multi-team.ts
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { isToolCallEventType } from "@mariozechner/pi-coding-agent";
 import type { AssistantMessage } from "@mariozechner/pi-ai";
 import { Type } from "@sinclair/typebox";
@@ -21,6 +21,7 @@ import { Text, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { basename, dirname, relative, resolve } from "path";
+import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 import { applyExtensionDefaults } from "./themeMap.ts";
 import { loadPiEnv } from "./env-loader.ts";
@@ -39,6 +40,7 @@ interface DomainRule {
 	read?: boolean;
 	upsert?: boolean;
 	delete?: boolean;
+	recursive?: boolean;
 }
 
 interface NormalizedDomainRule {
@@ -47,6 +49,7 @@ interface NormalizedDomainRule {
 	read: boolean;
 	upsert: boolean;
 	delete: boolean;
+	recursive: boolean;
 	index: number;
 }
 
@@ -99,6 +102,7 @@ interface AgentConfig {
 	skills?: Array<string | SkillReference>;
 	expertise?: string | ExpertiseReference;
 	domain?: DomainConfig | DomainRule[];
+	domain_profile?: string | string[];
 }
 
 interface TeamConfig {
@@ -113,10 +117,12 @@ interface MultiTeamConfig {
 	expertise_dir?: string;
 	orchestrator: AgentConfig;
 	teams: TeamConfig[];
+	domain_profiles?: Record<string, DomainRule[]>;
 }
 
 interface ResolvedConfig extends MultiTeamConfig {
 	baseDir: string;
+	repoRoot: string;
 	configPath: string;
 	sessionDirAbs: string;
 	expertiseDirAbs: string;
@@ -144,7 +150,7 @@ interface CardState {
 	lastLine: string;
 	elapsed: number;
 	runCount: number;
-	timer?: ReturnType<typeof setInterval>;
+	timer?: any;
 }
 
 const DEFAULT_WORKER_TOOLS = ["read", "bash", "edit", "write", "grep", "find", "ls"];
@@ -173,6 +179,9 @@ const SPAWNABLE_TOOL_NAMES = new Set([
 ]);
 const DEFAULT_EXPERTISE_MAX_LINES = 120;
 const EXPERTISE_NOTE_MAX_CHARS = 2000;
+const EXPERTISE_IDEAL_NOTE_CHARS = 160;
+const EXPERTISE_DECAY_AFTER_DAYS = 14;
+const EXPERTISE_SIMILARITY_THRESHOLD = 0.55;
 
 interface ParsedYamlLine {
 	indent: number;
@@ -320,6 +329,70 @@ function nextRelevantLine(lines: ParsedYamlLine[], index: number): ParsedYamlLin
 	return null;
 }
 
+function isBlockScalarToken(token: string): boolean {
+	return token === ">" || token === ">-" || token === "|" || token === "|-";
+}
+
+function consumeBlockScalar(
+	lines: ParsedYamlLine[],
+	startIndex: number,
+	parentIndent: number,
+	token: string,
+): { value: string; index: number } {
+	const chunks: string[] = [];
+	let index = startIndex;
+	while (index < lines.length) {
+		const line = lines[index];
+		if (line.indent <= parentIndent) break;
+		chunks.push(line.content);
+		index += 1;
+	}
+	const separator = token.startsWith("|") ? "\n" : " ";
+	return { value: chunks.join(separator).trim(), index };
+}
+
+function isYamlKeyLine(content: string): boolean {
+	// A line is treated as a YAML key only if the first colon appears in key-position.
+	// Lines where ':' is embedded in URLs, inline key=value text, or
+	// semicolon-delimited prose are NOT key lines.
+	const colonIndex = content.indexOf(":");
+	if (colonIndex === -1) return false;
+	// A valid YAML key must be at the start of the line (after optional whitespace).
+	// The key part (before the colon) must be a bare identifier: letters, digits,
+	// hyphens, underscores, and dots — no spaces, no '=', no '/', no ';'.
+	const keyPart = content.slice(0, colonIndex).trimEnd();
+	if (keyPart.length === 0) return false;
+	if (keyPart.includes(" ")) return false;
+	if (keyPart.includes("=")) return false;
+	if (keyPart.includes("/")) return false;
+	if (keyPart.includes(";")) return false;
+	// The character immediately after the colon must be whitespace, end-of-string,
+	// or the start of an inline value (anything but another identifier char).
+	// This distinguishes "key:" from "validate:config" or "http://...".
+	const afterColon = content.slice(colonIndex + 1);
+	if (afterColon.length > 0 && !/^[\s/"'#\[\-{]/.test(afterColon)) return false;
+	// Valid YAML key pattern: bare identifier (letters, digits, hyphens, underscores, dots).
+	return /^[a-zA-Z_][a-zA-Z0-9_.-]*$/.test(keyPart);
+}
+
+function consumeWrappedScalar(
+	lines: ParsedYamlLine[],
+	startIndex: number,
+	parentIndent: number,
+): { value: string; index: number } {
+	const chunks: string[] = [];
+	let index = startIndex;
+	while (index < lines.length) {
+		const line = lines[index];
+		if (line.indent <= parentIndent) break;
+		if (line.content.startsWith("- ")) break;
+		if (isYamlKeyLine(line.content)) break;
+		chunks.push(line.content.trim());
+		index += 1;
+	}
+	return { value: chunks.join(" ").trim(), index };
+}
+
 function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: number): { value: any; index: number } {
 	if (startIndex >= lines.length) return { value: null, index: startIndex };
 
@@ -359,8 +432,15 @@ function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: num
 			const valueToken = rest.slice(colonIndex + 1).trim();
 
 			if (valueToken) {
-				item[key] = parseScalarToken(valueToken);
-				index++;
+				if (isBlockScalarToken(valueToken)) {
+					const block = consumeBlockScalar(lines, index + 1, indent, valueToken);
+					item[key] = block.value;
+					index = block.index;
+				} else {
+					const wrapped = consumeWrappedScalar(lines, index + 1, indent);
+					item[key] = [parseScalarToken(valueToken), wrapped.value].filter(Boolean).join(" ").trim();
+					index = wrapped.index;
+				}
 			} else {
 				const next = nextRelevantLine(lines, index + 1);
 				if (next && next.indent > indent) {
@@ -389,8 +469,15 @@ function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: num
 				const siblingValueToken = sibling.content.slice(siblingColon + 1).trim();
 
 				if (siblingValueToken) {
-					item[siblingKey] = parseScalarToken(siblingValueToken);
-					index++;
+					if (isBlockScalarToken(siblingValueToken)) {
+						const block = consumeBlockScalar(lines, index + 1, sibling.indent, siblingValueToken);
+						item[siblingKey] = block.value;
+						index = block.index;
+					} else {
+						const wrapped = consumeWrappedScalar(lines, index + 1, sibling.indent);
+						item[siblingKey] = [parseScalarToken(siblingValueToken), wrapped.value].filter(Boolean).join(" ").trim();
+						index = wrapped.index;
+					}
 					continue;
 				}
 
@@ -430,8 +517,15 @@ function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: num
 		const valueToken = line.content.slice(colonIndex + 1).trim();
 
 		if (valueToken) {
-			object[key] = parseScalarToken(valueToken);
-			index++;
+			if (isBlockScalarToken(valueToken)) {
+				const block = consumeBlockScalar(lines, index + 1, indent, valueToken);
+				object[key] = block.value;
+				index = block.index;
+			} else {
+				const wrapped = consumeWrappedScalar(lines, index + 1, indent);
+				object[key] = [parseScalarToken(valueToken), wrapped.value].filter(Boolean).join(" ").trim();
+				index = wrapped.index;
+			}
 			continue;
 		}
 
@@ -455,8 +549,18 @@ function parseYamlSubset(raw: string): any {
 	return parseYamlBlock(lines, 0, lines[0].indent).value;
 }
 
+function findRepoRoot(startPath: string): string {
+	let current = resolve(startPath);
+	while (true) {
+		if (existsSync(resolve(current, "meta-agents.yaml"))) return current;
+		const parent = dirname(current);
+		if (parent === current) return startPath;
+		current = parent;
+	}
+}
+
 function getPromptDefinition(config: ResolvedConfig, agent: AgentConfig): PromptDefinition {
-	const promptPath = resolveArtifact(config.baseDir, agent.prompt);
+	const promptPath = resolveArtifact(config.repoRoot, agent.prompt);
 	const raw = safeReadText(promptPath);
 	if (!raw) return { body: "", metadata: {} };
 	return parsePromptDefinition(raw);
@@ -589,34 +693,48 @@ function legacyDomainToRules(readPaths: string[], writePaths: string[]): DomainR
 
 function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConfig {
 	const metadata = getPromptDefinition(config, agent).metadata;
+
+	// 1. Collect rules from domain_profile (defined in the config)
+	let profileRules: DomainRule[] = [];
+	const profileName = agent.domain_profile || metadata?.domain_profile;
+	if (profileName) {
+		const profiles = Array.isArray(profileName) ? profileName : [profileName];
+		for (const name of profiles) {
+			if (config.domain_profiles?.[name]) {
+				profileRules.push(...config.domain_profiles[name]);
+			}
+		}
+	}
+
+	// 2. Collect explicit domain rules from the agent config
 	const explicitRules = Array.isArray(agent.domain)
 		? agent.domain
 		: Array.isArray(agent.domain?.rules)
 			? agent.domain.rules
 			: [];
-	if (explicitRules.length > 0) {
-		return { rules: explicitRules };
+
+	// 3. Collect domain rules from the metadata (prompt frontmatter)
+	let metadataRules: DomainRule[] = [];
+	if (metadata?.domain) {
+		metadataRules = Array.isArray(metadata.domain)
+			? metadata.domain
+			: (Array.isArray(metadata.domain.rules) ? metadata.domain.rules : []);
 	}
-	const metadataRules = Array.isArray(metadata.domain)
-		? metadata.domain
-		: Array.isArray(metadata.domain?.rules)
-			? metadata.domain.rules
-			: [];
-	if (metadataRules.length > 0) {
-		return { rules: metadataRules };
+
+	const rules = [...profileRules, ...explicitRules, ...metadataRules];
+
+	if (rules.length > 0) {
+		return { rules };
 	}
-	const domainObject = !Array.isArray(agent.domain) ? agent.domain : undefined;
-	const read = domainObject?.read && domainObject.read.length > 0
-		? domainObject.read
-		: Array.isArray(metadata.domain_read)
-			? metadata.domain_read
-			: [];
-	const write = domainObject?.write && domainObject.write.length > 0
-		? domainObject.write
-		: Array.isArray(metadata.domain_write)
-			? metadata.domain_write
-			: [];
-	return { read, write, rules: legacyDomainToRules(read, write) };
+
+	// 4. Fallback to legacy read/write paths if no rules found
+	const read = !Array.isArray(agent.domain) ? agent.domain?.read || metadata?.domain?.read || metadata?.read_paths || [] : [];
+	const write = !Array.isArray(agent.domain) ? agent.domain?.write || metadata?.domain?.write || metadata?.write_paths || [] : [];
+
+	return {
+		read: Array.isArray(read) ? read : [],
+		write: Array.isArray(write) ? write : [],
+	};
 }
 
 function resolveConfigPath(cwd: string): string {
@@ -694,6 +812,7 @@ function resolveConfigPath(cwd: string): string {
 function loadConfig(cwd: string): ResolvedConfig {
 	const configPath = resolveConfigPath(cwd);
 	const baseDir = dirname(configPath);
+	const repoRoot = findRepoRoot(baseDir);
 	const raw = parseYamlSubset(readFileSync(configPath, "utf-8")) as MultiTeamConfig;
 
 	if (!raw?.orchestrator) {
@@ -712,14 +831,54 @@ function loadConfig(cwd: string): ResolvedConfig {
 	return {
 		...raw,
 		baseDir,
+		repoRoot,
 		configPath,
 		sessionDirAbs: resolve(baseDir, raw.session_dir || defaultSessionDir),
 		expertiseDirAbs: resolve(baseDir, raw.expertise_dir || defaultExpertiseDir),
 	};
 }
 
-function resolveArtifact(baseDir: string, target: string): string {
-	return resolve(baseDir, target);
+function resolveArtifact(repoRoot: string, target: string): string {
+	return resolve(repoRoot, target);
+}
+
+function cosineSimilarityTokens(a: string, b: string): number {
+	const tokenize = (s: string): Set<string> =>
+		new Set(s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').filter(Boolean));
+	const setA = tokenize(a);
+	const setB = tokenize(b);
+	if (setA.size === 0 || setB.size === 0) return 0;
+	let dot = 0;
+	for (const t of setA) {
+		if (setB.has(t)) dot++;
+	}
+	return dot / (Math.sqrt(setA.size) * Math.sqrt(setB.size));
+}
+
+function notesAreSimilar(a: string, b: string): boolean {
+	if (a === b) return true;
+	if (Math.abs(a.length - b.length) / Math.max(a.length, b.length, 1) > 0.7) return false;
+	return cosineSimilarityTokens(a, b) >= EXPERTISE_SIMILARITY_THRESHOLD;
+}
+
+function daysBetweenDates(a: string, b: string): number {
+	const parse = (d: string) => {
+		const match = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+		if (!match) return Date.now();
+		return Date.UTC(+match[1], +match[2] - 1, +match[3]);
+	};
+	return Math.abs(parse(a) - parse(b)) / (1000 * 60 * 60 * 24);
+}
+
+function isNoteStale(date: string): boolean {
+	return daysBetweenDates(date, new Date().toISOString().slice(0, 10)) > EXPERTISE_DECAY_AFTER_DAYS;
+}
+
+function compressNote(note: string): string {
+	const normalized = note.replace(/\s+/g, ' ').trim();
+	if (normalized.length <= EXPERTISE_IDEAL_NOTE_CHARS) return normalized;
+	const prefix = normalized.slice(0, EXPERTISE_IDEAL_NOTE_CHARS - 6);
+	return prefix + ' [...]';
 }
 
 function normalizeTools(tools: AgentConfig["tools"], role: RuntimeRole): string[] {
@@ -832,25 +991,119 @@ function isDeleteBash(command: string): boolean {
 }
 
 function normalizeDomainRules(config: ResolvedConfig, domain: DomainConfig | DomainRule[] | undefined, fallbackRead = "."): NormalizedDomainRule[] {
-	const rules = Array.isArray(domain)
+	const rawRules = Array.isArray(domain)
 		? domain
 		: domain?.rules && domain.rules.length > 0
 			? domain.rules
 			: legacyDomainToRules(domain?.read || [fallbackRead], domain?.write || []);
-	return rules.map((rule, index) => ({
-		path: rule.path,
-		absolutePath: resolve(config.baseDir, rule.path),
-		read: !!rule.read,
-		upsert: !!rule.upsert,
-		delete: !!rule.delete,
-		index,
-	}));
+	return expandDomainRules(config.repoRoot, rawRules);
+}
+
+function expandDomainRules(repoRoot: string, rules: DomainRule[]): NormalizedDomainRule[] {
+	const expanded: NormalizedDomainRule[] = [];
+	let syntheticIndex = rules.length;
+
+	for (const rule of rules) {
+		const trimmed = rule.path.trim();
+		const hasGlob = trimmed.includes("*");
+		const isRecursive = !!rule.recursive;
+
+		// If the path uses glob patterns (* or **), expand against the filesystem
+		if (hasGlob) {
+			const expandedPaths = expandGlobPatterns(repoRoot, trimmed);
+			for (const absPath of expandedPaths) {
+				expanded.push({
+					path: relative(repoRoot, absPath) || ".",
+					absolutePath: absPath,
+					read: !!rule.read,
+					upsert: !!rule.upsert,
+					delete: !!rule.delete,
+					recursive: false,
+					index: syntheticIndex++,
+				});
+			}
+			// Always keep the glob pattern itself as a runtime matcher
+			// so new files created after config load still match
+			expanded.push({
+				path: trimmed,
+				absolutePath: resolve(repoRoot, trimmed.replace(/\*+.*$/, "")),
+				read: !!rule.read,
+				upsert: !!rule.upsert,
+				delete: !!rule.delete,
+				recursive: true,
+				index: syntheticIndex++,
+			});
+			continue;
+		}
+
+		// If recursive is set without a glob, enable recursive prefix matching
+		expanded.push({
+			path: trimmed,
+			absolutePath: resolve(repoRoot, trimmed),
+			read: !!rule.read,
+			upsert: !!rule.upsert,
+			delete: !!rule.delete,
+			recursive: isRecursive,
+			index: syntheticIndex++,
+		});
+	}
+
+	return expanded;
+}
+
+function expandGlobPatterns(repoRoot: string, pattern: string): string[] {
+	const results: string[] = [];
+	const basePrefix = pattern.replace(/\*+.*$/, "");
+	const baseDir = resolve(repoRoot, basePrefix);
+
+	if (!existsSync(baseDir) || !statSync(baseDir).isDirectory()) return results;
+
+	// Collect all files/dirs recursively from baseDir
+	function walk(dir: string, depth: number): void {
+		if (depth > 10) return; // Safety limit
+		let entries: string[];
+		try {
+			entries = readdirSync(dir);
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			const fullPath = resolve(dir, entry);
+			try {
+				const stat = statSync(fullPath);
+				results.push(fullPath);
+				if (stat.isDirectory()) {
+					walk(fullPath, depth + 1);
+				}
+			} catch {
+				// Skip entries we can't stat
+			}
+		}
+	}
+
+	walk(baseDir, 0);
+	return results;
 }
 
 function matchingDomainRule(targetPath: string, rules: NormalizedDomainRule[]): NormalizedDomainRule | null {
 	const matches = rules.filter((rule) => {
 		const normalized = rule.absolutePath.endsWith("/") ? rule.absolutePath.slice(0, -1) : rule.absolutePath;
-		return targetPath === normalized || targetPath.startsWith(normalized + "/");
+
+		// Exact match or prefix match (recursive)
+		if (targetPath === normalized || targetPath.startsWith(normalized + "/")) {
+			return true;
+		}
+
+		// For glob-based rules (recursive from wildcard expansion),
+		// check if the target is a descendant of the glob's base directory
+		if (rule.recursive) {
+			const relToRule = relative(rule.absolutePath, targetPath);
+			if (!relToRule.startsWith("..") && relToRule !== targetPath) {
+				return true;
+			}
+		}
+
+		return false;
 	});
 	if (matches.length === 0) return null;
 	matches.sort((left, right) => {
@@ -868,9 +1121,18 @@ function ruleAllows(targetPath: string, rules: NormalizedDomainRule[], permissio
 }
 
 function domainRulesSummary(config: ResolvedConfig, domain: DomainConfig | DomainRule[] | undefined): string[] {
-	return normalizeDomainRules(config, domain).map((rule) =>
-		`${toConfigRelative(config, rule.absolutePath)} [read:${rule.read ? "true" : "false"} upsert:${rule.upsert ? "true" : "false"} delete:${rule.delete ? "true" : "false"}]`
-	);
+	// Show the ORIGINAL rules (pre-expansion) to avoid blowing up the prompt
+	// with thousands of per-file entries from wildcard patterns.
+	const rawRules = Array.isArray(domain)
+		? domain
+		: domain?.rules && domain.rules.length > 0
+			? domain.rules
+			: legacyDomainToRules(domain?.read || ["."], domain?.write || []);
+	return rawRules.map((rule) => {
+		const hasGlob = rule.path.includes("*");
+		const label = hasGlob ? rule.path + "**" : rule.path;
+		return `${label} [read:${!!rule.read} upsert:${!!rule.upsert} delete:${!!rule.delete}]`;
+	});
 }
 
 function toConfigRelative(config: ResolvedConfig, targetPath: string): string {
@@ -895,6 +1157,96 @@ function stripMarkdownNoise(value: string): string {
 		.replace(/__/g, "")
 		.replace(/\s+/g, " ")
 		.trim();
+}
+
+function redactSensitiveString(value: string): string {
+	return `${value || ""}`
+		.replace(/\b([A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*)=([^\s]+)/g, "$1=[REDACTED]")
+		.replace(/\b(authorization\s*:\s*)(bearer\s+)?([^\s,]+)/gi, "$1$2[REDACTED]")
+		.replace(/(["']?(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|authorization|password|secret)["']?\s*[:=]\s*)(["'][^"']*["']|[^\s,}\]]+)/gi, "$1\"[REDACTED]\"")
+		.replace(/\b(?:sk-or-v1|ctx7sk|ghp|gho|github_pat|xox[baprs]-|AIza)[A-Za-z0-9._-]+\b/g, "[REDACTED]")
+		.replace(/\bBearer\s+[A-Za-z0-9._-]+\b/g, "Bearer [REDACTED]");
+}
+
+function redactSensitiveValue(value: any, keyName = ""): any {
+	if (value === null || value === undefined) return value;
+	if (typeof value === "string") {
+		if (/(?:api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret|authorization|password|secret)/i.test(keyName)) {
+			return "[REDACTED]";
+		}
+		return redactSensitiveString(value);
+	}
+	if (Array.isArray(value)) return value.map((item) => redactSensitiveValue(item, keyName));
+	if (typeof value !== "object") return value;
+	return Object.fromEntries(
+		Object.entries(value).map(([key, item]) => [key, redactSensitiveValue(item, key)]),
+	);
+}
+
+function compactArtifactContent(content: string, limit = 20000): string {
+	const sanitized = redactSensitiveString(content);
+	if (sanitized.length <= limit) return sanitized;
+	const keep = Math.max(2000, Math.floor((limit - 32) / 2));
+	return `${sanitized.slice(0, keep)}\n\n...[truncated]...\n\n${sanitized.slice(-keep)}`;
+}
+
+// --- Artifact reference system ---
+// Instead of relaying raw output through prompts (which bloats context),
+// delegation results are persisted as artifacts and only compact references
+// (path + content hash + summary + byte size) flow through the prompt.
+// This keeps context lean while preserving full data for on-demand reads.
+
+interface ArtifactRef {
+	path: string;
+	hash: string;
+	summary: string;
+	bytes: number;
+}
+
+const ARTIFACT_REF_INLINE_THRESHOLD = 600; // Below this, inline output; above, use ref.
+
+function contentHash(text: string): string {
+	return createHash("sha256").update(text).digest("hex").slice(0, 12);
+}
+
+function buildArtifactRef(artifactPath: string, output: string): ArtifactRef {
+	return {
+		path: artifactPath,
+		hash: contentHash(output),
+		summary: firstUsefulLine(output),
+		bytes: Buffer.byteLength(output, "utf-8"),
+	};
+}
+
+function formatArtifactRef(ref: ArtifactRef): string {
+	return `[artifact] ${ref.path} (hash=${ref.hash}, ${ref.bytes}B) — ${ref.summary}`;
+}
+
+function formatArtifactRefBlock(refs: ArtifactRef[]): string {
+	if (refs.length === 0) return "";
+	return "## Artifact References\n\n" + refs.map(formatArtifactRef).join("\n");
+}
+
+function buildDelegationResultContent(
+	target: string,
+	status: string,
+	elapsed: number,
+	output: string,
+	artifactPath: string | null,
+	header = "",
+): string {
+	// Small outputs: inline for immediate readability.
+	if (output.length <= ARTIFACT_REF_INLINE_THRESHOLD && artifactPath) {
+		const ref = buildArtifactRef(artifactPath, output);
+		return `${header}[${target}] ${status} in ${elapsed}s (${ref.bytes}B)\n\n${output}\n\n${formatArtifactRef(ref)}`;
+	}
+	// Large outputs: summary + ref only. Parent reads artifact on demand.
+	if (artifactPath) {
+		const ref = buildArtifactRef(artifactPath, output);
+		return `${header}[${target}] ${status} in ${elapsed}s\n\n${formatArtifactRef(ref)}\n\nUse read("${ref.path}") to retrieve the full output when needed.`;
+	}
+	// No artifact path (error cases): inline whatever we have.
+	return `${header}[${target}] ${status} in ${elapsed}s\n\n${output}`;
 }
 
 function isLowSignalExpertiseSummary(summary: string): boolean {
@@ -1056,6 +1408,7 @@ export default function (pi: ExtensionAPI) {
 	const pendingToolCalls: PendingToolCall[] = [];
 	const cards = new Map<string, CardState>();
 	const childProcesses = new Map<string, ChildProcessWithoutNullStreams>();
+	const activeDelegations = new Map<string, Promise<any>>();
 
 	function currentSessionId(): string {
 		return process.env.PI_MULTI_SESSION_ID?.trim() || sessionId;
@@ -1090,7 +1443,7 @@ export default function (pi: ExtensionAPI) {
 	}
 
 	function appendJsonl(relativePath: string, payload: Record<string, unknown>) {
-		appendFileSync(sessionPath(relativePath), JSON.stringify(payload) + "\n");
+		appendFileSync(sessionPath(relativePath), JSON.stringify(redactSensitiveValue(payload)) + "\n");
 	}
 
 	function mutateSessionIndex(mutator: (index: any) => void) {
@@ -1230,7 +1583,7 @@ export default function (pi: ExtensionAPI) {
 		const fileName = artifactFileName([runtime.agent.name, kind, label]);
 		const fullPath = sessionPath("artifacts", fileName);
 		const relativePath = relative(currentSessionRoot(), fullPath);
-		writeFileSync(fullPath, content);
+		writeFileSync(fullPath, compactArtifactContent(content));
 		appendJsonl("artifacts/index.jsonl", {
 			type: "artifact",
 			at: new Date().toISOString(),
@@ -1239,7 +1592,7 @@ export default function (pi: ExtensionAPI) {
 			label,
 			path: relativePath,
 			...sessionProcessInfo(),
-			...metadata,
+			...redactSensitiveValue(metadata),
 		});
 		mutateSessionIndex((index) => {
 			index.counts.artifacts = (index.counts.artifacts || 0) + 1;
@@ -1303,7 +1656,7 @@ export default function (pi: ExtensionAPI) {
 		if (!config) return "";
 		const expertise = effectiveExpertise(config, agent);
 		return expertise?.path
-			? resolveArtifact(config.baseDir, expertise.path)
+			? resolveArtifact(config.repoRoot, expertise.path)
 			: resolve(config.expertiseDirAbs, `${slugify(agent.name)}-expertise-model.yaml`);
 	}
 
@@ -1438,19 +1791,103 @@ export default function (pi: ExtensionAPI) {
 		}
 	}
 
+	const MAX_EXPERTISE_FILE_BYTES = 32_000;
+	const MAX_EXPERTISE_INJECTION_BYTES = 24_000;
+	const ABSOLUTE_EXPERTISE_LINE_CAP = 500;
+
 	function renderExpertiseDocument(doc: ExpertiseDocument): string {
 		return stringifyYaml(doc) + "\n";
 	}
 
-	function enforceExpertiseLineLimit(doc: ExpertiseDocument): ExpertiseDocument {
-		const maxLines = doc.meta.max_lines || DEFAULT_EXPERTISE_MAX_LINES;
+	function truncateOversizedNotes(doc: ExpertiseDocument): void {
+		const dynamicSections = Object.keys(doc).filter(
+			(key) => key !== "agent" && key !== "meta" && Array.isArray(doc[key])
+		);
+		for (const section of dynamicSections) {
+			const items = doc[section] as ExpertiseEntry[];
+			for (let i = 0; i < items.length; i++) {
+				if (items[i].note && items[i].note.length > EXPERTISE_NOTE_MAX_CHARS) {
+					items[i] = { ...items[i], note: shortText(items[i].note, EXPERTISE_NOTE_MAX_CHARS) };
+				}
+			}
+		}
+	}
+
+	function deduplicateAndMerge(doc: ExpertiseDocument): { merged: number } {
+		let merged = 0;
+		const dynamicSections = Object.keys(doc).filter(
+			(key) => key !== "agent" && key !== "meta" && Array.isArray(doc[key])
+		);
+		for (const section of dynamicSections) {
+			const items = doc[section] as ExpertiseEntry[];
+			const keep: ExpertiseEntry[] = [];
+			for (const item of items) {
+				const existingIdx = keep.findIndex((k) => notesAreSimilar(k.note, item.note));
+				if (existingIdx >= 0) {
+					const existing = keep[existingIdx];
+					if (item.note.length > existing.note.length || item.date >= existing.date) {
+						keep[existingIdx] = item;
+					}
+					merged++;
+				} else {
+					keep.push(item);
+				}
+			}
+			doc[section] = keep;
+		}
+		return { merged };
+	}
+
+	function evictStaleAndLowSignal(doc: ExpertiseDocument): { evicted: number } {
+		let evicted = 0;
+		const trimOrder = ["open_questions", "observations", "lessons", "workflows", "patterns", "tools", "decisions", "risks"];
+		for (const section of trimOrder) {
+			const items = doc[section] as ExpertiseEntry[];
+			if (!Array.isArray(items)) continue;
+			if (section === "open_questions") {
+				const active = items.filter((item) => !isNoteStale(item.date));
+				evicted += items.length - active.length;
+				doc[section] = active;
+			}
+		}
+		return { evicted };
+	}
+
+	function compressAllNotes(doc: ExpertiseDocument): void {
+		const dynamicSections = Object.keys(doc).filter(
+			(key) => key !== "agent" && key !== "meta" && Array.isArray(doc[key])
+		);
+		for (const section of dynamicSections) {
+			const items = doc[section] as ExpertiseEntry[];
+			for (let i = 0; i < items.length; i++) {
+				if (items[i].note && items[i].note.length > EXPERTISE_IDEAL_NOTE_CHARS) {
+					items[i] = { ...items[i], note: compressNote(items[i].note) };
+				}
+			}
+		}
+	}
+
+	function enforceExpertiseLineLimit(doc: ExpertiseDocument): { doc: ExpertiseDocument; stats: { deduplicated: number; evicted: number; compressed: boolean } } {
+		const absoluteCap = ABSOLUTE_EXPERTISE_LINE_CAP;
+		const configuredMax = typeof doc.meta.max_lines === "number" ? doc.meta.max_lines : DEFAULT_EXPERTISE_MAX_LINES;
+		const maxLines = Math.min(configuredMax, absoluteCap);
+
+		// Phase 1: truncate any notes that exceed the hard character limit
+		truncateOversizedNotes(doc);
+
+		// Phase 2: deduplicate similar notes (merge, keep best version)
+		const { merged: deduplicated } = deduplicateAndMerge(doc);
+
+		// Phase 3: evict stale low-signal entries (open_questions older than decay threshold)
+		const { evicted } = evictStaleAndLowSignal(doc);
+
 		const preferredTrimOrder = [
-			"observations",
 			"open_questions",
+			"observations",
 			"lessons",
+			"workflows",
 			"patterns",
 			"tools",
-			"workflows",
 			"decisions",
 			"risks",
 		];
@@ -1462,20 +1899,67 @@ export default function (pi: ExtensionAPI) {
 		);
 		const trimOrder = [...preferredTrimOrder, ...dynamicSections];
 
+		// Phase 4: compress verbose notes to ideal length when approaching budget
+		let compressed = false;
+		if (renderExpertiseDocument(doc).split("\n").length > maxLines * 0.8 ||
+			Buffer.byteLength(renderExpertiseDocument(doc), "utf-8") > MAX_EXPERTISE_FILE_BYTES * 0.8) {
+			compressAllNotes(doc);
+			compressed = true;
+		}
+
+		// Phase 5: line-limit enforcement (evict oldest from lowest-priority sections)
 		while (renderExpertiseDocument(doc).split("\n").length > maxLines) {
 			const key = trimOrder.find((section) => Array.isArray(doc[section]) && doc[section].length > 0);
 			if (!key) break;
 			doc[key].shift();
 		}
 
-		return doc;
+		// Phase 6: byte-size safety — final hard cap
+		if (Buffer.byteLength(renderExpertiseDocument(doc), "utf-8") > MAX_EXPERTISE_FILE_BYTES) {
+			while (Buffer.byteLength(renderExpertiseDocument(doc), "utf-8") > MAX_EXPERTISE_FILE_BYTES) {
+				const key = trimOrder.find((section) => Array.isArray(doc[section]) && doc[section].length > 0);
+				if (!key) break;
+				doc[key].shift();
+			}
+		}
+
+		return { doc, stats: { deduplicated, evicted, compressed } };
 	}
 
 	function saveExpertiseDocument(agent: AgentConfig, doc: ExpertiseDocument) {
 		const path = expertisePathFor(agent);
 		if (!path) return;
 		doc.meta.last_updated = new Date().toISOString();
-		writeFileSync(path, renderExpertiseDocument(enforceExpertiseLineLimit(doc)));
+		const { doc: enforced, stats } = enforceExpertiseLineLimit(doc);
+		const rendered = renderExpertiseDocument(enforced);
+		const byteSize = Buffer.byteLength(rendered, "utf-8");
+
+		if (byteSize > MAX_EXPERTISE_FILE_BYTES) {
+			const emergency = defaultExpertiseDocument(agent);
+			emergency.meta.last_updated = doc.meta.last_updated;
+			emergency.observations.push({
+				date: new Date().toISOString().slice(0, 10),
+				note: `[Expertise file was corrupted (${byteSize} bytes) and has been reset. Previous entries were lost.]`,
+			});
+			appendEvent("expertise_corruption_reset", {
+				path,
+				originalSize: byteSize,
+				recoveredEntries: 0,
+			});
+			writeFileSync(path, renderExpertiseDocument(emergency));
+			return;
+		}
+
+		writeFileSync(path, rendered);
+
+		// Log enforcement stats when meaningful work happened
+		if (stats.deduplicated > 0 || stats.evicted > 0 || stats.compressed) {
+			appendEvent("expertise_enforcement", {
+				path,
+				byteSize,
+				...stats,
+			});
+		}
 	}
 
 	function ensureExpertiseFile(agent: AgentConfig) {
@@ -1540,7 +2024,7 @@ export default function (pi: ExtensionAPI) {
 		sections.push(promptDef.body || `Prompt file missing: ${agent.prompt}`);
 
 		const skillBodies = declaredSkillRefs.map((skillRef) => {
-			const fullPath = resolveArtifact(config.baseDir, skillRef.path);
+			const fullPath = resolveArtifact(config.repoRoot, skillRef.path);
 			const raw = safeReadText(fullPath);
 			const label = basename(fullPath);
 			const useWhen = skillRef.useWhen ? `Use when: ${skillRef.useWhen}\n\n` : "";
@@ -1553,9 +2037,34 @@ export default function (pi: ExtensionAPI) {
 		}
 
 		ensureExpertiseFile(agent);
-		const expertiseBody = safeReadText(expertisePathFor(agent));
+		const expertisePath = expertisePathFor(agent);
+		const expertiseBody = safeReadText(expertisePath);
 		if (expertiseBody) {
-			sections.push(`## Persistent Expertise\n${stripFrontmatter(expertiseBody)}`);
+			// Validate expertise file before injection — reject oversized files
+			// that would exhaust the model context window.
+			const expertiseBytes = Buffer.byteLength(expertiseBody, "utf-8");
+			const expertiseLines = expertiseBody.split("\n").length;
+			if (expertiseBytes > MAX_EXPERTISE_INJECTION_BYTES || expertiseLines > ABSOLUTE_EXPERTISE_LINE_CAP) {
+				appendEvent("expertise_injection_skipped", {
+					path: expertisePath,
+					bytes: expertiseBytes,
+					lines: expertiseLines,
+					maxBytes: MAX_EXPERTISE_INJECTION_BYTES,
+					maxLines: ABSOLUTE_EXPERTISE_LINE_CAP,
+				});
+				sections.push(`## Persistent Expertise
+(skipped — expertise file is ${formatTokenCount(expertiseBytes)}B / ${expertiseLines} lines, exceeds budget of ${formatTokenCount(MAX_EXPERTISE_INJECTION_BYTES)}B / ${ABSOLUTE_EXPERTISE_LINE_CAP} lines. Path: ${expertisePath})`);
+				// Attempt to fix the file on the fly for next run
+				try {
+					const doc = loadExpertiseDocument(agent);
+					const { doc: enforced } = enforceExpertiseLineLimit(doc);
+					writeFileSync(expertisePath, renderExpertiseDocument(enforced));
+				} catch (fixErr) {
+					appendEvent("expertise_fix_failed", { path: expertisePath, error: String(fixErr) });
+				}
+			} else {
+				sections.push(`## Persistent Expertise\n${stripFrontmatter(expertiseBody)}`);
+			}
 		}
 
 		const domainSummary = domainRulesSummary(config, declaredDomain);
@@ -1678,7 +2187,7 @@ export default function (pi: ExtensionAPI) {
 							const teamLabel = item.teamName || displayName(item.agent.name);
 							const prefix = `- ${teamLabel}: `;
 							const available = Math.max(8, width - visibleWidth(prefix));
-							const suffix = shortText(item.lastLine, available);
+							const suffix = middleEllipsis(item.lastLine, available);
 							lines.push(truncateToWidth(theme.fg("dim", prefix + suffix), width));
 						}
 					}
@@ -1758,6 +2267,57 @@ export default function (pi: ExtensionAPI) {
 		return null;
 	}
 
+	function usageTotalsFromSessionLines(raw: string): { input: number; output: number; cost: number } {
+		let input = 0;
+		let output = 0;
+		let cost = 0;
+		for (const line of `${raw || ""}`.split("\n")) {
+			if (!line.trim()) continue;
+			try {
+				const parsed = JSON.parse(line);
+				if (parsed?.type !== "message" || parsed?.message?.role !== "assistant") continue;
+				input += parsed.message?.usage?.input || 0;
+				output += parsed.message?.usage?.output || 0;
+				cost += parsed.message?.usage?.cost?.total || 0;
+			} catch { }
+		}
+		return { input, output, cost };
+	}
+
+	function branchUsageTotals(ctx: any): { input: number; output: number; cost: number } {
+		let input = 0;
+		let output = 0;
+		let cost = 0;
+		for (const entry of ctx.sessionManager.getBranch()) {
+			if (entry.type !== "message" || entry.message?.role !== "assistant") continue;
+			const message = entry.message as AssistantMessage;
+			input += message.usage?.input || 0;
+			output += message.usage?.output || 0;
+			cost += message.usage?.cost?.total || 0;
+		}
+		return { input, output, cost };
+	}
+
+	function crewUsageTotals(excludeAgentName?: string): { input: number; output: number; cost: number } {
+		const totals = { input: 0, output: 0, cost: 0 };
+		const stateDir = resolve(currentSessionRoot(), "state");
+		if (!existsSync(stateDir)) return totals;
+		const excluded = excludeAgentName ? `${slugify(excludeAgentName)}.session.jsonl` : "";
+		for (const entry of readdirSync(stateDir)) {
+			if (!entry.endsWith(".session.jsonl")) continue;
+			if (excluded && entry === excluded) continue;
+			const filePath = resolve(stateDir, entry);
+			try {
+				if (!statSync(filePath).isFile()) continue;
+				const usage = usageTotalsFromSessionLines(readFileSync(filePath, "utf-8"));
+				totals.input += usage.input;
+				totals.output += usage.output;
+				totals.cost += usage.cost;
+			} catch { }
+		}
+		return totals;
+	}
+
 	function buildDelegationPrompt(target: DispatchTarget, task: string): string {
 		const parentLabel = `${displayName(runtime!.agent.name)} (${runtime!.role})`;
 		const targetRole = target.role === "lead" ? `team lead for ${target.team?.name}` : `worker in ${target.team?.name}`;
@@ -1774,10 +2334,10 @@ export default function (pi: ExtensionAPI) {
 			task,
 			"",
 			"Return:",
-			"1. Outcome",
-			"2. Files changed",
-			"3. Verification or evidence",
-			"4. Risks or blockers",
+			"1. Outcome (one sentence)",
+			"2. Files changed (list or 'none')",
+			"3. Artifact references (if delegation returned artifact refs, forward them verbatim)",
+			"4. Risks or blockers (if any)",
 		];
 		if (target.role === "lead") {
 			lines.push(
@@ -1790,6 +2350,13 @@ export default function (pi: ExtensionAPI) {
 				"- If asked for team status, report each worker from this roster.",
 				"- If status cannot be confirmed, mark worker status as unknown (do not claim missing roster).",
 				"- Use delegate_agent or delegate_agents_parallel to ping workers when needed.",
+				"",
+				"Artifact reference protocol:",
+				"- When a worker returns [artifact] refs in its result, FORWARD THOSE REFS VERBATIM in your response.",
+				"- Do NOT summarize or rephrase artifact refs — they contain paths and hashes the parent needs.",
+				"- Do NOT read the artifact files and relay their content — the parent will read them on demand.",
+				"- If you need to check worker output yourself, read the artifact, but still forward the ref.",
+				"- Your response should be: outcome + files changed + forwarded artifact refs + blockers.",
 			);
 		}
 		if (target.role === "worker") {
@@ -1799,113 +2366,129 @@ export default function (pi: ExtensionAPI) {
 				"- Execute the repo work needed in this turn.",
 				"- Do not claim success without concrete operations or verification.",
 				"- If blocked, report the blocker directly and stop.",
+				`- Note: Your work root is the repository root (regardless of your prompt depth).`,
+				`- All paths passed to tools (read, write, ls, edit, etc.) should be relative to the repository root.`,
+				`- Do not use ".." to reach the repository root.`,
 			);
 		}
 		return lines.join("\n");
 	}
 
-function outputSignalsNoExecution(output: string): boolean {
-	const text = output.toLowerCase();
-	return text.includes("did not execute in this turn")
-		|| text.includes("didn't execute in this turn")
-		|| text.includes("without executing")
-		|| text.includes("no operations were executed")
-		|| text.includes("no commands were executed")
-		|| text.includes("no file changes were made");
-}
-
-function sleep(ms: number): Promise<void> {
-	return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
-}
-
-function isRetryableDelegationFailure(output: string): boolean {
-	const text = output.toLowerCase();
-	return text.includes("lock file is already being held")
-		|| text.includes("startup, global settings")
-		|| text.includes("startup, project settings")
-		|| text.includes("no api key found for openai-codex")
-		|| text.includes("no models match pattern \"openai-codex/")
-		|| text.includes("no models match pattern 'openai-codex/");
-}
-
-function isModelFallbackFailure(output: string): boolean {
-	const text = output.toLowerCase();
-	return text.includes("no endpoints available matching your guardrail restrictions")
-		|| text.includes("no models match pattern")
-		|| text.includes("model not found")
-		|| text.includes("provider returned error")
-		|| text.includes("404 no endpoints available");
-}
-
-function modelCandidates(ctx: any, child: DispatchTarget): string[] {
-	const primary = currentModel(ctx, effectiveModel(config!, child.agent) || child.agent.model);
-	const fallbacks = Array.isArray(child.agent.model_fallbacks) ? child.agent.model_fallbacks : [];
-	return Array.from(new Set([primary, ...fallbacks].map((item) => `${item || ""}`.trim()).filter(Boolean)));
-}
-
-function shouldResumeChildSession(child: DispatchTarget, sessionFile: string): boolean {
-	if (!existsSync(sessionFile)) return false;
-	return false;
-}
-
-async function dispatchChildWithRetry(
-	targetName: string,
-	task: string,
-	ctx: any,
-	options?: {
-		maxAttempts?: number;
-		baseDelayMs?: number;
-		onRetry?: (attempt: number, maxAttempts: number, reason: string) => void;
-	},
-): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget; attempts: number; retried: boolean }> {
-	const maxAttempts = Math.max(1, options?.maxAttempts ?? 3);
-	const baseDelayMs = Math.max(50, options?.baseDelayMs ?? 350);
-	const child = config && runtime ? resolveTarget(targetName) : null;
-	const candidates = child ? modelCandidates(ctx, child) : [];
-	let modelIndex = 0;
-	let attempt = 0;
-	let lastResult: { output: string; exitCode: number; elapsed: number; child?: DispatchTarget } = {
-		output: "Delegation did not run.",
-		exitCode: 1,
-		elapsed: 0,
-	};
-
-	while (attempt < maxAttempts) {
-		attempt += 1;
-		const modelOverride = candidates[modelIndex] || "";
-		lastResult = await dispatchChild(targetName, task, ctx, { modelOverride: modelOverride || undefined });
-		if (lastResult.exitCode === 0) {
-			return { ...lastResult, attempts: attempt, retried: attempt > 1 };
-		}
-		if (isModelFallbackFailure(lastResult.output) && modelIndex < candidates.length - 1) {
-			modelIndex += 1;
-			options?.onRetry?.(
-				attempt + 1,
-				maxAttempts,
-				`switching model to ${candidates[modelIndex]} after ${shortText(firstUsefulLine(lastResult.output), 120)}`,
-			);
-			continue;
-		}
-		if (!isRetryableDelegationFailure(lastResult.output) || attempt >= maxAttempts) {
-			break;
-		}
-		const delayMs = baseDelayMs * attempt;
-		options?.onRetry?.(attempt + 1, maxAttempts, shortText(firstUsefulLine(lastResult.output), 180));
-		await sleep(delayMs);
+	function outputSignalsNoExecution(output: string): boolean {
+		const text = output.toLowerCase();
+		return text.includes("did not execute in this turn")
+			|| text.includes("didn't execute in this turn")
+			|| text.includes("without executing")
+			|| text.includes("no operations were executed")
+			|| text.includes("no commands were executed")
+			|| text.includes("no file changes were made");
 	}
 
-	return { ...lastResult, attempts: attempt, retried: attempt > 1 };
-}
-
-function dispatchChild(
-	targetName: string,
-	task: string,
-	ctx: any,
-	options?: { modelOverride?: string },
-): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget }> {
-	if (!config || !runtime) {
-		return Promise.resolve({ output: "Runtime not initialized.", exitCode: 1, elapsed: 0 });
+	function outputSignalsBlocked(output: string): boolean {
+		const text = output.toLowerCase();
+		return text.includes("blocked by ")
+			|| text.includes("ownership guardrail")
+			|| text.includes("access denied")
+			|| text.includes("permission denied")
+			|| text.includes("read access denied")
+			|| text.includes("rate limit")
+			|| text.includes("429")
+			|| text.includes("no api key found")
+			|| text.includes("missing api key");
 	}
+
+	function sleep(ms: number): Promise<void> {
+		return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
+	}
+
+	function isRetryableDelegationFailure(output: string): boolean {
+		const text = output.toLowerCase();
+		return text.includes("lock file is already being held")
+			|| text.includes("startup, global settings")
+			|| text.includes("startup, project settings")
+			|| text.includes("no api key found for openai-codex")
+			|| text.includes("no models match pattern \"openai-codex/")
+			|| text.includes("no models match pattern 'openai-codex/");
+	}
+
+	function isModelFallbackFailure(output: string): boolean {
+		const text = output.toLowerCase();
+		return text.includes("no endpoints available matching your guardrail restrictions")
+			|| text.includes("no models match pattern")
+			|| text.includes("model not found")
+			|| text.includes("provider returned error")
+			|| text.includes("404 no endpoints available");
+	}
+
+	function modelCandidates(ctx: any, child: DispatchTarget): string[] {
+		const primary = currentModel(ctx, effectiveModel(config!, child.agent) || child.agent.model);
+		const fallbacks = Array.isArray(child.agent.model_fallbacks) ? child.agent.model_fallbacks : [];
+		return Array.from(new Set([primary, ...fallbacks].map((item) => `${item || ""}`.trim()).filter(Boolean)));
+	}
+
+	function shouldResumeChildSession(child: DispatchTarget, sessionFile: string): boolean {
+		if (!existsSync(sessionFile)) return false;
+		return false;
+	}
+
+	async function dispatchChildWithRetry(
+		targetName: string,
+		task: string,
+		ctx: any,
+		options?: {
+			maxAttempts?: number;
+			baseDelayMs?: number;
+			onRetry?: (attempt: number, maxAttempts: number, reason: string) => void;
+		},
+	): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget; artifactPath?: string; attempts: number; retried: boolean }> {
+		const maxAttempts = Math.max(1, options?.maxAttempts ?? 3);
+		const baseDelayMs = Math.max(50, options?.baseDelayMs ?? 350);
+		const child = config && runtime ? resolveTarget(targetName) : null;
+		const candidates = child ? modelCandidates(ctx, child) : [];
+		let modelIndex = 0;
+		let attempt = 0;
+		let lastResult: { output: string; exitCode: number; elapsed: number; child?: DispatchTarget; artifactPath?: string } = {
+			output: "Delegation did not run.",
+			exitCode: 1,
+			elapsed: 0,
+		};
+
+		while (attempt < maxAttempts) {
+			attempt += 1;
+			const modelOverride = candidates[modelIndex] || "";
+			lastResult = await dispatchChild(targetName, task, ctx, { modelOverride: modelOverride || undefined });
+			if (lastResult.exitCode === 0) {
+				return { ...lastResult, attempts: attempt, retried: attempt > 1 };
+			}
+			if (isModelFallbackFailure(lastResult.output) && modelIndex < candidates.length - 1) {
+				modelIndex += 1;
+				options?.onRetry?.(
+					attempt + 1,
+					maxAttempts,
+					`switching model to ${candidates[modelIndex]} after ${shortText(firstUsefulLine(lastResult.output), 120)}`,
+				);
+				continue;
+			}
+			if (!isRetryableDelegationFailure(lastResult.output) || attempt >= maxAttempts) {
+				break;
+			}
+			const delayMs = baseDelayMs * attempt;
+			options?.onRetry?.(attempt + 1, maxAttempts, shortText(firstUsefulLine(lastResult.output), 180));
+			await sleep(delayMs);
+		}
+
+		return { ...lastResult, attempts: attempt, retried: attempt > 1 };
+	}
+
+	function dispatchChild(
+		targetName: string,
+		task: string,
+		ctx: any,
+		options?: { modelOverride?: string },
+	): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget; artifactPath?: string }> {
+		if (!config || !runtime) {
+			return Promise.resolve({ output: "Runtime not initialized.", exitCode: 1, elapsed: 0 });
+		}
 		if (runtime.role === "worker") {
 			return Promise.resolve({ output: "Workers cannot delegate work.", exitCode: 1, elapsed: 0 });
 		}
@@ -1916,6 +2499,16 @@ function dispatchChild(
 				output: `Unknown target "${targetName}". Available: ${availableTargetsText()}`,
 				exitCode: 1,
 				elapsed: 0,
+			});
+		}
+
+		const activeKey = `${runtime!.agent.name}:${targetName}`;
+		if (activeDelegations.has(activeKey)) {
+			return Promise.resolve({
+				output: `${displayName(targetName)} is already being delegated by ${runtime!.agent.name}. Please wait for the current delegation to complete before issuing another.`,
+				exitCode: 1,
+				elapsed: 0,
+				child,
 			});
 		}
 
@@ -1940,10 +2533,13 @@ function dispatchChild(
 
 		const startTime = Date.now();
 		if (card) {
-			card.timer = setInterval(() => {
+			card.timer = (globalThis.setInterval(() => {
 				card.elapsed = Date.now() - startTime;
 				updateWidget();
-			}, 1000);
+			}, 1000) as any);
+			if (typeof card.timer?.unref === "function") {
+				card.timer.unref();
+			}
 		}
 
 		const model = options?.modelOverride || currentModel(ctx, effectiveModel(config, child.agent) || child.agent.model);
@@ -1969,15 +2565,10 @@ function dispatchChild(
 			"--thinking", "off",
 			"--session", sessionFile,
 		];
-		// Important: custom extension tools (delegate_agent, mcp_*, update_expertise_model)
-		// are not recognized by the CLI --tools validator when spawning a child process.
-		// If we pass them for leads, they get stripped and leads lose delegation capability.
-		// Keep --tools only for workers (builtin repo tools restriction), and let leads
-		// receive extension tools from runtime registration.
-		if (child.role === "worker" && spawnTools.length > 0) {
+		if (spawnTools.length > 0) {
 			args.splice(args.indexOf("--session"), 0, "--tools", spawnTools.join(","));
 		}
-		if (existsSync(mcpBridgePath)) args.splice(6, 0, "-e", mcpBridgePath);
+		if (existsSync(mcpBridgePath)) args.splice(args.indexOf("-e"), 0, "-e", mcpBridgePath);
 		if (resumeSession) args.push("-c");
 		if (model) args.push("--model", model);
 		args.push(prompt);
@@ -2008,229 +2599,238 @@ function dispatchChild(
 		const textChunks: string[] = [];
 		const stderrChunks: string[] = [];
 		const collectedAssistantTexts = new Set<string>();
+		let functionallyDone = false;
 
-		return new Promise((resolvePromise) => {
-			const proc = spawn("pi", args, {
-				stdio: ["ignore", "pipe", "pipe"],
-				env: {
-					...process.env,
-					PI_MULTI_CONFIG: config!.configPath,
-					PI_MULTI_ROLE: child.role,
-					PI_MULTI_AGENT: child.agent.name,
-					PI_MULTI_TEAM: child.team?.name || "",
-					PI_MULTI_SESSION_ID: currentSessionId(),
-					PI_MULTI_SESSION_ROOT: currentSessionRoot(),
-					PI_MULTI_PARENT: runtime!.agent.name,
-					PI_MULTI_DEPTH: String(currentDepth() + 1),
-				},
-			});
-			childProcesses.set(child.agent.name, proc);
+		let resolvePromise: (res: { output: string; exitCode: number; elapsed: number; child?: DispatchTarget; artifactPath?: string }) => void;
+		const resultPromise = new Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget; artifactPath?: string }>((resolve) => {
+			resolvePromise = resolve;
+		});
 
-			let buffer = "";
-			const toolCalls: string[] = [];
+		activeDelegations.set(activeKey, resultPromise);
+		resultPromise.then(() => activeDelegations.delete(activeKey)).catch(() => activeDelegations.delete(activeKey));
 
-			proc.stdout!.setEncoding("utf-8");
-			proc.stdout!.on("data", (chunk: string) => {
-				buffer += chunk;
-				const lines = buffer.split("\n");
-				buffer = lines.pop() || "";
-				for (const line of lines) {
-					if (!line.trim()) continue;
-					appendFileSync(logFile, line + "\n");
-					try {
-						const event = JSON.parse(line);
-						const pushAssistantText = (text: string) => {
-							const normalized = `${text || ""}`.trim();
-							if (!normalized || collectedAssistantTexts.has(normalized)) return;
-							collectedAssistantTexts.add(normalized);
-							textChunks.push(normalized);
-							if (card) {
-								card.lastLine = normalized.split("\n").filter((row: string) => row.trim()).pop() || "";
-								updateWidget();
-							}
-						};
-						if (event.type === "message_update") {
-							const delta = event.assistantMessageEvent;
-							if (delta?.type === "toolcall_start") {
-								const toolName = delta.partial?.content?.[delta.contentIndex || 0]?.name
-									|| event.message?.content?.[delta.contentIndex || 0]?.name
-									|| "";
-								if (toolName) toolCalls.push(toolName);
-							}
-							if (delta?.type === "text_delta") {
-								pushAssistantText(delta.delta || "");
-							}
+		const proc = spawn("pi", args, {
+			stdio: ["ignore", "pipe", "pipe"],
+			env: {
+				...process.env,
+				PI_MULTI_CONFIG: config!.configPath,
+				PI_MULTI_ROLE: child.role,
+				PI_MULTI_AGENT: child.agent.name,
+				PI_MULTI_TEAM: child.team?.name || "",
+				PI_MULTI_SESSION_ID: currentSessionId(),
+				PI_MULTI_SESSION_ROOT: currentSessionRoot(),
+				PI_MULTI_PARENT: runtime!.agent.name,
+				PI_MULTI_DEPTH: String(currentDepth() + 1),
+			},
+		});
+		childProcesses.set(child.agent.name, proc);
+
+		let buffer = "";
+		const toolCalls: string[] = [];
+
+		proc.stdout!.setEncoding("utf-8");
+		proc.stdout!.on("data", (chunk: string) => {
+			buffer += chunk;
+			const lines = buffer.split("\n");
+			buffer = lines.pop() || "";
+			for (const line of lines) {
+				if (!line.trim()) continue;
+				appendFileSync(logFile, line + "\n");
+				try {
+					const event = JSON.parse(line);
+					const pushAssistantText = (text: string) => {
+						const raw = text || "";
+						if (!raw) return;
+						const trimmed = raw.trim();
+						if (!trimmed) {
+							// For pure whitespace deltas, we still want to add them to textChunks
+							// but we don't need to update the card.lastLine again
+							textChunks.push(raw);
+							return;
 						}
-						const fromMessages = extractAssistantMessageText(event.messages || []);
-						if (fromMessages) pushAssistantText(fromMessages);
-						const fromEvent = extractStructuredText(event.message || event.output || event.response || event.final || event.result);
-						if (fromEvent) pushAssistantText(fromEvent);
-					} catch { }
-				}
-			});
 
-			proc.stderr!.setEncoding("utf-8");
-			proc.stderr!.on("data", (chunk: string) => {
-				stderrChunks.push(chunk);
-				appendFileSync(logFile, JSON.stringify({
-					type: "stderr",
-					at: new Date().toISOString(),
-					data: chunk,
-				}) + "\n");
-			});
+						textChunks.push(raw);
+						if (card) {
+							const fullCurrentResponse = textChunks.join("");
+							const lines = fullCurrentResponse.split("\n").filter((row) => row.trim());
+							card.lastLine = lines.pop() || "";
+							updateWidget();
+						}
+					};
+					if (event.type === "message_update") {
+						const delta = event.assistantMessageEvent;
+						if (delta?.type === "toolcall_start") {
+							const toolName = delta.partial?.content?.[delta.contentIndex || 0]?.name
+								|| event.message?.content?.[delta.contentIndex || 0]?.name
+								|| "";
+							if (toolName) toolCalls.push(toolName);
+						}
+						if (delta?.type === "text_delta") {
+							pushAssistantText(delta.delta || "");
+						}
+					}
 
-			proc.on("close", (code) => {
-				childProcesses.delete(child.agent.name);
-				if (buffer.trim()) {
-					appendFileSync(logFile, buffer.trim() + "\n");
-					try {
-						const event = JSON.parse(buffer.trim());
+					if (event.type === "turn_end" || event.type === "agent_end") {
+						// Only fallback to full messages if we didn't receive any streaming deltas
+						if (textChunks.length === 0) {
+							const fromMessages = extractAssistantMessageText(event.messages || []);
+							if (fromMessages) pushAssistantText(fromMessages);
+							const fromEvent = extractStructuredText(event.message || event.output || event.response || event.final || event.result);
+							if (fromEvent) pushAssistantText(fromEvent);
+						}
+					}
+				} catch { }
+			}
+		});
+
+		proc.stderr!.setEncoding("utf-8");
+		proc.stderr!.on("data", (chunk: string) => {
+			stderrChunks.push(chunk);
+			appendFileSync(logFile, JSON.stringify({
+				type: "stderr",
+				at: new Date().toISOString(),
+				data: chunk,
+			}) + "\n");
+		});
+
+		proc.on("close", (code) => {
+			childProcesses.delete(child.agent.name);
+			if (buffer.trim()) {
+				appendFileSync(logFile, buffer.trim() + "\n");
+				try {
+					const event = JSON.parse(buffer.trim());
+					// Only fallback if we don't have deltas
+					if (textChunks.length === 0) {
 						const fromMessages = extractAssistantMessageText(event.messages || []);
 						if (fromMessages && !collectedAssistantTexts.has(fromMessages)) {
 							collectedAssistantTexts.add(fromMessages);
 							textChunks.push(fromMessages);
-						}
-						if (event.type === "message_update") {
-							const delta = event.assistantMessageEvent;
-							if (delta?.type === "text_delta") {
-								const normalized = `${delta.delta || ""}`.trim();
-								if (normalized && !collectedAssistantTexts.has(normalized)) {
-									collectedAssistantTexts.add(normalized);
-									textChunks.push(normalized);
-								}
-							}
 						}
 						const fromEvent = extractStructuredText(event.message || event.output || event.response || event.final || event.result);
 						if (fromEvent && !collectedAssistantTexts.has(fromEvent)) {
 							collectedAssistantTexts.add(fromEvent);
 							textChunks.push(fromEvent);
 						}
-					} catch { }
+					}
+				} catch { }
+			}
+
+			if (card?.timer) clearInterval(card.timer);
+			const elapsed = Date.now() - startTime;
+			const output = textChunks.join("");
+			const stderrOutput = stderrChunks.join("").trim();
+			const childExitCode = code ?? 1;
+			const realToolCalls = toolCalls.filter((tool) => tool && tool !== "update_expertise_model");
+
+			const executionPostureFailure = child.role === "worker"
+				&& childExitCode === 0
+				&& realToolCalls.length === 0
+				&& !outputSignalsBlocked(output);
+			const effectiveExitCode = executionPostureFailure ? 2 : childExitCode;
+			let effectiveOutput = executionPostureFailure
+				? [
+					output || "(empty)",
+					"",
+					"[Runtime] Worker returned without any concrete tool execution in this turn.",
+					`[Runtime] Detected tool calls: ${toolCalls.join(", ") || "(none)"}`,
+					`[Runtime] Resumed prior session: ${resumeSession ? "yes" : "no"}`,
+				].join("\n")
+				: output;
+
+			if (effectiveExitCode !== 0 && !effectiveOutput.trim() && stderrOutput) {
+				const compactStderr = stderrOutput.length > 6000 ? stderrOutput.slice(-6000) : stderrOutput;
+				effectiveOutput = `[stderr]\n${compactStderr}`;
+			}
+
+			if (card) {
+				if (!functionallyDone || effectiveExitCode !== 0) {
+					if (!functionallyDone) {
+						card.status = effectiveExitCode === 0 ? "done" : "error";
+					} else if (effectiveExitCode !== 0 && effectiveExitCode !== 137 && code !== null) {
+						card.status = "error";
+					}
 				}
-
-				if (card?.timer) clearInterval(card.timer);
-				const elapsed = Date.now() - startTime;
-				const output = textChunks.join("");
-				const stderrOutput = stderrChunks.join("").trim();
-				const outputTrimmed = output.trim();
-				const childExitCode = code ?? 1;
-				const realToolCalls = toolCalls.filter((tool) => tool && tool !== "update_expertise_model");
-				// Only enforce execution posture when the worker process itself exited successfully.
-				// If the process already failed (for example invalid model/auth/tool bootstrap),
-				// preserve the real runtime error instead of masking it as "did not execute".
-				const executionPostureFailure = child.role === "worker"
-					&& childExitCode === 0
-					&& realToolCalls.length === 0
-					&& (outputTrimmed.length === 0 || outputSignalsNoExecution(output));
-				const effectiveExitCode = executionPostureFailure ? 2 : childExitCode;
-				let effectiveOutput = executionPostureFailure
-					? [
-						output || "(empty)",
-						"",
-						"[Runtime] Worker returned without any concrete tool execution in this turn.",
-						`[Runtime] Detected tool calls: ${toolCalls.join(", ") || "(none)"}`,
-						`[Runtime] Resumed prior session: ${resumeSession ? "yes" : "no"}`,
-					].join("\n")
-					: output;
-				if (effectiveExitCode !== 0 && !effectiveOutput.trim() && stderrOutput) {
-					const compactStderr = stderrOutput.length > 6000
-						? stderrOutput.slice(-6000)
-						: stderrOutput;
-					effectiveOutput = `[stderr]\n${compactStderr}`;
+				card.elapsed = elapsed;
+				if (!card.lastLine || card.lastLine.startsWith("Running") || card.lastLine === "Done (Functional)") {
+					card.lastLine = effectiveOutput.split("\n").filter((line) => line.trim()).pop() || (effectiveExitCode === 0 ? "Done" : `Error ${effectiveExitCode}`);
 				}
+				updateWidget();
+			}
 
-				if (card) {
-					card.elapsed = elapsed;
-					card.status = effectiveExitCode === 0 ? "done" : "error";
-					card.lastLine = effectiveOutput.split("\n").filter((line) => line.trim()).pop() || "";
-					updateWidget();
-				}
+			if (effectiveExitCode === 0) {
+				updateExpertise(child.agent, task, effectiveOutput);
+			}
 
-				if (effectiveExitCode === 0) {
-					updateExpertise(child.agent, task, effectiveOutput);
-				}
-
-				const artifactPath = persistArtifact(
-					"delegation-result",
-					child.agent.name,
-					[
-						`# Delegation Result`,
-						``,
-						`- Target: ${child.agent.name}`,
-						`- Target role: ${child.role}`,
-						`- Team: ${child.team?.name || "global"}`,
-						`- Exit code: ${effectiveExitCode}`,
-						`- Elapsed: ${Math.round(elapsed / 1000)}s`,
-						`- Tool calls: ${toolCalls.join(", ") || "(none)"}`,
-						``,
-						`## Task`,
-						``,
-						task,
-						``,
-						`## Output`,
-						``,
-						effectiveOutput || "(empty)",
-					].join("\n"),
-					{
-						target: child.agent.name,
-						targetRole: child.role,
-						targetTeam: child.team?.name || null,
-						exitCode: effectiveExitCode,
-						toolCalls,
-						executionPostureFailure,
-					},
-				);
-
-				appendEvent("delegate_end", {
+			const artifactPath = persistArtifact(
+				"delegation-result",
+				child.agent.name,
+				[
+					`# Delegation Result`,
+					``,
+					`- Target: ${child.agent.name}`,
+					`- Target role: ${child.role}`,
+					`- Team: ${child.team?.name || "global"}`,
+					`- Exit code: ${effectiveExitCode}`,
+					`- Elapsed: ${Math.round(elapsed / 1000)}s`,
+					`- Tool calls: ${toolCalls.join(", ") || "(none)"}`,
+					``,
+					`## Task`,
+					``,
+					task,
+					``,
+					`## Output`,
+					``,
+					effectiveOutput || "(empty)",
+				].join("\n"),
+				{
 					target: child.agent.name,
 					targetRole: child.role,
+					targetTeam: child.team?.name || null,
 					exitCode: effectiveExitCode,
-					elapsed,
-					summary: shortText(firstUsefulLine(effectiveOutput), 200),
-					artifactPath,
 					toolCalls,
 					executionPostureFailure,
-				});
+				},
+			);
 
-				resolvePromise({
-					output: effectiveOutput,
-					exitCode: effectiveExitCode,
-					elapsed,
-					child,
-				});
+			appendEvent("delegate_end", {
+				target: child.agent.name,
+				targetRole: child.role,
+				exitCode: effectiveExitCode,
+				elapsed,
+				summary: shortText(firstUsefulLine(effectiveOutput), 200),
+				artifactPath,
+				toolCalls,
+				executionPostureFailure,
 			});
 
-			proc.on("error", (err) => {
-				childProcesses.delete(child.agent.name);
-				if (card?.timer) clearInterval(card.timer);
-				if (card) {
-					card.status = "error";
-					card.lastLine = `Spawn error: ${err.message}`;
-					card.elapsed = Date.now() - startTime;
-					updateWidget();
-				}
-				appendEvent("delegate_error", {
-					target: child.agent.name,
-					error: err.message,
-				});
-				persistArtifact(
-					"delegation-error",
-					child.agent.name,
-					`Error spawning ${child.agent.name}: ${err.message}\n`,
-					{
-						target: child.agent.name,
-						targetRole: child.role,
-						targetTeam: child.team?.name || null,
-					},
-				);
-				resolvePromise({
-					output: `Error spawning ${child.agent.name}: ${err.message}`,
-					exitCode: 1,
-					elapsed: Date.now() - startTime,
-					child,
-				});
+			resolvePromise({
+				output: effectiveOutput,
+				exitCode: effectiveExitCode,
+				elapsed,
+				child,
+				artifactPath,
 			});
 		});
+
+		proc.on("error", (err) => {
+			childProcesses.delete(child.agent.name);
+			if (card?.timer) clearInterval(card.timer);
+			if (card) {
+				card.status = "error";
+				card.lastLine = `Spawn error: ${err.message}`;
+				card.elapsed = Date.now() - startTime;
+				updateWidget();
+			}
+			appendEvent("delegate_error", { target: child.agent.name, error: err.message });
+			resolvePromise({
+				output: `Error spawning ${child.agent.name}: ${err.message}`,
+				exitCode: 1,
+				elapsed: Date.now() - startTime,
+				child,
+			});
+		});
+
+		return resultPromise;
 	}
 
 	function protectWorkerPaths(event: any, ctx: any, pending: PendingToolCall | null) {
@@ -2255,16 +2855,16 @@ function dispatchChild(
 		};
 
 		if (isToolCallEventType("read", event) || isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
-			const inputPath = event.input.path ? resolve(config.baseDir, event.input.path) : config.baseDir;
+			const inputPath = event.input.path ? resolve(config.repoRoot, event.input.path) : config.repoRoot;
 			if (!ruleAllows(inputPath, domainRules, "read")) {
 				return block(`read access denied for ${event.input.path || "."}`);
 			}
 		}
 
 		if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
-			const inputPath = resolve(config.baseDir, event.input.path);
+			const inputPath = resolve(config.repoRoot, event.input.path || ".");
 			if (!ruleAllows(inputPath, domainRules, "upsert")) {
-				return block(`upsert access denied for ${event.input.path}`);
+				return block(`upsert access denied for ${event.input.path || "."}`);
 			}
 		}
 
@@ -2273,7 +2873,7 @@ function dispatchChild(
 			if (/\bsudo\b/.test(command)) {
 				return block("sudo is not allowed inside worker bash.");
 			}
-			const pathTokens = extractPathLikeTokens(command).map((token) => resolve(config.baseDir, token));
+			const pathTokens = extractPathLikeTokens(command).map((token) => resolve(config.repoRoot, token));
 			for (const token of pathTokens) {
 				if (!ruleAllows(token, domainRules, "read")) {
 					return block(`bash references path outside read scope: ${token}`);
@@ -2327,9 +2927,9 @@ function dispatchChild(
 					category: category || null,
 					note,
 				},
-			};
-		},
 
+		};
+		},
 		renderCall(args, theme) {
 			const category = (args as any).category ? `[${(args as any).category}] ` : "";
 			const note = shortText((args as any).note || "", 60);
@@ -2390,16 +2990,17 @@ function dispatchChild(
 			}
 
 			const result = await dispatchChild(effectiveTarget, effectiveTask, ctx);
-			const body = result.output.length > 12000
-				? result.output.slice(0, 12000) + "\n\n... [truncated]"
-				: result.output;
 			const status = result.exitCode === 0 ? "done" : "error";
 			const elapsed = Math.round(result.elapsed / 1000);
 			const header = rerouted
 				? `[rerouted ${rerouted.originalTarget} -> ${rerouted.lead}] `
 				: "";
+			const body = buildDelegationResultContent(
+				effectiveTarget, status, elapsed, result.output,
+				result.artifactPath || null, header,
+			);
 			return {
-				content: [{ type: "text", text: `${header}[${effectiveTarget}] ${status} in ${elapsed}s\n\n${body}` }],
+				content: [{ type: "text", text: body }],
 				details: {
 					target: effectiveTarget,
 					task: effectiveTask,
@@ -2407,11 +3008,11 @@ function dispatchChild(
 					elapsed: result.elapsed,
 					exitCode: result.exitCode,
 					fullOutput: result.output,
+					artifactPath: result.artifactPath || null,
 					rerouted,
 				},
-			};
+			}
 		},
-
 		renderCall(args, theme) {
 			const target = (args as any).target || "?";
 			const task = shortText((args as any).task || "", 60);
@@ -2516,19 +3117,54 @@ function dispatchChild(
 				};
 			}
 
+			const alreadyDelegating: string[] = [];
+			const uniqueEffectiveTargets: string[] = [];
+			const parentKey = runtime!.agent.name;
+			for (const target of effectiveTargets) {
+				const activeKey = `${parentKey}:${target}`;
+				if (activeDelegations.has(activeKey)) {
+					alreadyDelegating.push(target);
+				} else {
+					uniqueEffectiveTargets.push(target);
+				}
+			}
+			const effectiveTargetsFiltered = uniqueEffectiveTargets;
+			const skippedForActive = alreadyDelegating.length;
+
+			if (effectiveTargetsFiltered.length === 0 && skippedForActive > 0) {
+				return {
+					content: [{
+						type: "text",
+						text: `All targets are already being delegated by ${parentKey}. Please wait for current delegations to complete. Skipped: ${alreadyDelegating.join(", ")}`,
+					}],
+					details: {
+						status: "error",
+						targets: effectiveTargets,
+						alreadyDelegating,
+						total: effectiveTargets.length,
+						successCount: 0,
+						failedCount: skippedForActive,
+						elapsed: 0,
+						results: [],
+					},
+				};
+			}
+
 			if (onUpdate) {
 				const reroutedCount = Array.from(reroutedWorkersByLead.values())
 					.reduce((sum, item) => sum + item.workers.size, 0);
+				const skippedMsg = skippedForActive > 0 ? ` (${skippedForActive} already active, skipped)` : "";
 				const updateLine = reroutedCount > 0
-					? `Delegating in parallel to ${effectiveTargets.length} targets (rerouted ${reroutedCount} worker targets via leads)...`
-					: `Delegating in parallel to ${effectiveTargets.length} targets...`;
+					? `Delegating in parallel to ${effectiveTargetsFiltered.length} targets${skippedMsg} (rerouted ${reroutedCount} worker targets via leads)...`
+					: `Delegating in parallel to ${effectiveTargetsFiltered.length} targets${skippedMsg}...`;
 				onUpdate({
 					content: [{ type: "text", text: updateLine }],
 					details: {
 						status: "dispatching",
-						total: effectiveTargets.length,
+						total: effectiveTargetsFiltered.length,
 						completed: 0,
-						targets: effectiveTargets,
+						targets: effectiveTargetsFiltered,
+						alreadyDelegating,
 						reroutedWorkersByLead: Array.from(reroutedWorkersByLead.entries()).map(([lead, info]) => ({
 							lead,
 							team: info.teamName,
@@ -2543,7 +3179,7 @@ function dispatchChild(
 			let completed = 0;
 
 			const results = await Promise.all(
-				effectiveTargets.map(async (target, index) => {
+				effectiveTargetsFiltered.map(async (target, index) => {
 					try {
 						const rerouteInfo = reroutedWorkersByLead.get(target);
 						const scopedTask = rerouteInfo
@@ -2562,7 +3198,7 @@ function dispatchChild(
 									content: [{ type: "text", text: `Retrying ${target} (${nextAttempt}/${maxAttempts})` }],
 									details: {
 										status: "dispatching",
-										total: effectiveTargets.length,
+										total: effectiveTargetsFiltered.length,
 										completed,
 										target,
 										retrying: true,
@@ -2574,8 +3210,8 @@ function dispatchChild(
 						completed += 1;
 						if (onUpdate) {
 							onUpdate({
-								content: [{ type: "text", text: `Parallel delegation progress: ${completed}/${effectiveTargets.length} (${target})` }],
-								details: { status: "dispatching", total: effectiveTargets.length, completed, target },
+								content: [{ type: "text", text: `Parallel delegation progress: ${completed}/${effectiveTargetsFiltered.length} (${target})` }],
+								details: { status: "dispatching", total: effectiveTargetsFiltered.length, completed, target },
 							});
 						}
 						return { target, ...result };
@@ -2584,8 +3220,8 @@ function dispatchChild(
 						const message = error instanceof Error ? error.message : String(error);
 						if (onUpdate) {
 							onUpdate({
-								content: [{ type: "text", text: `Parallel delegation progress: ${completed}/${effectiveTargets.length} (${target})` }],
-								details: { status: "dispatching", total: effectiveTargets.length, completed, target, error: message },
+								content: [{ type: "text", text: `Parallel delegation progress: ${completed}/${effectiveTargetsFiltered.length} (${target})` }],
+								details: { status: "dispatching", total: effectiveTargetsFiltered.length, completed, target, error: message },
 							});
 						}
 						return {
@@ -2602,17 +3238,23 @@ function dispatchChild(
 
 			const elapsed = Date.now() - startedAt;
 			const requestedTotal = cleanedTargets.length;
-			const dispatchedTotal = results.length;
+			const dispatchedTotal = effectiveTargetsFiltered.length;
 			const successCount = results.filter((result) => result.exitCode === 0).length;
-			const failedCount = requestedTotal - successCount;
-			const status = failedCount === 0 ? "done" : successCount === 0 ? "error" : "partial";
+			const failedCount = requestedTotal - successCount - skippedForActive;
+			const status = failedCount + skippedForActive === requestedTotal ? "error" : successCount === requestedTotal - skippedForActive ? "done" : "partial";
 
 			const body = results.map((result) => {
 				const icon = result.exitCode === 0 ? "✓" : "✗";
-				const output = result.output.length > 4000 ? `${result.output.slice(0, 4000)}\n... [truncated]` : result.output;
+				const content = buildDelegationResultContent(
+					result.target,
+					result.exitCode === 0 ? "done" : "error",
+					Math.round(result.elapsed / 1000),
+					result.output,
+					result.artifactPath || null,
+				);
 				return [
-					`### ${icon} ${result.target} (${Math.round(result.elapsed / 1000)}s)`,
-					output || "(empty)",
+					`### ${icon} ${result.target}`,
+					content,
 				].join("\n");
 			}).join("\n\n");
 
@@ -2629,11 +3271,11 @@ function dispatchChild(
 			return {
 				content: [{
 					type: "text",
-					text: `[parallel] ${status} ${successCount}/${requestedTotal} succeeded in ${Math.round(elapsed / 1000)}s${detailsHeader}${unresolvedSummary}\n\n${body}`,
+					text: `[parallel] ${status} ${successCount}/${requestedTotal} succeeded in ${Math.round(elapsed / 1000)}s${detailsHeader}${unresolvedSummary}${skippedForActive > 0 ? `\n\n[skipped - already active] ${alreadyDelegating.join(", ")}` : ""}\n\n${body}`,
 				}],
 				details: {
 					status,
-					targets: effectiveTargets,
+					targets: effectiveTargetsFiltered,
 					requestedTargets: cleanedTargets,
 					total: requestedTotal,
 					dispatchedTotal,
@@ -2641,6 +3283,7 @@ function dispatchChild(
 					failedCount,
 					elapsed,
 					unresolvedTargets,
+					alreadyDelegating: skippedForActive > 0 ? alreadyDelegating : undefined,
 					reroutedWorkersByLead: Array.from(reroutedWorkersByLead.entries()).map(([lead, info]) => ({
 						lead,
 						team: info.teamName,
@@ -2778,6 +3421,55 @@ function dispatchChild(
 		},
 	});
 
+	async function stopAllAgents(target: string | undefined, ctx: ExtensionContext) {
+		if (!runtime) return;
+
+		const targetLower = target?.trim().toLowerCase();
+		const running = Array.from(childProcesses.entries());
+		if (running.length === 0) {
+			if (target) ctx.ui.notify("No running child agents.", "info");
+			return;
+		}
+
+		const shouldStop = (name: string) =>
+			!targetLower || targetLower === "all" || name.toLowerCase() === targetLower;
+
+		let stopped = 0;
+		for (const [name, proc] of running) {
+			if (!shouldStop(name)) continue;
+			try {
+				proc.kill("SIGTERM");
+				setTimeout(() => {
+					if (childProcesses.has(name)) {
+						try { proc.kill("SIGKILL"); } catch { }
+						childProcesses.delete(name);
+					}
+				}, 1000);
+			} catch { }
+			childProcesses.delete(name);
+			stopped++;
+
+			const card = cards.get(childKey(name));
+			if (card && card.status === "running") {
+				card.status = "error";
+				card.lastLine = target ? "Stopped by /stop" : "Stopped by [Shutdown]";
+				updateWidget();
+			}
+		}
+
+		appendEvent("delegate_stop", {
+			target: target || "all",
+			stopped,
+		});
+
+		if (stopped > 0 && ctx?.ui) {
+			try {
+				const label = target ? `target "${target}"` : "all running agents";
+				ctx.ui.notify(`Stopped ${stopped} child process(es) for ${label}.`, "info");
+			} catch { }
+		}
+	}
+
 	pi.registerCommand("stop", {
 		description: "Stop running multi-team child agents and return to idle",
 		handler: async (args, ctx) => {
@@ -2785,43 +3477,10 @@ function dispatchChild(
 				ctx.ui.notify("Multi-team runtime not initialized.", "warning");
 				return;
 			}
-
-			const target = args?.trim().toLowerCase();
-			const running = Array.from(childProcesses.entries());
-			if (running.length === 0) {
-				ctx.ui.notify("No running child agents.", "info");
-				return;
-			}
-
-			const shouldStop = (name: string) =>
-				!target || target === "all" || name.toLowerCase() === target;
-
-			let stopped = 0;
-			for (const [name, proc] of running) {
-				if (!shouldStop(name)) continue;
-				try {
-					proc.kill("SIGTERM");
-				} catch { }
-				childProcesses.delete(name);
-				stopped++;
-
-				const card = cards.get(childKey(name));
-				if (card && card.status === "running") {
-					card.status = "error";
-					card.lastLine = "Stopped by /stop";
-					updateWidget();
-				}
-			}
-
-			appendEvent("delegate_stop", {
-				target: target || "all",
-				stopped,
-			});
-
-			const label = target ? `target "${target}"` : "all running agents";
-			ctx.ui.notify(`Stopped ${stopped} child process(es) for ${label}.`, stopped ? "info" : "warning");
+			await stopAllAgents(args, ctx);
 		},
 	});
+
 
 	pi.on("input", async (event, _ctx) => {
 		if (!runtime) {
@@ -2829,12 +3488,108 @@ function dispatchChild(
 		}
 		const text = extractStructuredText((event as any).message || (event as any).content || (event as any).input || (event as any).text || event);
 		if (text) {
+			if (text.startsWith("/compact")) {
+				return handleCompactCommand(text);
+			}
 			appendConversation("user", text, {
 				source: currentParentAgent() ? "delegation" : "user",
 			});
 		}
 		return { action: "continue" as const };
 	});
+
+	async function handleCompactCommand(text: string): Promise<{ action: string; response?: string }> {
+		const args = text.slice("/compact".length).trim();
+		const parts = args.split(/\s+/).filter(Boolean);
+		let keepRecent = 20;
+		let maxTokens = 150000;
+		let dryRun = false;
+		for (let i = 0; i < parts.length; i++) {
+			if (parts[i] === "--keep" || parts[i] === "-k") {
+				keepRecent = parseInt(parts[i + 1]) || keepRecent;
+				i++;
+			} else if (parts[i] === "--tokens" || parts[i] === "-t") {
+				maxTokens = parseInt(parts[i + 1]) || maxTokens;
+				i++;
+			} else if (parts[i] === "--dry-run" || parts[i] === "-n") {
+				dryRun = true;
+			} else if (parts[i] === "--help" || parts[i] === "-h") {
+				return {
+					action: "respond",
+					response: `**/compact** - Compact session to reduce token count
+
+Usage: /compact [options]
+
+Options:
+  -k, --keep <N>      Keep N most recent conversation turns (default: 20)
+  -t, --tokens <N>   Target max tokens (default: 150000)
+  -n, --dry-run      Show what would be compacted without applying
+  -h, --help         Show this help
+
+Examples:
+  /compact              Compact to ~150k tokens, keep 20 turns
+  /compact --keep 50   Keep 50 recent turns
+  /compact --tokens 80000  Target 80k tokens
+  /compact --dry-run    Preview compaction without changes`
+				};
+			}
+		}
+
+		if (!sessionRoot || !existsSync(sessionRoot)) {
+			return { action: "respond", response: "No active session found." };
+		}
+
+		const convPath = resolve(sessionRoot, "conversation.jsonl");
+		if (!existsSync(convPath)) {
+			return { action: "respond", response: "No conversation file found." };
+		}
+
+		const lines = readFileSync(convPath, "utf-8").split("\n").filter(Boolean);
+		const totalLines = lines.length;
+		const estimatedTokens = totalLines * 150;
+
+		if (dryRun) {
+			return {
+				action: "respond",
+				response: `**Compaction Preview**\n` +
+					`- Current turns: ${totalLines}\n` +
+					`- Estimated tokens: ~${estimatedTokens.toLocaleString()}\n` +
+					`- Target tokens: ~${maxTokens.toLocaleString()}\n` +
+					`- Would keep: ${Math.min(totalLines, keepRecent * 2)} turns\n` +
+					`- Would remove: ${Math.max(0, totalLines - keepRecent * 2)} turns`
+			};
+		}
+
+		const targetTurns = Math.max(keepRecent * 2, Math.ceil(maxTokens / 150));
+		const keptLines = lines.slice(-targetTurns);
+		const removedCount = totalLines - keptLines.length;
+
+		if (keptLines.length < lines.length) {
+			writeFileSync(convPath, keptLines.join("\n") + "\n");
+		}
+
+		const newTokens = keptLines.length * 150;
+		const savedTokens = estimatedTokens - newTokens;
+
+		appendEvent("session_compacted", {
+			beforeTurns: totalLines,
+			afterTurns: keptLines.length,
+			beforeTokens: estimatedTokens,
+			afterTokens: newTokens,
+			savedTokens,
+			keepRecent,
+			maxTokens,
+		});
+
+		return {
+			action: "respond",
+			response: `**Session Compacted** ✓\n` +
+				`- Before: ~${estimatedTokens.toLocaleString()} tokens (${totalLines} turns)\n` +
+				`- After: ~${newTokens.toLocaleString()} tokens (${keptLines.length} turns)\n` +
+				`- Saved: ~${savedTokens.toLocaleString()} tokens (${Math.round(savedTokens / estimatedTokens * 100)}% reduction)\n` +
+				`- Removed: ${removedCount} conversation turns`
+		};
+	}
 
 	pi.on("tool_call", async (event, ctx) => {
 		if (!runtime) return { block: false };
@@ -2908,6 +3663,9 @@ function dispatchChild(
 
 	pi.on("session_shutdown", async () => {
 		if (!runtime) return;
+		if (widgetCtx) {
+			await stopAllAgents(undefined, widgetCtx);
+		}
 		mutateSessionIndex((index) => {
 			const processKey = `${process.pid}:${runtime!.agent.name}`;
 			index.processes = Array.isArray(index.processes) ? index.processes : [];
@@ -2922,6 +3680,15 @@ function dispatchChild(
 			}
 		});
 	});
+
+	// Robust signal handling for ghost processes
+	const handleExit = async () => {
+		if (childProcesses.size > 0 && widgetCtx) {
+			await stopAllAgents(undefined, widgetCtx);
+		}
+	};
+	process.on("SIGINT", handleExit);
+	process.on("SIGTERM", handleExit);
 
 	pi.on("session_start", async (_event, ctx) => {
 		loadPiEnv(ctx.cwd);
@@ -2996,16 +3763,11 @@ function dispatchChild(
 				const separator = " · ";
 				const buildPlainLeft = () => ` ${modelLabel}${separator}${roleLabel}${separator}${sessionLabel}`;
 
-				let tokIn = 0;
-				let tokOut = 0;
-				let cost = 0;
-				for (const entry of ctx.sessionManager.getBranch()) {
-					if (entry.type !== "message" || entry.message?.role !== "assistant") continue;
-					const message = entry.message as AssistantMessage;
-					tokIn += message.usage?.input || 0;
-					tokOut += message.usage?.output || 0;
-					cost += message.usage?.cost?.total || 0;
-				}
+				const branchTotals = branchUsageTotals(ctx);
+				const crewTotals = crewUsageTotals(runtime?.role === "orchestrator" ? undefined : runtime?.agent.name);
+				const tokIn = branchTotals.input + crewTotals.input;
+				const tokOut = branchTotals.output + crewTotals.output;
+				const cost = branchTotals.cost + crewTotals.cost;
 
 				const pctLabel = `${Math.round(pct)}% `;
 				const tokenInLabel = formatTokenCount(tokIn);
@@ -3018,12 +3780,15 @@ function dispatchChild(
 					theme.fg("accent", tokenOutLabel) +
 					theme.fg("dim", " out ") +
 					theme.fg("warning", costLabel) +
+					theme.fg("muted", " crew") +
 					theme.fg("muted", " · ") +
 					theme.fg("dim", `[${bar}] ${pctLabel}`),
 					theme.fg("success", tokenInLabel) +
 					theme.fg("dim", "↑ ") +
 					theme.fg("accent", tokenOutLabel) +
 					theme.fg("dim", "↓ ") +
+					theme.fg("warning", `${costLabel} `) +
+					theme.fg("muted", "crew ") +
 					theme.fg("muted", "· ") +
 					theme.fg("dim", `[${bar}] ${pctLabel}`),
 					theme.fg("success", tokenInLabel) +

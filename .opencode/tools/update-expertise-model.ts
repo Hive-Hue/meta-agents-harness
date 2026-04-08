@@ -12,8 +12,10 @@ type ExpertiseDoc = {
   [key: string]: unknown
 }
 
-const DEFAULT_MAX_LINES = 10000
-const NOTE_MAX_CHARS = 1000
+const DEFAULT_MAX_LINES = 120
+const NOTE_MAX_CHARS = 2000
+const DECAY_AFTER_DAYS = 14
+const SIMILARITY_THRESHOLD = 0.55
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -36,23 +38,86 @@ function toCategoryKey(category?: string): string {
   return normalized + "s"
 }
 
+function cosineSimilarityTokens(a: string, b: string): number {
+  const tokenize = (s: string): Set<string> =>
+    new Set(s.toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter(Boolean))
+  const setA = tokenize(a)
+  const setB = tokenize(b)
+  if (setA.size === 0 || setB.size === 0) return 0
+  let dot = 0
+  for (const t of setA) {
+    if (setB.has(t)) dot++
+  }
+  return dot / (Math.sqrt(setA.size) * Math.sqrt(setB.size))
+}
+
+function notesAreSimilar(a: string, b: string): boolean {
+  if (a === b) return true
+  if (Math.abs(a.length - b.length) / Math.max(a.length, b.length, 1) > 0.7) return false
+  return cosineSimilarityTokens(a, b) >= SIMILARITY_THRESHOLD
+}
+
+function daysBetweenDates(a: string, b: string): number {
+  const parse = (d: string) => {
+    const match = d.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (!match) return Date.now()
+    return Date.UTC(+match[1], +match[2] - 1, +match[3])
+  }
+  return Math.abs(parse(a) - parse(b)) / (1000 * 60 * 60 * 24)
+}
+
 function lineCount(text: string): number {
   if (!text) return 0
   return text.split("\n").length
 }
 
-function trimLines(doc: ExpertiseDoc): ExpertiseDoc {
-  const clone = doc
-  const preferred = ["observations", "open_questions"]
+function byteCount(text: string): number {
+  return Buffer.byteLength(text, "utf-8")
+}
+
+function trimAndClean(doc: ExpertiseDoc): ExpertiseDoc {
+  const clone = structuredClone(doc)
+  const preferred = ["open_questions", "observations", "lessons", "workflows", "patterns", "tools", "decisions", "risks"]
   const dynamic = Object.keys(clone).filter((key) => Array.isArray(clone[key]) && !preferred.includes(key))
-  const order = [...preferred, ...dynamic]
+  const allSections = [...preferred, ...dynamic]
+
+  // Phase 1: deduplicate similar notes
+  for (const section of allSections) {
+    const items = clone[section] as ExpertiseEntry[]
+    if (!Array.isArray(items)) continue
+    const keep: ExpertiseEntry[] = []
+    for (const item of items) {
+      const idx = keep.findIndex((k) => notesAreSimilar(k.note, item.note))
+      if (idx >= 0) {
+        if (item.note.length > keep[idx].note.length || item.date >= keep[idx].date) {
+          keep[idx] = item
+        }
+      } else {
+        keep.push(item)
+      }
+    }
+    clone[section] = keep
+  }
+
+  // Phase 2: evict stale open_questions
+  const todayStr = today()
+  const questions = clone["open_questions"] as ExpertiseEntry[]
+  if (Array.isArray(questions)) {
+    clone["open_questions"] = questions.filter((q) => daysBetweenDates(q.date, todayStr) <= DECAY_AFTER_DAYS)
+  }
+
+  // Phase 3: line + byte limit enforcement
+  const maxLines = Math.min(clone.meta.max_lines || DEFAULT_MAX_LINES, 500)
+  const maxBytes = 32_000
   let rendered = YAML.stringify(clone)
-  while (lineCount(rendered) > clone.meta.max_lines) {
-    const section = order.find((key) => Array.isArray(clone[key]) && (clone[key] as ExpertiseEntry[]).length > 0)
+  const trimOrder = [...allSections]
+  while ((lineCount(rendered) > maxLines || byteCount(rendered) > maxBytes) && trimOrder.length > 0) {
+    const section = trimOrder.find((key) => Array.isArray(clone[key]) && (clone[key] as ExpertiseEntry[]).length > 0)
     if (!section) break
     ;(clone[section] as ExpertiseEntry[]).shift()
     rendered = YAML.stringify(clone)
   }
+
   return clone
 }
 
@@ -127,7 +192,7 @@ export default tool({
       note: shortText(args.note, NOTE_MAX_CHARS)
     })
     doc.meta.last_updated = new Date().toISOString()
-    doc = trimLines(doc)
+    doc = trimAndClean(doc)
     writeFileSync(filePath, YAML.stringify(doc), "utf-8")
 
     return `ok agent=${agent} category=${key} path=${filePath}`

@@ -21,11 +21,11 @@ Model: `zai/glm-5-turbo`
 Planning worker focused on scoped execution within assigned ownership boundaries.
 
 ## Expertise
-- path: `.opencode/crew/marketing/expertise/market-researcher-expertise-model.yaml`
+- path: `.opencode/crew/marketing/expertise/market-researcher-mental-model.yaml`
 - use-when: Capture audience insights, competitor patterns, and channel opportunities.
 
 ## Skills
-- path: `.opencode/skills/expertise-model/SKILL.md` | use-when: Before and after research tasks.
+- path: `.opencode/skills/mental-model/SKILL.md` | use-when: Before and after research tasks.
 - path: `.opencode/skills/web-research/SKILL.md` | use-when: For evidence-based web discovery and source extraction.
 
 ## Tools
@@ -33,7 +33,7 @@ Planning worker focused on scoped execution within assigned ownership boundaries
 - grep
 - glob
 - list
-- update-expertise-model
+- update-mental-model
 
 ## MCP Access
 - context7
@@ -51,7 +51,7 @@ Planning worker focused on scoped execution within assigned ownership boundaries
 - Stay within ownership boundaries declared in `Domain`.
 - Return evidence with explicit file paths and concrete outcomes.
 - Avoid speculative claims; state assumptions clearly when needed.
-- Persist durable learnings using `update-expertise-model` after meaningful work.
+- Persist durable learnings using `update-mental-model` after meaningful work.
 
 ## Response Contract
 1. execution summary

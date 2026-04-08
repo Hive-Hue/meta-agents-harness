@@ -62,7 +62,7 @@ test("graph --mermaid returns flowchart syntax", () => {
 })
 
 test("graph --mermaid supports basic and group detail levels", () => {
-  const basic = spawnSync(process.execPath, [cliPath, "graph", "--mermaid", "--mermaid-level", "basic"], {
+  const basic = spawnSync(process.execPath, [cliPath, "graph", "--crew", "dev", "--mermaid", "--mermaid-level", "basic"], {
     cwd: repoRoot,
     env: process.env,
     encoding: "utf-8"
@@ -72,7 +72,7 @@ test("graph --mermaid supports basic and group detail levels", () => {
   assert.match(basic.stdout, /m_leads/)
   assert.match(basic.stdout, /m_workers/)
 
-  const group = spawnSync(process.execPath, [cliPath, "graph", "--mermaid", "--mermaid-level", "group"], {
+  const group = spawnSync(process.execPath, [cliPath, "graph", "--crew", "dev", "--mermaid", "--mermaid-level", "group"], {
     cwd: repoRoot,
     env: process.env,
     encoding: "utf-8"
@@ -105,6 +105,44 @@ test("graph --mermaid detailed can render capabilities with legend and colors", 
   assert.match(result.stdout, /subgraph legend\[Legend\]/)
   assert.doesNotMatch(result.stdout, /\|uses skills\|/)
   assert.doesNotMatch(result.stdout, /\|uses MCP\|/)
+})
+
+test("sync projects crew mission and sprint metadata into runtime artifacts", () => {
+  const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "sync-meta-agents.mjs")], {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: "utf-8"
+  })
+  assert.equal(sync.status, 0, sync.stderr)
+
+  const claudeCrew = readFileSync(path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const opencodeCrew = readFileSync(path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const hermesCrew = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const hermesConfig = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "config.yaml"), "utf-8")
+  const hermesPrompt = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
+  const piPrompt = readFileSync(path.join(repoRoot, ".pi", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
+
+  assert.match(claudeCrew, /mission: Setup and evolve runtime support/)
+  assert.match(claudeCrew, /sprint_mode:/)
+  assert.match(claudeCrew, /instruction_block:/)
+  assert.match(claudeCrew, /crew=dev/)
+  assert.match(claudeCrew, /sprint_responsibilities:/)
+  assert.match(opencodeCrew, /mission: Setup and evolve runtime support/)
+  assert.match(opencodeCrew, /target_release: v0\.4\.0/)
+  assert.match(opencodeCrew, /instruction_block:/)
+  assert.match(opencodeCrew, /sprint=v0\.4\.0-runtime-evolution/)
+  assert.match(hermesCrew, /mission: Setup and evolve runtime support/)
+  assert.match(hermesCrew, /instruction_block:/)
+  assert.match(hermesConfig, /runtime: hermes/)
+  assert.match(hermesConfig, /multi_team: \.hermes\/crew\/dev\/multi-team.yaml/)
+  assert.match(hermesPrompt, /instruction_block:/)
+  assert.match(hermesPrompt, /\.hermes\/skills\/delegate-bounded\/SKILL.md/)
+  assert.match(piPrompt, /mission: Setup and evolve runtime support/)
+  assert.match(piPrompt, /sprint_mode:/)
+  assert.match(piPrompt, /instruction_block:/)
+  assert.match(piPrompt, /sprint_responsibilities:/)
+  assert.match(piPrompt, /\[MAH_CONTEXT\]/)
+  assert.match(piPrompt, /avoid=full Hermes parity;/)
 })
 
 test("provenance retention keeps most recent lines and compacts old entries", () => {

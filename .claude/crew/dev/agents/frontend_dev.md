@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/frontend-dev-expertise-model.yaml
   use-when: Track UI architecture, component patterns, and safe frontend implementation approaches in Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - read
   - write

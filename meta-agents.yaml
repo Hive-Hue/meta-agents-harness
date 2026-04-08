@@ -19,6 +19,7 @@ runtime_detection:
     pi: ".pi"
     claude: ".claude"
     opencode: ".opencode"
+    hermes: ".hermes"
   cli:
     pi:
       direct_cli: "pi"
@@ -29,6 +30,9 @@ runtime_detection:
     opencode:
       direct_cli: "opencode"
       wrapper: "ocmh"
+    hermes:
+      direct_cli: "hermes"
+      wrapper: "hermesh"
 
 runtimes:
   pi:
@@ -54,26 +58,37 @@ runtimes:
   opencode:
     wrapper: "ocmh"
     config_root: ".opencode"
-    config_pattern: ".opencode/crew/<crew>/multi-team.yaml"
+    config_pattern: ".opencode/multi-team.yaml"
     task_policy: "permission.task"
     model_overrides:
       orchestrator_default: "zai/glm-4.7"
       lead_default: "zai/glm-4.7"
       worker_default: "zai/glm-4.7"
+  hermes:
+    wrapper: "hermesh"
+    config_root: ".hermes"
+    config_pattern: ".hermes/crew/<crew>/config.yaml"
+    capabilities:
+      persistent_memory: true
+      supports_background_operation: true
+      supports_multi_backend_execution: true
+      gateway_aware: true
 
 catalog:
   models:
-    orchestrator_default: "zai/glm-4.7"
-    lead_default: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
-    worker_default: "zai/glm-5-turbo"
+    orchestrator_default: "minimax/minimax-m2.7"
+    lead_default: "minimax/minimax-m2.7"
+    worker_default: "minimax/minimax-m2.7"
   model_fallbacks:
     orchestrator_default:
-      - "zai/glm-5-turbo"
+      - "nvidia/nemotron-3-super-120b-a12b:free"
+      - "zai/glm-5"
       - "zai/glm-4.5-air"
     lead_default:
-      - "zai/glm-5-turbo"
+      - "zai/glm-5"
       - "zai/glm-4.5-air"
     worker_default:
+      - "nvidia/nemotron-3-super-120b-a12b:free"
       - "zai/glm-4.7"
       - "zai/glm-4.5-air"
   skills:
@@ -81,81 +96,452 @@ catalog:
       opencode: ".opencode/skills/delegate-bounded/SKILL.md"
       claude: ".claude/skills/delegate-bounded/SKILL.md"
       pi: ".pi/skills/delegate-bounded/SKILL.md"
+      hermes: ".hermes/skills/delegate-bounded/SKILL.md"
     zero_micromanagement:
       opencode: ".opencode/skills/zero-micromanagement/SKILL.md"
       claude: ".claude/skills/zero-micromanagement/SKILL.md"
       pi: ".pi/skills/zero-micromanagement/SKILL.md"
+      hermes: ".hermes/skills/zero-micromanagement/SKILL.md"
     expertise_model:
       opencode: ".opencode/skills/expertise-model/SKILL.md"
       claude: ".claude/skills/expertise-model/SKILL.md"
       pi: ".pi/skills/expertise-model/SKILL.md"
-  domain_profiles:
-    read_only_repo:
-      - path: "."
-        read: true
-        edit: false
-        bash: false
-    specs_writer:
-      - path: "."
-        read: true
-        edit: false
-        bash: false
-      - path: "specs/"
-        read: true
-        edit: true
-        bash: false
-    frontend_impl:
-      - path: "."
-        read: true
-        edit: false
-        bash: false
-      - path: "src/frontend/"
-        read: true
-        edit: true
-        bash: true
-      - path: "web/"
-        read: true
-        edit: true
-        bash: true
-    backend_impl:
-      - path: "."
-        read: true
-        edit: false
-        bash: false
-      - path: "src/backend/"
-        read: true
-        edit: true
-        bash: true
-      - path: "api/"
-        read: true
-        edit: true
-        bash: true
-    qa_security:
-      - path: "."
-        read: true
-        edit: false
-        bash: true
-    marketing_assets:
-      - path: "."
-        read: true
-        edit: false
-        bash: false
-      - path: "campaigns/"
-        read: true
-        edit: true
-        bash: false
-      - path: "assets/"
-        read: true
-        edit: true
-        bash: false
+      hermes: ".hermes/skills/expertise-model/SKILL.md"
+    bootstrap_config_architect:
+      opencode: ".opencode/skills/bootstrap-config-architect/SKILL.md"
+      claude: ".claude/skills/bootstrap-config-architect/SKILL.md"
+      pi: ".pi/skills/bootstrap-config-architect/SKILL.md"
+      hermes: ".hermes/skills/bootstrap-config-architect/SKILL.md"
+
+domain_profiles:
+  read_only_repo:
+    - path: .
+      read: true
+
+  planning_delivery:
+    - path: .
+      read: true
+    - path: plan/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+
+  cli_operator_surface:
+    - path: .
+      read: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: assets/*
+      read: true
+      edit: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+
+  runtime_impl:
+    - path: .
+      read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+    - path: package.json
+      read: true
+      edit: true
+    - path: package-lock.json
+      read: true
+      edit: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: extensions/*
+      read: true
+      edit: true
+      bash: true
+    - path: .claude/*
+      read: true
+      edit: true
+      bash: true
+    - path: .opencode/*
+      read: true
+      edit: true
+      bash: true
+    - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: .hermes/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mcp.example.json
+      read: true
+      edit: true
+    - path: .env.sample
+      read: true
+      edit: true
+
+  validation_runtime:
+    - path: .
+      read: true
+      bash: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: .github/workflows/*
+      read: true
+      edit: true
+      bash: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+
+  bootstrap_generation:
+    - path: .
+      read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+
+  runtime_assets_sync:
+    - path: .claude/*
+      read: true
+      edit: true
+    - path: .opencode/*
+      read: true
+      edit: true
+    - path: .pi/*
+      read: true
+      edit: true
+    - path: .hermes/*
+      read: true
+      edit: true
+    - path: extensions/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mcp.example.json
+      read: true
+      edit: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+
+  docs_authoring:
+    - path: .
+      read: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: assets/*
+      read: true
+      edit: true
 
 crews:
+  - id: "bootstrap-config"
+    display_name: "Bootstrap Config Crew"
+    mission: "Design and implement an initial bootstrap CLI that creates a minimally valid meta-agents.yaml with low operator friction. In interactive terminals it prompts for required fields and selected optional fields. In non-interactive environments it applies logical defaults or accepts explicit flags. It may also support an AI-assisted bootstrap mode using API key or OAuth."
+    sprint_mode:
+      name: "v0.4.0-bootstrap-cli-onboarding"
+      active: true
+      target_release: "v0.4.0"
+      objective: "Deliver a first-run bootstrap flow that generates a minimally valid meta-agents.yaml and reduces configuration resistance for new users."
+      execution_mode: "spec-bound-slice-driven"
+      directives:
+        - "spec-bound execution"
+        - "onboarding-first UX"
+        - "required-fields-first"
+        - "interactive and non-interactive parity"
+        - "AI-assisted mode optional, never mandatory"
+        - "safe defaults over config sprawl"
+        - "PR-sized slices"
+        - "mandatory validation at each slice"
+      must_deliver:
+        - "bootstrap command design"
+        - "interactive terminal questionnaire"
+        - "non-interactive fallback behavior"
+        - "minimal required schema generation"
+        - "logical defaults for required fields"
+        - "AI-assisted bootstrap option design"
+        - "API key and/or OAuth input flow contract"
+        - "post-generation validate step"
+        - "overwrite/merge safety behavior"
+        - "docs and examples"
+        - "test plan"
+      must_not_deliver:
+        - "full AI orchestration engine"
+        - "remote bootstrap service dependency"
+        - "expansion of unrelated runtime features"
+        - "schema redesign outside bootstrap needs"
+        - "v0.5.0+ onboarding wizard scope"
+    source_configs:
+      pi: ".pi/crew/bootstrap-config/multi-team.yaml"
+      claude: ".claude/crew/bootstrap-config/multi-team.yaml"
+      opencode: ".opencode/multi-team.yaml"
+      hermes: ".hermes/crew/bootstrap-config/config.yaml"
+    session:
+      pi_root: ".pi/crew/bootstrap-config/sessions"
+      claude_mirror_root: ".claude/crew/bootstrap-config/sessions"
+    topology:
+      orchestrator: "orchestrator"
+      leads:
+        product: "product-lead"
+        engineering: "engineering-lead"
+        validation: "validation-lead"
+      workers:
+        product: ["ux-researcher", "schema-planner"]
+        engineering: ["cli-dev", "runtime-dev"]
+        validation: ["qa-reviewer", "docs-reviewer"]
+    agents:
+      - id: "orchestrator"
+        role: "orchestrator"
+        team: "orchestration"
+        model_ref: "orchestrator_default"
+        expertise: "orchestrator-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        domain_profile: "read_only_repo"
+        sprint_responsibilities:
+          - "control bootstrap scope"
+          - "keep focus on low-friction onboarding"
+          - "prevent scope expansion into unrelated runtime work"
+          - "consolidate final bootstrap contract"
+      - id: "product-lead"
+        role: "lead"
+        team: "product"
+        model_ref: "lead_default"
+        expertise: "product-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "bootstrap_config_architect"]
+        domain_profile: "planning_delivery"
+        sprint_responsibilities:
+          - "define onboarding flow"
+          - "decide required vs optional prompts"
+          - "define AI-assisted UX boundaries"
+          - "minimize operator friction"
+      - id: "engineering-lead"
+        role: "lead"
+        team: "engineering"
+        model_ref: "lead_default"
+        expertise: "engineering-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        domain_profile: "runtime_impl"
+        sprint_responsibilities:
+          - "coordinate CLI implementation"
+          - "preserve config and adapter boundaries"
+          - "split bootstrap into implementation slices"
+      - id: "validation-lead"
+        role: "lead"
+        team: "validation"
+        model_ref: "lead_default"
+        expertise: "validation-lead-expertise-model"
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        domain_profile: "validation_runtime"
+        sprint_responsibilities:
+          - "define validation gates"
+          - "ensure generated config is minimally valid"
+          - "block unsafe overwrite behavior"
+      - id: "ux-researcher"
+        role: "worker"
+        team: "product"
+        model_ref: "worker_default"
+        expertise: "ux-researcher-expertise-model"
+        skills: ["expertise_model", "bootstrap_config_architect"]
+        domain_profile: "planning_delivery"
+        sprint_responsibilities:
+          - "design first-run questionnaire"
+          - "define prompt wording"
+          - "reduce decision fatigue"
+          - "propose smart defaults"
+      - id: "schema-planner"
+        role: "worker"
+        team: "product"
+        model_ref: "worker_default"
+        expertise: "schema-planner-expertise-model"
+        skills: ["expertise_model", "bootstrap_config_architect"]
+        domain_profile: "planning_delivery"
+        sprint_responsibilities:
+          - "identify minimally required fields"
+          - "define generated config skeleton"
+          - "map required fields to validation rules"
+      - id: "cli-dev"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "cli-dev-expertise-model"
+        skills: ["expertise_model"]
+        domain_profile: "cli_operator_surface"
+        sprint_responsibilities:
+          - "implement bootstrap command"
+          - "implement interactive prompts"
+          - "handle non-interactive mode and flags"
+          - "improve help and explain surfaces"
+      - id: "runtime-dev"
+        role: "worker"
+        team: "engineering"
+        model_ref: "worker_default"
+        expertise: "runtime-dev-expertise-model"
+        skills: ["expertise_model", "bootstrap_config_architect"]
+        domain_profile: "bootstrap_generation"
+        sprint_responsibilities:
+          - "generate meta-agents.yaml"
+          - "integrate with validate:config"
+          - "support AI-assisted config completion contract"
+          - "add safe merge/overwrite behavior"
+      - id: "qa-reviewer"
+        role: "worker"
+        team: "validation"
+        model_ref: "worker_default"
+        expertise: "qa-reviewer-expertise-model"
+        skills: ["expertise_model"]
+        domain_profile: "validation_runtime"
+        sprint_responsibilities:
+          - "test interactive flow"
+          - "test non-interactive flow"
+          - "test partial input recovery"
+          - "test invalid and overwrite scenarios"
+      - id: "docs-reviewer"
+        role: "worker"
+        team: "validation"
+        model_ref: "worker_default"
+        expertise: "docs-reviewer-expertise-model"
+        skills: ["expertise_model"]
+        domain_profile: "docs_authoring"
+        sprint_responsibilities:
+          - "document bootstrap examples"
+          - "document AI-assisted mode"
+          - "document defaults and required fields"
+          - "document CI/non-interactive usage"
+    runtime_overrides:
+      opencode:
+        permission:
+          task:
+            allow_delegate:
+              orchestrator: ["product-lead", "engineering-lead", "validation-lead"]
+              product-lead: ["ux-researcher", "schema-planner"]
+              engineering-lead: ["cli-dev", "runtime-dev"]
+              validation-lead: ["qa-reviewer", "docs-reviewer"]
+      claude:
+        ccr:
+          team_routes:
+            orchestrator: ["product-lead", "engineering-lead", "validation-lead"]
+      pi:
+        multi_team:
+          session_root: ".pi/crew/bootstrap-config/sessions"
+          extension_entry: "extensions/multi-team.ts"
+
   - id: "dev"
     display_name: "Development Crew"
+    mission: "Setup and evolve runtime support, validation, projection, and operator-facing architecture for Meta Agents Harness while preserving bounded scope and runtime-agnostic design."
+    sprint_mode:
+      name: "v0.4.0-runtime-evolution"
+      active: true
+      target_release: "v0.4.0"
+      objective: "Finalize the current runtime support roadmap with bounded adapter and validation improvements."
+      execution_mode: "spec-bound-slice-driven"
+      directives:
+        - "spec-bound execution"
+        - "no architecture-wave expansion"
+        - "no v0.5.0+ scope"
+        - "PR-sized slices"
+        - "mandatory validation at each slice"
+        - "explicit deferred list for anything outside v0.4.0"
+      must_deliver:
+        - "Hermes command and capability discovery"
+        - "runtime compatibility matrix"
+        - "adapter skeleton"
+        - "bounded dispatcher and config integration plan"
+        - "diagnostics and explainability impact plan"
+        - "test plan"
+        - "small implementation-ready slices"
+      must_not_deliver:
+        - "full Hermes parity"
+        - "remote execution foundation"
+        - "policy engine"
+        - "federation/interconnect"
+        - "confidential execution"
+        - "runtime contract redesign driven by Hermes"
+        - "MAH becoming Hermes-shaped"
     source_configs:
       pi: ".pi/crew/dev/multi-team.yaml"
       claude: ".claude/crew/dev/multi-team.yaml"
       opencode: ".opencode/multi-team.yaml"
+      hermes: ".hermes/crew/dev/config.yaml"
     session:
       pi_root: ".pi/crew/dev/sessions"
       claude_mirror_root: ".claude/crew/dev/sessions"
@@ -177,27 +563,45 @@ crews:
         expertise: "orchestrator-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
         domain_profile: "read_only_repo"
+        sprint_responsibilities:
+          - "control sprint scope"
+          - "distribute slices"
+          - "consolidate decisions"
+          - "prevent runtime capture by Hermes"
+          - "defer anything outside v0.4.0"
       - id: "planning-lead"
         role: "lead"
         team: "planning"
         model_ref: "lead_default"
         expertise: "planning-lead-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "read_only_repo"
+        domain_profile: "planning_delivery"
+        sprint_responsibilities:
+          - "translate spec into executable backlog"
+          - "order slices"
+          - "prevent backlog inflation"
       - id: "engineering-lead"
         role: "lead"
         team: "engineering"
         model_ref: "lead_default"
         expertise: "engineering-lead-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "read_only_repo"
+        domain_profile: "runtime_impl"
+        sprint_responsibilities:
+          - "coordinate implementation"
+          - "split work into reviewable changesets"
+          - "preserve adapter and dispatcher boundaries"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
         expertise: "validation-lead-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "read_only_repo"
+        domain_profile: "validation_runtime"
+        sprint_responsibilities:
+          - "define phase gates"
+          - "validate spec adherence"
+          - "block scope escape from the release boundary"
       - id: "repo-analyst"
         role: "worker"
         team: "planning"
@@ -205,41 +609,68 @@ crews:
         expertise: "repo-analyst-expertise-model"
         skills: ["expertise_model"]
         domain_profile: "read_only_repo"
+        sprint_responsibilities:
+          - "map real codebase integration points"
+          - "locate affected files"
+          - "surface regression and coupling risks"
       - id: "solution-architect"
         role: "worker"
         team: "planning"
         model_ref: "lead_default"
         expertise: "solution-architect-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "specs_writer"
+        domain_profile: "planning_delivery"
+        sprint_responsibilities:
+          - "define the adapter approach"
+          - "define minimal meta-agents.yaml compatibility"
+          - "identify the smallest technically correct slice"
       - id: "frontend-dev"
         role: "worker"
         team: "engineering"
         model_ref: "worker_default"
         expertise: "frontend-dev-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "frontend_impl"
+        domain_profile: 
+         - "cli_operator_surface"
+         - "runtime_impl"
+        sprint_responsibilities:
+          - "update CLI and help surfaces"
+          - "handle operator-facing explainability and docs changes"
       - id: "backend-dev"
         role: "worker"
         team: "engineering"
         model_ref: "worker_default"
         expertise: "backend-dev-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "backend_impl"
+        domain_profile: 
+          - "cli_operator_surface"
+          - "runtime_impl"
+        sprint_responsibilities:
+          - "implement runtime adapter behavior"
+          - "integrate dispatcher and config changes"
+          - "own Hermes-aware runtime projection and tests"
       - id: "qa-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
         expertise: "qa-reviewer-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "qa_security"
+        domain_profile: "validation_runtime"
+        sprint_responsibilities:
+          - "run smoke tests"
+          - "run diagnostics tests"
+          - "verify sync consistency"
       - id: "security-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
         expertise: "security-reviewer-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "qa_security"
+        domain_profile: "validation_runtime"
+        sprint_responsibilities:
+          - "review runtime boundary and unsafe coupling"
+          - "flag Hermes architecture capture risks"
+          - "cut future-wave contamination from the sprint"
     runtime_overrides:
       opencode:
         permission:
@@ -260,10 +691,12 @@ crews:
 
   - id: "marketing"
     display_name: "Marketing Crew"
+    mission: "Plan, produce, refine, and validate communication assets, launch narratives, campaign collateral, and supporting media for Meta Agents Harness."
     source_configs:
       pi: ".pi/crew/marketing/multi-team.yaml"
       claude: ".claude/crew/marketing/multi-team.yaml"
       opencode: ".opencode/multi-team.yaml"
+      hermes: ".hermes/crew/marketing/config.yaml"
     session:
       pi_root: ".pi/crew/marketing/sessions"
       claude_mirror_root: ".claude/crew/marketing/sessions"
@@ -291,70 +724,70 @@ crews:
         model_ref: "lead_default"
         expertise: "planning-lead-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "creative-lead"
         role: "lead"
         team: "creative"
         model_ref: "lead_default"
         expertise: "creative-lead-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
         expertise: "validation-lead-expertise-model"
         skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "market-researcher"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
         expertise: "market-researcher-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "campaign-strategist"
         role: "worker"
         team: "planning"
         model_ref: "worker_default"
         expertise: "campaign-strategist-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "copywriter"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
         expertise: "copywriter-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "creative-strategist"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
         expertise: "creative-strategist-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "media-operator"
         role: "worker"
         team: "creative"
         model_ref: "worker_default"
         expertise: "media-operator-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "performance-analyst"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
         expertise: "performance-analyst-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
       - id: "brand-safety-reviewer"
         role: "worker"
         team: "validation"
         model_ref: "worker_default"
         expertise: "brand-safety-reviewer-expertise-model"
         skills: ["expertise_model"]
-        domain_profile: "marketing_assets"
+        domain_profile: "docs_authoring"
     runtime_overrides:
       opencode:
         permission:
@@ -380,15 +813,19 @@ adapters:
       opencode: "agent files + permission.task"
       claude: "agent files + CCR route map + .mcp.json"
       pi: "crew multi-team.yaml + extensions/multi-team.ts"
+      hermes: "crew config + runtime capability projection"
     expertise_to_runtime:
       opencode: ".opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml"
       claude: ".claude/crew/<crew>/expertise/<agent>-expertise-model.yaml"
       pi: ".pi/crew/<crew>/expertise/<agent>-expertise-model.yaml"
+      hermes: ".hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml"
     skills_to_runtime:
       opencode: ".opencode/skills/*/SKILL.md"
       claude: ".claude/skills/*/SKILL.md"
       pi: ".pi/skills/*/SKILL.md"
+      hermes: ".hermes/skills/*/SKILL.md"
     domain_to_runtime:
       opencode: "permission.read/edit/bash"
       claude: "tool + routing scope"
       pi: "domain.read/upsert/delete + session scope"
+      hermes: "capability and workspace scope projection"

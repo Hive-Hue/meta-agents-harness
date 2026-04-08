@@ -7,7 +7,7 @@ expertise:
   path: .claude/crew/dev/expertise/security-reviewer-expertise-model.yaml
   use-when: Track auth, data exposure, blast-radius risks, and recurring security review patterns in Hivehue.
   updatable: true
-  max-lines: 10000
+  max-lines: 120
 tools:
   - read
   - bash
