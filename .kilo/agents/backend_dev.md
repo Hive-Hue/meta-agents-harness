@@ -1,1 +1,1 @@
-../crew/dev/agents/backend_dev.md
+/home/alysson/Github/meta-agents-harness/.kilo/crew/dev/agents/backend_dev.md

@@ -148,6 +148,7 @@ function ensureDefaults(doc) {
     kilo: ".kilo",
     opencode: ".opencode",
     hermes: ".hermes",
+    codex: ".codex",
     // Plugin entries override nothing (built-ins above take priority by name),
     // but we include them so the YAML documents all available markers
     ...Object.fromEntries(
@@ -182,6 +183,7 @@ function ensureDefaults(doc) {
     kilo: ".kilo/skills/delegate-bounded/SKILL.md",
     opencode: ".opencode/skills/delegate-bounded/SKILL.md",
     hermes: ".hermes/skills/delegate-bounded/SKILL.md",
+    codex: ".codex/skills/delegate-bounded/SKILL.md",
     ...(next.catalog.skills.delegate_bounded || {})
   }
   next.catalog.skills.zero_micromanagement = {
@@ -190,6 +192,7 @@ function ensureDefaults(doc) {
     kilo: ".kilo/skills/zero-micromanagement/SKILL.md",
     opencode: ".opencode/skills/zero-micromanagement/SKILL.md",
     hermes: ".hermes/skills/zero-micromanagement/SKILL.md",
+    codex: ".codex/skills/zero-micromanagement/SKILL.md",
     ...(next.catalog.skills.zero_micromanagement || {})
   }
   next.catalog.skills.expertise_model = {
@@ -198,6 +201,7 @@ function ensureDefaults(doc) {
     kilo: ".kilo/skills/expertise-model/SKILL.md",
     opencode: ".opencode/skills/expertise-model/SKILL.md",
     hermes: ".hermes/skills/expertise-model/SKILL.md",
+    codex: ".codex/skills/expertise-model/SKILL.md",
     ...(next.catalog.skills.expertise_model || {})
   }
   next.catalog.domain_profiles = next.catalog.domain_profiles || {}
@@ -211,21 +215,24 @@ function ensureDefaults(doc) {
       claude: "agent files + CCR route map + .mcp.json",
       kilo: "crew multi-team.yaml + generated agents + generated expertise",
       pi: "crew multi-team.yaml + extensions/multi-team.ts",
-      hermes: "crew config + runtime capability projection"
+      hermes: "crew config + runtime capability projection",
+      codex: "crew multi-team.yaml + prompt execution"
     },
     expertise_to_runtime: {
       opencode: ".opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml",
       claude: ".claude/crew/<crew>/expertise/<agent>-expertise-model.yaml",
       kilo: ".kilo/crew/<crew>/expertise/<agent>-expertise-model.yaml",
       pi: ".pi/crew/<crew>/expertise/<agent>-expertise-model.yaml",
-      hermes: ".hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml"
+      hermes: ".hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml",
+      codex: ".codex/crew/<crew>/expertise/<agent>-expertise-model.yaml"
     },
     skills_to_runtime: {
       opencode: ".opencode/skills/*/SKILL.md",
       claude: ".claude/skills/*/SKILL.md",
       kilo: ".kilo/skills/*/SKILL.md",
       pi: ".pi/skills/*/SKILL.md",
-      hermes: ".hermes/skills/*/SKILL.md"
+      hermes: ".hermes/skills/*/SKILL.md",
+      codex: ".codex/skills/*/SKILL.md"
     },
     domain_to_runtime: {
       opencode: "permission.read/edit/bash",
@@ -247,12 +254,14 @@ function buildMinimalCrew(crewId, mission) {
     source_configs: {
       pi: `.pi/crew/${crewId}/multi-team.yaml`,
       claude: `.claude/crew/${crewId}/multi-team.yaml`,
+      codex: `.codex/crew/${crewId}/multi-team.yaml`,
       kilo: `.kilo/crew/${crewId}/multi-team.yaml`,
       opencode: `.opencode/crew/${crewId}/multi-team.yaml`
     },
     session: {
       pi_root: `.pi/crew/${crewId}/sessions`,
       claude_mirror_root: `.claude/crew/${crewId}/sessions`,
+      codex_root: `.codex/crew/${crewId}/sessions`,
       kilo_root: `.kilo/crew/${crewId}/sessions`,
       hermes_root: `.hermes/crew/${crewId}/sessions`
     },
@@ -272,6 +281,7 @@ function buildMinimalCrew(crewId, mission) {
 function detectAvailableRuntime() {
   const runtimes = [
     { name: "pi", cli: "pi", skillFlag: "--skill", printFlag: "-p", usesSkillFlag: true },
+    { name: "codex", cli: "codex", runCommand: "exec", usesSkillFlag: false },
     { name: "kilo", cli: "kilo", runCommand: "run", usesSkillFlag: false },
     { name: "opencode", cli: "opencode", fileFlag: "-f", runCommand: "run", usesSkillFlag: false }
   ]
@@ -298,6 +308,7 @@ function getRepoContext() {
   if (existsSync(path.join(cwd, ".opencode"))) detectedMarkers.push("opencode")
   if (existsSync(path.join(cwd, ".pi"))) detectedMarkers.push("pi")
   if (existsSync(path.join(cwd, ".claude"))) detectedMarkers.push("claude")
+  if (existsSync(path.join(cwd, ".codex"))) detectedMarkers.push("codex")
   if (existsSync(path.join(cwd, ".kilo"))) detectedMarkers.push("kilo")
   if (existsSync(path.join(cwd, ".hermes"))) detectedMarkers.push("hermes")
   return { readmeContent, detectedMarkers, cwd }

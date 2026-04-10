@@ -1,1 +1,1 @@
-../crew/dev/agents/engineering_lead.md
+/home/alysson/Github/meta-agents-harness/.kilo/crew/dev/agents/engineering_lead.md

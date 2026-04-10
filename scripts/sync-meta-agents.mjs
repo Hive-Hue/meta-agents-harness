@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync, rmSync, readdirSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
@@ -43,6 +43,14 @@ function resolvePromptPath(runtime, crewId, agentId) {
   return `.${path.sep}${path.relative(repoRoot, fallback)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
 }
 
+function listSubdirs(rootPath) {
+  if (!existsSync(rootPath)) return []
+  return readdirSync(rootPath, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort((left, right) => left.localeCompare(right))
+}
+
 function resolveExpertisePath(runtime, crewId, expertiseName) {
   return `.${runtime}/crew/${crewId}/expertise/${expertiseName}.yaml`
 }
@@ -75,6 +83,9 @@ function runtimeSessionDirRoot(runtime, crew) {
   }
   if (runtime === "claude") {
     return crew.session?.claude_mirror_root || `.${runtime}/crew/${crew.id}/sessions`
+  }
+  if (runtime === "codex") {
+    return crew.session?.codex_root || `.${runtime}/crew/${crew.id}/sessions`
   }
   if (runtime === "kilo") {
     return crew.session?.kilo_root || `.${runtime}/crew/${crew.id}/sessions`
@@ -571,6 +582,83 @@ function ensurePiThemes(mode, records, jsonOutput) {
   return allGood
 }
 
+function ensureCodexSkills(mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
+  const sourceDir = path.join(repoRoot, "skills")
+  const targetDir = path.join(repoRoot, ".codex", "skills")
+
+  if (!existsSync(sourceDir)) {
+    if (!jsonOutput) console.log(`drift: source skills dir missing ${rel(sourceDir)}`)
+    pushRecord(records, { kind: "skill", path: rel(sourceDir), status: "missing", action: "fail" })
+    return false
+  }
+
+  const sourceSkills = listSubdirs(sourceDir)
+  const targetSkills = listSubdirs(targetDir)
+  const sourceSet = new Set(sourceSkills)
+  const targetSet = new Set(targetSkills)
+  const missingSkills = sourceSkills.filter((skill) => !targetSet.has(skill))
+  const extraSkills = targetSkills.filter((skill) => !sourceSet.has(skill))
+  let allGood = missingSkills.length === 0 && extraSkills.length === 0
+
+  if (checkOnly) {
+    for (const skill of sourceSkills) {
+      const sourceSkillFile = path.join(sourceDir, skill, "SKILL.md")
+      const targetSkillFile = path.join(targetDir, skill, "SKILL.md")
+      if (!existsSync(sourceSkillFile)) continue
+      if (!existsSync(targetSkillFile)) {
+        pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "missing", action: determineAction("missing") })
+        if (!jsonOutput) console.log(`drift: missing ${rel(targetSkillFile)}`)
+        allGood = false
+        continue
+      }
+      const sourceContent = readFileSync(sourceSkillFile, "utf-8")
+      const targetContent = readFileSync(targetSkillFile, "utf-8")
+      if (sourceContent !== targetContent) {
+        const preview = mode === "diff" ? diffPreview(targetContent, sourceContent) : []
+        pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "out_of_sync", action: determineAction("out_of_sync"), preview })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: update ${rel(targetSkillFile)}`)
+          else {
+            console.log(`drift: out-of-sync ${rel(targetSkillFile)}`)
+            if (mode === "diff") for (const line of preview) console.log(line)
+          }
+        }
+        allGood = false
+      } else {
+        pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "ok", action: determineAction("ok") })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: no-change ${rel(targetSkillFile)}`)
+          else console.log(`ok: ${rel(targetSkillFile)}`)
+        }
+      }
+    }
+
+    for (const skill of extraSkills) {
+      const targetSkillFile = path.join(targetDir, skill, "SKILL.md")
+      pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "out_of_sync", action: determineAction("out_of_sync") })
+      if (!jsonOutput) {
+        if (mode === "plan") console.log(`plan: remove stale ${rel(path.join(targetDir, skill))}`)
+        else console.log(`drift: stale ${rel(path.join(targetDir, skill))}`)
+      }
+      allGood = false
+    }
+    return allGood
+  }
+
+  rmSync(targetDir, { recursive: true, force: true })
+  for (const skill of sourceSkills) {
+    const sourceSkillFile = path.join(sourceDir, skill, "SKILL.md")
+    if (!existsSync(sourceSkillFile)) continue
+    const targetSkillFile = path.join(targetDir, skill, "SKILL.md")
+    mkdirSync(path.dirname(targetSkillFile), { recursive: true })
+    cpSync(sourceSkillFile, targetSkillFile, { force: true })
+    console.log(`synced: ${rel(targetSkillFile)}`)
+    pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "synced", action: determineAction("synced") })
+  }
+  return true
+}
+
 function injectAgentPermissions(content, agent, allowDelegate, byId, meta, runtime) {
   const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   let frontmatter = {}
@@ -990,6 +1078,7 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   for (const crew of metaDoc.crews) {
     const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
     const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
+    const codexYaml = buildRuntimeCrewDoc(metaDoc, crew, "codex")
     const kiloYaml = buildRuntimeCrewDoc(metaDoc, crew, "kilo")
     const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
     const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
@@ -997,6 +1086,7 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
 
     const piPath = path.join(repoRoot, ".pi", "crew", crew.id, "multi-team.yaml")
     const claudePath = path.join(repoRoot, ".claude", "crew", crew.id, "multi-team.yaml")
+    const codexPath = path.join(repoRoot, ".codex", "crew", crew.id, "multi-team.yaml")
     const kiloPath = path.join(repoRoot, ".kilo", "crew", crew.id, "multi-team.yaml")
     const opencodeCrewPath = path.join(repoRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
     const hermesCrewPath = path.join(repoRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
@@ -1004,15 +1094,18 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
 
     allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
+    allGood = writeOrCheck(codexPath, codexYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(kiloPath, kiloYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
     allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
     allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
+    allGood = syncRuntimePrompts(metaDoc, crew, "codex", mode, records, jsonOutput) && allGood
     allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
     allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
     allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
+    allGood = ensureCodexSkills(mode, records, jsonOutput) && allGood
 
     if (!checkOnly) {
       ensureHermesArtifacts(crew)

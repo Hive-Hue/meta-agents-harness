@@ -1,0 +1,15 @@
+agent:
+  name: validation-lead
+  role: lead
+  team: Validation
+meta:
+  version: "1"
+  max_lines: "120"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

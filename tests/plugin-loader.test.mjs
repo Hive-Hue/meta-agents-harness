@@ -198,6 +198,7 @@ describe("plugin-loader", async () => {
       const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
 
       assert.ok(loaded.some(p => p.name === "fake"), "should discover runtime-fake plugin")
+      assert.ok(loaded.some(p => p.name === "codex"), "should discover runtime-codex plugin")
     })
 
     it("skips plugins with version incompatibility", async () => {

@@ -1,0 +1,15 @@
+agent:
+  name: market-researcher
+  role: worker
+  team: Planning
+meta:
+  version: "1"
+  max_lines: "120"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

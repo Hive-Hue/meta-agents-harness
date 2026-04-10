@@ -1,1 +1,1 @@
-../crew/dev/agents/qa_reviewer.md
+/home/alysson/Github/meta-agents-harness/.kilo/crew/dev/agents/qa_reviewer.md

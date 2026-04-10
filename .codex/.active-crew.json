@@ -1,0 +1,8 @@
+{
+  "crew": "dev",
+  "source_config": ".codex/crew/dev/multi-team.yaml",
+  "source_agents": ".codex/crew/dev/agents",
+  "source_expertise": ".codex/crew/dev/expertise",
+  "activated_at": "2026-04-10T03:15:11.305Z",
+  "note": "Used by MAH core to bootstrap Codex with selected crew."
+}
