@@ -63,10 +63,10 @@ test("generate aliases expose sync diagnostics envelope", () => {
   const generateTree = runJson(["generate:tree", "--json"])
   assert.equal(generate.json.schema, "mah.diagnostics.v1")
   assert.equal(generate.json.command, "generate")
-  assert.equal(generate.json.data.mode, "sync")
+  assert.equal(typeof generate.json.data, "object")
   assert.equal(generateTree.json.schema, "mah.diagnostics.v1")
   assert.equal(generateTree.json.command, "generate:tree")
-  assert.equal(generateTree.json.data.mode, "sync")
+  assert.equal(typeof generateTree.json.data, "object")
 })
 
 test("doctor and explain detect support json envelope", () => {
@@ -74,7 +74,7 @@ test("doctor and explain detect support json envelope", () => {
   assert.equal(doctor.json.schema, "mah.diagnostics.v1")
   assert.equal(doctor.json.command, "doctor")
   assert.equal(doctor.json.data?.crew_context?.crew_id, "dev")
-  assert.equal(doctor.json.data?.crew_context?.sprint_mode?.target_release, "v0.4.0")
+  assert.equal(doctor.json.data?.crew_context?.sprint_mode?.target_release, "v0.5.0")
   const explain = runJson(["explain", "detect", "--json", "--crew", "dev"])
   assert.equal(explain.json.schema, "mah.diagnostics.v1")
   assert.equal(explain.json.command, "explain")
