@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, cpSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
@@ -45,6 +45,41 @@ function resolvePromptPath(runtime, crewId, agentId) {
 
 function resolveExpertisePath(runtime, crewId, expertiseName) {
   return `.${runtime}/crew/${crewId}/expertise/${expertiseName}.yaml`
+}
+
+function defaultExpertiseContent(agent) {
+  return YAML.stringify({
+    agent: {
+      name: agent.id,
+      role: agent.role,
+      team: titleCase(agent.team || "")
+    },
+    meta: {
+      version: "1",
+      max_lines: "120"
+    },
+    patterns: [],
+    risks: [],
+    tools: [],
+    workflows: [],
+    decisions: [],
+    lessons: [],
+    observations: [],
+    open_questions: []
+  }, { indent: 2 }).trimEnd()
+}
+
+function runtimeSessionDirRoot(runtime, crew) {
+  if (runtime === "pi") {
+    return crew.session?.pi_root || `.${runtime}/crew/${crew.id}/sessions`
+  }
+  if (runtime === "claude") {
+    return crew.session?.claude_mirror_root || `.${runtime}/crew/${crew.id}/sessions`
+  }
+  if (runtime === "kilo") {
+    return crew.session?.kilo_root || `.${runtime}/crew/${crew.id}/sessions`
+  }
+  return crew.session?.opencode_root || `.opencode/crew/${crew.id}/sessions`
 }
 
 function parsePromptFrontmatter(raw) {
@@ -250,6 +285,46 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
       pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "synced", action: determineAction("synced"), crew: crew.id, agent: agent.id })
     }
   }
+  if (runtime !== "hermes") {
+    const expertiseDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id, "expertise")
+    const piExpertiseDir = path.join(repoRoot, ".pi", "crew", crew.id, "expertise")
+    mkdirSync(expertiseDir, { recursive: true })
+    for (const agent of crew.agents || []) {
+      const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
+      const hadExpertiseFile = existsSync(expertiseFile)
+      const expertiseContent =
+        runtime === "kilo"
+          ? defaultExpertiseContent(agent)
+          : (() => {
+              const piExpertiseFile = path.join(piExpertiseDir, `${agent.expertise}.yaml`)
+              if (existsSync(piExpertiseFile)) return readFileSync(piExpertiseFile, "utf-8")
+              return defaultExpertiseContent(agent)
+            })()
+      const currentExpertise = hadExpertiseFile ? readFileSync(expertiseFile, "utf-8") : ""
+      if (checkOnly) {
+        if (!hadExpertiseFile) {
+          pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
+          if (!jsonOutput) console.log(`drift: missing ${rel(expertiseFile)}`)
+          ok = false
+        } else if (currentExpertise !== expertiseContent) {
+          const preview = mode === "diff" ? diffPreview(currentExpertise, expertiseContent) : []
+          pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id, preview })
+          if (!jsonOutput) {
+            if (mode === "plan") console.log(`plan: update ${rel(expertiseFile)}`)
+            else { console.log(`drift: out-of-sync ${rel(expertiseFile)}`); for (const l of preview) console.log(l) }
+          }
+          ok = false
+        } else {
+          pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+          if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+        }
+      } else if (currentExpertise !== expertiseContent) {
+        writeFileSync(expertiseFile, expertiseContent, "utf-8")
+        console.log(`synced: ${rel(expertiseFile)}`)
+        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: hadExpertiseFile ? "synced" : "generated", action: determineAction(hadExpertiseFile ? "synced" : "generated"), crew: crew.id, agent: agent.id })
+      }
+    }
+  }
   return ok
 }
 
@@ -335,7 +410,8 @@ function ensureValidateDelegationPermission() {
   }
 }
 
-function ensureOpencodeArtifacts(crew) {
+function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
   const agentsDir = path.join(repoRoot, ".opencode", "crew", crew.id, "agents")
   const expertiseDir = path.join(repoRoot, ".opencode", "crew", crew.id, "expertise")
   const legacyAgentsDir = path.join(repoRoot, ".opencode", "agents")
@@ -352,6 +428,7 @@ function ensureOpencodeArtifacts(crew) {
 
   const allowDelegate = crew.runtime_overrides?.opencode?.permission?.task?.allow_delegate || {}
   const byId = new Map((crew.agents || []).map((a) => [a.id, a]))
+  let ok = true
 
   for (const agent of crew.agents || []) {
     const agentFile = path.join(agentsDir, `${agent.id}.md`)
@@ -368,11 +445,30 @@ function ensureOpencodeArtifacts(crew) {
       baseContent = `# ${titleCase(agent.id)}\n\nRole: ${agent.role}\nTeam: ${agent.team}\n\nUse this file as the runtime prompt source for ${agent.id}.\n`
     }
 
-    const content = injectAgentPermissions(baseContent, agent, allowDelegate, byId)
+    const content = injectAgentPermissions(baseContent, agent, allowDelegate, byId, metaDoc, "opencode")
     const current = hadAgentFile ? readFileSync(agentFile, "utf-8") : ""
-    if (current !== content) {
+
+    if (checkOnly) {
+      if (!hadAgentFile) {
+        pushRecord(records, { kind: "prompt", path: rel(agentFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`drift: missing ${rel(agentFile)}`)
+        ok = false
+      } else if (current !== content) {
+        const preview = mode === "diff" ? diffPreview(current, content) : []
+        pushRecord(records, { kind: "prompt", path: rel(agentFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id, preview })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: update ${rel(agentFile)}`)
+          else { console.log(`drift: out-of-sync ${rel(agentFile)}`); for (const l of preview) console.log(l) }
+        }
+        ok = false
+      } else {
+        pushRecord(records, { kind: "prompt", path: rel(agentFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`ok: ${rel(agentFile)}`)
+      }
+    } else if (current !== content) {
       writeFileSync(agentFile, content, "utf-8")
-      console.log(`${hadAgentFile ? "synced" : "generated"}: ${rel(agentFile)}`)
+      if (!jsonOutput) console.log(`${hadAgentFile ? "synced" : "generated"}: ${rel(agentFile)}`)
+      pushRecord(records, { kind: "prompt", path: rel(agentFile), status: hadAgentFile ? "synced" : "generated", action: determineAction(hadAgentFile ? "synced" : "generated"), crew: crew.id, agent: agent.id })
     }
 
     const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
@@ -385,14 +481,97 @@ function ensureOpencodeArtifacts(crew) {
         ? readFileSync(legacyExpertiseFile, "utf-8")
         : `agent: ${agent.id}\nsummary: []\n`
     const currentExpertise = hadExpertiseFile ? readFileSync(expertiseFile, "utf-8") : ""
-    if (currentExpertise !== expertiseContent) {
+
+    if (checkOnly) {
+      if (!hadExpertiseFile) {
+        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`drift: missing ${rel(expertiseFile)}`)
+        ok = false
+      } else if (currentExpertise !== expertiseContent) {
+        const preview = mode === "diff" ? diffPreview(currentExpertise, expertiseContent) : []
+        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id, preview })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: update ${rel(expertiseFile)}`)
+          else { console.log(`drift: out-of-sync ${rel(expertiseFile)}`); for (const l of preview) console.log(l) }
+        }
+        ok = false
+      } else {
+        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+      }
+    } else if (currentExpertise !== expertiseContent) {
       writeFileSync(expertiseFile, expertiseContent, "utf-8")
-      console.log(`${hadExpertiseFile ? "synced" : "generated"}: ${rel(expertiseFile)}`)
+      if (!jsonOutput) console.log(`${hadExpertiseFile ? "synced" : "generated"}: ${rel(expertiseFile)}`)
+      pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: hadExpertiseFile ? "synced" : "generated", action: determineAction(hadExpertiseFile ? "synced" : "generated"), crew: crew.id, agent: agent.id })
     }
   }
+  return ok
 }
 
-function injectAgentPermissions(content, agent, allowDelegate, byId) {
+function ensurePiThemes(mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
+  const sourceDir = path.join(repoRoot, "extensions", "themes")
+  const targetDir = path.join(repoRoot, ".pi", "themes")
+
+  // Read source theme files
+  if (!existsSync(sourceDir)) {
+    if (!jsonOutput) console.log(`drift: source themes dir missing ${rel(sourceDir)}`)
+    pushRecord(records, { kind: "theme", path: rel(sourceDir), status: "missing", action: "fail" })
+    return false
+  }
+
+  const sourceFiles = ["catppuccin-mocha.json", "cyberpunk.json", "dracula.json", "everforest.json", "gruvbox.json", "midnight-ocean.json", "nord.json", "ocean-breeze.json", "rose-pine.json", "synthwave.json", "tokyo-night.json"]
+  let allGood = true
+
+  for (const themeFile of sourceFiles) {
+    const sourcePath = path.join(sourceDir, themeFile)
+    const targetPath = path.join(targetDir, themeFile)
+
+    if (!existsSync(sourcePath)) continue // Skip if source doesn't exist
+
+    const sourceContent = readFileSync(sourcePath, "utf-8")
+
+    if (checkOnly) {
+      if (!existsSync(targetPath)) {
+        pushRecord(records, { kind: "theme", path: rel(targetPath), status: "missing", action: determineAction("missing") })
+        if (!jsonOutput) {
+          if (mode === "plan") console.log(`plan: create ${rel(targetPath)}`)
+          else console.log(`drift: missing ${rel(targetPath)}`)
+        }
+        allGood = false
+      } else {
+        const targetContent = readFileSync(targetPath, "utf-8")
+        if (sourceContent !== targetContent) {
+          const preview = mode === "diff" ? diffPreview(targetContent, sourceContent) : []
+          pushRecord(records, { kind: "theme", path: rel(targetPath), status: "out_of_sync", action: determineAction("out_of_sync"), preview })
+          if (!jsonOutput) {
+            if (mode === "plan") console.log(`plan: update ${rel(targetPath)}`)
+            else {
+              console.log(`drift: out-of-sync ${rel(targetPath)}`)
+              if (mode === "diff") for (const line of preview) console.log(line)
+            }
+          }
+          allGood = false
+        } else {
+          pushRecord(records, { kind: "theme", path: rel(targetPath), status: "ok", action: determineAction("ok") })
+          if (!jsonOutput) {
+            if (mode === "plan") console.log(`plan: no-change ${rel(targetPath)}`)
+            else console.log(`ok: ${rel(targetPath)}`)
+          }
+        }
+      }
+    } else {
+      // Sync mode - copy file
+      mkdirSync(path.dirname(targetPath), { recursive: true })
+      cpSync(sourcePath, targetPath, { force: true })
+      console.log(`synced: ${rel(targetPath)}`)
+      pushRecord(records, { kind: "theme", path: rel(targetPath), status: "synced", action: determineAction("synced") })
+    }
+  }
+  return allGood
+}
+
+function injectAgentPermissions(content, agent, allowDelegate, byId, meta, runtime) {
   const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/)
   let frontmatter = {}
   let body = content
@@ -404,6 +583,14 @@ function injectAgentPermissions(content, agent, allowDelegate, byId) {
       frontmatter = {}
     }
     body = match[2]
+  }
+
+  // Inject model from model_ref
+  const resolvedModel = resolveAgentModel(meta, runtime, agent)
+  if (resolvedModel && resolvedModel !== "inherit") {
+    frontmatter.model = resolvedModel
+    // Also update Model: in body (markdown format) if present.
+    body = body.replace(/^Model: `.*`$/m, `Model: \`${resolvedModel}\``)
   }
 
   const role = agent.role
@@ -423,7 +610,7 @@ function injectAgentPermissions(content, agent, allowDelegate, byId) {
   }
 
   if (Object.keys(frontmatter).length > 0) {
-    const fmYaml = YAML.stringify(frontmatter).trimEnd().replaceAll("use_when", "use-when")
+    const fmYaml = YAML.stringify(frontmatter, { indent: 2 }).trimEnd().replaceAll("use_when", "use-when")
     return `---\n${fmYaml}\n---\n${body}`
   }
   return content
@@ -462,13 +649,15 @@ function domainFromProfile(meta, profileNameOrNames, runtime) {
 function runtimeTools(agent, runtime) {
   const safeTools = ["read", "grep", "find", "ls"]
   if (agent.role === "orchestrator" || agent.role === "lead") {
-    return [...safeTools, "delegate_agent", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
+    const tools = [...safeTools, "delegate_agent", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
+    return runtime === "kilo" ? Object.fromEntries(tools.map((tool) => [tool, true])) : tools
   }
   const base = ["read", "grep", "find", "ls", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
   const domain = domainFromProfile(metaDoc, agent.domain_profile, runtime)
   if (domain.some((item) => item.upsert || item.edit)) base.unshift("write", "edit")
   if (domain.some((item) => item.delete || item.bash)) base.push("bash")
-  return Array.from(new Set(base))
+  const tools = Array.from(new Set(base))
+  return runtime === "kilo" ? Object.fromEntries(tools.map((tool) => [tool, true])) : tools
 }
 
 function runtimeSkillPaths(meta, skillRefs, runtime) {
@@ -492,17 +681,15 @@ function runtimeMcpAccess() {
 }
 
 function resolveModel(meta, runtime, modelRef) {
-  if (runtime === "opencode") {
-    const override = meta.runtimes?.opencode?.model_overrides?.[modelRef]
-    if (override) return override
-  }
+  const override = meta.runtimes?.[runtime]?.model_overrides?.[modelRef]
+  if (override) return override
   return meta.catalog?.models?.[modelRef] || "inherit"
 }
 
 function resolveModelToken(meta, runtime, token) {
   const key = `${token || ""}`.trim()
   if (!key) return ""
-  if (meta.catalog?.models?.[key] || runtime === "opencode") {
+  if (meta.catalog?.models?.[key] || meta.runtimes?.[runtime]?.model_overrides?.[key]) {
     const resolved = resolveModel(meta, runtime, key)
     return resolved || key
   }
@@ -712,12 +899,7 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
   }
 
   const configDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id)
-  const sessionDirRoot =
-    runtime === "pi"
-      ? crew.session?.pi_root || `.${runtime}/crew/${crew.id}/sessions`
-      : runtime === "claude"
-        ? crew.session?.claude_mirror_root || `.${runtime}/crew/${crew.id}/sessions`
-      : crew.session?.opencode_root || `.opencode/crew/${crew.id}/sessions`
+  const sessionDirRoot = runtimeSessionDirRoot(runtime, crew)
 
   const sessionDir = path.relative(configDir, path.resolve(repoRoot, sessionDirRoot))
   const expertiseDir = path.relative(configDir, path.resolve(repoRoot, `.${runtime}/crew/${crew.id}/expertise`))
@@ -808,26 +990,31 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   for (const crew of metaDoc.crews) {
     const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
     const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
+    const kiloYaml = buildRuntimeCrewDoc(metaDoc, crew, "kilo")
     const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
     const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
     const hermesConfig = buildHermesRuntimeConfig(metaDoc, crew)
 
     const piPath = path.join(repoRoot, ".pi", "crew", crew.id, "multi-team.yaml")
     const claudePath = path.join(repoRoot, ".claude", "crew", crew.id, "multi-team.yaml")
+    const kiloPath = path.join(repoRoot, ".kilo", "crew", crew.id, "multi-team.yaml")
     const opencodeCrewPath = path.join(repoRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
     const hermesCrewPath = path.join(repoRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
     const hermesConfigPath = path.join(repoRoot, ".hermes", "crew", crew.id, "config.yaml")
 
     allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
+    allGood = writeOrCheck(kiloPath, kiloYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
     allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
+    allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
     allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
+    allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
     allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
+    allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
 
     if (!checkOnly) {
-      ensureOpencodeArtifacts(crew)
       ensureHermesArtifacts(crew)
     }
   }

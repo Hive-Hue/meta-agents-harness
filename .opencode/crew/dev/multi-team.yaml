@@ -1,50 +1,49 @@
 version: 1
 name: dev-multi-team-harness
-mission: Setup and evolve runtime support, validation, projection, and
-  operator-facing architecture for Meta Agents Harness while preserving bounded
-  scope and runtime-agnostic design.
+mission: Advance runtime support, validation, projection, and operator-facing
+  architecture for Meta Agents Harness while preserving bounded scope and
+  runtime-agnostic design.
 sprint_mode:
-  name: v0.4.0-runtime-evolution
+  name: v0.5.0-runtime-evolution
   active: true
-  target_release: v0.4.0
-  objective: Finalize the current runtime support roadmap with bounded adapter and
-    validation improvements.
+  target_release: v0.5.0
+  objective: Advance runtime support with adapter completion, dispatcher
+    integration, and validation framework maturation for v0.5.0
   execution_mode: spec-bound-slice-driven
   directives:
     - spec-bound execution
     - no architecture-wave expansion
-    - no v0.5.0+ scope
+    - no v0.6.0+ scope
     - PR-sized slices
     - mandatory validation at each slice
-    - explicit deferred list for anything outside v0.4.0
+    - explicit deferred list for anything outside v0.5.0
   must_deliver:
-    - Hermes command and capability discovery
-    - runtime compatibility matrix
-    - adapter skeleton
-    - bounded dispatcher and config integration plan
-    - diagnostics and explainability impact plan
-    - test plan
-    - small implementation-ready slices
+    - Hermes adapter implementation completion
+    - Full dispatcher integration with config
+    - Runtime compatibility matrix validation
+    - Validation framework expansion
+    - Diagnostics and explainability tooling
+    - Operator-facing CLI completion
+    - Integration test coverage
   must_not_deliver:
-    - full Hermes parity
+    - full multi-runtime parity
     - remote execution foundation
     - policy engine
     - federation/interconnect
     - confidential execution
-    - runtime contract redesign driven by Hermes
-    - MAH becoming Hermes-shaped
-instruction_block: crew=dev | mission=Setup and evolve runtime support,
-  validation, projection, and operator-facing architecture for Meta Agents
-  Harness while preserving bounded scope and runtime-agnostic design. |
-  sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
-  | directives=spec-bound execution; no architecture-wave expansion; no v0.5.0+
+    - v0.6.0+ scope
+instruction_block: crew=dev | mission=Advance runtime support, validation,
+  projection, and operator-facing architecture for Meta Agents Harness while
+  preserving bounded scope and runtime-agnostic design. |
+  sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+  | directives=spec-bound execution; no architecture-wave expansion; no v0.6.0+
   scope; PR-sized slices; mandatory validation at each slice; explicit deferred
-  list for anything outside v0.4.0 | do=Hermes command and capability discovery;
-  runtime compatibility matrix; adapter skeleton; bounded dispatcher and config
-  integration plan; diagnostics and explainability impact plan; test plan; small
-  implementation-ready slices | avoid=full Hermes parity; remote execution
-  foundation; policy engine; federation/interconnect; confidential execution;
-  runtime contract redesign driven by Hermes; MAH becoming Hermes-shaped
+  list for anything outside v0.5.0 | do=Hermes adapter implementation
+  completion; Full dispatcher integration with config; Runtime compatibility
+  matrix validation; Validation framework expansion; Diagnostics and
+  explainability tooling; Operator-facing CLI completion; Integration test
+  coverage | avoid=full multi-runtime parity; remote execution foundation;
+  policy engine; federation/interconnect; confidential execution; v0.6.0+ scope
 runtime:
   harness: opencode
   source_of_truth: meta-agents.yaml
@@ -52,11 +51,11 @@ runtime:
   validation_command: npm --prefix .opencode run validate:multi-team
 shared:
   skills:
-    - path: .opencode/skills/delegate-bounded/SKILL.md
+    - path: skills/delegate_bounded/SKILL.md
       use-when: Use when relevant to current task.
-    - path: .opencode/skills/zero-micromanagement/SKILL.md
+    - path: skills/zero_micromanagement/SKILL.md
       use-when: Use when relevant to current task.
-    - path: .opencode/skills/expertise-model/SKILL.md
+    - path: skills/expertise_model/SKILL.md
       use-when: Use when relevant to current task.
   tools:
     - update-expertise-model
@@ -265,23 +264,22 @@ orchestrator:
     - distribute slices
     - consolidate decisions
     - prevent runtime capture by Hermes
-    - defer anything outside v0.4.0
-  instruction_block: crew=dev | mission=Setup and evolve runtime support,
-    validation, projection, and operator-facing architecture for Meta Agents
-    Harness while preserving bounded scope and runtime-agnostic design. |
-    sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+    - defer anything outside v0.5.0
+  instruction_block: crew=dev | mission=Advance runtime support, validation,
+    projection, and operator-facing architecture for Meta Agents Harness while
+    preserving bounded scope and runtime-agnostic design. |
+    sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
     | directives=spec-bound execution; no architecture-wave expansion; no
-    v0.5.0+ scope; PR-sized slices; mandatory validation at each slice; explicit
-    deferred list for anything outside v0.4.0 | do=Hermes command and capability
-    discovery; runtime compatibility matrix; adapter skeleton; bounded
-    dispatcher and config integration plan; diagnostics and explainability
-    impact plan; test plan; small implementation-ready slices | avoid=full
-    Hermes parity; remote execution foundation; policy engine;
-    federation/interconnect; confidential execution; runtime contract redesign
-    driven by Hermes; MAH becoming Hermes-shaped | role=control sprint scope;
-    distribute slices; consolidate decisions; prevent runtime capture by Hermes;
-    defer anything outside v0.4.0
-  model: zai/glm-4.7
+    v0.6.0+ scope; PR-sized slices; mandatory validation at each slice; explicit
+    deferred list for anything outside v0.5.0 | do=Hermes adapter implementation
+    completion; Full dispatcher integration with config; Runtime compatibility
+    matrix validation; Validation framework expansion; Diagnostics and
+    explainability tooling; Operator-facing CLI completion; Integration test
+    coverage | avoid=full multi-runtime parity; remote execution foundation;
+    policy engine; federation/interconnect; confidential execution; v0.6.0+
+    scope | role=control sprint scope; distribute slices; consolidate decisions;
+    prevent runtime capture by Hermes; defer anything outside v0.5.0
+  model: minimax-coding-plan/MiniMax-M2.7
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
@@ -291,11 +289,11 @@ orchestrator:
     path: .opencode/crew/dev/expertise/orchestrator-expertise-model.yaml
     use-when: Track durable learnings for orchestrator.
   skills:
-    - path: .opencode/skills/delegate-bounded/SKILL.md
+    - path: skills/delegate_bounded/SKILL.md
       use-when: Use when relevant to current task.
-    - path: .opencode/skills/zero-micromanagement/SKILL.md
+    - path: skills/zero_micromanagement/SKILL.md
       use-when: Use when relevant to current task.
-    - path: .opencode/skills/expertise-model/SKILL.md
+    - path: skills/expertise_model/SKILL.md
       use-when: Use when relevant to current task.
   tools:
     - task
@@ -322,22 +320,21 @@ teams:
         - translate spec into executable backlog
         - order slices
         - prevent backlog inflation
-      instruction_block: crew=dev | mission=Setup and evolve runtime support,
-        validation, projection, and operator-facing architecture for Meta Agents
-        Harness while preserving bounded scope and runtime-agnostic design. |
-        sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+      instruction_block: crew=dev | mission=Advance runtime support, validation,
+        projection, and operator-facing architecture for Meta Agents Harness
+        while preserving bounded scope and runtime-agnostic design. |
+        sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
         | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.4.0 | do=Hermes command
-        and capability discovery; runtime compatibility matrix; adapter
-        skeleton; bounded dispatcher and config integration plan; diagnostics
-        and explainability impact plan; test plan; small implementation-ready
-        slices | avoid=full Hermes parity; remote execution foundation; policy
-        engine; federation/interconnect; confidential execution; runtime
-        contract redesign driven by Hermes; MAH becoming Hermes-shaped |
-        role=translate spec into executable backlog; order slices; prevent
-        backlog inflation
-      model: zai/glm-4.7
+        v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+        implementation completion; Full dispatcher integration with config;
+        Runtime compatibility matrix validation; Validation framework expansion;
+        Diagnostics and explainability tooling; Operator-facing CLI completion;
+        Integration test coverage | avoid=full multi-runtime parity; remote
+        execution foundation; policy engine; federation/interconnect;
+        confidential execution; v0.6.0+ scope | role=translate spec into
+        executable backlog; order slices; prevent backlog inflation
+      model: minimax-coding-plan/MiniMax-M2.7
       model_fallbacks:
         - zai/glm-5
         - zai/glm-4.5-air
@@ -346,11 +343,11 @@ teams:
         path: .opencode/crew/dev/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
       skills:
-        - path: .opencode/skills/delegate-bounded/SKILL.md
+        - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/zero-micromanagement/SKILL.md
+        - path: skills/zero_micromanagement/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/expertise-model/SKILL.md
+        - path: skills/expertise_model/SKILL.md
           use-when: Use when relevant to current task.
       tools:
         - task
@@ -402,23 +399,22 @@ teams:
           - map real codebase integration points
           - locate affected files
           - surface regression and coupling risks
-        instruction_block: crew=dev | mission=Setup and evolve runtime support,
-          validation, projection, and operator-facing architecture for Meta
-          Agents Harness while preserving bounded scope and runtime-agnostic
-          design. |
-          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Advance runtime support, validation,
+          projection, and operator-facing architecture for Meta Agents Harness
+          while preserving bounded scope and runtime-agnostic design. |
+          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.4.0 | do=Hermes command
-          and capability discovery; runtime compatibility matrix; adapter
-          skeleton; bounded dispatcher and config integration plan; diagnostics
-          and explainability impact plan; test plan; small implementation-ready
-          slices | avoid=full Hermes parity; remote execution foundation; policy
-          engine; federation/interconnect; confidential execution; runtime
-          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+          implementation completion; Full dispatcher integration with config;
+          Runtime compatibility matrix validation; Validation framework
+          expansion; Diagnostics and explainability tooling; Operator-facing CLI
+          completion; Integration test coverage | avoid=full multi-runtime
+          parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; v0.6.0+ scope |
           role=map real codebase integration points; locate affected files;
           surface regression and coupling risks
-        model: zai/glm-4.7
+        model: minimax-coding-plan/MiniMax-M2.7
         model_fallbacks:
           - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
@@ -428,7 +424,7 @@ teams:
           path: .opencode/crew/dev/expertise/repo-analyst-expertise-model.yaml
           use-when: Track durable learnings for repo-analyst.
         skills:
-          - path: .opencode/skills/expertise-model/SKILL.md
+          - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
@@ -451,23 +447,22 @@ teams:
           - define the adapter approach
           - define minimal meta-agents.yaml compatibility
           - identify the smallest technically correct slice
-        instruction_block: crew=dev | mission=Setup and evolve runtime support,
-          validation, projection, and operator-facing architecture for Meta
-          Agents Harness while preserving bounded scope and runtime-agnostic
-          design. |
-          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Advance runtime support, validation,
+          projection, and operator-facing architecture for Meta Agents Harness
+          while preserving bounded scope and runtime-agnostic design. |
+          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.4.0 | do=Hermes command
-          and capability discovery; runtime compatibility matrix; adapter
-          skeleton; bounded dispatcher and config integration plan; diagnostics
-          and explainability impact plan; test plan; small implementation-ready
-          slices | avoid=full Hermes parity; remote execution foundation; policy
-          engine; federation/interconnect; confidential execution; runtime
-          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+          implementation completion; Full dispatcher integration with config;
+          Runtime compatibility matrix validation; Validation framework
+          expansion; Diagnostics and explainability tooling; Operator-facing CLI
+          completion; Integration test coverage | avoid=full multi-runtime
+          parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; v0.6.0+ scope |
           role=define the adapter approach; define minimal meta-agents.yaml
           compatibility; identify the smallest technically correct slice
-        model: zai/glm-4.7
+        model: minimax-coding-plan/MiniMax-M2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.5-air
@@ -476,7 +471,7 @@ teams:
           path: .opencode/crew/dev/expertise/solution-architect-expertise-model.yaml
           use-when: Track durable learnings for solution-architect.
         skills:
-          - path: .opencode/skills/expertise-model/SKILL.md
+          - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
@@ -529,22 +524,22 @@ teams:
         - coordinate implementation
         - split work into reviewable changesets
         - preserve adapter and dispatcher boundaries
-      instruction_block: crew=dev | mission=Setup and evolve runtime support,
-        validation, projection, and operator-facing architecture for Meta Agents
-        Harness while preserving bounded scope and runtime-agnostic design. |
-        sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+      instruction_block: crew=dev | mission=Advance runtime support, validation,
+        projection, and operator-facing architecture for Meta Agents Harness
+        while preserving bounded scope and runtime-agnostic design. |
+        sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
         | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.4.0 | do=Hermes command
-        and capability discovery; runtime compatibility matrix; adapter
-        skeleton; bounded dispatcher and config integration plan; diagnostics
-        and explainability impact plan; test plan; small implementation-ready
-        slices | avoid=full Hermes parity; remote execution foundation; policy
-        engine; federation/interconnect; confidential execution; runtime
-        contract redesign driven by Hermes; MAH becoming Hermes-shaped |
-        role=coordinate implementation; split work into reviewable changesets;
-        preserve adapter and dispatcher boundaries
-      model: zai/glm-4.7
+        v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+        implementation completion; Full dispatcher integration with config;
+        Runtime compatibility matrix validation; Validation framework expansion;
+        Diagnostics and explainability tooling; Operator-facing CLI completion;
+        Integration test coverage | avoid=full multi-runtime parity; remote
+        execution foundation; policy engine; federation/interconnect;
+        confidential execution; v0.6.0+ scope | role=coordinate implementation;
+        split work into reviewable changesets; preserve adapter and dispatcher
+        boundaries
+      model: minimax-coding-plan/MiniMax-M2.7
       model_fallbacks:
         - zai/glm-5
         - zai/glm-4.5-air
@@ -553,11 +548,11 @@ teams:
         path: .opencode/crew/dev/expertise/engineering-lead-expertise-model.yaml
         use-when: Track durable learnings for engineering-lead.
       skills:
-        - path: .opencode/skills/delegate-bounded/SKILL.md
+        - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/zero-micromanagement/SKILL.md
+        - path: skills/zero_micromanagement/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/expertise-model/SKILL.md
+        - path: skills/expertise_model/SKILL.md
           use-when: Use when relevant to current task.
       tools:
         - task
@@ -645,23 +640,22 @@ teams:
         sprint_responsibilities:
           - update CLI and help surfaces
           - handle operator-facing explainability and docs changes
-        instruction_block: crew=dev | mission=Setup and evolve runtime support,
-          validation, projection, and operator-facing architecture for Meta
-          Agents Harness while preserving bounded scope and runtime-agnostic
-          design. |
-          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Advance runtime support, validation,
+          projection, and operator-facing architecture for Meta Agents Harness
+          while preserving bounded scope and runtime-agnostic design. |
+          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.4.0 | do=Hermes command
-          and capability discovery; runtime compatibility matrix; adapter
-          skeleton; bounded dispatcher and config integration plan; diagnostics
-          and explainability impact plan; test plan; small implementation-ready
-          slices | avoid=full Hermes parity; remote execution foundation; policy
-          engine; federation/interconnect; confidential execution; runtime
-          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+          implementation completion; Full dispatcher integration with config;
+          Runtime compatibility matrix validation; Validation framework
+          expansion; Diagnostics and explainability tooling; Operator-facing CLI
+          completion; Integration test coverage | avoid=full multi-runtime
+          parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; v0.6.0+ scope |
           role=update CLI and help surfaces; handle operator-facing
           explainability and docs changes
-        model: zai/glm-4.7
+        model: minimax-coding-plan/MiniMax-M2.7
         model_fallbacks:
           - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
@@ -671,7 +665,7 @@ teams:
           path: .opencode/crew/dev/expertise/frontend-dev-expertise-model.yaml
           use-when: Track durable learnings for frontend-dev.
         skills:
-          - path: .opencode/skills/expertise-model/SKILL.md
+          - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
@@ -796,23 +790,22 @@ teams:
           - implement runtime adapter behavior
           - integrate dispatcher and config changes
           - own Hermes-aware runtime projection and tests
-        instruction_block: crew=dev | mission=Setup and evolve runtime support,
-          validation, projection, and operator-facing architecture for Meta
-          Agents Harness while preserving bounded scope and runtime-agnostic
-          design. |
-          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Advance runtime support, validation,
+          projection, and operator-facing architecture for Meta Agents Harness
+          while preserving bounded scope and runtime-agnostic design. |
+          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.4.0 | do=Hermes command
-          and capability discovery; runtime compatibility matrix; adapter
-          skeleton; bounded dispatcher and config integration plan; diagnostics
-          and explainability impact plan; test plan; small implementation-ready
-          slices | avoid=full Hermes parity; remote execution foundation; policy
-          engine; federation/interconnect; confidential execution; runtime
-          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+          implementation completion; Full dispatcher integration with config;
+          Runtime compatibility matrix validation; Validation framework
+          expansion; Diagnostics and explainability tooling; Operator-facing CLI
+          completion; Integration test coverage | avoid=full multi-runtime
+          parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; v0.6.0+ scope |
           role=implement runtime adapter behavior; integrate dispatcher and
           config changes; own Hermes-aware runtime projection and tests
-        model: zai/glm-4.7
+        model: minimax-coding-plan/MiniMax-M2.7
         model_fallbacks:
           - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
@@ -822,7 +815,7 @@ teams:
           path: .opencode/crew/dev/expertise/backend-dev-expertise-model.yaml
           use-when: Track durable learnings for backend-dev.
         skills:
-          - path: .opencode/skills/expertise-model/SKILL.md
+          - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
@@ -949,22 +942,21 @@ teams:
         - define phase gates
         - validate spec adherence
         - block scope escape from the release boundary
-      instruction_block: crew=dev | mission=Setup and evolve runtime support,
-        validation, projection, and operator-facing architecture for Meta Agents
-        Harness while preserving bounded scope and runtime-agnostic design. |
-        sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+      instruction_block: crew=dev | mission=Advance runtime support, validation,
+        projection, and operator-facing architecture for Meta Agents Harness
+        while preserving bounded scope and runtime-agnostic design. |
+        sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
         | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.4.0 | do=Hermes command
-        and capability discovery; runtime compatibility matrix; adapter
-        skeleton; bounded dispatcher and config integration plan; diagnostics
-        and explainability impact plan; test plan; small implementation-ready
-        slices | avoid=full Hermes parity; remote execution foundation; policy
-        engine; federation/interconnect; confidential execution; runtime
-        contract redesign driven by Hermes; MAH becoming Hermes-shaped |
-        role=define phase gates; validate spec adherence; block scope escape
-        from the release boundary
-      model: zai/glm-4.7
+        v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+        implementation completion; Full dispatcher integration with config;
+        Runtime compatibility matrix validation; Validation framework expansion;
+        Diagnostics and explainability tooling; Operator-facing CLI completion;
+        Integration test coverage | avoid=full multi-runtime parity; remote
+        execution foundation; policy engine; federation/interconnect;
+        confidential execution; v0.6.0+ scope | role=define phase gates;
+        validate spec adherence; block scope escape from the release boundary
+      model: minimax-coding-plan/MiniMax-M2.7
       model_fallbacks:
         - zai/glm-5
         - zai/glm-4.5-air
@@ -973,11 +965,11 @@ teams:
         path: .opencode/crew/dev/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
       skills:
-        - path: .opencode/skills/delegate-bounded/SKILL.md
+        - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/zero-micromanagement/SKILL.md
+        - path: skills/zero_micromanagement/SKILL.md
           use-when: Use when relevant to current task.
-        - path: .opencode/skills/expertise-model/SKILL.md
+        - path: skills/expertise_model/SKILL.md
           use-when: Use when relevant to current task.
       tools:
         - task
@@ -1021,22 +1013,21 @@ teams:
           - run smoke tests
           - run diagnostics tests
           - verify sync consistency
-        instruction_block: crew=dev | mission=Setup and evolve runtime support,
-          validation, projection, and operator-facing architecture for Meta
-          Agents Harness while preserving bounded scope and runtime-agnostic
-          design. |
-          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Advance runtime support, validation,
+          projection, and operator-facing architecture for Meta Agents Harness
+          while preserving bounded scope and runtime-agnostic design. |
+          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.4.0 | do=Hermes command
-          and capability discovery; runtime compatibility matrix; adapter
-          skeleton; bounded dispatcher and config integration plan; diagnostics
-          and explainability impact plan; test plan; small implementation-ready
-          slices | avoid=full Hermes parity; remote execution foundation; policy
-          engine; federation/interconnect; confidential execution; runtime
-          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+          implementation completion; Full dispatcher integration with config;
+          Runtime compatibility matrix validation; Validation framework
+          expansion; Diagnostics and explainability tooling; Operator-facing CLI
+          completion; Integration test coverage | avoid=full multi-runtime
+          parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; v0.6.0+ scope |
           role=run smoke tests; run diagnostics tests; verify sync consistency
-        model: zai/glm-4.7
+        model: minimax-coding-plan/MiniMax-M2.7
         model_fallbacks:
           - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
@@ -1046,7 +1037,7 @@ teams:
           path: .opencode/crew/dev/expertise/qa-reviewer-expertise-model.yaml
           use-when: Track durable learnings for qa-reviewer.
         skills:
-          - path: .opencode/skills/expertise-model/SKILL.md
+          - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read
@@ -1087,26 +1078,24 @@ teams:
         role: worker
         sprint_responsibilities:
           - review runtime boundary and unsafe coupling
-          - flag Hermes architecture capture risks
+          - flag runtime capture risks across runtimes
           - cut future-wave contamination from the sprint
-        instruction_block: crew=dev | mission=Setup and evolve runtime support,
-          validation, projection, and operator-facing architecture for Meta
-          Agents Harness while preserving bounded scope and runtime-agnostic
-          design. |
-          sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Advance runtime support, validation,
+          projection, and operator-facing architecture for Meta Agents Harness
+          while preserving bounded scope and runtime-agnostic design. |
+          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.5.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.4.0 | do=Hermes command
-          and capability discovery; runtime compatibility matrix; adapter
-          skeleton; bounded dispatcher and config integration plan; diagnostics
-          and explainability impact plan; test plan; small implementation-ready
-          slices | avoid=full Hermes parity; remote execution foundation; policy
-          engine; federation/interconnect; confidential execution; runtime
-          contract redesign driven by Hermes; MAH becoming Hermes-shaped |
-          role=review runtime boundary and unsafe coupling; flag Hermes
-          architecture capture risks; cut future-wave contamination from the
-          sprint
-        model: zai/glm-4.7
+          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
+          implementation completion; Full dispatcher integration with config;
+          Runtime compatibility matrix validation; Validation framework
+          expansion; Diagnostics and explainability tooling; Operator-facing CLI
+          completion; Integration test coverage | avoid=full multi-runtime
+          parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; v0.6.0+ scope |
+          role=review runtime boundary and unsafe coupling; flag runtime capture
+          risks across runtimes; cut future-wave contamination from the sprint
+        model: minimax-coding-plan/MiniMax-M2.7
         model_fallbacks:
           - nvidia/nemotron-3-super-120b-a12b:free
           - zai/glm-4.7
@@ -1116,7 +1105,7 @@ teams:
           path: .opencode/crew/dev/expertise/security-reviewer-expertise-model.yaml
           use-when: Track durable learnings for security-reviewer.
         skills:
-          - path: .opencode/skills/expertise-model/SKILL.md
+          - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
           - read

@@ -1,11 +1,10 @@
 agent:
-  name: "market-researcher"
-  role: "agent"
-  team: "marketing"
+  name: market-researcher
+  role: worker
+  team: Planning
 meta:
-  version: 1
-  max_lines: 120
-  last_updated: "2026-04-08T01:44:27Z"
+  version: "1"
+  max_lines: "120"
 patterns: []
 risks: []
 tools: []

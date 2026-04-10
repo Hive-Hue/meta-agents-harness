@@ -31,6 +31,9 @@ jobs:
       - name: Run runtime contract tests
         run: npm run test:contract
 
+      - name: Run plugin system tests
+        run: npm run test:plugins
+
       - name: Run diagnostics and platform reliability tests
         run: npm run test:diagnostics
 

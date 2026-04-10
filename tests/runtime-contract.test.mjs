@@ -3,8 +3,13 @@ import assert from "node:assert/strict"
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { RUNTIME_ADAPTERS, RUNTIME_ORDER, createAdapter } from "../scripts/runtime-adapters.mjs"
 import { validateRuntimeAdapterContract, REQUIRED_RUNTIME_COMMANDS } from "../scripts/runtime-adapter-contract.mjs"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const repoRoot = path.resolve(__dirname, "..")
 
 test("runtime adapters satisfy minimal contract", () => {
   const result = validateRuntimeAdapterContract(RUNTIME_ADAPTERS)
@@ -27,21 +32,22 @@ test("hermes adapter name matches key", () => {
 test("hermes adapter has correct structural fields", () => {
   const adapter = RUNTIME_ADAPTERS.hermes
   assert.equal(adapter.markerDir, ".hermes")
-  assert.equal(adapter.wrapper, "hermesh")
+  assert.equal(adapter.wrapper, null)
   assert.equal(adapter.directCli, "hermes")
   assert.equal(typeof adapter.detect, "function")
   assert.equal(typeof adapter.supports, "function")
   assert.equal(typeof adapter.resolveCommandPlan, "function")
   assert.equal(typeof adapter.validateRuntime, "function")
+  assert.equal(typeof adapter.prepareRunContext, "function")
+  assert.equal(typeof adapter.executePreparedRun, "function")
 })
 
-test("hermes adapter has all required commands", () => {
+test("hermes adapter supports all required commands through the core-managed contract", () => {
   const adapter = RUNTIME_ADAPTERS.hermes
   for (const cmd of REQUIRED_RUNTIME_COMMANDS) {
-    assert.ok(adapter.commands?.[cmd], `hermes missing command: ${cmd}`)
-    assert.ok(Array.isArray(adapter.commands[cmd]), `hermes ${cmd} must be an array of variants`)
-    assert.ok(adapter.commands[cmd].length > 0, `hermes ${cmd} must have at least one variant`)
+    assert.equal(adapter.supports(cmd), true, `hermes should support command: ${cmd}`)
   }
+  assert.deepEqual(adapter.commands.doctor[0], ["hermes", ["doctor"]])
 })
 
 test("hermes adapter capabilities include session support", () => {
@@ -77,11 +83,25 @@ test("hermes adapter supports returns correct results", () => {
   assert.equal(adapter.supports("nonexistent:cmd"), false)
 })
 
-test("hermes wrapper variants use run while direct cli uses chat", () => {
-  const variants = RUNTIME_ADAPTERS.hermes.commands.run
-  assert.deepEqual(variants[0], ["node", [".hermes/bin/hermesh", "run"]])
-  assert.deepEqual(variants[1], ["hermesh", ["run"]])
-  assert.deepEqual(variants[2], ["hermes", ["chat"]])
+test("hermes run preparation resolves to hermes chat with MAH-managed context", () => {
+  const adapter = RUNTIME_ADAPTERS.hermes
+  const configPath = path.join(repoRoot, ".hermes", "crew", "dev", "config.yaml")
+  const result = adapter.prepareRunContext({
+    repoRoot,
+    runtime: "hermes",
+    adapter,
+    crew: "dev",
+    requestedCrew: "dev",
+    activeCrew: null,
+    configPath,
+    argv: [],
+    envOverrides: {}
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.exec, "hermes")
+  assert.deepEqual(result.args, ["chat"])
+  assert.equal(result.envOverrides.MAH_HERMES_CONFIG, configPath)
+  assert.equal(result.envOverrides.MAH_ACTIVE_CREW, "dev")
 })
 
 test("hermes adapter validateRuntime checks all fields", () => {
@@ -89,10 +109,11 @@ test("hermes adapter validateRuntime checks all fields", () => {
   const result = adapter.validateRuntime(() => false)
   assert.ok(Array.isArray(result.checks))
   assert.ok(result.checks.some((c) => c.name === "marker_dir" && c.ok === true))
-  assert.ok(result.checks.some((c) => c.name === "wrapper_declared" && c.ok === true))
+  assert.ok(result.checks.some((c) => c.name === "wrapper_declared" && c.ok === false))
   assert.ok(result.checks.some((c) => c.name === "direct_cli_declared" && c.ok === true))
-  assert.ok(result.checks.some((c) => c.name === "wrapper_available" && c.ok === false))
-  assert.ok(result.checks.some((c) => c.name === "direct_cli_available" && c.ok === false))
+  assert.ok(result.checks.some((c) => c.name === "runtime_entrypoint_declared" && c.ok === true))
+  assert.ok(result.checks.some((c) => c.name === "wrapper_available"))
+  assert.ok(result.checks.some((c) => c.name === "direct_cli_available"))
   assert.ok(result.checks.some((c) => c.name === "commands_declared" && c.ok === true))
 })
 
@@ -134,4 +155,44 @@ test("adapter command resolution accepts npm prefix variants only when package e
   } finally {
     process.chdir(previousCwd)
   }
+})
+
+test("contract accepts wrapperless runtime when core prepares run context", () => {
+  const runtime = {
+    synthetic: {
+      name: "synthetic",
+      markerDir: ".synthetic",
+      wrapper: null,
+      directCli: "synthetic",
+      capabilities: {
+        sessionModeNew: false,
+        sessionModeContinue: false,
+        sessionModeNone: false
+      },
+      commands: {
+        doctor: [["synthetic", ["doctor"]]],
+        "check:runtime": [["synthetic", ["doctor"]]],
+        validate: [["synthetic", ["doctor"]]],
+        "validate:runtime": [["synthetic", ["doctor"]]]
+      },
+      detect() { return false },
+      supports(command) {
+        return ["list:crews", "use", "clear", "run", "doctor", "check:runtime", "validate", "validate:runtime"].includes(command)
+      },
+      prepareRunContext() {
+        return { ok: true, exec: "synthetic", args: [], passthrough: [] }
+      },
+      resolveCommandPlan(command) {
+        const variants = this.commands?.[command] || []
+        if (variants.length === 0) return { ok: false, error: "command not supported", variants: [] }
+        return { ok: true, exec: variants[0][0], args: variants[0][1], variants }
+      },
+      validateRuntime() {
+        return { ok: true, checks: [{ name: "runtime_entrypoint_declared", ok: true }] }
+      }
+    }
+  }
+
+  const result = validateRuntimeAdapterContract(runtime)
+  assert.equal(result.ok, true, result.errors.join("\n"))
 })

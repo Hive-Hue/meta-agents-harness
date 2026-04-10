@@ -4,6 +4,45 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
+## [0.5.0] - Unreleased
+
+### Highlights
+- Runtime plugins became a supported release feature, so new runtimes can be installed, validated, listed, and removed without patching core files.
+- Plugin discovery now covers `mah-plugins/` and `node_modules/@mah/runtime-*`, with built-in runtimes always taking priority and discovery anchored to the MAH package root.
+- Core-managed plugin runtimes can join the normal MAH surface (`run`, `list:crews`, `use`, `clear`, and session flows) while still honoring the same adapter contract as built-ins.
+
+### Added
+- `scripts/plugin-loader.mjs` for plugin discovery, validation, registry merge, unload, and lifecycle hooks.
+- `mah plugins list|install|uninstall|validate` CLI commands.
+- Support for wrapper-based plugins and wrapperless core-integrated plugins.
+- `MAH_PLUGINS_ENABLED=0` opt-out for plugin discovery.
+- Runtime plugin documentation in [`docs/plugin-api.md`](./docs/plugin-api.md) and the README.
+- Unit and end-to-end coverage for plugin loading, install/uninstall, validation, and runtime detection.
+- `/thinking` slash command for runtime control of thinking level in delegated child agents.
+  - Levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`
+  - Usage: `/thinking`, `/thinking <level>`, `/thinking help`
+  - Default changed from `off` to `minimal` for child agents
+
+### Changed
+- MAH runtime resolution now uses the merged built-in-plus-plugin registry instead of a static built-in-only view.
+- Session and run-context handling derive from adapter capabilities, which lets plugin runtimes participate in `run` and session flows consistently.
+- `mah plugins list` reports loaded, valid plugins rather than raw directory names.
+- Plugin install/uninstall now preserves user-authored `meta-agents.yaml` runtime overrides while syncing plugin metadata.
+- Plugin discovery is resolved from the MAH package root rather than the caller's current working directory, so plugins remain visible from subdirectories.
+- Built-in runtimes (`pi`, `claude`, `opencode`, `hermes`) remain authoritative and cannot be shadowed by same-named plugins.
+- Model projection is now runtime-specific: `pi` and `hermes` keep the canonical `minimax/minimax-m2.7` mapping, while `opencode` and `kilo` override to `minimax-coding-plan/MiniMax-M2.7` so delegated subagents resolve correctly.
+- `thinkingLevel` option support in `dispatchChild` for elevated reasoning on complex tasks.
+- Child agent thinking level default changed from `off` to `minimal`.
+- `/thinking` command handler added to `pi.on("input")` processing, matching the `/compact` pattern.
+
+### Fixed
+- Plugin validation now rejects incompatible `mahVersion` ranges and malformed adapter contracts before registration.
+- `mah sync --check` no longer restores marker directories or mutates the worktree.
+- `mah sync --json` and the generate aliases now emit clean machine-readable output without progress noise.
+- Kilo onboarding now resolves the wrapper from the MAH package root instead of `process.cwd()`.
+- `ProviderModelNotFoundError` during delegated subagent spawn is resolved by keeping provider-qualified models scoped to the runtimes that require them.
+- `package.json` and release docs now align on `0.5.0`.
+
 ## [0.4.0] - 2026-04-08
 
 ### Highlights

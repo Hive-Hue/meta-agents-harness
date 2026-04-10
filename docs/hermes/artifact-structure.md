@@ -79,7 +79,6 @@ Hermes configuration follows the pattern defined in `meta-agents.yaml`:
 ```yaml
 runtimes:
   hermes:
-    wrapper: "hermesh"
     direct_cli: "hermes"
     config_root: ".hermes"
     config_pattern: ".hermes/crew/<crew>/config.yaml"

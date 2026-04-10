@@ -58,6 +58,17 @@ test("plan --json and diff --json expose deterministic command envelope", () => 
   assert.equal(diff.json.data.mode, "diff")
 })
 
+test("generate aliases expose sync diagnostics envelope", () => {
+  const generate = runJson(["generate", "--json"])
+  const generateTree = runJson(["generate:tree", "--json"])
+  assert.equal(generate.json.schema, "mah.diagnostics.v1")
+  assert.equal(generate.json.command, "generate")
+  assert.equal(generate.json.data.mode, "sync")
+  assert.equal(generateTree.json.schema, "mah.diagnostics.v1")
+  assert.equal(generateTree.json.command, "generate:tree")
+  assert.equal(generateTree.json.data.mode, "sync")
+})
+
 test("doctor and explain detect support json envelope", () => {
   const doctor = runJson(["doctor", "--json", "--crew", "dev"])
   assert.equal(doctor.json.schema, "mah.diagnostics.v1")

@@ -12,13 +12,14 @@ permission:
     planning-lead: allow
     creative-lead: allow
     validation-lead: allow
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Orchestrator
 
 Role: `ceo`
 Team: `Global`
-Model: `openai/gpt-5.2`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Top-level orchestrator that routes work to team leads and controls execution order.

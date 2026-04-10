@@ -1,18 +1,19 @@
 ---
 name: multi-team-bootstrap
-description: Build a new PI multi-team crew from a minimal specification across domains (coding, productivity, teaching, marketing, ads). Infer teams, members, tools, MCP access, and initial domain rules.
+description: Build a new Claude multi-team crew from a minimal specification across domains (coding, productivity, teaching, marketing, ads). Infer teams, members, tools, MCP access, and initial domain rules.
+compatibility: [generic]
 ---
 
 # Multi-Team Bootstrap
 
-Use this skill when the user provides goals and desired scopes and wants a ready-to-run PI multi-team setup with:
+Use this skill when the user provides goals and desired scopes and wants a ready-to-run Claude multi-team setup with:
 
 - topology YAML
 - agent prompts
 - initial expertise files
 - sensible tool/domain defaults
 
-This skill is portable in spirit (Markdown + plain files), but this version is optimized for PI conventions.
+This skill is portable in spirit (Markdown + plain files), but this version is optimized for Claude Code TUI + CCR conventions.
 
 ## Minimal Input Spec
 
@@ -54,11 +55,11 @@ If required pieces are missing, infer conservative defaults and state assumption
 
 Always generate:
 
-1. `.pi/crew/<crew>/multi-team.yaml`
-2. `.pi/crew/<crew>/agents/orchestrator.md`
+1. `.claude/crew/<crew>/multi-team.yaml`
+2. `.claude/crew/<crew>/agents/orchestrator.md`
 3. one lead prompt per team/workstream
 4. one or more worker prompts per team/workstream
-5. `.pi/crew/<crew>/expertise/*-expertise-model.yaml` for every generated agent
+5. `.claude/crew/<crew>/expertise/*-expertise-model.yaml` for every generated agent
 
 ## Team Topology Rules
 
@@ -95,9 +96,9 @@ Profile worker defaults:
 - `custom`
   - infer names from goals, using `<capability>-lead` plus 1-3 workers per stream
 
-## Tool Inference Rules (PI)
+## Tool Inference Rules (Claude)
 
-Use PI tool names and runtime semantics:
+Use Claude harness tool names and runtime semantics:
 
 - Orchestrator: `delegate_agent`, `update_expertise_model`
 - Leads: `delegate_agent`, `update_expertise_model`
@@ -105,19 +106,21 @@ Use PI tool names and runtime semantics:
 - Document/spec/content workers: add `write`, `edit`
 - Code/script execution workers: add `bash`
 
-Avoid OpenCode-only names (`task`, `update-expertise-model`, `glob`, `list`) in PI output.
+In Claude runtime, `update_expertise_model` is a local MCP-backed tool. Agents should call it with their own `agent` id instead of editing expertise YAML manually.
 
-## MCP Inference Rules (PI)
+Avoid OpenCode-only names (`task`, `update-expertise-model`, `glob`, `list`) in Claude output.
+
+## MCP Inference Rules (Claude)
 
 If `enable_mcp: true`:
 
-- add PI MCP bridge tools to all leads: `mcp_servers`, `mcp_tools`, `mcp_call`
-- add PI MCP bridge tools to planning/research workers and any worker requiring external systems
+- add Claude MCP bridge tools to all leads: `mcp_servers`, `mcp_tools`, `mcp_call`
+- add Claude MCP bridge tools to planning/research workers and any worker requiring external systems
 - infer MCP server usage from goals (examples: `clickup`, `github`, `context7`, `brave-search`, `firecrawl`, `zeplin`)
 
 ## Domain Inference Rules
 
-For each agent, build ownership paths with PI domain flags:
+For each agent, build ownership paths with Claude domain flags:
 
 - global read-only baseline:
   - `path: .`
@@ -135,9 +138,9 @@ Guidelines:
 - workers write only to stream-owned paths
 - validation workers stay read-only unless corrective edits are explicitly requested
 
-## Prompt and Frontmatter Rules (PI)
+## Prompt and Frontmatter Rules (Claude)
 
-Each agent `.md` must follow PI conventions:
+Each agent `.md` must follow the Claude harness conventions:
 
 - frontmatter:
   - `name`
@@ -160,9 +163,9 @@ Each agent `.md` must follow PI conventions:
 
 Default skill paths:
 
-- `.pi/skills/delegate-bounded/SKILL.md`
-- `.pi/skills/expertise-model/SKILL.md`
-- `.pi/skills/zero-micromanagement/SKILL.md`
+- `.claude/skills/delegate-bounded/SKILL.md`
+- `.claude/skills/expertise-model/SKILL.md`
+- `.claude/skills/zero-micromanagement/SKILL.md`
 
 Mission text must reflect domain language (coding, marketing, teaching, etc.), not coding-only assumptions.
 
@@ -170,7 +173,7 @@ Mission text must reflect domain language (coding, marketing, teaching, etc.), n
 
 Create one expertise file per agent:
 
-- `.pi/crew/<crew>/expertise/<agent-name>-expertise-model.yaml`
+- `.claude/crew/<crew>/expertise/<agent-name>-expertise-model.yaml`
 
 Initial structure:
 
@@ -193,9 +196,9 @@ open_questions: []
 2. Build team/member matrix from workstreams + profile defaults.
 3. Infer tools (including `mcp_servers`, `mcp_tools`, `mcp_call` when needed) by role and objective.
 4. Infer domain rules from stream ownership (`read`/`write` paths).
-5. Generate `.pi/crew/<crew>/multi-team.yaml`.
-6. Generate all prompts under `.pi/crew/<crew>/agents/`.
-7. Generate expertise files under `.pi/crew/<crew>/expertise/`.
+5. Generate `.claude/crew/<crew>/multi-team.yaml`.
+6. Generate all prompts under `.claude/crew/<crew>/agents/`.
+7. Generate expertise files under `.claude/crew/<crew>/expertise/`.
 8. Validate references:
    - every prompt path exists
    - every expertise path exists
@@ -209,7 +212,7 @@ open_questions: []
 
 Output is acceptable only if:
 
-- it can run with `PI_MULTI_CONFIG=<path> pi -e extensions/multi-team.ts`
+- it can be selected with `ccmh use <crew>` and launched with `ccmh run --crew <crew>`
 - no worker has `edit/bash` outside owned scope
 - leads do not get direct `edit/bash` by default
 - prompts clearly match selected profile and goals

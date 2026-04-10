@@ -283,7 +283,13 @@ mah validate:all
 Generate runtime-specific configuration files:
 
 ```bash
-# Generate artifacts
+# Generate the runtime tree from meta-agents.yaml
+mah generate
+
+# npm shortcut
+npm run generate:meta
+
+# legacy direct sync script
 npm run sync:meta
 
 # Check for drift without writing

@@ -10,7 +10,7 @@
 
 **Meta Agents Harness** is a unified multi-agent control layer for **OpenCode**, **Claude Code**, **PI**, and **Hermes**.
 
-Instead of maintaining separate operator flows, wrappers, and team topologies for each runtime, this project exposes a **single command surface** — `mah` — and dispatches to the correct runtime automatically.
+Instead of maintaining separate operator flows, runtime shims, and team topologies for each runtime, this project exposes a **single command surface** — `mah` — and dispatches to the correct runtime automatically.
 
 The `development` branch represents the **product-grade evolution path** of the project: stronger canonical configuration, layered validation, explainability, and a future adapter-based runtime architecture.
 
@@ -92,7 +92,7 @@ mah <command>
 And let the harness resolve:
 
 - which runtime is available
-- which wrapper or executable to use
+- which executable or compatibility shim to use
 - which crew is active
 - how session flags should be normalized
 - how runtime-specific artifacts are generated or validated
@@ -105,7 +105,7 @@ Detection currently follows this priority:
 
 1. forced runtime via `--runtime`, `-r`, `-f`, or `MAH_RUNTIME`
 2. runtime marker directory in the repository (`.pi`, `.claude`, `.opencode`, `.hermes`)
-3. installed executable or wrapper available in the environment
+3. installed runtime executable or compatibility shim available in the environment
 
 This allows the same repository to remain runtime-aware while preserving explicit overrides for CI, local debugging, or controlled execution.
 
@@ -124,6 +124,21 @@ The repository ships runtime assets for all four runtimes, while presenting a si
 
 Hermes support is deep but intentionally bounded — it strengthens the runtime portfolio without compromising MAH's runtime-agnostic product identity. See [`docs/hermes/runtime-support.md`](./docs/hermes/runtime-support.md) for details on what is supported and what remains intentionally out of scope.
 
+### Plugin API for Runtimes (v0.5.0)
+
+MAH supports **runtime plugins** — add new runtimes without touching core files.
+
+```bash
+mah plugins list                      # show loaded plugins
+mah plugins validate ./path           # validate a plugin without installing
+mah plugins install ./path           # install a plugin locally
+mah plugins uninstall <name>         # remove an installed plugin
+```
+
+Installed plugins persist across MAH updates. See [`docs/plugin-api.md`](./docs/plugin-api.md) for the full plugin contract, manifest format, discovery mechanism, and CLI API.
+
+Plugins can be wrapper-based or core-integrated. In the core-integrated model, MAH owns crew state and generated artifacts, and the plugin only maps that context into the runtime's direct CLI.
+
 ---
 
 ## Key concepts
@@ -141,6 +156,7 @@ mah explain run --trace
 mah doctor
 mah init --runtime opencode --crew dev
 mah init --yes --force --crew bootstrap-config
+mah generate
 mah plan
 mah diff
 mah sessions list
@@ -176,7 +192,7 @@ The project uses `meta-agents.yaml` as the canonical multi-runtime configuration
 This config is used to define:
 
 - runtime detection metadata
-- runtime-specific wrappers and config roots
+- runtime-specific config roots and optional runtime entrypoint overrides
 - model catalog and fallbacks
 - skill references
 - domain profiles
@@ -202,7 +218,7 @@ The common abstraction is:
 - **team leads**
 - **workers**
 
-This structure is translated into each runtime’s expected configuration model.
+This structure is translated into each runtime's expected configuration model.
 
 ### 5. Hermes runtime support
 
@@ -226,7 +242,7 @@ mah --runtime hermes explain run --trace
 mah --runtime hermes run
 ```
 
-On `mah --runtime hermes run`, the repo-local wrapper bootstraps the active crew's orchestrator context before continuing the interactive Hermes session.
+On `mah --runtime hermes run`, the MAH core now bootstraps the active crew's orchestrator context and then continues the interactive Hermes session through the native `hermes` CLI.
 
 See [`docs/hermes/`](./docs/hermes/) for the complete Hermes integration guide.
 
@@ -453,8 +469,8 @@ These are translated to runtime-native behavior internally.
 For Hermes specifically:
 
 - `--session-mode continue` maps to Hermes resume/continue semantics
-- `--session-id` is bridged by the repo-local Hermes wrapper
-- `--session-root` is captured by the wrapper as MAH session metadata, but Hermes still uses its own global session store/layout
+- `--session-id` is bridged by the MAH core to Hermes resume arguments
+- `--session-root` is captured as MAH session metadata, but Hermes still uses its own global session store/layout
 - `--session-mirror` is ignored
 
 ---
@@ -477,6 +493,12 @@ Use these files to understand and author crew topology, model mapping, skill ref
 Generate runtime artifacts from canonical config:
 
 ```bash
+mah generate
+
+# equivalent npm shortcut
+npm run generate:meta
+
+# legacy direct sync entrypoint
 npm run sync:meta
 ```
 
@@ -495,8 +517,8 @@ This is an important part of keeping runtime artifacts aligned with the source c
 The repository currently contains runtime-specific assets such as:
 
 - `.opencode/` — OpenCode harness topology and scripts
-- `.claude/` — Claude runtime wrappers and crew structure
-- `.pi/` — PI runtime wrappers and crew structure
+- `.claude/` — Claude runtime assets and crew structure
+- `.pi/` — PI runtime assets and crew structure
 - `.hermes/` — Hermes runtime configuration and crew structure
 - `extensions/` — PI runtime extensions and entrypoints
 
@@ -549,7 +571,7 @@ Current maturity note:
 
 ## Architectural direction
 
-The long-term direction is to move toward an adapter model for runtimes.
+The runtime model is converging on adapters and plugins that integrate with the MAH core.
 
 Canonical boundary in this repository:
 
@@ -558,7 +580,10 @@ Canonical boundary in this repository:
 
 Boundary details are documented in `docs/runtime-boundary.md`.
 
-A runtime should be represented as an explicit contract rather than implicit command branching scattered through the dispatcher.
+A runtime should be represented as an explicit contract rather than implicit command branching scattered through the dispatcher. MAH now supports two integration styles:
+
+- core-integrated runtimes, where MAH manages crew state, generated tree lookup, and run preparation before calling the runtime CLI directly
+- compatibility-shim runtimes, where a repo-local wrapper still bridges missing runtime primitives
 
 Illustrative direction:
 
@@ -574,7 +599,7 @@ interface RuntimeAdapter {
 }
 ```
 
-This is an architectural direction for the branch, not yet a claim of completed implementation.
+`plugins/runtime-kilo` is the reference plugin for the core-integrated model in this branch. The built-in runtimes (`pi`, `claude`, `opencode`, `hermes`) now follow the same MAH-owned orchestration path, with wrappers kept only as an optional compatibility escape hatch for future runtimes that may need them.
 
 ---
 
@@ -613,7 +638,7 @@ mah --runtime opencode detect
 Try:
 
 - running `npm run setup`
-- verifying wrapper/runtime availability
+- verifying runtime executable or optional wrapper availability
 - forcing a known runtime explicitly
 
 ### MCP configuration missing

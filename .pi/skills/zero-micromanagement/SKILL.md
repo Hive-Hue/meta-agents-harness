@@ -1,6 +1,7 @@
 ---
 name: zero-micromanagement
 description: Set outcomes, ownership boundaries, and acceptance criteria without prescribing keystroke-level implementation.
+compatibility: [generic]
 ---
 
 # Zero Micromanagement

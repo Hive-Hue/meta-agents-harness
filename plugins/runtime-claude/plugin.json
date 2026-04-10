@@ -1,0 +1,12 @@
+{
+  "name": "claude",
+  "version": "1.0.0",
+  "mahVersion": "^0.5.0",
+  "markerDir": ".claude",
+  "directCli": "claude",
+  "wrapper": null,
+  "configRoot": ".claude",
+  "configPattern": ".claude/crew/<crew>/multi-team.yaml",
+  "entry": "index.mjs",
+  "description": "Claude Code runtime plugin. Integrates the claude CLI directly with MAH core-managed crew context and sessions."
+}

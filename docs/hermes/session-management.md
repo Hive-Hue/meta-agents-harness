@@ -2,7 +2,7 @@
 
 ## Overview
 
-MAH provides unified session controls that are translated through the repo-local Hermes wrapper. For Hermes, session management follows the standard MAH session model with bounded Hermes-specific adaptations.
+MAH provides unified session controls through the core-integrated Hermes adapter. For Hermes, session management follows the standard MAH session model with bounded Hermes-specific adaptations.
 
 ---
 
@@ -44,11 +44,11 @@ mah --runtime hermes run [session-options] [runtime-args]
 
 | Flag | Description | Hermes Support |
 |---|---|---|
-| `--session-mode new` | Start a new session | Supported via wrapper bootstrap |
+| `--session-mode new` | Start a new session | Supported via MAH bootstrap |
 | `--session-mode continue` | Continue an existing session | Supported with orchestrator-session pinning |
 | `--session-mode none` | Ephemeral session (no persistence) | Not supported — warning emitted, session persists |
-| `--session-id <id>` | Target a specific session by ID | Supported via wrapper resume bridge |
-| `--session-root <path>` | Override session directory | Captured as wrapper metadata |
+| `--session-id <id>` | Target a specific session by ID | Supported via MAH resume bridge |
+| `--session-root <path>` | Override session directory | Captured as MAH metadata |
 | `--session-mirror` | Mirror session artifacts | Not applicable |
 
 ---
@@ -63,7 +63,7 @@ mah --runtime hermes run --session-mode new
 
 Creates a fresh Hermes execution context.
 
-On a fresh run, the wrapper first injects the selected crew's orchestrator context into a quiet Hermes session and then continues that session interactively. That is why Hermes starts in-role instead of acting like a generic assistant.
+On a fresh run, the MAH core first injects the selected crew's orchestrator context into a quiet Hermes session and then continues that session interactively. That is why Hermes starts in-role instead of acting like a generic assistant.
 
 ### Continuing sessions
 
@@ -73,7 +73,7 @@ mah --runtime hermes run --session-mode continue
 
 Resumes an existing Hermes session for the active crew.
 
-When continuing an existing session, the wrapper skips bootstrap.
+When continuing an existing session, the Hermes adapter skips bootstrap.
 
 If MAH has a pinned orchestrator session for the active crew, `--session-mode continue` resolves to `--resume <pinned-session-id>` to keep you on the orchestration thread.
 
@@ -87,7 +87,7 @@ mah --runtime hermes run --session-mode continue --session-id <id>
 
 Resumes a specific session by its identifier.
 
-MAH passes the session ID through the wrapper, which translates it to Hermes resume arguments.
+MAH passes the session ID through the core adapter, which translates it to Hermes resume arguments.
 
 ---
 
@@ -126,7 +126,7 @@ Hermes session handling may differ from other MAH runtimes in the following ways
 
 1. **Session bootstrap**: MAH injects crew context on fresh runs before continuing interactively
 2. **Session persistence**: Hermes owns the real session store and may retain context beyond MAH metadata
-3. **Session root**: Hermes does not currently expose a native session-root flag, so MAH stores that path as wrapper metadata instead of forcing Hermes storage layout
+3. **Session root**: Hermes does not currently expose a native session-root flag, so MAH stores that path as session metadata instead of forcing Hermes storage layout
 
 Inspect the resolved plan with:
 

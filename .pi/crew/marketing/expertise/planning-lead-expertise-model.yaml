@@ -1,11 +1,10 @@
 agent:
-  name: "planning-lead"
-  role: "agent"
-  team: "marketing"
+  name: planning-lead
+  role: lead
+  team: Planning
 meta:
-  version: 1
-  max_lines: 120
-  last_updated: "2026-04-08T01:44:27Z"
+  version: "1"
+  max_lines: "120"
 patterns: []
 risks: []
 tools: []
