@@ -30,6 +30,19 @@ test("help returns usage", () => {
   const result = run(["--help"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /Usage:/)
+  assert.match(result.stdout, /\bgenerate\b/)
+})
+
+test("generate:tree alias materializes artifacts from meta-agents.yaml", () => {
+  const result = run(["generate:tree"])
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(result.stdout, /meta sync completed/)
+})
+
+test("multi-team extension registers the thinking slash command", () => {
+  const source = readFileSync(path.join(repoRoot, "extensions", "multi-team.ts"), "utf-8")
+  assert.match(source, /pi\.registerCommand\("thinking"/)
+  assert.match(source, /handleThinkingCommand\(commandText\)/)
 })
 
 test("forced runtime works when flag appears before command", () => {
@@ -70,35 +83,33 @@ test("explain detect with hermes forced returns hermes in payload", () => {
   assert.equal(payload.data?.runtime, "hermes")
 })
 
-test("forced hermes list:crews resolves through repo-local runtime wrapper", () => {
+test("forced hermes list:crews resolves through the MAH core-managed runtime surface", () => {
   const result = run(["--runtime", "hermes", "list:crews"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /\bdev\b/)
   assert.match(result.stdout, /\bmarketing\b/)
 })
 
-test("hermes wrapper does not treat short continue flag as a crew id", () => {
-  const useResult = spawnSync(process.execPath, [path.join(repoRoot, ".hermes", "bin", "hermesh"), "use", "dev"], {
-    cwd: repoRoot,
-    env: process.env,
-    encoding: "utf-8"
-  })
-  assert.equal(useResult.status, 0, useResult.stderr)
+test("hermes use and list:crews expose MAH-managed active crew state", () => {
+  const activeCrewFile = path.join(repoRoot, ".hermes", ".active-crew.json")
+  const previous = existsSync(activeCrewFile) ? readFileSync(activeCrewFile, "utf-8") : null
+  try {
+    const useResult = run(["--runtime", "hermes", "use", "dev", "--json"])
+    assert.equal(useResult.status, 0, useResult.stderr)
+    const usePayload = JSON.parse(useResult.stdout)
+    assert.equal(usePayload.active_crew, "dev")
 
-  const result = spawnSync(process.execPath, [path.join(repoRoot, ".hermes", "bin", "hermesh"), "check:runtime", "-c", "--json"], {
-    cwd: repoRoot,
-    env: process.env,
-    encoding: "utf-8"
-  })
-  assert.equal(result.status, 0, result.stderr)
-  const payload = JSON.parse(result.stdout)
-  assert.equal(payload.active_crew, "dev")
+    const result = run(["--runtime", "hermes", "list:crews", "--json"])
+    assert.equal(result.status, 0, result.stderr)
+    const payload = JSON.parse(result.stdout)
+    assert.equal(payload.active_crew, "dev")
+  } finally {
+    if (previous === null) rmSync(activeCrewFile, { force: true })
+    else writeFileSync(activeCrewFile, previous, "utf-8")
+  }
 })
 
-// CCR test - only runs if ccr is available
-const ccrAvailable = spawnSync("ccr", ["--version"], { encoding: "utf-8" }).status === 0
-const ccrTest = ccrAvailable ? test : (name, opts, fn) => test.skip(name, fn)
-ccrTest("claude dry-run works with wrapped instruction blocks in crew config", () => {
+test("claude dry-run works with wrapped instruction blocks in crew config", () => {
   const result = run(["--runtime", "claude", "run", "--crew", "dev", "--dry-run"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /config=\.claude\/crew\/dev\/multi-team\.yaml/)

@@ -1,0 +1,12 @@
+{
+  "name": "opencode",
+  "version": "1.0.0",
+  "mahVersion": "^0.5.0",
+  "markerDir": ".opencode",
+  "directCli": "opencode",
+  "wrapper": null,
+  "configRoot": ".opencode",
+  "configPattern": ".opencode/crew/<crew>/multi-team.yaml",
+  "entry": "index.mjs",
+  "description": "OpenCode runtime plugin. Integrates the opencode CLI directly with MAH core-managed crew context and sessions."
+}

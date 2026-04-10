@@ -1,6 +1,7 @@
 ---
 name: zeplin-mcp-ops
 description: Optimize Zeplin MCP usage for fast, traceable design extraction (screens, components, tokens, assets) with minimal redundant calls.
+compatibility: [generic]
 ---
 
 # Zeplin MCP Ops

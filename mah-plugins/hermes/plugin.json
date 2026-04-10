@@ -1,0 +1,12 @@
+{
+  "name": "hermes",
+  "version": "1.0.0",
+  "mahVersion": "^0.5.0",
+  "markerDir": ".hermes",
+  "directCli": "hermes",
+  "wrapper": null,
+  "configRoot": ".hermes",
+  "configPattern": ".hermes/crew/<crew>/config.yaml",
+  "entry": "index.mjs",
+  "description": "Hermes runtime plugin. Integrates the hermes CLI directly with MAH core-managed crew context, sessions, and generated runtime artifacts."
+}

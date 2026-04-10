@@ -11,13 +11,14 @@ permission:
     "*": deny
     qa-reviewer: allow
     security-reviewer: allow
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Validation Lead
 
 Role: `lead`
 Team: `Validation`
-Model: `openai/gpt-5.2`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Validation lead responsible for delegation, synthesis, and team-level coordination.

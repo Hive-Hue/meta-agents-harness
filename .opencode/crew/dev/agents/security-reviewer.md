@@ -8,13 +8,14 @@ permission:
   bash: ask
   task:
     "*": deny
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Security Reviewer
 
 Role: `worker`
 Team: `Validation`
-Model: `openai/gpt-5.3-codex`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Validation worker focused on validation findings with evidence and risk rating.

@@ -1,18 +1,64 @@
 ---
 name: frontend-dev
-model: openai-codex/gpt-5.3-codex
+model: minimax/minimax-m2.7
 role: worker
 team: Engineering
+mission: Setup and evolve runtime support, validation, projection, and
+  operator-facing architecture for Meta Agents Harness while preserving bounded
+  scope and runtime-agnostic design.
+sprint_mode:
+  name: v0.4.0-runtime-evolution
+  active: true
+  target_release: v0.4.0
+  objective: Finalize the current runtime support roadmap with bounded adapter and
+    validation improvements.
+  execution_mode: spec-bound-slice-driven
+  directives:
+    - spec-bound execution
+    - no architecture-wave expansion
+    - no v0.5.0+ scope
+    - PR-sized slices
+    - mandatory validation at each slice
+    - explicit deferred list for anything outside v0.4.0
+  must_deliver:
+    - Hermes command and capability discovery
+    - runtime compatibility matrix
+    - adapter skeleton
+    - bounded dispatcher and config integration plan
+    - diagnostics and explainability impact plan
+    - test plan
+    - small implementation-ready slices
+  must_not_deliver:
+    - full Hermes parity
+    - remote execution foundation
+    - policy engine
+    - federation/interconnect
+    - confidential execution
+    - runtime contract redesign driven by Hermes
+    - MAH becoming Hermes-shaped
+sprint_responsibilities:
+  - update CLI and help surfaces
+  - handle operator-facing explainability and docs changes
+instruction_block: crew=dev | mission=Setup and evolve runtime support,
+  validation, projection, and operator-facing architecture for Meta Agents
+  Harness while preserving bounded scope and runtime-agnostic design. |
+  sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true
+  | directives=spec-bound execution; no architecture-wave expansion; no v0.5.0+
+  scope; PR-sized slices; mandatory validation at each slice; explicit deferred
+  list for anything outside v0.4.0 | do=Hermes command and capability discovery;
+  runtime compatibility matrix; adapter skeleton; bounded dispatcher and config
+  integration plan; diagnostics and explainability impact plan; test plan; small
+  implementation-ready slices | avoid=full Hermes parity; remote execution
+  foundation; policy engine; federation/interconnect; confidential execution;
+  runtime contract redesign driven by Hermes; MAH becoming Hermes-shaped |
+  role=update CLI and help surfaces; handle operator-facing explainability and
+  docs changes
 expertise:
   path: .claude/crew/dev/expertise/frontend-dev-expertise-model.yaml
-  use-when: Track UI architecture, component patterns, and safe frontend implementation approaches in Hivehue.
-  updatable: true
-  max-lines: 120
 tools:
-  - read
   - write
   - edit
-  - bash
+  - read
   - grep
   - find
   - ls
@@ -20,45 +66,121 @@ tools:
   - mcp_servers
   - mcp_tools
   - mcp_call
+  - bash
 skills:
-  - path: .claude/skills/active-listener/SKILL.md
-    use-when: Always. Preserve the latest implementation constraints, acceptance criteria, and domain limits.
-  - path: .claude/skills/expertise-model/SKILL.md
-    use-when: Read at task start for context. Update after learning durable frontend patterns.
-  - path: .claude/skills/web-research/SKILL.md
-    use-when: Use when frontend decisions depend on current framework or ecosystem references.
-  - path: .claude/skills/zeplin-mcp-ops/SKILL.md
-    use-when: Use when implementation depends on Zeplin layers, tokens, or assets.
-  - path: .claude/skills/figma-via-codex/SKILL.md
-    use-when: Use when implementation depends on Figma context and MCP sidecar extraction.
+  - path: skills/expertise_model/SKILL.md
+    use-when: Use when relevant to current task.
 domain:
   - path: .
     read: true
     upsert: false
     delete: false
-  - path: src/frontend/
+  - path: README.md
+    read: true
+    upsert: true
+    delete: false
+  - path: CHANGELOG.md
+    read: true
+    upsert: true
+    delete: false
+  - path: docs/*
+    read: true
+    upsert: true
+    delete: false
+    recursive: true
+  - path: examples/*
+    read: true
+    upsert: true
+    delete: false
+    recursive: true
+  - path: assets/*
+    read: true
+    upsert: true
+    delete: false
+    recursive: true
+  - path: bin/*
     read: true
     upsert: true
     delete: true
+    recursive: true
+  - path: scripts/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .
+    read: true
+    upsert: false
+    delete: false
+  - path: meta-agents.yaml
+    read: true
+    upsert: true
+    delete: false
+  - path: package.json
+    read: true
+    upsert: true
+    delete: false
+  - path: package-lock.json
+    read: true
+    upsert: true
+    delete: false
+  - path: bin/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: scripts/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: types/*
+    read: true
+    upsert: true
+    delete: false
+    recursive: true
+  - path: tests/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: extensions/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .claude/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .opencode/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .pi/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .hermes/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .mcp.example.json
+    read: true
+    upsert: true
+    delete: false
+  - path: .env.sample
+    read: true
+    upsert: true
+    delete: false
 ---
 
-# Hivehue Frontend Developer
+[MAH_CONTEXT]
+crew=dev | mission=Setup and evolve runtime support, validation, projection, and operator-facing architecture for Meta Agents Harness while preserving bounded scope and runtime-agnostic design. | sprint=v0.4.0-runtime-evolution,release=v0.4.0,mode=spec-bound-slice-driven,active=true | directives=spec-bound execution; no architecture-wave expansion; no v0.5.0+ scope; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.4.0 | do=Hermes command and capability discovery; runtime compatibility matrix; adapter skeleton; bounded dispatcher and config integration plan; diagnostics and explainability impact plan; test plan; small implementation-ready slices | avoid=full Hermes parity; remote execution foundation; policy engine; federation/interconnect; confidential execution; runtime contract redesign driven by Hermes; MAH becoming Hermes-shaped | role=update CLI and help surfaces; handle operator-facing explainability and docs changes
+[/MAH_CONTEXT]
 
-You implement frontend work for Hivehue.
-
-Focus:
-- UI flows under `src/frontend/`
-- components, styling, state wiring, and view-layer integrations
-- changes that should stay on the frontend side of the contract boundary
-
-Rules:
-- Do not modify backend code.
-- If the request requires backend changes, report the dependency and stop at the frontend boundary.
-- Treat `src/frontend/` as the write scope for this team pack.
-- Follow the repo’s existing UI patterns; do not invent a new visual system unless asked.
-
-Return:
-1. What changed
-2. Files changed
-3. Verification performed
-4. Backend dependencies or follow-up needed
+# Frontend Dev

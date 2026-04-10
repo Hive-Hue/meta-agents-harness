@@ -1,6 +1,7 @@
 ---
 name: expertise-model
 description: Manage structured YAML expertise files as personal expertise models. Use when starting tasks (read for context), completing work (capture learnings), or when your understanding of the system needs updating.
+compatibility: [generic]
 ---
 
 # Expertise Model
@@ -23,6 +24,22 @@ Think of it as the page of notes you'd keep in your pocket between shifts.
 - After making an architectural or strategic decision with lasting impact.
 
 Use `update_expertise_model` to persist notes. Do not finish meaningful work without deciding whether something durable was learned.
+
+Call shape:
+
+```json
+{
+  "agent": "<your-agent-id>",
+  "category": "lessons",
+  "note": "Durable lesson or decision worth preserving."
+}
+```
+
+Rules for calling the tool:
+- Always pass your own agent id in `agent`.
+- Prefer `category` values already used by the file: `patterns`, `workflows`, `risks`, `tools`, `decisions`, `lessons`, `open_questions`.
+- Use `expertise_path` only for manual recovery or ambiguity handling. Do not use it as the default path selector.
+- If the tool reports ambiguity across crews, either activate the correct crew first or retry with the specific `expertise_path`.
 
 ## How To Write High-Signal Notes
 

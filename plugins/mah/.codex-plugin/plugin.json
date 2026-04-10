@@ -1,0 +1,41 @@
+{
+  "name": "mah",
+  "version": "0.5.0",
+  "description": "Expose Meta Agents Harness operational tools inside Codex sessions.",
+  "author": {
+    "name": "Meta Agents Harness",
+    "email": "noreply@example.com",
+    "url": "https://github.com/alysson/meta-agents-harness"
+  },
+  "homepage": "https://github.com/alysson/meta-agents-harness",
+  "repository": "https://github.com/alysson/meta-agents-harness",
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": [
+    "codex",
+    "mah",
+    "mcp",
+    "multi-agent"
+  ],
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "MAH",
+    "shortDescription": "Inspect active crew context and delegate through MAH.",
+    "longDescription": "Adds native Codex tools for active crew inspection, route discovery, and bounded MAH-driven delegation.",
+    "developerName": "Meta Agents Harness",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/alysson/meta-agents-harness",
+    "privacyPolicyURL": "https://openai.com/policies/row-privacy-policy/",
+    "termsOfServiceURL": "https://openai.com/policies/row-terms-of-use/",
+    "defaultPrompt": [
+      "Show the active MAH crew context.",
+      "List the valid delegation targets from this agent.",
+      "Delegate a bounded task through the MAH graph."
+    ],
+    "brandColor": "#2563EB"
+  }
+}

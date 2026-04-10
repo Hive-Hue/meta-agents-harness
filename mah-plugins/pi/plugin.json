@@ -1,0 +1,12 @@
+{
+  "name": "pi",
+  "version": "1.0.0",
+  "mahVersion": "^0.5.0",
+  "markerDir": ".pi",
+  "directCli": "pi",
+  "wrapper": null,
+  "configRoot": ".pi",
+  "configPattern": ".pi/crew/<crew>/multi-team.yaml",
+  "entry": "index.mjs",
+  "description": "PI runtime plugin. Integrates the pi CLI directly with MAH core-managed crew context and sessions."
+}

@@ -227,9 +227,9 @@ orchestrator:
     - mcp_tools
     - mcp_call
   skills:
-    - .hermes/skills/delegate-bounded/SKILL.md
-    - .hermes/skills/zero-micromanagement/SKILL.md
-    - .hermes/skills/expertise-model/SKILL.md
+    - skills/delegate_bounded/SKILL.md
+    - skills/zero_micromanagement/SKILL.md
+    - skills/expertise_model/SKILL.md
   routes_to:
     - planning-lead
     - creative-lead
@@ -268,9 +268,9 @@ teams:
         - mcp_tools
         - mcp_call
       skills:
-        - .hermes/skills/delegate-bounded/SKILL.md
-        - .hermes/skills/zero-micromanagement/SKILL.md
-        - .hermes/skills/expertise-model/SKILL.md
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
       routes_to:
         - market-researcher
         - campaign-strategist
@@ -331,7 +331,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -388,7 +388,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -445,9 +445,9 @@ teams:
         - mcp_tools
         - mcp_call
       skills:
-        - .hermes/skills/delegate-bounded/SKILL.md
-        - .hermes/skills/zero-micromanagement/SKILL.md
-        - .hermes/skills/expertise-model/SKILL.md
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
       routes_to:
         - copywriter
         - creative-strategist
@@ -509,7 +509,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -566,7 +566,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -623,7 +623,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -680,9 +680,9 @@ teams:
         - mcp_tools
         - mcp_call
       skills:
-        - .hermes/skills/delegate-bounded/SKILL.md
-        - .hermes/skills/zero-micromanagement/SKILL.md
-        - .hermes/skills/expertise-model/SKILL.md
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
       routes_to:
         - performance-analyst
         - brand-safety-reviewer
@@ -743,7 +743,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -800,7 +800,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .hermes/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true

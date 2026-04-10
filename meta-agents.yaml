@@ -1,7 +1,6 @@
 version: 1
-name: "meta-agents-harness"
-description: "Unified source-of-truth for crews, roles, skills, expertise, models, domains, and runtime projections."
-
+name: meta-agents-harness
+description: Unified source-of-truth for crews, roles, skills, expertise, models, domains, and runtime projections.
 runtime_detection:
   order:
     - forced
@@ -9,109 +8,125 @@ runtime_detection:
     - cli
   forced:
     args:
-      - "--runtime=<name>"
-      - "--runtime <name>"
-      - "-r <name>"
-      - "-f <name>"
+      - --runtime=<name>
+      - --runtime <name>
+      - -r <name>
+      - -f <name>
     env:
       - MAH_RUNTIME
   marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-    hermes: ".hermes"
-  cli:
-    pi:
-      direct_cli: "pi"
-      wrapper: "pimh"
-    claude:
-      direct_cli: "claude"
-      wrapper: "ccmh"
-    opencode:
-      direct_cli: "opencode"
-      wrapper: "ocmh"
-    hermes:
-      direct_cli: "hermes"
-      wrapper: "hermesh"
-
+    pi: .pi
+    claude: .claude
+    hermes: .hermes
+    kilo: .kilo
+    opencode: .opencode
+    codex: .codex
+    corefake: .corefake
 runtimes:
-  pi:
-    wrapper: "pimh"
-    config_root: ".pi"
-    extension_root: "extensions"
-    config_pattern: ".pi/crew/<crew>/multi-team.yaml"
-    default_extensions:
-      - "extensions/multi-team.ts"
-      - "extensions/agent-session-navigator.ts"
-      - "extensions/mcp-bridge.ts"
-      - "extensions/theme-cycler.ts"
-  claude:
-    wrapper: "ccmh"
-    config_root: ".claude"
-    config_pattern: ".claude/crew/<crew>/multi-team.yaml"
-    ccr:
-      route_map: ".claude/ccr/route-map.example.json"
-      policy: "bounded"
-    mcp:
-      config: ".mcp.json"
-      template: ".mcp.example.json"
+  pi: {}
+  claude: {}
   opencode:
-    wrapper: "ocmh"
-    config_root: ".opencode"
-    config_pattern: ".opencode/multi-team.yaml"
-    task_policy: "permission.task"
     model_overrides:
-      orchestrator_default: "zai/glm-4.7"
-      lead_default: "zai/glm-4.7"
-      worker_default: "zai/glm-4.7"
-  hermes:
-    wrapper: "hermesh"
-    config_root: ".hermes"
-    config_pattern: ".hermes/crew/<crew>/config.yaml"
-    capabilities:
-      persistent_memory: true
-      supports_background_operation: true
-      supports_multi_backend_execution: true
-      gateway_aware: true
-
+      orchestrator_default: minimax-coding-plan/MiniMax-M2.7
+      lead_default: minimax-coding-plan/MiniMax-M2.7
+      worker_default: minimax-coding-plan/MiniMax-M2.7
+  hermes: {}
+  kilo:
+    model_overrides:
+      orchestrator_default: minimax-coding-plan/MiniMax-M2.7
+      lead_default: minimax-coding-plan/MiniMax-M2.7
+      worker_default: minimax-coding-plan/MiniMax-M2.7
+  codex:
+    model_overrides:
+      orchestrator_default: gpt-5.4-mini
+      lead_default: gpt-5.4-mini
+      worker_default: gpt-5.4-mini
+  corefake: {}
 catalog:
   models:
-    orchestrator_default: "minimax/minimax-m2.7"
-    lead_default: "minimax/minimax-m2.7"
-    worker_default: "minimax/minimax-m2.7"
+    orchestrator_default: minimax/minimax-m2.7
+    lead_default: minimax/minimax-m2.7
+    worker_default: minimax/minimax-m2.7
   model_fallbacks:
     orchestrator_default:
-      - "nvidia/nemotron-3-super-120b-a12b:free"
-      - "zai/glm-5"
-      - "zai/glm-4.5-air"
+      - nvidia/nemotron-3-super-120b-a12b:free
+      - zai/glm-5
+      - zai/glm-4.5-air
     lead_default:
-      - "zai/glm-5"
-      - "zai/glm-4.5-air"
+      - zai/glm-5
+      - zai/glm-4.5-air
     worker_default:
-      - "nvidia/nemotron-3-super-120b-a12b:free"
-      - "zai/glm-4.7"
-      - "zai/glm-4.5-air"
+      - nvidia/nemotron-3-super-120b-a12b:free
+      - zai/glm-4.7
+      - zai/glm-4.5-air
   skills:
     delegate_bounded:
-      opencode: ".opencode/skills/delegate-bounded/SKILL.md"
-      claude: ".claude/skills/delegate-bounded/SKILL.md"
-      pi: ".pi/skills/delegate-bounded/SKILL.md"
-      hermes: ".hermes/skills/delegate-bounded/SKILL.md"
+      opencode: skills/delegate_bounded/SKILL.md
+      claude: skills/delegate_bounded/SKILL.md
+      kilo: skills/delegate_bounded/SKILL.md
+      pi: skills/delegate_bounded/SKILL.md
+      hermes: skills/delegate_bounded/SKILL.md
+      codex: skills/delegate_bounded/SKILL.md
     zero_micromanagement:
-      opencode: ".opencode/skills/zero-micromanagement/SKILL.md"
-      claude: ".claude/skills/zero-micromanagement/SKILL.md"
-      pi: ".pi/skills/zero-micromanagement/SKILL.md"
-      hermes: ".hermes/skills/zero-micromanagement/SKILL.md"
+      opencode: skills/zero_micromanagement/SKILL.md
+      claude: skills/zero_micromanagement/SKILL.md
+      kilo: skills/zero_micromanagement/SKILL.md
+      pi: skills/zero_micromanagement/SKILL.md
+      hermes: skills/zero_micromanagement/SKILL.md
+      codex: skills/zero_micromanagement/SKILL.md
     expertise_model:
-      opencode: ".opencode/skills/expertise-model/SKILL.md"
-      claude: ".claude/skills/expertise-model/SKILL.md"
-      pi: ".pi/skills/expertise-model/SKILL.md"
-      hermes: ".hermes/skills/expertise-model/SKILL.md"
+      opencode: skills/expertise_model/SKILL.md
+      claude: skills/expertise_model/SKILL.md
+      kilo: skills/expertise_model/SKILL.md
+      pi: skills/expertise_model/SKILL.md
+      hermes: skills/expertise_model/SKILL.md
+      codex: skills/expertise_model/SKILL.md
+    active_listener:
+      opencode: skills/active_listener/SKILL.md
+      claude: skills/active_listener/SKILL.md
+      kilo: skills/active_listener/SKILL.md
+      pi: skills/active_listener/SKILL.md
+      hermes: skills/active_listener/SKILL.md
+      codex: skills/active_listener/SKILL.md
+    agentic_pert:
+      opencode: skills/agentic_pert/SKILL.md
+      claude: skills/agentic_pert/SKILL.md
+      kilo: skills/agentic_pert/SKILL.md
+      pi: skills/agentic_pert/SKILL.md
+      hermes: skills/agentic_pert/SKILL.md
+      codex: skills/agentic_pert/SKILL.md
+    figma_via_codex:
+      opencode: skills/figma_via_codex/SKILL.md
+      claude: skills/figma_via_codex/SKILL.md
+      kilo: skills/figma_via_codex/SKILL.md
+      pi: skills/figma_via_codex/SKILL.md
+      hermes: skills/figma_via_codex/SKILL.md
+      codex: skills/figma_via_codex/SKILL.md
+    multi_team_bootstrap:
+      opencode: skills/multi_team_bootstrap/SKILL.md
+      claude: skills/multi_team_bootstrap/SKILL.md
+      kilo: skills/multi_team_bootstrap/SKILL.md
+      pi: skills/multi_team_bootstrap/SKILL.md
+      hermes: skills/multi_team_bootstrap/SKILL.md
+      codex: skills/multi_team_bootstrap/SKILL.md
+    web_research:
+      opencode: skills/web_research/SKILL.md
+      claude: skills/web_research/SKILL.md
+      kilo: skills/web_research/SKILL.md
+      pi: skills/web_research/SKILL.md
+      hermes: skills/web_research/SKILL.md
+      codex: skills/web_research/SKILL.md
+    zeplin_mcp_ops:
+      opencode: skills/zeplin_mcp_ops/SKILL.md
+      claude: skills/zeplin_mcp_ops/SKILL.md
+      kilo: skills/zeplin_mcp_ops/SKILL.md
+      pi: skills/zeplin_mcp_ops/SKILL.md
+      hermes: skills/zeplin_mcp_ops/SKILL.md
+      codex: skills/zeplin_mcp_ops/SKILL.md
 domain_profiles:
   read_only_repo:
     - path: .
       read: true
-
   planning_delivery:
     - path: .
       read: true
@@ -133,7 +148,6 @@ domain_profiles:
     - path: CHANGELOG.md
       read: true
       edit: true
-
   cli_operator_surface:
     - path: .
       read: true
@@ -160,7 +174,6 @@ domain_profiles:
       read: true
       edit: true
       bash: true
-
   runtime_impl:
     - path: .
       read: true
@@ -214,7 +227,6 @@ domain_profiles:
     - path: .env.sample
       read: true
       edit: true
-
   validation_runtime:
     - path: .
       read: true
@@ -233,7 +245,6 @@ domain_profiles:
     - path: specs/*
       read: true
       edit: true
-
   bootstrap_generation:
     - path: .
       read: true
@@ -264,7 +275,6 @@ domain_profiles:
       read: true
       edit: true
       bash: true
-
   runtime_assets_sync:
     - path: .claude/*
       read: true
@@ -288,7 +298,6 @@ domain_profiles:
     - path: meta-agents.yaml
       read: true
       edit: true
-
   docs_authoring:
     - path: .
       read: true
@@ -308,327 +317,411 @@ domain_profiles:
       read: true
       edit: true
 crews:
-  - id: "dev"
-    display_name: "Development Crew"
-    mission: "Setup and evolve runtime support, validation, projection, and operator-facing architecture for Meta Agents Harness while preserving bounded scope and runtime-agnostic design."
+  - id: dev
+    display_name: Development Crew
+    mission: Advance runtime support, validation, projection, and operator-facing architecture for Meta Agents Harness while preserving bounded scope and runtime-agnostic design.
     sprint_mode:
-      name: "v0.4.0-runtime-evolution"
+      name: v0.5.0-runtime-evolution
       active: true
-      target_release: "v0.4.0"
-      objective: "Finalize the current runtime support roadmap with bounded adapter and validation improvements."
-      execution_mode: "spec-bound-slice-driven"
+      target_release: v0.5.0
+      objective: Advance runtime support with adapter completion, dispatcher integration, and validation framework maturation for v0.5.0
+      execution_mode: spec-bound-slice-driven
       directives:
-        - "spec-bound execution"
-        - "no architecture-wave expansion"
-        - "no v0.5.0+ scope"
-        - "PR-sized slices"
-        - "mandatory validation at each slice"
-        - "explicit deferred list for anything outside v0.4.0"
+        - spec-bound execution
+        - no architecture-wave expansion
+        - no v0.6.0+ scope
+        - PR-sized slices
+        - mandatory validation at each slice
+        - explicit deferred list for anything outside v0.5.0
       must_deliver:
-        - "Hermes command and capability discovery"
-        - "runtime compatibility matrix"
-        - "adapter skeleton"
-        - "bounded dispatcher and config integration plan"
-        - "diagnostics and explainability impact plan"
-        - "test plan"
-        - "small implementation-ready slices"
+        - Hermes adapter implementation completion
+        - Full dispatcher integration with config
+        - Runtime compatibility matrix validation
+        - Validation framework expansion
+        - Diagnostics and explainability tooling
+        - Operator-facing CLI completion
+        - Integration test coverage
       must_not_deliver:
-        - "full Hermes parity"
-        - "remote execution foundation"
-        - "policy engine"
-        - "federation/interconnect"
-        - "confidential execution"
-        - "runtime contract redesign driven by Hermes"
-        - "MAH becoming Hermes-shaped"
+        - full multi-runtime parity
+        - remote execution foundation
+        - policy engine
+        - federation/interconnect
+        - confidential execution
+        - v0.6.0+ scope
     source_configs:
-      pi: ".pi/crew/dev/multi-team.yaml"
-      claude: ".claude/crew/dev/multi-team.yaml"
-      opencode: ".opencode/multi-team.yaml"
-      hermes: ".hermes/crew/dev/config.yaml"
+      pi: .pi/crew/dev/multi-team.yaml
+      claude: .claude/crew/dev/multi-team.yaml
+      codex: .codex/crew/dev/multi-team.yaml
+      kilo: .kilo/crew/dev/multi-team.yaml
+      opencode: .opencode/multi-team.yaml
+      hermes: .hermes/crew/dev/config.yaml
     session:
-      pi_root: ".pi/crew/dev/sessions"
-      claude_mirror_root: ".claude/crew/dev/sessions"
+      pi_root: .pi/crew/dev/sessions
+      claude_mirror_root: .claude/crew/dev/sessions
+      codex_root: .codex/crew/dev/sessions
+      kilo_root: .kilo/crew/dev/sessions
     topology:
-      orchestrator: "orchestrator"
+      orchestrator: orchestrator
       leads:
-        planning: "planning-lead"
-        engineering: "engineering-lead"
-        validation: "validation-lead"
+        planning: planning-lead
+        engineering: engineering-lead
+        validation: validation-lead
       workers:
-        planning: ["repo-analyst", "solution-architect"]
-        engineering: ["frontend-dev", "backend-dev"]
-        validation: ["qa-reviewer", "security-reviewer"]
+        planning:
+          - repo-analyst
+          - solution-architect
+        engineering:
+          - frontend-dev
+          - backend-dev
+        validation:
+          - qa-reviewer
+          - security-reviewer
     agents:
-      - id: "orchestrator"
-        role: "orchestrator"
-        team: "orchestration"
-        model_ref: "orchestrator_default"
-        expertise: "orchestrator-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "read_only_repo"
+      - id: orchestrator
+        role: orchestrator
+        team: orchestration
+        model_ref: orchestrator_default
+        expertise: orchestrator-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: read_only_repo
         sprint_responsibilities:
-          - "control sprint scope"
-          - "distribute slices"
-          - "consolidate decisions"
-          - "prevent runtime capture by Hermes"
-          - "defer anything outside v0.4.0"
-      - id: "planning-lead"
-        role: "lead"
-        team: "planning"
-        model_ref: "lead_default"
-        expertise: "planning-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "planning_delivery"
+          - control sprint scope
+          - distribute slices
+          - consolidate decisions
+          - prevent runtime capture by Hermes
+          - defer anything outside v0.5.0
+      - id: planning-lead
+        role: lead
+        team: planning
+        model_ref: lead_default
+        expertise: planning-lead-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: planning_delivery
         sprint_responsibilities:
-          - "translate spec into executable backlog"
-          - "order slices"
-          - "prevent backlog inflation"
-      - id: "engineering-lead"
-        role: "lead"
-        team: "engineering"
-        model_ref: "lead_default"
-        expertise: "engineering-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "runtime_impl"
+          - translate spec into executable backlog
+          - order slices
+          - prevent backlog inflation
+      - id: engineering-lead
+        role: lead
+        team: engineering
+        model_ref: lead_default
+        expertise: engineering-lead-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: runtime_impl
         sprint_responsibilities:
-          - "coordinate implementation"
-          - "split work into reviewable changesets"
-          - "preserve adapter and dispatcher boundaries"
-      - id: "validation-lead"
-        role: "lead"
-        team: "validation"
-        model_ref: "lead_default"
-        expertise: "validation-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "validation_runtime"
+          - coordinate implementation
+          - split work into reviewable changesets
+          - preserve adapter and dispatcher boundaries
+      - id: validation-lead
+        role: lead
+        team: validation
+        model_ref: lead_default
+        expertise: validation-lead-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: validation_runtime
         sprint_responsibilities:
-          - "define phase gates"
-          - "validate spec adherence"
-          - "block scope escape from the release boundary"
-      - id: "repo-analyst"
-        role: "worker"
-        team: "planning"
-        model_ref: "worker_default"
-        expertise: "repo-analyst-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "read_only_repo"
+          - define phase gates
+          - validate spec adherence
+          - block scope escape from the release boundary
+      - id: repo-analyst
+        role: worker
+        team: planning
+        model_ref: worker_default
+        expertise: repo-analyst-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: read_only_repo
         sprint_responsibilities:
-          - "map real codebase integration points"
-          - "locate affected files"
-          - "surface regression and coupling risks"
-      - id: "solution-architect"
-        role: "worker"
-        team: "planning"
-        model_ref: "lead_default"
-        expertise: "solution-architect-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "planning_delivery"
+          - map real codebase integration points
+          - locate affected files
+          - surface regression and coupling risks
+      - id: solution-architect
+        role: worker
+        team: planning
+        model_ref: lead_default
+        expertise: solution-architect-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: planning_delivery
         sprint_responsibilities:
-          - "define the adapter approach"
-          - "define minimal meta-agents.yaml compatibility"
-          - "identify the smallest technically correct slice"
-      - id: "frontend-dev"
-        role: "worker"
-        team: "engineering"
-        model_ref: "worker_default"
-        expertise: "frontend-dev-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: 
-         - "cli_operator_surface"
-         - "runtime_impl"
+          - define the adapter approach
+          - define minimal meta-agents.yaml compatibility
+          - identify the smallest technically correct slice
+      - id: frontend-dev
+        role: worker
+        team: engineering
+        model_ref: worker_default
+        expertise: frontend-dev-expertise-model
+        skills:
+          - expertise_model
+        domain_profile:
+          - cli_operator_surface
+          - runtime_impl
         sprint_responsibilities:
-          - "update CLI and help surfaces"
-          - "handle operator-facing explainability and docs changes"
-      - id: "backend-dev"
-        role: "worker"
-        team: "engineering"
-        model_ref: "worker_default"
-        expertise: "backend-dev-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: 
-          - "cli_operator_surface"
-          - "runtime_impl"
+          - update CLI and help surfaces
+          - handle operator-facing explainability and docs changes
+      - id: backend-dev
+        role: worker
+        team: engineering
+        model_ref: worker_default
+        expertise: backend-dev-expertise-model
+        skills:
+          - expertise_model
+        domain_profile:
+          - cli_operator_surface
+          - runtime_impl
         sprint_responsibilities:
-          - "implement runtime adapter behavior"
-          - "integrate dispatcher and config changes"
-          - "own Hermes-aware runtime projection and tests"
-      - id: "qa-reviewer"
-        role: "worker"
-        team: "validation"
-        model_ref: "worker_default"
-        expertise: "qa-reviewer-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "validation_runtime"
+          - implement runtime adapter behavior
+          - integrate dispatcher and config changes
+          - own Hermes-aware runtime projection and tests
+      - id: qa-reviewer
+        role: worker
+        team: validation
+        model_ref: worker_default
+        expertise: qa-reviewer-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: validation_runtime
         sprint_responsibilities:
-          - "run smoke tests"
-          - "run diagnostics tests"
-          - "verify sync consistency"
-      - id: "security-reviewer"
-        role: "worker"
-        team: "validation"
-        model_ref: "worker_default"
-        expertise: "security-reviewer-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "validation_runtime"
+          - run smoke tests
+          - run diagnostics tests
+          - verify sync consistency
+      - id: security-reviewer
+        role: worker
+        team: validation
+        model_ref: worker_default
+        expertise: security-reviewer-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: validation_runtime
         sprint_responsibilities:
-          - "review runtime boundary and unsafe coupling"
-          - "flag Hermes architecture capture risks"
-          - "cut future-wave contamination from the sprint"
+          - review runtime boundary and unsafe coupling
+          - flag runtime capture risks across runtimes
+          - cut future-wave contamination from the sprint
     runtime_overrides:
       opencode:
         permission:
           task:
             allow_delegate:
-              orchestrator: ["planning-lead", "engineering-lead", "validation-lead"]
-              planning-lead: ["repo-analyst", "solution-architect"]
-              engineering-lead: ["frontend-dev", "backend-dev"]
-              validation-lead: ["qa-reviewer", "security-reviewer"]
+              orchestrator:
+                - planning-lead
+                - engineering-lead
+                - validation-lead
+              planning-lead:
+                - repo-analyst
+                - solution-architect
+              engineering-lead:
+                - frontend-dev
+                - backend-dev
+              validation-lead:
+                - qa-reviewer
+                - security-reviewer
       claude:
         ccr:
           team_routes:
-            orchestrator: ["planning-lead", "engineering-lead", "validation-lead"]
+            orchestrator:
+              - planning-lead
+              - engineering-lead
+              - validation-lead
       pi:
         multi_team:
-          session_root: ".pi/crew/dev/sessions"
-          extension_entry: "extensions/multi-team.ts"
-
-  - id: "marketing"
-    display_name: "Marketing Crew"
-    mission: "Plan, produce, refine, and validate communication assets, launch narratives, campaign collateral, and supporting media for Meta Agents Harness."
+          session_root: .pi/crew/dev/sessions
+          extension_entry: extensions/multi-team.ts
+  - id: marketing
+    display_name: Marketing Crew
+    mission: Plan, produce, refine, and validate communication assets, launch narratives, campaign collateral, and supporting media for Meta Agents Harness.
     source_configs:
-      pi: ".pi/crew/marketing/multi-team.yaml"
-      claude: ".claude/crew/marketing/multi-team.yaml"
-      opencode: ".opencode/multi-team.yaml"
-      hermes: ".hermes/crew/marketing/config.yaml"
+      pi: .pi/crew/marketing/multi-team.yaml
+      claude: .claude/crew/marketing/multi-team.yaml
+      codex: .codex/crew/marketing/multi-team.yaml
+      kilo: .kilo/crew/marketing/multi-team.yaml
+      opencode: .opencode/multi-team.yaml
+      hermes: .hermes/crew/marketing/config.yaml
     session:
-      pi_root: ".pi/crew/marketing/sessions"
-      claude_mirror_root: ".claude/crew/marketing/sessions"
+      pi_root: .pi/crew/marketing/sessions
+      claude_mirror_root: .claude/crew/marketing/sessions
+      codex_root: .codex/crew/marketing/sessions
+      kilo_root: .kilo/crew/marketing/sessions
     topology:
-      orchestrator: "orchestrator"
+      orchestrator: orchestrator
       leads:
-        planning: "planning-lead"
-        creative: "creative-lead"
-        validation: "validation-lead"
+        planning: planning-lead
+        creative: creative-lead
+        validation: validation-lead
       workers:
-        planning: ["market-researcher", "campaign-strategist"]
-        creative: ["copywriter", "creative-strategist", "media-operator"]
-        validation: ["performance-analyst", "brand-safety-reviewer"]
+        planning:
+          - market-researcher
+          - campaign-strategist
+        creative:
+          - copywriter
+          - creative-strategist
+          - media-operator
+        validation:
+          - performance-analyst
+          - brand-safety-reviewer
     agents:
-      - id: "orchestrator"
-        role: "orchestrator"
-        team: "orchestration"
-        model_ref: "orchestrator_default"
-        expertise: "orchestrator-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "read_only_repo"
-      - id: "planning-lead"
-        role: "lead"
-        team: "planning"
-        model_ref: "lead_default"
-        expertise: "planning-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "creative-lead"
-        role: "lead"
-        team: "creative"
-        model_ref: "lead_default"
-        expertise: "creative-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "validation-lead"
-        role: "lead"
-        team: "validation"
-        model_ref: "lead_default"
-        expertise: "validation-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "market-researcher"
-        role: "worker"
-        team: "planning"
-        model_ref: "worker_default"
-        expertise: "market-researcher-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "campaign-strategist"
-        role: "worker"
-        team: "planning"
-        model_ref: "worker_default"
-        expertise: "campaign-strategist-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "copywriter"
-        role: "worker"
-        team: "creative"
-        model_ref: "worker_default"
-        expertise: "copywriter-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "creative-strategist"
-        role: "worker"
-        team: "creative"
-        model_ref: "worker_default"
-        expertise: "creative-strategist-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "media-operator"
-        role: "worker"
-        team: "creative"
-        model_ref: "worker_default"
-        expertise: "media-operator-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "performance-analyst"
-        role: "worker"
-        team: "validation"
-        model_ref: "worker_default"
-        expertise: "performance-analyst-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
-      - id: "brand-safety-reviewer"
-        role: "worker"
-        team: "validation"
-        model_ref: "worker_default"
-        expertise: "brand-safety-reviewer-expertise-model"
-        skills: ["expertise_model"]
-        domain_profile: "docs_authoring"
+      - id: orchestrator
+        role: orchestrator
+        team: orchestration
+        model_ref: orchestrator_default
+        expertise: orchestrator-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: read_only_repo
+      - id: planning-lead
+        role: lead
+        team: planning
+        model_ref: lead_default
+        expertise: planning-lead-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: creative-lead
+        role: lead
+        team: creative
+        model_ref: lead_default
+        expertise: creative-lead-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: validation-lead
+        role: lead
+        team: validation
+        model_ref: lead_default
+        expertise: validation-lead-expertise-model
+        skills:
+          - delegate_bounded
+          - zero_micromanagement
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: market-researcher
+        role: worker
+        team: planning
+        model_ref: worker_default
+        expertise: market-researcher-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: campaign-strategist
+        role: worker
+        team: planning
+        model_ref: worker_default
+        expertise: campaign-strategist-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: copywriter
+        role: worker
+        team: creative
+        model_ref: worker_default
+        expertise: copywriter-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: creative-strategist
+        role: worker
+        team: creative
+        model_ref: worker_default
+        expertise: creative-strategist-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: media-operator
+        role: worker
+        team: creative
+        model_ref: worker_default
+        expertise: media-operator-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: performance-analyst
+        role: worker
+        team: validation
+        model_ref: worker_default
+        expertise: performance-analyst-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
+      - id: brand-safety-reviewer
+        role: worker
+        team: validation
+        model_ref: worker_default
+        expertise: brand-safety-reviewer-expertise-model
+        skills:
+          - expertise_model
+        domain_profile: docs_authoring
     runtime_overrides:
       opencode:
         permission:
           task:
             allow_delegate:
-              orchestrator: ["planning-lead", "creative-lead", "validation-lead"]
-              planning-lead: ["market-researcher", "campaign-strategist"]
-              creative-lead: ["copywriter", "creative-strategist", "media-operator"]
-              validation-lead: ["performance-analyst", "brand-safety-reviewer"]
+              orchestrator:
+                - planning-lead
+                - creative-lead
+                - validation-lead
+              planning-lead:
+                - market-researcher
+                - campaign-strategist
+              creative-lead:
+                - copywriter
+                - creative-strategist
+                - media-operator
+              validation-lead:
+                - performance-analyst
+                - brand-safety-reviewer
       claude:
         ccr:
           team_routes:
-            orchestrator: ["planning-lead", "creative-lead", "validation-lead"]
+            orchestrator:
+              - planning-lead
+              - creative-lead
+              - validation-lead
       pi:
         multi_team:
-          session_root: ".pi/crew/marketing/sessions"
-          extension_entry: "extensions/multi-team.ts"
-
+          session_root: .pi/crew/marketing/sessions
+          extension_entry: extensions/multi-team.ts
 adapters:
-  source_of_truth: "meta-agents.yaml"
+  source_of_truth: meta-agents.yaml
   mapping_rules:
     roles_to_runtime:
-      opencode: "agent files + permission.task"
-      claude: "agent files + CCR route map + .mcp.json"
-      pi: "crew multi-team.yaml + extensions/multi-team.ts"
-      hermes: "crew config + runtime capability projection"
+      opencode: agent files + permission.task
+      claude: agent files + CCR route map + .mcp.json
+      kilo: crew multi-team.yaml + generated agents + generated expertise
+      pi: crew multi-team.yaml + extensions/multi-team.ts
+      hermes: crew config + runtime capability projection
     expertise_to_runtime:
-      opencode: ".opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml"
-      claude: ".claude/crew/<crew>/expertise/<agent>-expertise-model.yaml"
-      pi: ".pi/crew/<crew>/expertise/<agent>-expertise-model.yaml"
-      hermes: ".hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml"
+      opencode: .opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml
+      claude: .claude/crew/<crew>/expertise/<agent>-expertise-model.yaml
+      kilo: .kilo/crew/<crew>/expertise/<agent>-expertise-model.yaml
+      pi: .pi/crew/<crew>/expertise/<agent>-expertise-model.yaml
+      hermes: .hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml
     skills_to_runtime:
-      opencode: ".opencode/skills/*/SKILL.md"
-      claude: ".claude/skills/*/SKILL.md"
-      pi: ".pi/skills/*/SKILL.md"
-      hermes: ".hermes/skills/*/SKILL.md"
+      opencode: .opencode/skills/*/SKILL.md
+      claude: .claude/skills/*/SKILL.md
+      kilo: .kilo/skills/*/SKILL.md
+      pi: .pi/skills/*/SKILL.md
+      hermes: .hermes/skills/*/SKILL.md
     domain_to_runtime:
-      opencode: "permission.read/edit/bash"
-      claude: "tool + routing scope"
-      pi: "domain.read/upsert/delete + session scope"
-      hermes: "capability and workspace scope projection"
+      opencode: permission.read/edit/bash
+      claude: tool + routing scope
+      kilo: domain.read/upsert/delete + session scope
+      pi: domain.read/upsert/delete + session scope
+      hermes: capability and workspace scope projection

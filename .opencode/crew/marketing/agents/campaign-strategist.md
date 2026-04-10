@@ -9,13 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Campaign Strategist
 
 Role: `worker`
 Team: `Planning`
-Model: `zai/glm-5-turbo`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Planning worker focused on scoped execution within assigned ownership boundaries.

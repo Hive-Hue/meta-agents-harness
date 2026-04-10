@@ -227,9 +227,9 @@ orchestrator:
     - mcp_tools
     - mcp_call
   skills:
-    - .pi/skills/delegate-bounded/SKILL.md
-    - .pi/skills/zero-micromanagement/SKILL.md
-    - .pi/skills/expertise-model/SKILL.md
+    - skills/delegate_bounded/SKILL.md
+    - skills/zero_micromanagement/SKILL.md
+    - skills/expertise_model/SKILL.md
   routes_to:
     - planning-lead
     - creative-lead
@@ -247,7 +247,7 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      prompt: .pi/crew/marketing/agents/planning-lead.md
+      prompt: .pi/crew/marketing/agents/planning_lead.md
       expertise:
         path: .pi/crew/marketing/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
@@ -268,9 +268,9 @@ teams:
         - mcp_tools
         - mcp_call
       skills:
-        - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/expertise-model/SKILL.md
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
       routes_to:
         - market-researcher
         - campaign-strategist
@@ -308,7 +308,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        prompt: .pi/crew/marketing/agents/market-researcher.md
+        prompt: .pi/crew/marketing/agents/market_researcher.md
         expertise:
           path: .pi/crew/marketing/expertise/market-researcher-expertise-model.yaml
           use-when: Track durable learnings for market-researcher.
@@ -331,7 +331,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -365,7 +365,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        prompt: .pi/crew/marketing/agents/campaign-strategist.md
+        prompt: .pi/crew/marketing/agents/campaign_strategist.md
         expertise:
           path: .pi/crew/marketing/expertise/campaign-strategist-expertise-model.yaml
           use-when: Track durable learnings for campaign-strategist.
@@ -388,7 +388,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -424,7 +424,7 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      prompt: .pi/crew/marketing/agents/creative-lead.md
+      prompt: .pi/crew/marketing/agents/creative_lead.md
       expertise:
         path: .pi/crew/marketing/expertise/creative-lead-expertise-model.yaml
         use-when: Track durable learnings for creative-lead.
@@ -445,9 +445,9 @@ teams:
         - mcp_tools
         - mcp_call
       skills:
-        - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/expertise-model/SKILL.md
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
       routes_to:
         - copywriter
         - creative-strategist
@@ -509,7 +509,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -543,7 +543,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        prompt: .pi/crew/marketing/agents/creative-strategist.md
+        prompt: .pi/crew/marketing/agents/creative_strategist.md
         expertise:
           path: .pi/crew/marketing/expertise/creative-strategist-expertise-model.yaml
           use-when: Track durable learnings for creative-strategist.
@@ -566,7 +566,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -600,7 +600,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        prompt: .pi/crew/marketing/agents/media-operator.md
+        prompt: .pi/crew/marketing/agents/media_operator.md
         expertise:
           path: .pi/crew/marketing/expertise/media-operator-expertise-model.yaml
           use-when: Track durable learnings for media-operator.
@@ -623,7 +623,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -659,7 +659,7 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      prompt: .pi/crew/marketing/agents/validation-lead.md
+      prompt: .pi/crew/marketing/agents/validation_lead.md
       expertise:
         path: .pi/crew/marketing/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
@@ -680,9 +680,9 @@ teams:
         - mcp_tools
         - mcp_call
       skills:
-        - .pi/skills/delegate-bounded/SKILL.md
-        - .pi/skills/zero-micromanagement/SKILL.md
-        - .pi/skills/expertise-model/SKILL.md
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
       routes_to:
         - performance-analyst
         - brand-safety-reviewer
@@ -720,7 +720,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        prompt: .pi/crew/marketing/agents/performance-analyst.md
+        prompt: .pi/crew/marketing/agents/performance_analyst.md
         expertise:
           path: .pi/crew/marketing/expertise/performance-analyst-expertise-model.yaml
           use-when: Track durable learnings for performance-analyst.
@@ -743,7 +743,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true
@@ -777,7 +777,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        prompt: .pi/crew/marketing/agents/brand-safety-reviewer.md
+        prompt: .pi/crew/marketing/agents/brand_safety_reviewer.md
         expertise:
           path: .pi/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml
           use-when: Track durable learnings for brand-safety-reviewer.
@@ -800,7 +800,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
-          - .pi/skills/expertise-model/SKILL.md
+          - skills/expertise_model/SKILL.md
         domain:
           - path: .
             read: true

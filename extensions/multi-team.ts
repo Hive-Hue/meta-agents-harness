@@ -1401,6 +1401,7 @@ function stringifyYaml(value: any, indent = 0): string {
 export default function (pi: ExtensionAPI) {
 	let config: ResolvedConfig | null = null;
 	let runtime: RuntimeState | null = null;
+	let currentThinkingLevel = "minimal";
 	let widgetCtx: any;
 	let sessionId = "";
 	let sessionRoot = "";
@@ -2484,7 +2485,7 @@ export default function (pi: ExtensionAPI) {
 		targetName: string,
 		task: string,
 		ctx: any,
-		options?: { modelOverride?: string },
+		options?: { modelOverride?: string; thinkingLevel?: string },
 	): Promise<{ output: string; exitCode: number; elapsed: number; child?: DispatchTarget; artifactPath?: string }> {
 		if (!config || !runtime) {
 			return Promise.resolve({ output: "Runtime not initialized.", exitCode: 1, elapsed: 0 });
@@ -2562,7 +2563,7 @@ export default function (pi: ExtensionAPI) {
 			"--no-skills",
 			"--no-prompt-templates",
 			"--no-themes",
-			"--thinking", "off",
+			"--thinking", options?.thinkingLevel ?? currentThinkingLevel,
 			"--session", sessionFile,
 		];
 		if (spawnTools.length > 0) {
@@ -3481,6 +3482,16 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("thinking", {
+		description: "Control thinking level for child agents: /thinking [off|minimal|low|medium|high|xhigh]",
+		handler: async (args, ctx) => {
+			const commandText = args.trim() ? `/thinking ${args.trim()}` : "/thinking";
+			const result = await handleThinkingCommand(commandText);
+			if (result.response) {
+				ctx.ui.notify(result.response, "info");
+			}
+		},
+	});
 
 	pi.on("input", async (event, _ctx) => {
 		if (!runtime) {
@@ -3490,6 +3501,9 @@ export default function (pi: ExtensionAPI) {
 		if (text) {
 			if (text.startsWith("/compact")) {
 				return handleCompactCommand(text);
+			}
+			if (text.startsWith("/thinking")) {
+				return handleThinkingCommand(text);
 			}
 			appendConversation("user", text, {
 				source: currentParentAgent() ? "delegation" : "user",
@@ -3588,6 +3602,58 @@ Examples:
 				`- After: ~${newTokens.toLocaleString()} tokens (${keptLines.length} turns)\n` +
 				`- Saved: ~${savedTokens.toLocaleString()} tokens (${Math.round(savedTokens / estimatedTokens * 100)}% reduction)\n` +
 				`- Removed: ${removedCount} conversation turns`
+		};
+	}
+
+	const VALID_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"];
+
+	async function handleThinkingCommand(text: string): Promise<{ action: string; response?: string }> {
+		const args = text.slice("/thinking".length).trim();
+		const parts = args.split(/\s+/).filter(Boolean);
+		const subcommand = parts[0]?.toLowerCase();
+
+		if (!subcommand || subcommand === "status" || subcommand === "show") {
+			return {
+				action: "respond",
+				response: `**Thinking Level**: ${currentThinkingLevel}\n\nValid levels: ${VALID_THINKING_LEVELS.join(", ")}`
+			};
+		}
+
+		if (subcommand === "help") {
+			return {
+				action: "respond",
+				response: `**/thinking** - Control thinking level for child agents
+Usage: /thinking [level|help]
+
+Valid levels:
+  off      No thinking
+  minimal  Minimal reasoning (default)
+  low      Low reasoning
+  medium   Medium reasoning
+  high     High reasoning
+  xhigh    Extra high reasoning
+
+Examples:
+  /thinking        Show current level
+  /thinking high   Set to high reasoning
+  /thinking medium Set to medium reasoning
+  /thinking help   Show this help
+
+Note: Controls thinking level for delegated child agents only.`
+			};
+		}
+
+		if (VALID_THINKING_LEVELS.includes(subcommand)) {
+			currentThinkingLevel = subcommand;
+			return {
+				action: "respond",
+				response: `Thinking level set to **${currentThinkingLevel}**`
+			};
+		}
+
+		return {
+			action: "respond",
+			response: `Invalid thinking level "${subcommand}". Valid levels: ${VALID_THINKING_LEVELS.join(", ")}`
 		};
 	}
 
@@ -3740,7 +3806,8 @@ Examples:
 		ctx.ui.notify(
 			`Multi-Team loaded\nSystem: ${config!.name}\nRole: ${runtime.role}\nAgent: ${runtime.agent.name}\nSession: ${currentSessionId()}\n\n` +
 			`/multi-team       Runtime summary\n` +
-			`/multi-team-tree  Print hierarchy`,
+			`/multi-team-tree  Print hierarchy\n` +
+			`/thinking         Control thinking level`,
 			"info",
 		);
 

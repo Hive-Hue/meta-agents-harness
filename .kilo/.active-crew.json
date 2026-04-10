@@ -1,0 +1,7 @@
+{
+  "crew": "dev",
+  "source_config": ".kilo/crew/dev/multi-team.yaml",
+  "source_agents": ".kilo/crew/dev/agents",
+  "activated_at": "2026-04-10T02:39:11.143Z",
+  "note": "Used by MAH core to bootstrap Kilo with selected crew."
+}

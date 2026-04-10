@@ -32,7 +32,7 @@ Hermes is integrated through the standard adapter pattern in `scripts/runtime-ad
 |---|---|
 | `name` | `hermes` |
 | `markerDir` | `.hermes` |
-| `wrapper` | `hermesh` |
+| `wrapper` | `null` (core-integrated path) |
 | `directCli` | `hermes` |
 
 ### Detection precedence
@@ -41,7 +41,7 @@ Hermes follows the same detection priority as all runtimes:
 
 1. **Forced**: `--runtime hermes`, `-r hermes`, or `MAH_RUNTIME=hermes`
 2. **Marker**: presence of `.hermes/` directory in the repository
-3. **CLI**: `hermes` or `hermesh` executable available in PATH
+3. **CLI**: `hermes` executable available in PATH
 
 ### Capabilities
 
@@ -62,14 +62,14 @@ Hermes maps to the standard MAH command surface:
 | MAH Command | Hermes Equivalent | Status |
 |---|---|---|
 | `mah detect` | Runtime detection via marker/CLI | Supported |
-| `mah doctor` | `hermesh doctor` → `hermes doctor` | Supported |
-| `mah check:runtime` | `hermesh doctor` → `hermes doctor` | Supported |
-| `mah validate:runtime` | `hermesh doctor` → `hermes doctor` | Supported |
+| `mah doctor` | `hermes doctor` | Supported |
+| `mah check:runtime` | `hermes doctor` | Supported |
+| `mah validate:runtime` | `hermes doctor` | Supported |
 | `mah validate` | Config + runtime validation | Supported |
 | `mah explain` | Resolution plan display | Supported |
-| `mah run` | `hermesh run` → `hermes chat` | Supported |
-| `mah list:crews` | `hermesh list:crews` | Supported |
-| `mah use <crew>` | `hermesh use <crew>` | Supported |
+| `mah run` | MAH bootstrap → `hermes chat` | Supported |
+| `mah list:crews` | MAH core-managed crew enumeration | Supported |
+| `mah use <crew>` | MAH core-managed crew activation | Supported |
 | `mah clear` | Crew/session reset | Supported |
 
 If a command cannot be cleanly mapped to Hermes behavior, it fails with a clear, honest error message rather than silently degrading.
@@ -78,7 +78,7 @@ If a command cannot be cleanly mapped to Hermes behavior, it fails with a clear,
 
 ## Session management
 
-Hermes session semantics are handled through MAH's unified session controls and the repo-local `hermesh` wrapper:
+Hermes session semantics are handled through MAH's unified session controls and the core-integrated Hermes adapter:
 
 ```bash
 mah --runtime hermes run --session-mode new
@@ -93,7 +93,7 @@ mah --runtime hermes run --session-id <id>
 
 `--session-mode none` is not natively supported by Hermes — MAH emits a warning and the session persists normally.
 
-`--session-root` is accepted by the wrapper as MAH metadata, but Hermes does not currently expose a native session-root flag.
+`--session-root` is accepted by MAH as session metadata, but Hermes does not currently expose a native session-root flag.
 
 See [`session-management.md`](./session-management.md) for details.
 
@@ -113,7 +113,7 @@ See [`session-management.md`](./session-management.md) for details.
 
 - Hermes support in `v0.4.0` is an adapter foundation, not full runtime parity.
 - Forced detection, contract checks, and explainability are first-class.
-- `list:crews`, `use`, and `clear` work through the repo-local wrapper alone.
+- `list:crews`, `use`, and `clear` are handled directly by the MAH core.
 - Interactive `run` and `doctor` still depend on an actual `hermes` CLI being available in PATH.
 
 ---

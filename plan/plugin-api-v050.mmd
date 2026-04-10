@@ -1,0 +1,40 @@
+flowchart LR
+  E0(("Início\n0.0h")):::start
+  E1(("Evento T1\n3.2h")):::event
+  E0 -->|T1 · 3.2h| E1
+  E2(("Evento T2\n5.2h")):::event
+  E1 -.->|T2 · 2.0h| E2
+  E3(("Evento T3\n4.2h")):::event
+  E1 -.->|T3 · 1.0h| E3
+  E4(("Evento T4\n4.7h")):::event
+  E3 -.->|T4 · 0.5h| E4
+  E5(("Evento T5\n6.3h")):::event
+  E1 -->|T5 · 3.2h| E5
+  E6(("Join T6\n6.3h")):::join
+  E2 -. dummy · 0h .-> E6
+  E5 -. dummy · 0h .-> E6
+  E7(("Evento T6\n8.3h")):::event
+  E6 -->|T6 · 2.0h| E7
+  E8(("Evento T7\n4.2h")):::event
+  E1 -.->|T7 · 1.1h| E8
+  E9(("Evento T8\n1.0h")):::event
+  E0 -.->|T8 · 1.0h| E9
+  E10(("Join T9\n6.3h")):::join
+  E5 -. dummy · 0h .-> E10
+  E9 -. dummy · 0h .-> E10
+  E11(("Evento T9\n7.3h")):::event
+  E10 -.->|T9 · 1.0h| E11
+  E12(("Evento T10\n5.2h")):::event
+  E4 -.->|T10 · 0.5h| E12
+  E13(("Convergência final\n8.3h")):::join
+  E7 -. dummy · 0h .-> E13
+  E8 -. dummy · 0h .-> E13
+  E11 -. dummy · 0h .-> E13
+  E12 -. dummy · 0h .-> E13
+  E14(("Fim\n8.3h")):::finish
+  E13 -. dummy · 0h .-> E14
+
+  classDef start fill:#d3f9d8,stroke:#2b8a3e,color:#111;
+  classDef join fill:#fff3bf,stroke:#e67700,color:#111;
+  classDef event fill:#e7f5ff,stroke:#1c7ed6,color:#111;
+  classDef finish fill:#ffd8d8,stroke:#c92a2a,color:#111;

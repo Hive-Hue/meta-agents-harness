@@ -1,6 +1,7 @@
 ---
 name: active-listener
 description: Preserve user constraints and prior context, distinguish facts from assumptions, and produce crisp handoffs.
+compatibility: [generic]
 ---
 
 # Active Listener
