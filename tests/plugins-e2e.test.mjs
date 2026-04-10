@@ -1,8 +1,9 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, openSync, closeSync, rmSync, writeFileSync, readFileSync } from "node:fs"
 import path from "node:path"
+import os from "node:os"
 import { fileURLToPath } from "node:url"
 
 const __filename = fileURLToPath(import.meta.url)
@@ -22,15 +23,25 @@ const CORE_PLUGIN_SOURCE = path.join(TEST_PLUGIN_SOURCE_ROOT, CORE_PLUGIN_NAME)
 
 function runMah(args, options = {}) {
   const env = { ...process.env, ...options.env }
+  delete env.NODE_OPTIONS
+  delete env.NODE_TEST_CONTEXT
+  delete env.NODE_V8_COVERAGE
+  const outputDir = mkdtempSync(path.join(os.tmpdir(), "mah-e2e-run-"))
+  const stdoutPath = path.join(outputDir, "stdout.txt")
+  const stderrPath = path.join(outputDir, "stderr.txt")
+  const stdoutFd = openSync(stdoutPath, "w")
+  const stderrFd = openSync(stderrPath, "w")
   const result = spawnSync(process.execPath, [cliPath, ...args], {
     cwd: options.cwd || repoRoot,
     env,
-    encoding: "utf-8"
+    stdio: ["ignore", stdoutFd, stderrFd]
   })
+  closeSync(stdoutFd)
+  closeSync(stderrFd)
   return {
     status: result.status,
-    stdout: result.stdout || "",
-    stderr: result.stderr || ""
+    stdout: existsSync(stdoutPath) ? readFileSync(stdoutPath, "utf-8") : "",
+    stderr: existsSync(stderrPath) ? readFileSync(stderrPath, "utf-8") : ""
   }
 }
 

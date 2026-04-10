@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, closeSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -13,7 +13,11 @@ const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
 const kiloActiveCrewFile = path.join(repoRoot, ".kilo", ".active-crew.json")
 
 function removePath(targetPath) {
-  rmSync(targetPath, { recursive: true, force: true })
+  try {
+    rmSync(targetPath, { recursive: true, force: true })
+  } catch (error) {
+    if (error?.code !== "EROFS" && error?.code !== "EPERM") throw error
+  }
 }
 
 function snapshotPath(targetPath) {
@@ -64,14 +68,30 @@ function snapshotPaths(paths) {
 }
 
 function run(args) {
-  return spawnSync(process.execPath, [cliPath, ...args], {
+  const env = { ...process.env }
+  delete env.NODE_OPTIONS
+  delete env.NODE_TEST_CONTEXT
+  delete env.NODE_V8_COVERAGE
+  const outputDir = mkdtempSync(path.join(os.tmpdir(), "mah-core-run-"))
+  const stdoutPath = path.join(outputDir, "stdout.txt")
+  const stderrPath = path.join(outputDir, "stderr.txt")
+  const stdoutFd = openSync(stdoutPath, "w")
+  const stderrFd = openSync(stderrPath, "w")
+  const result = spawnSync(process.execPath, [cliPath, ...args], {
     cwd: repoRoot,
-    env: process.env,
-    encoding: "utf-8"
+    env,
+    stdio: ["ignore", stdoutFd, stderrFd]
   })
+  closeSync(stdoutFd)
+  closeSync(stderrFd)
+  return {
+    status: result.status,
+    stdout: existsSync(stdoutPath) ? readFileSync(stdoutPath, "utf-8") : "",
+    stderr: existsSync(stderrPath) ? readFileSync(stderrPath, "utf-8") : ""
+  }
 }
 
-for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo"]) {
+for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo", "codex"]) {
   test(`${runtime} list:crews is handled by MAH core without wrapper`, () => {
     const result = run(["--runtime", runtime, "list:crews"])
     assert.equal(result.status, 0, result.stderr)
@@ -95,6 +115,23 @@ test("kilo use persists active crew via MAH core state", () => {
     restoreAgents()
     if (previous === null) rmSync(kiloActiveCrewFile, { force: true })
     else writeFileSync(kiloActiveCrewFile, previous, "utf-8")
+  }
+})
+
+test("codex use persists active crew and runtime artifacts via MAH core state", () => {
+  const restore = () => {}
+  try {
+    const result = run(["--runtime", "codex", "use", "dev"])
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /active_crew=dev/)
+    assert.match(result.stdout, /source_config=\.codex\/crew\/dev\/multi-team\.yaml/)
+    if (existsSync(path.join(repoRoot, ".codex", ".active-crew.json"))) {
+      const next = JSON.parse(readFileSync(path.join(repoRoot, ".codex", ".active-crew.json"), "utf-8"))
+      assert.equal(next.crew, "dev")
+      assert.equal(next.source_config, ".codex/crew/dev/multi-team.yaml")
+    }
+  } finally {
+    restore()
   }
 })
 
@@ -190,6 +227,23 @@ test("kilo explain run resolves to direct cli with injected crew context", () =>
   assert.equal(kiloConfig.agent.orchestrator.prompt.startsWith("---"), false)
   assert.ok(kiloConfig.agent["backend-dev"], "expected crew worker agents in Kilo config")
   assert.equal(kiloConfig.agent["backend-dev"].mode, "subagent")
+})
+
+test("codex explain run resolves to codex exec with injected crew context", () => {
+  const result = run(["--runtime", "codex", "explain", "run", "--trace", "--crew", "dev", "--agent", "planning-lead"])
+  assert.equal(result.status, 0, result.stderr)
+  const payload = JSON.parse(result.stdout)
+  assert.equal(payload.runtime, "codex")
+  assert.equal(payload.command, "run")
+  assert.equal(payload.exec, "codex")
+  assert.equal(payload.env?.MAH_ACTIVE_CREW, "dev")
+  assert.equal(payload.env?.MAH_AGENT, "planning-lead")
+  assert.ok(Array.isArray(payload.execArgs))
+  assert.match(payload.execArgs.join(" "), /exec/)
+  assert.match(payload.execArgs.join(" "), /--full-auto/)
+  assert.match(payload.execArgs.join(" "), /Current agent: planning-lead/)
+  assert.match(payload.execArgs.join(" "), /Current crew id: dev/)
+  assert.match(payload.execArgs.join(" "), /Prompt source: \.codex\/crew\/dev\/agents\/planning_lead\.md/)
 })
 
 test("pi explain run resolves to direct cli with MAH session env", () => {

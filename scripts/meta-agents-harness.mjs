@@ -571,7 +571,14 @@ function normalizeRunArgs(runtime, passthrough) {
   const warnings = []
   const args = [...remaining]
 
-  if (!options.mode && !options.sessionId && !options.sessionRoot && options.sessionMirror === null) {
+  const hasSessionFlags =
+    Boolean(options.mode) ||
+    Boolean(options.sessionId) ||
+    Boolean(options.sessionRoot) ||
+    options.sessionMirror !== null
+  const hasAgentFlags = Boolean(options.agent) || options.hierarchy !== null
+
+  if (!hasSessionFlags && !hasAgentFlags) {
     return { args, envOverrides, warnings }
   }
 
@@ -639,6 +646,11 @@ function normalizeRunArgs(runtime, passthrough) {
     if (options.agent) args.push("--agent", options.agent)
     if (options.hierarchy === true) args.push("--hierarchy")
     if (options.hierarchy === false) args.push("--no-hierarchy")
+  } else if (options.agent) {
+    envOverrides.MAH_AGENT = options.agent
+    if (options.hierarchy !== null) {
+      warnings.push(`--hierarchy is ignored for ${runtime} runtime`)
+    }
   }
 
   return { args, envOverrides, warnings }
@@ -2112,4 +2124,8 @@ function main() {
   process.exitCode = status
 }
 
-main()
+await main()
+await Promise.all([
+  new Promise((resolve) => process.stdout.write("", resolve)),
+  new Promise((resolve) => process.stderr.write("", resolve))
+])

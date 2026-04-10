@@ -17,6 +17,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Support for wrapper-based plugins and wrapperless core-integrated plugins.
 - `MAH_PLUGINS_ENABLED=0` opt-out for plugin discovery.
 - Runtime plugin documentation in [`docs/plugin-api.md`](./docs/plugin-api.md) and the README.
+- Codex runtime CLI support with core-managed `list:crews`, `use`, `clear`, and `run` integration, including adapter-backed crew activation and diagnostics.
 - Unit and end-to-end coverage for plugin loading, install/uninstall, validation, and runtime detection.
 - `/thinking` slash command for runtime control of thinking level in delegated child agents.
   - Levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`
