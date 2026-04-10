@@ -649,6 +649,37 @@ If `.mcp.json` is missing:
 cp .mcp.example.json .mcp.json
 ```
 
+### Codex MCP `mah`
+
+To expose MAH operational tools inside a Codex session, register the local `mah` MCP server:
+
+```bash
+codex mcp add mah -- /home/alysson/.nvm/versions/node/v22.19.0/bin/node /home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs
+```
+
+Recommended `~/.codex/config.toml` entry:
+
+```toml
+[mcp_servers.mah]
+command = "/home/alysson/.nvm/versions/node/v22.19.0/bin/node"
+args = ["/home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs"]
+cwd = "/home/alysson/Github/meta-agents-harness"
+startup_timeout_sec = 120
+```
+
+Then run:
+
+```bash
+mah --runtime codex use --crew dev
+mah --runtime codex run
+```
+
+Inside the Codex session, the supported MAH tools are:
+
+- `mah_get_active_context`
+- `mah_list_agents`
+- `mah_delegate_agent`
+
 ### `mah` command not available
 
 Use the local entrypoint:
