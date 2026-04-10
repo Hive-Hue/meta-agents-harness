@@ -1,1 +1,0 @@
-../crew/dev/agents/security_reviewer.md

@@ -1,1 +1,0 @@
-../crew/dev/agents/planning_lead.md

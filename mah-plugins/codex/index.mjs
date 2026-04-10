@@ -181,6 +181,10 @@ function buildCodexPrompt({ crewId, crewName, mission, sprintMode, agent, prompt
   return sections.join("\n\n")
 }
 
+function buildCodexInitialMessagesPrompt(prompt) {
+  return `initial_messages=[{ role = "system", content = ${JSON.stringify(prompt)} }]`
+}
+
 function loadCodexCrewConfig(repoRoot, configPath) {
   if (!configPath || !existsSync(configPath)) {
     return { ok: false, error: `crew config not found: ${configPath || "(empty)"}` }
@@ -278,19 +282,28 @@ function buildCodexRunContext({ repoRoot, crew, configPath, argv = [], envOverri
 
   const crewConfig = crewResult.config || {}
   const agentName = `${envOverrides.MAH_AGENT || process.env.MAH_AGENT || ""}`.trim()
-  const taskPrompt = Array.isArray(argv) ? argv.map((item) => `${item || ""}`.trim()).filter(Boolean).join(" ") : ""
   const selectedAgent = findAgent(crewConfig, agentName)
   if (!selectedAgent) {
     return { ok: false, error: agentName ? `agent not found in crew config: ${agentName}` : "no Codex crew agent available" }
   }
+
+  const autonomous = `${envOverrides.MAH_CODEX_AUTONOMOUS || process.env.MAH_CODEX_AUTONOMOUS || ""}`.trim() === "1"
+  const rawTaskPrompt = Array.isArray(argv)
+    ? argv.map((item) => `${item || ""}`.trim()).filter(Boolean).join(" ")
+    : ""
+  const taskPrompt = autonomous ? rawTaskPrompt : ""
 
   const promptPath = resolveFromRepo(repoRoot, selectedAgent.prompt)
   const promptBody = loadPromptBody(promptPath)
   if (!promptBody) {
     return { ok: false, error: `Codex prompt not found: ${rel(repoRoot, promptPath)}` }
   }
+  const warnings = []
+  if (!autonomous && rawTaskPrompt) {
+    warnings.push("codex: task prompt ignored in interactive mode; set MAH_CODEX_AUTONOMOUS=1 for autonomous subagent execution")
+  }
 
-  const finalPrompt = buildCodexPrompt({
+  const systemPrompt = buildCodexPrompt({
     crewId: `${crew || ""}`.trim(),
     crewName: `${crewConfig?.name || ""}`.trim(),
     mission: `${crewConfig?.mission || ""}`.trim(),
@@ -298,17 +311,22 @@ function buildCodexRunContext({ repoRoot, crew, configPath, argv = [], envOverri
     agent: selectedAgent,
     promptPath: selectedAgent.prompt,
     promptBody,
-    userPrompt: taskPrompt
+    userPrompt: ""
   })
 
   const model = `${selectedAgent.model || ""}`.trim()
-  const hasTask = Boolean(taskPrompt) || Boolean(agentName)
-  const args = []
+  const args = [buildCodexInitialMessagesPrompt(systemPrompt)]
   if (model) args.push("--model", model)
-  if (hasTask) {
-    args.push("exec", "--cd", repoRoot, "--full-auto", finalPrompt)
+  if (autonomous && taskPrompt) {
+    args.push("exec", "--cd", repoRoot, "--full-auto", taskPrompt)
   } else {
-    args.push("--cd", repoRoot, finalPrompt)
+    if (taskPrompt) {
+      return {
+        ok: false,
+        error: "Codex run task prompts are only enabled for autonomous subagent execution"
+      }
+    }
+    args.push("--cd", repoRoot)
   }
 
   return {
@@ -319,16 +337,17 @@ function buildCodexRunContext({ repoRoot, crew, configPath, argv = [], envOverri
     envOverrides: {
       ...envOverrides,
       MAH_ACTIVE_CREW: `${crew || ""}`.trim(),
-      MAH_AGENT: selectedAgent.name
+      MAH_AGENT: selectedAgent.name,
+      ...(autonomous ? { MAH_CODEX_AUTONOMOUS: "1" } : {})
     },
-    warnings: [],
+    warnings,
     internal: {
       crew,
       configPath,
       agent: selectedAgent.name,
       promptPath: selectedAgent.prompt,
       taskPrompt,
-      automation: hasTask
+      automation: autonomous && Boolean(taskPrompt)
     }
   }
 }

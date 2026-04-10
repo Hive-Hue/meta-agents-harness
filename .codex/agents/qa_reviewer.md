@@ -1,1 +1,0 @@
-../crew/dev/agents/qa_reviewer.md

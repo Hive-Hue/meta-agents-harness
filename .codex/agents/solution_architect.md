@@ -1,1 +1,0 @@
-../crew/dev/agents/solution_architect.md

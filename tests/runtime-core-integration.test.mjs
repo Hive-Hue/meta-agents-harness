@@ -67,8 +67,8 @@ function snapshotPaths(paths) {
   }
 }
 
-function run(args) {
-  const env = { ...process.env }
+function run(args, options = {}) {
+  const env = { ...process.env, ...(options.env || {}) }
   delete env.NODE_OPTIONS
   delete env.NODE_TEST_CONTEXT
   delete env.NODE_V8_COVERAGE
@@ -229,7 +229,7 @@ test("kilo explain run resolves to direct cli with injected crew context", () =>
   assert.equal(kiloConfig.agent["backend-dev"].mode, "subagent")
 })
 
-test("codex explain run resolves to codex exec with injected crew context", () => {
+test("codex explain run resolves to interactive codex session with injected crew context", () => {
   const result = run(["--runtime", "codex", "explain", "run", "--trace", "--crew", "dev", "--agent", "planning-lead"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -239,11 +239,43 @@ test("codex explain run resolves to codex exec with injected crew context", () =
   assert.equal(payload.env?.MAH_ACTIVE_CREW, "dev")
   assert.equal(payload.env?.MAH_AGENT, "planning-lead")
   assert.ok(Array.isArray(payload.execArgs))
-  assert.match(payload.execArgs.join(" "), /exec/)
-  assert.match(payload.execArgs.join(" "), /--full-auto/)
+  assert.equal(payload.execArgs.some((arg) => arg === "exec"), false)
+  assert.equal(payload.execArgs.some((arg) => arg === "--full-auto"), false)
+  assert.match(payload.execArgs.join(" "), /initial_messages=\[\{ role = "system"/)
   assert.match(payload.execArgs.join(" "), /Current agent: planning-lead/)
   assert.match(payload.execArgs.join(" "), /Current crew id: dev/)
   assert.match(payload.execArgs.join(" "), /Prompt source: \.codex\/crew\/dev\/agents\/planning_lead\.md/)
+})
+
+test("codex explain run switches to full-auto only in autonomous subagent mode", () => {
+  const result = run([
+    "--runtime",
+    "codex",
+    "explain",
+    "run",
+    "--trace",
+    "--crew",
+    "dev",
+    "--agent",
+    "planning-lead",
+    "refactor",
+    "the",
+    "planner"
+  ], {
+    env: { MAH_CODEX_AUTONOMOUS: "1" }
+  })
+  assert.equal(result.status, 0, result.stderr)
+  const payload = JSON.parse(result.stdout)
+  assert.equal(payload.runtime, "codex")
+  assert.equal(payload.command, "run")
+  assert.equal(payload.exec, "codex")
+  assert.equal(payload.env?.MAH_CODEX_AUTONOMOUS, "1")
+  assert.equal(payload.env?.MAH_AGENT, "planning-lead")
+  assert.ok(Array.isArray(payload.execArgs))
+  assert.match(payload.execArgs.join(" "), /exec/)
+  assert.match(payload.execArgs.join(" "), /--full-auto/)
+  assert.match(payload.execArgs.join(" "), /refactor the planner/)
+  assert.match(payload.execArgs.join(" "), /initial_messages=\[\{ role = "system"/)
 })
 
 test("pi explain run resolves to direct cli with MAH session env", () => {
