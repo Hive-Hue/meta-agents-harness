@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
-## [0.5.0] - Unreleased
+## [0.5.0] - 2026-04-10
 
 ### Highlights
 - Runtime plugins became a supported release feature, so new runtimes can be installed, validated, listed, and removed without patching core files.
