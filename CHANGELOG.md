@@ -10,6 +10,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Runtime plugins became a supported release feature, so new runtimes can be installed, validated, listed, and removed without patching core files.
 - Plugin discovery now covers `mah-plugins/` and `node_modules/@mah/runtime-*`, with built-in runtimes always taking priority and discovery anchored to the MAH package root.
 - Core-managed plugin runtimes can join the normal MAH surface (`run`, `list:crews`, `use`, `clear`, and session flows) while still honoring the same adapter contract as built-ins.
+- Codex sessions can now expose bounded MAH operational tools through a local `mah` MCP server, enabling active-context inspection and graph-based delegation from inside the Codex runtime.
 
 ### Added
 - `scripts/plugin-loader.mjs` for plugin discovery, validation, registry merge, unload, and lifecycle hooks.
@@ -18,6 +19,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `MAH_PLUGINS_ENABLED=0` opt-out for plugin discovery.
 - Runtime plugin documentation in [`docs/plugin-api.md`](./docs/plugin-api.md) and the README.
 - Codex runtime CLI support with core-managed `list:crews`, `use`, `clear`, and `run` integration, including adapter-backed crew activation and diagnostics.
+- Native Codex-facing `mah` MCP plugin under `plugins/mah/` with:
+  - `mah_get_active_context`
+  - `mah_list_agents`
+  - `mah_delegate_agent`
+- Codex plugin documentation covering MCP registration, `config.toml` setup, and in-session usage for the `mah` tools.
 - Unit and end-to-end coverage for plugin loading, install/uninstall, validation, and runtime detection.
 - `/thinking` slash command for runtime control of thinking level in delegated child agents.
   - Levels: `off`, `minimal`, `low`, `medium`, `high`, `xhigh`
@@ -35,6 +41,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `thinkingLevel` option support in `dispatchChild` for elevated reasoning on complex tasks.
 - Child agent thinking level default changed from `off` to `minimal`.
 - `/thinking` command handler added to `pi.on("input")` processing, matching the `/compact` pattern.
+- Codex-side MAH delegation now has a documented installation path through a local MCP server using absolute `node`/script paths and explicit `cwd`, which avoids shell- and path-resolution drift during Codex startup.
 
 ### Fixed
 - Plugin validation now rejects incompatible `mahVersion` ranges and malformed adapter contracts before registration.
