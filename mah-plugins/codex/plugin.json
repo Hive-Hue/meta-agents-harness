@@ -1,0 +1,12 @@
+{
+  "name": "codex",
+  "version": "1.0.0",
+  "mahVersion": "^0.5.0",
+  "markerDir": ".codex",
+  "directCli": "codex",
+  "wrapper": null,
+  "configRoot": ".codex",
+  "configPattern": ".codex/crew/<crew>/multi-team.yaml",
+  "entry": "index.mjs",
+  "description": "Codex runtime plugin. Integrates the codex CLI directly with MAH core-managed crew context and generated prompt artifacts."
+}

@@ -1,6 +1,7 @@
 ---
 name: delegate-bounded
 description: Delegate one bounded outcome per subagent with clear ownership, expected artifact, and verification criteria.
+compatibility: [generic]
 ---
 
 # Delegate Bounded

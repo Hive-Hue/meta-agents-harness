@@ -1,5 +1,22 @@
 import { existsSync } from "node:fs"
 import path from "node:path"
+import {
+  activateClaudeCrewState,
+  activateHermesCrewState,
+  activateOpencodeCrewState,
+  activatePiCrewState,
+  clearClaudeCrewState,
+  clearHermesCrewState,
+  clearOpencodeCrewState,
+  clearPiCrewState,
+  executeClaudePreparedRun,
+  executeHermesPreparedRun,
+  executeOpencodePreparedRun,
+  prepareClaudeRunContext,
+  prepareHermesRunContext,
+  prepareOpencodeRunContext,
+  preparePiRunContext
+} from "./runtime-core-integrations.mjs"
 
 export const RUNTIME_ORDER = ["pi", "claude", "opencode", "hermes"]
 
@@ -32,6 +49,8 @@ export function createAdapter(definition) {
       return existsFn(`${cwd}/${this.markerDir}`)
     },
     supports(command) {
+      if (command === "run" && typeof this.prepareRunContext === "function") return true
+      if (["list:crews", "use", "clear"].includes(command) && !this.commands?.[command]) return true
       return Array.isArray(this.commands?.[command]) && this.commands[command].length > 0
     },
     resolveCommandPlan(command, commandExistsFn) {
@@ -48,16 +67,22 @@ export function createAdapter(definition) {
       return { ok: true, exec: selected.exec, args: selected.args, variants: candidates }
     },
     validateRuntime(commandExistsFn) {
+      const hasRuntimeEntrypoint = Boolean(this.wrapper) || Boolean(this.directCli)
       const checks = [
         { name: "marker_dir", ok: Boolean(this.markerDir) },
         { name: "wrapper_declared", ok: Boolean(this.wrapper) },
         { name: "direct_cli_declared", ok: Boolean(this.directCli) },
+        { name: "runtime_entrypoint_declared", ok: hasRuntimeEntrypoint },
         { name: "wrapper_available", ok: Boolean(this.wrapper) ? commandExistsFn(this.wrapper) : false },
         { name: "direct_cli_available", ok: Boolean(this.directCli) ? commandExistsFn(this.directCli) : false }
       ]
       const hasCommandTable = Object.keys(this.commands || {}).length > 0
       checks.push({ name: "commands_declared", ok: hasCommandTable })
-      const ok = checks.every((item) => item.ok || item.name.endsWith("_available"))
+      const ok = checks.every((item) =>
+        item.ok ||
+        item.name === "wrapper_declared" ||
+        item.name.endsWith("_available")
+      )
       return { ok, checks }
     }
   }
@@ -67,7 +92,8 @@ export const RUNTIME_ADAPTERS = {
   pi: createAdapter({
     name: "pi",
     markerDir: ".pi",
-    wrapper: "pimh",
+    configPattern: ".pi/crew/<crew>/multi-team.yaml",
+    wrapper: null,
     directCli: "pi",
     capabilities: {
       sessionModeNew: true,
@@ -75,7 +101,10 @@ export const RUNTIME_ADAPTERS = {
       sessionModeNone: true,
       sessionIdViaEnv: "PI_MULTI_SESSION_ID",
       sessionRootFlag: "--session-root",
-      sessionMirrorFlag: false
+      sessionMirrorFlag: false,
+      sessionNewArgs: ["--new-session"],
+      sessionContinueArgs: ["-c"],
+      sessionNoneArgs: ["--no-session"]
     },
     supportsSessions: true,
     sessionListCommand: null,
@@ -83,20 +112,26 @@ export const RUNTIME_ADAPTERS = {
     sessionDeleteCommand: null,
     supportsSessionNew: true,
     commands: {
-      "list:crews": [["node", [".pi/bin/pimh", "list:crews"]], ["pimh", ["list:crews"]], ["npm", ["--prefix", ".pi", "run", "list:crews"]]],
-      use: [["node", [".pi/bin/pimh", "use"]], ["pimh", ["use"]], ["npm", ["--prefix", ".pi", "run", "use:crew", "--"]]],
-      clear: [["node", [".pi/bin/pimh", "clear"]], ["pimh", ["clear"]], ["npm", ["--prefix", ".pi", "run", "clear:crew"]]],
-      run: [["node", [".pi/bin/pimh", "run"]], ["pimh", ["run"]], ["npm", ["--prefix", ".pi", "run", "run:crew", "--"]]],
-      doctor: [["node", [".pi/bin/pimh", "doctor"]], ["pimh", ["doctor"]], ["npm", ["--prefix", ".pi", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]],
-      validate: [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]],
-      "validate:runtime": [["node", [".pi/bin/pimh", "check:runtime"]], ["pimh", ["check:runtime"]], ["npm", ["--prefix", ".pi", "run", "check:runtime"]]]
+      doctor: [["pi", ["--help"]]],
+      "check:runtime": [["pi", ["--help"]]],
+      validate: [["pi", ["--help"]]],
+      "validate:runtime": [["pi", ["--help"]]]
+    },
+    activateCrew(context) {
+      return activatePiCrewState(context)
+    },
+    clearCrewState(context) {
+      return clearPiCrewState(context)
+    },
+    prepareRunContext(context) {
+      return preparePiRunContext(context)
     }
   }),
   claude: createAdapter({
     name: "claude",
     markerDir: ".claude",
-    wrapper: "ccmh",
+    configPattern: ".claude/crew/<crew>/multi-team.yaml",
+    wrapper: null,
     directCli: "claude",
     capabilities: {
       sessionModeNew: false,
@@ -104,7 +139,9 @@ export const RUNTIME_ADAPTERS = {
       sessionModeNone: true,
       sessionIdFlag: "--session-id",
       sessionRootFlag: false,
-      sessionMirrorFlag: true
+      sessionMirrorFlag: true,
+      sessionContinueArgs: ["--continue"],
+      sessionNoneArgs: ["--print", "--no-session-persistence"]
     },
     supportsSessions: true,
     sessionListCommand: null,
@@ -112,20 +149,29 @@ export const RUNTIME_ADAPTERS = {
     sessionDeleteCommand: null,
     supportsSessionNew: false,
     commands: {
-      "list:crews": [["node", [".claude/bin/ccmh", "list:crews"]], ["ccmh", ["list:crews"]], ["npm", ["--prefix", ".claude", "run", "list:crews"]]],
-      use: [["node", [".claude/bin/ccmh", "use"]], ["ccmh", ["use"]], ["npm", ["--prefix", ".claude", "run", "use:crew", "--"]]],
-      clear: [["node", [".claude/bin/ccmh", "clear"]], ["ccmh", ["clear"]], ["npm", ["--prefix", ".claude", "run", "clear:crew"]]],
-      run: [["node", [".claude/bin/ccmh", "run"]], ["ccmh", ["run"]], ["npm", ["--prefix", ".claude", "run", "run:crew", "--"]]],
-      doctor: [["node", [".claude/bin/ccmh", "doctor"]], ["ccmh", ["doctor"]], ["npm", ["--prefix", ".claude", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]],
-      validate: [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]],
-      "validate:runtime": [["node", [".claude/bin/ccmh", "check:runtime"]], ["ccmh", ["check:runtime"]], ["npm", ["--prefix", ".claude", "run", "check:runtime"]]]
+      doctor: [["claude", ["--help"]]],
+      "check:runtime": [["claude", ["--help"]]],
+      validate: [["claude", ["--help"]]],
+      "validate:runtime": [["claude", ["--help"]]]
+    },
+    activateCrew(context) {
+      return activateClaudeCrewState(context)
+    },
+    clearCrewState(context) {
+      return clearClaudeCrewState(context)
+    },
+    prepareRunContext(context) {
+      return prepareClaudeRunContext(context)
+    },
+    executePreparedRun(context) {
+      return executeClaudePreparedRun(context)
     }
   }),
   opencode: createAdapter({
     name: "opencode",
     markerDir: ".opencode",
-    wrapper: "ocmh",
+    configPattern: ".opencode/crew/<crew>/multi-team.yaml",
+    wrapper: null,
     directCli: "opencode",
     capabilities: {
       sessionModeNew: false,
@@ -133,28 +179,39 @@ export const RUNTIME_ADAPTERS = {
       sessionModeNone: false,
       sessionIdFlag: "--session-id",
       sessionRootFlag: false,
-      sessionMirrorFlag: false
+      sessionMirrorFlag: false,
+      sessionContinueArgs: ["-c"]
     },
     supportsSessions: true,
     sessionListCommand: null,
     sessionExportCommand: null,
     sessionDeleteCommand: null,
     supportsSessionNew: false,
+    sessionGlobalRoot: ".opencode/sessions",
     commands: {
-      "list:crews": [["node", [".opencode/bin/ocmh", "list:crews"]], ["ocmh", ["list:crews"]], ["npm", ["--prefix", ".opencode", "run", "list:crews"]]],
-      use: [["node", [".opencode/bin/ocmh", "use"]], ["ocmh", ["use"]], ["npm", ["--prefix", ".opencode", "run", "use:crew", "--"]]],
-      clear: [["node", [".opencode/bin/ocmh", "clear"]], ["ocmh", ["clear"]], ["npm", ["--prefix", ".opencode", "run", "clear:crew"]]],
-      run: [["node", [".opencode/bin/ocmh", "run"]], ["ocmh", ["run"]], ["npm", ["--prefix", ".opencode", "run", "run:crew", "--"]]],
-      doctor: [["node", [".opencode/bin/ocmh", "doctor"]], ["ocmh", ["doctor"]], ["npm", ["--prefix", ".opencode", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
-      validate: [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]],
-      "validate:runtime": [["node", [".opencode/bin/ocmh", "check:runtime"]], ["ocmh", ["check:runtime"]], ["npm", ["--prefix", ".opencode", "run", "check:runtime"]]]
+      doctor: [["opencode", ["--help"]]],
+      "check:runtime": [["opencode", ["--help"]]],
+      validate: [["opencode", ["--help"]]],
+      "validate:runtime": [["opencode", ["--help"]]]
+    },
+    activateCrew(context) {
+      return activateOpencodeCrewState(context)
+    },
+    clearCrewState(context) {
+      return clearOpencodeCrewState(context)
+    },
+    prepareRunContext(context) {
+      return prepareOpencodeRunContext(context)
+    },
+    executePreparedRun(context) {
+      return executeOpencodePreparedRun(context)
     }
   }),
   hermes: createAdapter({
     name: "hermes",
     markerDir: ".hermes",
-    wrapper: "hermesh",
+    configPattern: ".hermes/crew/<crew>/config.yaml",
+    wrapper: null,
     directCli: "hermes",
     capabilities: {
       sessionModeNew: true,
@@ -163,6 +220,8 @@ export const RUNTIME_ADAPTERS = {
       sessionIdViaEnv: "HERMES_SESSION_ID",
       sessionRootFlag: "--session-root",
       sessionMirrorFlag: false,
+      sessionNewArgs: ["--new-session"],
+      sessionContinueArgs: ["-c"],
       persistentMemory: true,
       supportsBackgroundOperation: true,
       supportsMultiBackendExecution: true,
@@ -174,14 +233,22 @@ export const RUNTIME_ADAPTERS = {
     sessionDeleteCommand: null,
     supportsSessionNew: true,
     commands: {
-      "list:crews": [["node", [".hermes/bin/hermesh", "list:crews"]], ["hermesh", ["list:crews"]], ["hermes", ["list:crews"]], ["npm", ["--prefix", ".hermes", "run", "list:crews"]]],
-      use: [["node", [".hermes/bin/hermesh", "use"]], ["hermesh", ["use"]], ["hermes", ["use"]], ["npm", ["--prefix", ".hermes", "run", "use:crew", "--"]]],
-      clear: [["node", [".hermes/bin/hermesh", "clear"]], ["hermesh", ["clear"]], ["hermes", ["clear"]], ["npm", ["--prefix", ".hermes", "run", "clear:crew"]]],
-      run: [["node", [".hermes/bin/hermesh", "run"]], ["hermesh", ["run"]], ["hermes", ["chat"]], ["npm", ["--prefix", ".hermes", "run", "run:crew", "--"]]],
-      doctor: [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]],
-      "check:runtime": [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]],
-      validate: [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]],
-      "validate:runtime": [["node", [".hermes/bin/hermesh", "doctor"]], ["hermesh", ["doctor"]], ["hermes", ["doctor"]], ["npm", ["--prefix", ".hermes", "run", "doctor", "--"]]]
+      doctor: [["hermes", ["doctor"]]],
+      "check:runtime": [["hermes", ["doctor"]]],
+      validate: [["hermes", ["doctor"]]],
+      "validate:runtime": [["hermes", ["doctor"]]]
+    },
+    activateCrew(context) {
+      return activateHermesCrewState(context)
+    },
+    clearCrewState(context) {
+      return clearHermesCrewState(context)
+    },
+    prepareRunContext(context) {
+      return prepareHermesRunContext(context)
+    },
+    executePreparedRun(context) {
+      return executeHermesPreparedRun(context)
     }
   })
 }

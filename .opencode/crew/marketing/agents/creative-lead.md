@@ -12,13 +12,14 @@ permission:
     copywriter: allow
     creative-strategist: allow
     media-operator: allow
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Creative Lead
 
 Role: `lead`
 Team: `Creative`
-Model: `openai/gpt-5.2`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Creative lead responsible for delegation, synthesis, and team-level coordination.

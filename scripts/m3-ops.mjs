@@ -4,6 +4,28 @@ import { execSync } from "node:child_process"
 import YAML from "yaml"
 import { RUNTIME_ADAPTERS } from "./runtime-adapters.mjs"
 
+function normalizeCapabilityArgs(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter((item) => typeof item === "string" && item.trim())
+  if (typeof value === "string" && value.trim()) return [value]
+  return []
+}
+
+function resolveRuntimeAdapter(runtimeRegistry, runtime) {
+  return runtimeRegistry?.[runtime] || null
+}
+
+function resolveRuntimeRoot(runtimeRegistry, runtime) {
+  const adapter = resolveRuntimeAdapter(runtimeRegistry, runtime)
+  return adapter?.markerDir || `.${runtime}`
+}
+
+function appendUniqueArgs(target, extraArgs) {
+  for (const token of extraArgs) {
+    if (!target.includes(token)) target.push(token)
+  }
+}
+
 function safeStat(targetPath) {
   try {
     return statSync(targetPath)
@@ -27,7 +49,7 @@ export function readMetaConfig(repoRoot) {
   return YAML.parse(raw)
 }
 
-export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}) {
+export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}, runtimeRegistry = RUNTIME_ADAPTERS) {
   const rows = []
   const normalizedRuntime = `${runtime || ""}`.trim()
   const normalizedCrew = `${crew || ""}`.trim()
@@ -62,26 +84,26 @@ export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}) {
     }
   }
 
-  collectCrewRuntime("pi", ".pi")
-  collectCrewRuntime("claude", ".claude")
-  collectCrewRuntime("opencode", ".opencode")
-  collectCrewRuntime("hermes", ".hermes")
+  for (const [runtimeName, adapter] of Object.entries(runtimeRegistry || {})) {
+    if (!adapter?.supportsSessions) continue
+    collectCrewRuntime(runtimeName, resolveRuntimeRoot(runtimeRegistry, runtimeName))
 
-  const ocGlobal = path.join(repoRoot, ".opencode", "sessions")
-  if (existsSync(ocGlobal)) {
-    const st = safeStat(ocGlobal)
-    if (st) {
-      pushRow({
-        id: "opencode:global",
-        runtime: "opencode",
-        crew: "global",
-        session_id: "global",
-        source_path: ocGlobal,
-        started_at: st.birthtime?.toISOString?.() || "",
-        last_active_at: st.mtime?.toISOString?.() || "",
-        status: "available"
-      })
-    }
+    const globalRoot = adapter?.sessionGlobalRoot
+    if (!globalRoot) continue
+    const absoluteGlobalRoot = path.join(repoRoot, globalRoot)
+    if (!existsSync(absoluteGlobalRoot)) continue
+    const st = safeStat(absoluteGlobalRoot)
+    if (!st) continue
+    pushRow({
+      id: `${runtimeName}:global:global`,
+      runtime: runtimeName,
+      crew: "global",
+      session_id: "global",
+      source_path: absoluteGlobalRoot,
+      started_at: st.birthtime?.toISOString?.() || "",
+      last_active_at: st.mtime?.toISOString?.() || "",
+      status: "available"
+    })
   }
 
   rows.sort((a, b) => `${b.last_active_at}`.localeCompare(`${a.last_active_at}`))
@@ -118,7 +140,7 @@ export function listSessions(repoRoot, options = {}) {
  * @param {string} sessionIdFull - session ID in format "runtime:crew:sessionId"
  * @returns {{ ok: boolean, path?: string, error?: string }}
  */
-export function exportSession(repoRoot, sessionIdFull) {
+export function exportSession(repoRoot, sessionIdFull, runtimeRegistry = RUNTIME_ADAPTERS) {
   const parsed = parseSessionId(sessionIdFull)
   if (!parsed) {
     return { ok: false, error: `invalid session ID format: ${sessionIdFull} (expected runtime:crew:sessionId)` }
@@ -129,7 +151,8 @@ export function exportSession(repoRoot, sessionIdFull) {
   const targetFile = path.join(targetDir, `${sessionIdFull}.tar.gz`)
 
   // Check if source exists
-  const sourcePath = path.join(repoRoot, `.${parsed.runtime}`, "crew", parsed.crew, "sessions", parsed.sessionId)
+  const runtimeRoot = resolveRuntimeRoot(runtimeRegistry, parsed.runtime)
+  const sourcePath = path.join(repoRoot, runtimeRoot, "crew", parsed.crew, "sessions", parsed.sessionId)
   if (!existsSync(sourcePath)) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
   }
@@ -153,7 +176,7 @@ export function exportSession(repoRoot, sessionIdFull) {
  * @param {string} confirmed - confirmation string ('y' or 'Y')
  * @returns {{ ok: boolean, error?: string }}
  */
-export function deleteSession(repoRoot, sessionIdFull, confirmed) {
+export function deleteSession(repoRoot, sessionIdFull, confirmed, runtimeRegistry = RUNTIME_ADAPTERS) {
   const parsed = parseSessionId(sessionIdFull)
   if (!parsed) {
     return { ok: false, error: `invalid session ID format: ${sessionIdFull} (expected runtime:crew:sessionId)` }
@@ -164,7 +187,8 @@ export function deleteSession(repoRoot, sessionIdFull, confirmed) {
     return { ok: false, error: "confirmation required: enter 'y' or 'Y' to delete" }
   }
 
-  const sourcePath = path.join(repoRoot, `.${parsed.runtime}`, "crew", parsed.crew, "sessions", parsed.sessionId)
+  const runtimeRoot = resolveRuntimeRoot(runtimeRegistry, parsed.runtime)
+  const sourcePath = path.join(repoRoot, runtimeRoot, "crew", parsed.crew, "sessions", parsed.sessionId)
   if (!existsSync(sourcePath)) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
   }
@@ -186,7 +210,7 @@ export function deleteSession(repoRoot, sessionIdFull, confirmed) {
  * @param {Array} passthroughArgs - additional args to pass to run
  * @returns {{ ok: boolean, envOverrides?: object, args?: string[], error?: string }}
  */
-export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs = []) {
+export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs = [], runtimeRegistry = RUNTIME_ADAPTERS) {
   const parsed = parseSessionId(sessionIdFull)
   if (!parsed) {
     return { ok: false, error: `invalid session ID format: ${sessionIdFull} (expected runtime:crew:sessionId)` }
@@ -198,45 +222,30 @@ export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs 
   }
 
   // Find the session
-  const sessions = collectSessions(repoRoot, { runtime })
+  const sessions = collectSessions(repoRoot, { runtime }, runtimeRegistry)
   const session = sessions.find((s) => s.id === sessionIdFull)
   if (!session) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
   }
 
-  const adapter = RUNTIME_ADAPTERS[runtime]
+  const adapter = resolveRuntimeAdapter(runtimeRegistry, runtime)
   const capabilities = adapter?.capabilities || {}
+  if (!adapter?.supportsSessions || !capabilities.sessionModeContinue) {
+    return { ok: false, error: `runtime '${runtime}' does not support resuming sessions` }
+  }
 
   const envOverrides = {}
   const args = [...passthroughArgs]
 
-  if (runtime === "pi") {
-    if (capabilities.sessionIdViaEnv) {
-      envOverrides[capabilities.sessionIdViaEnv] = parsed.sessionId
-    }
-    if (capabilities.sessionRootFlag) {
-      args.unshift(capabilities.sessionRootFlag, session.source_path)
-    }
-    args.push("-c") // continue mode
-  } else if (runtime === "claude") {
-    if (capabilities.sessionIdFlag) {
-      args.push(capabilities.sessionIdFlag, parsed.sessionId)
-    }
-    args.push("--continue")
-  } else if (runtime === "opencode") {
-    if (capabilities.sessionIdFlag) {
-      args.push(capabilities.sessionIdFlag, parsed.sessionId)
-    }
-    args.push("-c")
-  } else if (runtime === "hermes") {
-    if (capabilities.sessionIdViaEnv) {
-      envOverrides[capabilities.sessionIdViaEnv] = parsed.sessionId
-    }
-    if (capabilities.sessionRootFlag) {
-      args.unshift(capabilities.sessionRootFlag, session.source_path)
-    }
-    args.push("-c")
+  if (capabilities.sessionIdViaEnv) {
+    envOverrides[capabilities.sessionIdViaEnv] = parsed.sessionId
+  } else if (capabilities.sessionIdFlag) {
+    args.push(capabilities.sessionIdFlag, parsed.sessionId)
   }
+  if (capabilities.sessionRootFlag) {
+    args.unshift(capabilities.sessionRootFlag, session.source_path)
+  }
+  appendUniqueArgs(args, normalizeCapabilityArgs(capabilities.sessionContinueArgs))
 
   return { ok: true, envOverrides, args }
 }
@@ -248,11 +257,11 @@ export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs 
  * @param {Array} passthroughArgs
  * @returns {{ ok: boolean, error?: string, envOverrides?: object, args?: string[] }}
  */
-export function startSession(repoRoot, runtime, passthroughArgs = []) {
-  const adapter = RUNTIME_ADAPTERS[runtime]
+export function startSession(repoRoot, runtime, passthroughArgs = [], runtimeRegistry = RUNTIME_ADAPTERS) {
+  const adapter = resolveRuntimeAdapter(runtimeRegistry, runtime)
   const capabilities = adapter?.capabilities || {}
 
-  if (!capabilities.sessionModeNew) {
+  if (!adapter?.supportsSessions || !capabilities.sessionModeNew) {
     return {
       ok: false,
       error: `runtime '${runtime}' does not support starting new sessions (sessionModeNew is false)`
@@ -261,12 +270,7 @@ export function startSession(repoRoot, runtime, passthroughArgs = []) {
 
   const envOverrides = {}
   const args = [...passthroughArgs]
-
-  if (runtime === "pi") {
-    args.unshift("--new-session")
-  } else if (runtime === "hermes") {
-    args.unshift("--new-session")
-  }
+  args.unshift(...normalizeCapabilityArgs(capabilities.sessionNewArgs))
 
   return { ok: true, envOverrides, args }
 }

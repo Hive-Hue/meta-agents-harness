@@ -1,0 +1,1 @@
+/home/alysson/Github/meta-agents-harness/.kilo/crew/dev/agents/frontend_dev.md

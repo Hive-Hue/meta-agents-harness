@@ -1,6 +1,6 @@
 {
   "name": "meta-agents-harness",
-  "version": "0.2.0",
+  "version": "0.5.0",
   "description": "Unified multi-agent harness that detects OpenCode, Claude, or PI runtime and adapts commands dynamically.",
   "type": "module",
   "bin": {
@@ -9,6 +9,7 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "bootstrap:meta": "node scripts/bootstrap-meta-agents.mjs",
+    "generate:meta": "node scripts/meta-agents-harness.mjs generate",
     "sync:meta": "node scripts/sync-meta-agents.mjs",
     "check:meta-sync": "node scripts/sync-meta-agents.mjs --check",
     "validate:config": "node scripts/validate-meta-config.mjs",
@@ -26,16 +27,18 @@
     "doctor": "node scripts/meta-agents-harness.mjs doctor",
     "check:runtime": "node scripts/meta-agents-harness.mjs check:runtime",
     "validate:runtime": "node scripts/meta-agents-harness.mjs validate:runtime",
-    "validate": "node scripts/meta-agents-harness.mjs validate",
+    "validate": "node scripts/meta-agents-harness.mjs validate:all",
     "list:crews": "node scripts/meta-agents-harness.mjs list:crews",
     "use": "node scripts/meta-agents-harness.mjs use",
     "clear": "node scripts/meta-agents-harness.mjs clear",
     "run": "node scripts/meta-agents-harness.mjs run",
     "test:smoke": "node --test tests/smoke.test.mjs",
     "test:contract": "node --test tests/runtime-contract.test.mjs",
-    "test:diagnostics": "node --test tests/diagnostics-json.test.mjs tests/sync-helpers.test.mjs tests/platform-reliability.test.mjs"
+    "test:diagnostics": "node --test tests/diagnostics-json.test.mjs tests/sync-helpers.test.mjs tests/platform-reliability.test.mjs",
+    "test:plugins": "node --test tests/plugin-loader.test.mjs tests/plugins-e2e.test.mjs tests/runtime-core-integration.test.mjs"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "yaml": "^2.8.1",
     "zod": "^3.23.8"
   },

@@ -1,6 +1,7 @@
 ---
 name: figma-via-codex
 description: Usa o Codex CLI como sidecar para acessar o MCP do Figma indiretamente quando o cliente atual nao suporta o MCP remoto do Figma.
+compatibility: [generic]
 ---
 
 # Figma via Codex
@@ -39,7 +40,7 @@ O esperado e ver `figma` com `Status=enabled` e `Auth=OAuth`.
 2. Rode o helper:
 
 ```bash
-bash .pi/skills/figma-via-codex/scripts/figma_codex_extract.sh "<FIGMA_URL>" "<OBJETIVO>"
+bash .claude/skills/figma-via-codex/scripts/figma_codex_extract.sh "<FIGMA_URL>" "<OBJETIVO>"
 ```
 
 3. Leia o arquivo de saida indicado pelo script.
@@ -82,4 +83,4 @@ Se o Codex sidecar falhar mesmo autenticado:
 
 - padrao observado no OpenClaw: `/home/ec2-user/workspace/TOOLS.md`
 - o helper desta skill encapsula o `codex exec` em:
-  - `.pi/skills/figma-via-codex/scripts/figma_codex_extract.sh`
+  - `.claude/skills/figma-via-codex/scripts/figma_codex_extract.sh`

@@ -1,11 +1,10 @@
 agent:
-  name: "performance-analyst"
-  role: "agent"
-  team: "marketing"
+  name: performance-analyst
+  role: worker
+  team: Validation
 meta:
-  version: 1
-  max_lines: 120
-  last_updated: "2026-04-07T02:00:00.000Z"
+  version: "1"
+  max_lines: "120"
 patterns: []
 risks: []
 tools: []

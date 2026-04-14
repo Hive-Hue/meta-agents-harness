@@ -1,16 +1,29 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, cpSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import { RUNTIME_ADAPTERS, RUNTIME_ORDER } from "./runtime-adapters.mjs"
+import YAML from "yaml"
+import { RUNTIME_ORDER } from "./runtime-adapters.mjs"
 import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
 import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./m3-ops.mjs"
+import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./plugin-loader.mjs"
+import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 
-const runtimeProfiles = RUNTIME_ADAPTERS
+// Bootstrap plugin discovery at module load time (top-level await).
+// This ensures plugin runtimes are available for all commands including detect.
+const runtimeProfiles = await getAllRuntimes()
+
+function orderedRuntimeNames(profiles = runtimeProfiles) {
+  const builtIns = RUNTIME_ORDER.filter((name) => profiles[name])
+  const plugins = Object.keys(profiles)
+    .filter((name) => !RUNTIME_ORDER.includes(name))
+    .sort((left, right) => left.localeCompare(right))
+  return [...builtIns, ...plugins]
+}
 
 function commandExists(command) {
   const probe = spawnSync("bash", ["-lc", `command -v ${command} >/dev/null 2>&1`], {
@@ -76,10 +89,12 @@ function detectRuntime(cwd, forcedRuntime) {
     }
     const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
     if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
+    const pluginPreferred = [...byMarker].sort((left, right) => left.localeCompare(right))[0]
+    if (pluginPreferred) return { runtime: pluginPreferred, reason: `markers:${byMarker.join(",")}` }
   }
 
-  const byCli = Object.entries(runtimeProfiles)
-    .map(([name, profile]) => ({ name, profile, status: runtimeExecutableStatus(name) }))
+  const byCli = orderedRuntimeNames(runtimeProfiles)
+    .map((name) => ({ name, profile: runtimeProfiles[name], status: runtimeExecutableStatus(name) }))
     .filter(({ status }) => status.directCliAvailable || status.wrapperAvailable)
 
   if (byCli.length > 0) {
@@ -100,7 +115,7 @@ function printHelp() {
   console.log("Commands:")
   console.log("  detect")
   console.log("  doctor")
-  console.log("  explain [detect|use|run|sync] [args]")
+  console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate] [args]")
   console.log("  init [--yes] [--force] [--crew <name>] [--runtime <name>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
@@ -112,15 +127,19 @@ function printHelp() {
   console.log("  validate:sync")
   console.log("  validate:all")
   console.log("  validate")
+  console.log("  generate")
+  console.log("  generate:tree")
   console.log("  list:crews")
+  console.log("  plugins [list|install <path>|uninstall <name>|validate <path>]")
   console.log("  use <crew>")
   console.log("  clear")
   console.log("  run [runtime-args]")
   console.log("  plan")
   console.log("  diff")
+  console.log("  sync")
   console.log("")
   console.log("Options:")
-  const runtimes = Object.keys(runtimeProfiles).join("|")
+  const runtimes = orderedRuntimeNames(runtimeProfiles).join("|")
   console.log(`  --runtime <${runtimes}>`)
   console.log(`  -r <${runtimes}>`)
   console.log(`  -f <${runtimes}>`)
@@ -364,6 +383,186 @@ function hasContinueFlag(argv) {
   return argv.includes("-c") || argv.includes("--continue") || argv.includes("--resume")
 }
 
+function normalizeCapabilityArgs(value) {
+  if (!value) return []
+  if (Array.isArray(value)) return value.filter((item) => typeof item === "string" && item.trim())
+  if (typeof value === "string" && value.trim()) return [value]
+  return []
+}
+
+function appendArgsOnce(target, extraArgs) {
+  if (extraArgs.length === 0) return
+  const alreadyPresent = extraArgs.every((token) => target.includes(token))
+  if (!alreadyPresent) target.push(...extraArgs)
+}
+
+function supportsCoreManagedCommand(adapter, command) {
+  if (!adapter || typeof adapter !== "object") return false
+  if (command === "run") return typeof adapter.prepareRunContext === "function"
+  if (["list:crews", "use", "clear"].includes(command)) return !adapter.commands?.[command]
+  return false
+}
+
+function extractUseCrewArg(argv = []) {
+  let crew = ""
+  const remaining = []
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (!crew && token === "--crew" && argv[i + 1]) {
+      crew = argv[i + 1]
+      i += 1
+      continue
+    }
+    if (!crew && token.startsWith("--crew=")) {
+      crew = token.slice("--crew=".length)
+      continue
+    }
+    if (!crew && !token.startsWith("-")) {
+      crew = token
+      continue
+    }
+    remaining.push(token)
+  }
+  return { crew: `${crew || ""}`.trim(), remaining }
+}
+
+function executeCoreManagedCommand(runtime, command, passthrough, jsonMode = false) {
+  const adapter = runtimeProfiles[runtime]
+  if (!supportsCoreManagedCommand(adapter, command) || command === "run") {
+    return { handled: false }
+  }
+
+  const crews = listRuntimeCrews(repoRoot, adapter, runtime)
+  const activeCrew = readActiveCrew(repoRoot, adapter, runtime)
+
+  if (command === "list:crews") {
+    if (jsonMode) {
+      console.log(JSON.stringify({ runtime, active_crew: activeCrew?.crew || "", crews }, null, 2))
+    } else if (crews.length === 0) {
+      console.log("crews=none")
+    } else {
+      for (const crew of crews) {
+        const suffix = activeCrew?.crew === crew ? " active=true" : ""
+        console.log(`crew=${crew}${suffix}`)
+      }
+    }
+    return { handled: true, status: 0 }
+  }
+
+  if (command === "use") {
+    const { crew, remaining } = extractUseCrewArg(passthrough)
+    if (!crew) {
+      console.error("ERROR: 'mah use <crew>' requires a crew name")
+      return { handled: true, status: 1 }
+    }
+    if (!crews.includes(crew)) {
+      console.error(`ERROR: crew not found for runtime '${runtime}': ${crew}`)
+      return { handled: true, status: 1 }
+    }
+    let payload = null
+    try {
+      payload = typeof adapter.activateCrew === "function"
+        ? adapter.activateCrew({ repoRoot, runtime, adapter, crewId: crew, argv: remaining })
+        : writeActiveCrew(repoRoot, adapter, runtime, crew)
+    } catch (error) {
+      console.error(`ERROR: failed to activate crew '${crew}' for runtime '${runtime}': ${error.message}`)
+      return { handled: true, status: 1 }
+    }
+    payload = payload || writeActiveCrew(repoRoot, adapter, runtime, crew)
+    if (jsonMode) {
+      console.log(JSON.stringify({ ok: true, runtime, active_crew: crew, source_config: payload.source_config }, null, 2))
+    } else {
+      console.log(`active_crew=${crew}`)
+      console.log(`runtime=${runtime}`)
+      console.log(`source_config=${payload.source_config}`)
+    }
+    return { handled: true, status: 0 }
+  }
+
+  if (command === "clear") {
+    let removed = false
+    try {
+      removed = typeof adapter.clearCrewState === "function"
+        ? adapter.clearCrewState({ repoRoot, runtime, adapter, argv: passthrough })
+        : clearActiveCrew(repoRoot, adapter, runtime)
+    } catch (error) {
+      console.error(`ERROR: failed to clear runtime state for '${runtime}': ${error.message}`)
+      return { handled: true, status: 1 }
+    }
+    if (jsonMode) {
+      console.log(JSON.stringify({ ok: true, runtime, cleared: removed }, null, 2))
+    } else {
+      console.log(`runtime=${runtime}`)
+      console.log(`cleared=${removed ? "active-crew" : "none"}`)
+    }
+    return { handled: true, status: 0 }
+  }
+
+  return { handled: false }
+}
+
+function resolveCoreManagedRunPlan(runtime, passthrough, envOverrides = {}, warnings = []) {
+  const adapter = runtimeProfiles[runtime]
+  if (!supportsCoreManagedCommand(adapter, "run")) return null
+
+  const { crew: requestedCrew, remaining } = extractCrewArg(passthrough)
+  const crews = listRuntimeCrews(repoRoot, adapter, runtime)
+  if (requestedCrew && !crews.includes(requestedCrew)) {
+    return { error: `crew not found for runtime '${runtime}': ${requestedCrew}` }
+  }
+
+  const activeCrew = readActiveCrew(repoRoot, adapter, runtime)
+  const selectedCrew = requestedCrew || activeCrew?.crew || ""
+  const configPath = selectedCrew ? resolveCrewConfigPath(repoRoot, adapter, runtime, selectedCrew) : ""
+  const prepared = adapter.prepareRunContext({
+    repoRoot,
+    runtime,
+    adapter,
+    crew: selectedCrew,
+    requestedCrew,
+    activeCrew,
+    configPath,
+    argv: remaining,
+    envOverrides
+  })
+
+  if (!prepared?.ok) {
+    return { error: prepared?.error || `failed to prepare run context for runtime '${runtime}'` }
+  }
+
+  return {
+    runtime,
+    command: "run",
+    exec: prepared.exec || adapter.directCli,
+    args: Array.isArray(prepared.args) ? prepared.args : [],
+    passthrough: Array.isArray(prepared.passthrough) ? prepared.passthrough : remaining,
+    envOverrides: { ...envOverrides, ...(prepared.envOverrides || {}) },
+    warnings: [...warnings, ...((prepared.warnings || []).filter(Boolean))],
+    candidates: [],
+    crew: selectedCrew,
+    internal: prepared.internal || null
+  }
+}
+
+function buildCoreManagedCommandPayload(runtime, command, passthrough = []) {
+  const adapter = runtimeProfiles[runtime]
+  if (!supportsCoreManagedCommand(adapter, command) || command === "run") return null
+  const crews = listRuntimeCrews(repoRoot, adapter, runtime)
+  const activeCrew = readActiveCrew(repoRoot, adapter, runtime)
+  const payload = {
+    runtime,
+    command,
+    mode: "core-managed",
+    crew_root: path.join(adapter.markerDir || `.${runtime}`, "crew"),
+    active_crew: activeCrew?.crew || "",
+    crews
+  }
+  if (command === "use") {
+    payload.target_crew = `${passthrough[0] || ""}`.trim()
+  }
+  return payload
+}
+
 function normalizeRunArgs(runtime, passthrough) {
   const adapter = runtimeProfiles[runtime]
   const capabilities = adapter?.capabilities || {}
@@ -372,7 +571,14 @@ function normalizeRunArgs(runtime, passthrough) {
   const warnings = []
   const args = [...remaining]
 
-  if (!options.mode && !options.sessionId && !options.sessionRoot && options.sessionMirror === null) {
+  const hasSessionFlags =
+    Boolean(options.mode) ||
+    Boolean(options.sessionId) ||
+    Boolean(options.sessionRoot) ||
+    options.sessionMirror !== null
+  const hasAgentFlags = Boolean(options.agent) || options.hierarchy !== null
+
+  if (!hasSessionFlags && !hasAgentFlags) {
     return { args, envOverrides, warnings }
   }
 
@@ -381,53 +587,70 @@ function normalizeRunArgs(runtime, passthrough) {
   }
 
   if (options.mode === "none") {
-    if (runtime === "pi") {
-      args.unshift("--no-session")
-    } else if (runtime === "claude") {
-      args.unshift("--print", "--no-session-persistence")
-      warnings.push("claude: --session-mode none uses --print mode (non-interactive)")
-    } else if (runtime === "hermes") {
-      warnings.push("hermes: --session-mode none is not supported, sessions will persist")
-    } else if (runtime === "opencode") {
-      warnings.push("opencode: --session-mode none is not supported, sessions will persist")
+    if (capabilities.sessionModeNone) {
+      args.unshift(...normalizeCapabilityArgs(capabilities.sessionNoneArgs))
+      if (runtime === "claude") {
+        warnings.push("claude: --session-mode none uses --print mode (non-interactive)")
+      }
+    } else {
+      warnings.push(`${runtime}: --session-mode none is not supported, sessions will persist`)
     }
     if (options.sessionId) warnings.push("--session-id is ignored with --session-mode none")
     if (options.sessionRoot) warnings.push("--session-root is ignored with --session-mode none")
     if (options.sessionMirror === true) warnings.push("--session-mirror is ignored with --session-mode none")
-    return { args, envOverrides, warnings }
+  } else {
+    if (capabilities.sessionMirrorFlag === true) {
+      if (options.sessionMirror === true) args.unshift("--session-mirror")
+      if (options.sessionMirror === false) args.unshift("--no-session-mirror")
+    } else if (options.sessionMirror !== null) {
+      warnings.push(`--session-mirror is ignored for ${runtime} runtime`)
+    }
+
+    if (options.mode === "new") {
+      if (capabilities.sessionModeNew) {
+        args.unshift(...normalizeCapabilityArgs(capabilities.sessionNewArgs))
+      } else {
+        warnings.push(`${runtime}: --session-mode new is not supported`)
+      }
+    }
+
+    if (options.mode === "continue") {
+      if (capabilities.sessionModeContinue) {
+        const continueArgs = normalizeCapabilityArgs(capabilities.sessionContinueArgs)
+        if (continueArgs.length > 0 && !hasContinueFlag(args)) appendArgsOnce(args, continueArgs)
+      } else {
+        warnings.push(`${runtime}: --session-mode continue is not supported`)
+      }
+    }
+
+    if (options.sessionRoot) {
+      if (capabilities.sessionRootFlag) {
+        args.unshift(capabilities.sessionRootFlag, options.sessionRoot)
+      } else {
+        warnings.push(`--session-root is ignored for ${runtime} runtime`)
+      }
+    }
+
+    if (options.sessionId) {
+      if (capabilities.sessionIdViaEnv) {
+        envOverrides[capabilities.sessionIdViaEnv] = options.sessionId
+      } else if (capabilities.sessionIdFlag) {
+        args.push(capabilities.sessionIdFlag, options.sessionId)
+      } else {
+        warnings.push(`--session-id is ignored for ${runtime} runtime`)
+      }
+    }
   }
 
-  if (capabilities.sessionMirrorFlag === true) {
-    if (options.sessionMirror === true) args.unshift("--session-mirror")
-    if (options.sessionMirror === false) args.unshift("--no-session-mirror")
-  }
-
-  if (runtime === "claude") {
-    const claudePassthrough = []
-    if (options.mode === "continue" && capabilities.sessionModeContinue) claudePassthrough.push("--continue")
-    if (options.sessionId && capabilities.sessionIdFlag) claudePassthrough.push(capabilities.sessionIdFlag, options.sessionId)
-    if (claudePassthrough.length > 0) args.push("--", ...claudePassthrough)
-    if (options.sessionRoot) warnings.push("--session-root is ignored for claude runtime")
-  } else if (runtime === "pi") {
-    if (options.mode === "new" && capabilities.sessionModeNew) args.unshift("--new-session")
-    if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
-    if (options.sessionRoot && capabilities.sessionRootFlag) args.unshift(capabilities.sessionRootFlag, options.sessionRoot)
-    if (options.sessionId && capabilities.sessionIdViaEnv) envOverrides[capabilities.sessionIdViaEnv] = options.sessionId
-    if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for pi runtime")
-  } else if (runtime === "opencode") {
-    if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
-    if (options.sessionId && capabilities.sessionIdFlag) args.push(capabilities.sessionIdFlag, options.sessionId)
+  if (runtime === "opencode") {
     if (options.agent) args.push("--agent", options.agent)
     if (options.hierarchy === true) args.push("--hierarchy")
     if (options.hierarchy === false) args.push("--no-hierarchy")
-    if (options.sessionRoot) warnings.push("--session-root is ignored for opencode runtime")
-    if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for opencode runtime")
-  } else if (runtime === "hermes") {
-    if (options.mode === "new" && capabilities.sessionModeNew) args.unshift("--new-session")
-    if (options.mode === "continue" && capabilities.sessionModeContinue && !hasContinueFlag(args)) args.push("-c")
-    if (options.sessionRoot && capabilities.sessionRootFlag) args.unshift(capabilities.sessionRootFlag, options.sessionRoot)
-    if (options.sessionId && capabilities.sessionIdViaEnv) envOverrides[capabilities.sessionIdViaEnv] = options.sessionId
-    if (options.sessionMirror !== null) warnings.push("--session-mirror is ignored for hermes runtime")
+  } else if (options.agent) {
+    envOverrides.MAH_AGENT = options.agent
+    if (options.hierarchy !== null) {
+      warnings.push(`--hierarchy is ignored for ${runtime} runtime`)
+    }
   }
 
   return { args, envOverrides, warnings }
@@ -459,8 +682,10 @@ function resolveDispatchPlan(runtime, command, passthrough) {
     normalizedPassthrough = normalized.args
     envOverrides = normalized.envOverrides
     warnings.push(...normalized.warnings)
+    const coreManagedPlan = resolveCoreManagedRunPlan(runtime, normalizedPassthrough, envOverrides, warnings)
+    if (coreManagedPlan) return coreManagedPlan
   }
-  const resolved = profile.resolveCommandPlan(command, commandExists)
+  const resolved = profile.resolveCommandPlan(command, commandExists, normalizedPassthrough)
   if (!resolved.ok) {
     if (command === "run") {
       return {
@@ -501,6 +726,7 @@ function printExplain(traceMode, payload) {
   if (payload.runtime) console.log(`runtime=${payload.runtime}`)
   if (payload.reason) console.log(`reason=${payload.reason}`)
   if (payload.command) console.log(`command=${payload.command}`)
+  if (payload.mode) console.log(`mode=${payload.mode}`)
   if (payload.exec) console.log(`resolved_exec=${payload.exec}`)
   if (payload.execArgs) console.log(`resolved_args=${payload.execArgs.join(" ")}`)
   if (payload.passthrough) console.log(`passthrough=${payload.passthrough.join(" ")}`)
@@ -522,6 +748,8 @@ function printExplain(traceMode, payload) {
   } else if (payload.crewContext?.requested_crew && payload.crewContext?.found === false) {
     console.log(`crew_context_missing=${payload.crewContext.requested_crew}`)
   }
+  if (payload.active_crew) console.log(`active_crew=${payload.active_crew}`)
+  if (payload.target_crew) console.log(`target_crew=${payload.target_crew}`)
 }
 
 function runInit(argv) {
@@ -580,7 +808,7 @@ function runInit(argv) {
     console.log(`crew_hint=${crew}`)
     console.log(`next=mah use ${crew}`)
   }
-  console.log("next=npm run sync:meta")
+  console.log("next=mah sync")
   return bootstrapResult.status !== null ? bootstrapResult.status : 1
 }
 
@@ -615,16 +843,19 @@ function printSessionsHelp() {
   console.log("")
 }
 
-function runSessions(argv, jsonMode = false, detectedRuntime = "") {
+async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const subcommand = argv[0] || "list"
   const filters = parseFilterArgs(argv)
   // Use explicitly forced runtime (from --runtime flag) or auto-detected runtime
   const effectiveRuntime = filters.runtime || detectedRuntime || ""
   if (jsonMode) filters.json = true
 
+  // Get all runtimes (built-ins + loaded plugins)
+  const allRuntimes = await getAllRuntimes()
+
   // Handle subcommands
   if (subcommand === "list") {
-    const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew })
+    const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew }, allRuntimes)
     if (filters.json) {
       console.log(JSON.stringify({ sessions: rows }, null, 2))
       return 0
@@ -652,13 +883,13 @@ function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       return 1
     }
     const targetRuntime = effectiveRuntime || parsedSessionId.runtime
-    const sessions = collectSessions(repoRoot, { runtime: targetRuntime })
+    const sessions = collectSessions(repoRoot, { runtime: targetRuntime }, allRuntimes)
     const session = sessions.find((s) => s.id === sessionId)
     if (!session) {
       console.error(`ERROR: session not found: ${sessionId}`)
       return 1
     }
-    const resumeResult = resumeSessionFn(repoRoot, sessionId, targetRuntime, argv.slice(2))
+    const resumeResult = resumeSessionFn(repoRoot, sessionId, targetRuntime, argv.slice(2), allRuntimes)
     if (!resumeResult.ok) {
       console.error(`ERROR: ${resumeResult.error}`)
       return 1
@@ -688,18 +919,18 @@ function runSessions(argv, jsonMode = false, detectedRuntime = "") {
         console.error("ERROR: could not detect runtime. Use --runtime to specify a runtime")
         return 1
       }
-      if (!RUNTIME_ADAPTERS[detected.runtime]?.supportsSessionNew) {
+      if (!allRuntimes[detected.runtime]?.supportsSessionNew) {
         console.error(`ERROR: runtime '${detected.runtime}' does not support starting new sessions`)
         return 1
       }
     } else {
-      if (!RUNTIME_ADAPTERS[targetRuntime]?.supportsSessionNew) {
+      if (!allRuntimes[targetRuntime]?.supportsSessionNew) {
         console.error(`ERROR: runtime '${targetRuntime}' does not support starting new sessions`)
         return 1
       }
     }
     const runtimeToUse = targetRuntime || detectRuntime(repoRoot, "").runtime
-    const startResult = startSessionFn(repoRoot, runtimeToUse, argv.slice(1))
+    const startResult = startSessionFn(repoRoot, runtimeToUse, argv.slice(1), allRuntimes)
     if (!startResult.ok) {
       console.error(`ERROR: ${startResult.error}`)
       return 1
@@ -725,7 +956,7 @@ function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error("ERROR: 'mah sessions export <id>' requires a session ID")
       return 1
     }
-    const exportResult = exportSessionFn(repoRoot, sessionId)
+    const exportResult = exportSessionFn(repoRoot, sessionId, allRuntimes)
     if (!exportResult.ok) {
       console.error(`ERROR: ${exportResult.error}`)
       return 1
@@ -768,7 +999,7 @@ function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error("ERROR: deletion requires explicit confirmation. Use --yes flag or pipe 'y' to stdin")
       return 1
     }
-    const deleteResult = deleteSessionFn(repoRoot, sessionId, confirmed)
+    const deleteResult = deleteSessionFn(repoRoot, sessionId, confirmed, allRuntimes)
     if (!deleteResult.ok) {
       console.error(`ERROR: ${deleteResult.error}`)
       return 1
@@ -1029,6 +1260,359 @@ function runGraph(argv, jsonMode = false, mermaidMode = false) {
   return 0
 }
 
+function printSyncHelp() {
+  console.log("mah sync / mah generate — materialize tree artifacts from meta-agents.yaml")
+  console.log("")
+  console.log("Usage:")
+  console.log("  mah sync              sync all meta-agent files (prompts for confirmation)")
+  console.log("  mah generate          generate runtime tree artifacts from meta-agents.yaml")
+  console.log("  mah generate:tree     alias for `mah generate`")
+  console.log("  mah sync --check      check for drift without modifying files")
+  console.log("  mah sync --plan       show planned changes")
+  console.log("  mah sync --diff       show detailed diff")
+  console.log("")
+  console.log("Options:")
+  console.log("  --json                output machine-readable JSON")
+  console.log("  -h, --help            show this help")
+}
+
+/**
+ * Sync plugin runtime entry into meta-agents.yaml.
+ * action: "add" — adds the plugin's markerDir entry.
+ * action: "remove" — removes the plugin's markerDir entry.
+ *
+ * This function only updates plugin-owned marker entries.
+ * It does not remove user-authored runtime overrides from meta-agents.yaml.
+ */
+function syncPluginYaml(pluginName, pluginMeta, action) {
+  const yamlPath = path.join(repoRoot, "meta-agents.yaml")
+  if (!existsSync(yamlPath)) return
+
+  let doc = {}
+  try {
+    const raw = readFileSync(yamlPath, "utf-8")
+    doc = YAML.parse(raw) || {}
+  } catch {
+    return
+  }
+
+  doc.runtime_detection = doc.runtime_detection || {}
+  doc.runtime_detection.marker = doc.runtime_detection.marker || {}
+
+  if (action === "add") {
+    // Add/update marker entry
+    if (pluginMeta.markerDir) {
+      doc.runtime_detection.marker[pluginName] = pluginMeta.markerDir
+    }
+  } else if (action === "remove") {
+    delete doc.runtime_detection.marker[pluginName]
+  }
+  try {
+    const updated = YAML.stringify(doc, { indent: 2, lineWidth: 0 })
+    writeFileSync(yamlPath, updated, "utf-8")
+  } catch {
+    // non-fatal
+  }
+}
+
+function printPluginsHelp() {
+  console.log("mah plugins — manage runtime plugins")
+  console.log("")
+  console.log("Usage:")
+  console.log("  mah plugins [list]")
+  console.log("  mah plugins install <path>")
+  console.log("  mah plugins uninstall <name>")
+  console.log("  mah plugins validate <path>")
+  console.log("")
+  console.log("Commands:")
+  console.log("  list                      list installed plugins")
+  console.log("  install <path>            validate and install a plugin from <path>")
+  console.log("  uninstall <name>          remove an installed plugin")
+  console.log("  validate <path>           validate a plugin without installing it")
+  console.log("")
+  console.log("Options:")
+  console.log("  --json                    output as JSON")
+  console.log("  -h, --help                show this help")
+}
+
+async function runPlugins(argv, jsonMode = false) {
+  // Handle help flags before subcommand dispatch
+  if (argv.includes("--help") || argv.includes("-h")) {
+    printPluginsHelp()
+    return 0
+  }
+
+  const subcommand = argv[0] || "list"
+  const mahPluginsDir = path.join(repoRoot, "mah-plugins")
+
+  if (subcommand === "list") {
+    const entries = listLoadedPlugins()
+    if (jsonMode) {
+      console.log(JSON.stringify({ plugins: entries }, null, 2))
+    } else if (entries.length === 0) {
+      console.log("plugins=none")
+    } else {
+      for (const plugin of entries) {
+        console.log(`plugin ${plugin.name} version=${plugin.version} source=${plugin.source}`)
+      }
+    }
+    return 0
+  }
+
+  if (subcommand === "install") {
+    const pluginPath = argv[1]
+    if (!pluginPath) {
+      console.error("ERROR: 'mah plugins install <path>' requires a plugin path")
+      return 1
+    }
+    const validation = await validatePluginFn(pluginPath)
+    if (!validation.ok) {
+      console.error(`ERROR: plugin validation failed: ${validation.errors.join("; ")}`)
+      return 1
+    }
+    for (const warning of validation.warnings || []) {
+      console.warn(`WARN: ${warning}`)
+    }
+    const pluginName = validation.name
+    if (!pluginName) {
+      console.error("ERROR: plugin name could not be determined")
+      return 1
+    }
+    const targetDir = path.join(mahPluginsDir, pluginName)
+    if (existsSync(targetDir)) {
+      console.error(`ERROR: plugin '${pluginName}' is already installed at ${targetDir}`)
+      return 1
+    }
+
+    let markerPath = ""
+    let markerCreated = false
+    mkdirSync(mahPluginsDir, { recursive: true })
+    try {
+      // Copy plugin files to mah-plugins/<name>/
+      cpSync(pluginPath, targetDir, { recursive: true })
+      // Create the plugin's marker directory so mah detect can find it immediately
+      const markerDir = validation.adapter?.markerDir
+      if (markerDir) {
+        markerPath = path.join(repoRoot, markerDir)
+        if (!existsSync(markerPath)) {
+          mkdirSync(markerPath, { recursive: true })
+          markerCreated = true
+          console.log(`marker created=${markerDir}`)
+        }
+      }
+      // --- Runtime CLI provisioning ---
+      const directCli = validation.adapter?.directCli
+      if (directCli) {
+        const { execSync } = await import("child_process")
+        let cliAvailable = false
+        try {
+          execSync(`which ${directCli}`, { stdio: "ignore" })
+          cliAvailable = true
+        } catch {
+          cliAvailable = false
+        }
+        if (!cliAvailable) {
+          if (validation.adapter?.runtimePackage === false) {
+            console.log(`runtime provisioning skipped=${directCli}`)
+          } else {
+          // Derive npm package name: directCli or runtimePackage override
+            let npmPackage = validation.adapter?.runtimePackage
+            if (!npmPackage) {
+            // Convention: kilo -> @kilocode/cli, opencode -> @opencodeai/cli
+              if (directCli === "kilo") {
+                npmPackage = "@kilocode/cli"
+              } else if (directCli === "opencode") {
+                npmPackage = "@opencodeai/cli"
+              } else {
+                npmPackage = directCli
+              }
+            }
+            console.log(`runtime ${directCli} not found — installing ${npmPackage}...`)
+            try {
+              execSync(`npm install -g ${npmPackage}`, { stdio: "inherit" })
+              console.log(`runtime installed=${directCli} package=${npmPackage}`)
+            } catch (err) {
+              throw new Error(`failed to install runtime ${directCli}: ${err.message}`)
+            }
+          }
+        }
+        // --- Run onboard hook if plugin exports it ---
+        const installedIndex = path.join(targetDir, "index.mjs")
+        if (existsSync(installedIndex)) {
+          try {
+            const mod = await import(`file://${installedIndex}`)
+            if (typeof mod.runtimePlugin?.onboard === "function") {
+              const onboardCtx = {
+                name: pluginName,
+                version: validation.version,
+                markerDir: validation.adapter?.markerDir,
+                directCli,
+                mahVersion: MAH_VERSION
+              }
+              await mod.runtimePlugin.onboard(onboardCtx)
+              console.log(`onboarded=${pluginName}`)
+            }
+          } catch (err) {
+            console.warn(`WARN: onboard hook failed for ${pluginName}: ${err.message}`)
+          }
+        }
+      }
+      // Sync plugin entry into meta-agents.yaml
+      syncPluginYaml(pluginName, {
+        markerDir: validation.adapter?.markerDir || null,
+        directCli: validation.adapter?.directCli || null,
+        wrapper: validation.adapter?.wrapper || null,
+        configRoot: validation.adapter?.configRoot || null,
+        configPattern: validation.adapter?.configPattern || null
+      }, "add")
+      await loadPlugins([targetDir], MAH_VERSION)
+      console.log(`installed=${pluginName} path=${targetDir}`)
+      return 0
+    } catch (err) {
+      console.error(`ERROR: plugin install failed: ${err.message}`)
+      try {
+        rmSync(targetDir, { recursive: true, force: true })
+      } catch {
+      }
+      if (markerCreated && markerPath) {
+        try {
+          rmSync(markerPath, { recursive: true, force: true })
+        } catch {
+        }
+      }
+      return 1
+    }
+  }
+
+  if (subcommand === "uninstall") {
+    const pluginName = argv[1]
+    if (!pluginName) {
+      console.error("ERROR: 'mah plugins uninstall <name>' requires a plugin name")
+      return 1
+    }
+    // Read plugin metadata from plugin.json (sync, no module import needed)
+    const installedPluginJson = path.join(mahPluginsDir, pluginName, "plugin.json")
+    let markerDir = null
+    let directCli = null
+    let wrapper = null
+    let configRoot = null
+    let configPattern = null
+    if (existsSync(installedPluginJson)) {
+      try {
+        const pluginMeta = JSON.parse(readFileSync(installedPluginJson, "utf-8"))
+        markerDir = pluginMeta.markerDir || null
+        directCli = pluginMeta.directCli || null
+        wrapper = pluginMeta.wrapper || null
+        configRoot = pluginMeta.configRoot || null
+        configPattern = pluginMeta.configPattern || null
+      } catch {
+        // ignore — will remove plugin dir anyway
+      }
+    }
+    // Also try index.mjs for adapter.markerDir as fallback
+    if (!markerDir) {
+      const installedIndex = path.join(mahPluginsDir, pluginName, "index.mjs")
+      if (existsSync(installedIndex)) {
+        const content = readFileSync(installedIndex, "utf-8")
+        const match = content.match(/markerDir:\s*["']([^"']+)["']/)
+        if (match) markerDir = match[1]
+      }
+    }
+    // Remove plugin entry from meta-agents.yaml before removing files
+    syncPluginYaml(pluginName, { markerDir, directCli, wrapper, configRoot, configPattern }, "remove")
+    // First remove from mah-plugins/ directory if present
+    const targetDir = path.join(mahPluginsDir, pluginName)
+    if (existsSync(targetDir)) {
+      try {
+        rmSync(targetDir, { recursive: true })
+      } catch (err) {
+        console.warn(`WARN: could not remove plugin directory: ${err.message}`)
+      }
+    }
+    // Remove the marker directory if it exists
+    if (markerDir) {
+      const markerPath = path.join(repoRoot, markerDir)
+      if (existsSync(markerPath)) {
+        try {
+          rmSync(markerPath, { recursive: true })
+          console.log(`marker removed=${markerDir}`)
+        } catch (err) {
+          console.warn(`WARN: could not remove marker directory: ${err.message}`)
+        }
+      }
+    }
+    // Then try to unload from registry (will be no-op if not loaded)
+    unloadPluginFn(pluginName)
+    // --- Clean orphaned runtime if no other plugin uses it ---
+    if (directCli) {
+      // Check if any other installed plugin uses the same directCli
+      let otherPluginUsesRuntime = false
+      if (existsSync(mahPluginsDir)) {
+        try {
+          const otherDirs = readdirSync(mahPluginsDir, { withFileTypes: true })
+          for (const entry of otherDirs) {
+            if (entry.isDirectory() && entry.name !== pluginName) {
+              const otherPluginJson = path.join(mahPluginsDir, entry.name, "plugin.json")
+              if (existsSync(otherPluginJson)) {
+                const otherMeta = JSON.parse(readFileSync(otherPluginJson, "utf-8"))
+                if (otherMeta.directCli === directCli) {
+                  otherPluginUsesRuntime = true
+                  break
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore — proceed with cleanup suggestion
+        }
+      }
+      if (!otherPluginUsesRuntime) {
+        // Derive npm package name
+        let npmPackage = null
+        if (directCli === "kilo") {
+          npmPackage = "@kilocode/cli"
+        } else if (directCli === "opencode") {
+          npmPackage = "@opencodeai/cli"
+        } else {
+          npmPackage = directCli
+        }
+        console.log(`runtime orphaned=${directCli} package=${npmPackage}`)
+        console.log(`  No other plugin uses this runtime. Run:`)
+        console.log(`    npm uninstall -g ${npmPackage}`)
+      }
+    }
+    console.log(`uninstalled=${pluginName}`)
+    return 0
+  }
+
+  if (subcommand === "validate") {
+    const pluginPath = argv[1]
+    if (!pluginPath) {
+      console.error("ERROR: 'mah plugins validate <path>' requires a plugin path")
+      return 1
+    }
+    const validation = await validatePluginFn(pluginPath)
+    if (jsonMode) {
+      console.log(JSON.stringify(validation, null, 2))
+    } else if (validation.ok) {
+      console.log(`valid plugin=${validation.name} version=${validation.version} mahVersion=${validation.mahVersion}`)
+      for (const warning of validation.warnings || []) {
+        console.warn(`WARN: ${warning}`)
+      }
+    } else {
+      console.error(`ERROR: invalid plugin: ${validation.errors.join("; ")}`)
+      for (const warning of validation.warnings || []) {
+        console.warn(`WARN: ${warning}`)
+      }
+    }
+    return validation.ok ? 0 : 1
+  }
+
+  console.error(`ERROR: unknown plugins subcommand '${subcommand}'`)
+  console.error("Usage: mah plugins [list|install <path>|uninstall <name>|validate <path>]")
+  return 1
+}
+
 function runDemo(argv) {
   const crew = argv[0] || "dev"
   console.log(`demo crew=${crew}`)
@@ -1062,6 +1646,17 @@ function dispatch(runtime, command, passthrough) {
     exec: plan.exec,
     args: [...(plan.args || []), ...(plan.passthrough || [])]
   })
+  const adapter = runtimeProfiles[runtime]
+  if (command === "run" && typeof adapter?.executePreparedRun === "function") {
+    return adapter.executePreparedRun({
+      repoRoot,
+      runtime,
+      command,
+      adapter,
+      plan,
+      runCommand
+    })
+  }
   return runCommand(plan.exec, plan.args, plan.passthrough || [], plan.envOverrides || {})
 }
 
@@ -1079,6 +1674,10 @@ function dispatchCapture(runtime, command, passthrough) {
     stderr: child.stderr || "",
     plan
   }
+}
+
+function isSyncLikeCommand(command) {
+  return ["plan", "diff", "sync", "generate", "generate:tree"].includes(command)
 }
 
 function main() {
@@ -1143,7 +1742,16 @@ function main() {
   }
 
   if (first === "sessions") {
-    process.exitCode = runSessions(normalizedArgv.slice(1), jsonMode, runtimeResult.runtime)
+    ;(async () => {
+      process.exitCode = await runSessions(normalizedArgv.slice(1), jsonMode, runtimeResult.runtime)
+    })()
+    return
+  }
+
+  if (first === "plugins") {
+    ;(async () => {
+      process.exitCode = await runPlugins(normalizedArgv.slice(1), jsonMode)
+    })()
     return
   }
 
@@ -1157,10 +1765,19 @@ function main() {
     return
   }
 
-  if (first === "plan" || first === "diff") {
-    const modeFlag = first === "plan" ? "--plan" : "--diff"
+  if (isSyncLikeCommand(first)) {
+    if ((first === "sync" || first === "generate" || first === "generate:tree") && argv.includes("--help")) {
+      printSyncHelp()
+      return
+    }
+    // Collect mode flags and forward remaining argv (--check, --plan, --diff, etc.)
+    const extraArgs = argv.filter((a) => !a.startsWith("--json"))
+    const modeFlag = (first === "sync" || first === "generate" || first === "generate:tree")
+      ? []
+      : [first === "plan" ? "--plan" : "--diff"]
+    const allArgs = [...modeFlag, ...extraArgs]
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), [modeFlag, "--json"])
+      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), [...allArgs, "--json"])
       let report = {}
       try {
         report = JSON.parse(captured.stdout || "{}")
@@ -1175,7 +1792,7 @@ function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), [modeFlag])
+    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), allArgs)
     return
   }
 
@@ -1315,15 +1932,15 @@ function main() {
       return
     }
     if (!runtimeResult.runtime) {
-      console.error(`ERROR: could not detect runtime. Use --runtime <${RUNTIME_ORDER.join("|")}>`)
+      console.error(`ERROR: could not detect runtime. Use --runtime <${orderedRuntimeNames(runtimeProfiles).join("|")}>`)
       process.exitCode = 1
       return
     }
-    if (explainCommand === "sync") {
+    if (["sync", "generate", "generate:tree"].includes(explainCommand)) {
       const payload = {
         runtime: runtimeResult.runtime,
         reason: runtimeResult.reason,
-        command: "sync",
+        command: explainCommand,
         resolved_exec: process.execPath,
         resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"],
         crewContext
@@ -1333,12 +1950,28 @@ function main() {
           status: 0,
           runtime: runtimeResult.runtime,
           reason: runtimeResult.reason,
-          data: { target: "sync", payload }
+          data: { target: explainCommand, payload }
         }))
       } else {
         printExplain(traceMode, payload)
       }
       return
+    }
+    if (["list:crews", "use", "clear"].includes(explainCommand)) {
+      const corePayload = buildCoreManagedCommandPayload(runtimeResult.runtime, explainCommand, normalizedArgv.slice(2))
+      if (corePayload) {
+        if (jsonMode) {
+          printDiagnosticPayload(createDiagnosticPayload("explain", {
+            status: 0,
+            runtime: runtimeResult.runtime,
+            reason: runtimeResult.reason,
+            data: { target: explainCommand, payload: corePayload }
+          }))
+        } else {
+          printExplain(traceMode, corePayload)
+        }
+        return
+      }
     }
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
       const passthrough = normalizedArgv.slice(2)
@@ -1456,8 +2089,14 @@ function main() {
   }
 
   if (!runtimeResult.runtime) {
-    console.error(`ERROR: could not detect runtime. Use --runtime <${RUNTIME_ORDER.join("|")}>`)
+    console.error(`ERROR: could not detect runtime. Use --runtime <${orderedRuntimeNames(runtimeProfiles).join("|")}>`)
     process.exitCode = 1
+    return
+  }
+
+  const coreManaged = executeCoreManagedCommand(runtimeResult.runtime, first, normalizedArgv.slice(1), jsonMode)
+  if (coreManaged.handled) {
+    process.exitCode = coreManaged.status
     return
   }
 
@@ -1485,4 +2124,8 @@ function main() {
   process.exitCode = status
 }
 
-main()
+await main()
+await Promise.all([
+  new Promise((resolve) => process.stdout.write("", resolve)),
+  new Promise((resolve) => process.stderr.write("", resolve))
+])

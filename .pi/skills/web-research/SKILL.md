@@ -1,6 +1,7 @@
 ---
 name: web-research
 description: Run evidence-based web research with Brave Search for discovery and Firecrawl for extraction/synthesis.
+compatibility: [generic]
 ---
 
 # Web Research

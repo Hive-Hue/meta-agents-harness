@@ -1,0 +1,84 @@
+{
+  "tasks": [
+    {
+      "id": "T1",
+      "description": "Criar scripts/plugin-loader.mjs: loadPlugins(), getAllRuntimes(), validatePlugin(), unloadPlugin() - descoberta em mah-plugins/ e node_modules/@mah/runtime-*",
+      "predecessors": [],
+      "optimistic": 2,
+      "most_likely": 3,
+      "pessimistic": 5
+    },
+    {
+      "id": "T2",
+      "description": "Escrever testes unitarios para plugin-loader (loadPlugins, getAllRuntimes, validatePlugin, unloadPlugin, priority built-in)",
+      "predecessors": ["T1"],
+      "optimistic": 1,
+      "most_likely": 2,
+      "pessimistic": 3
+    },
+    {
+      "id": "T3",
+      "description": "Integrar getAllRuntimes() no meta-agents-harness.mjs - substituir import estatico de RUNTIME_ADAPTERS por chamada dinamica",
+      "predecessors": ["T1"],
+      "optimistic": 0.5,
+      "most_likely": 1,
+      "pessimistic": 1.5
+    },
+    {
+      "id": "T4",
+      "description": "Validar que mah detect ainda retorna pi, claude, opencode, hermes corretamente apos integracao",
+      "predecessors": ["T3"],
+      "optimistic": 0.25,
+      "most_likely": 0.5,
+      "pessimistic": 1
+    },
+    {
+      "id": "T5",
+      "description": "Implementar comandos mah plugins (list), mah plugins install, mah plugins uninstall, mah plugins validate em meta-agents-harness.mjs",
+      "predecessors": ["T1"],
+      "optimistic": 2,
+      "most_likely": 3,
+      "pessimistic": 5
+    },
+    {
+      "id": "T6",
+      "description": "Criar teste e2e com runtime ficticio - instalar, detectar, desinstalar plugin",
+      "predecessors": ["T2", "T5"],
+      "optimistic": 1,
+      "most_likely": 2,
+      "pessimistic": 3
+    },
+    {
+      "id": "T7",
+      "description": "Integrar validacao de plugins via runtime-adapter-contract.mjs (validateAdapter) antes de registrar",
+      "predecessors": ["T1"],
+      "optimistic": 0.5,
+      "most_likely": 1,
+      "pessimistic": 2
+    },
+    {
+      "id": "T8",
+      "description": "Criar mah-plugins/ e um plugin de teste runtime-fake para validacao manual",
+      "predecessors": [],
+      "optimistic": 0.5,
+      "most_likely": 1,
+      "pessimistic": 1.5
+    },
+    {
+      "id": "T9",
+      "description": "Testar mah plugins install com runtime-fake e mah plugins uninstall",
+      "predecessors": ["T5", "T8"],
+      "optimistic": 0.5,
+      "most_likely": 1,
+      "pessimistic": 1.5
+    },
+    {
+      "id": "T10",
+      "description": "Validar retrocompatibilidade: mah validate:all funciona sem plugins, mah detect retorna built-ins",
+      "predecessors": ["T4"],
+      "optimistic": 0.25,
+      "most_likely": 0.5,
+      "pessimistic": 1
+    }
+  ]
+}

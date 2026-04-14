@@ -1,0 +1,15 @@
+agent:
+  name: backend-dev
+  role: worker
+  team: Engineering
+meta:
+  version: "1"
+  max_lines: "120"
+patterns: []
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+observations: []
+open_questions: []

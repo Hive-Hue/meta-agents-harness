@@ -11,13 +11,14 @@ permission:
     "*": deny
     frontend-dev: allow
     backend-dev: allow
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Engineering Lead
 
 Role: `lead`
 Team: `Engineering`
-Model: `openai/gpt-5.2`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Engineering lead responsible for delegation, synthesis, and team-level coordination.

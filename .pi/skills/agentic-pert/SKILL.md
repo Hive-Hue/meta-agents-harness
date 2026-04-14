@@ -6,6 +6,7 @@ license: MIT
 compatibility:
   - opencode
   - generic-python
+  - generic
 tags:
   - project-management
   - workflow-orchestration
@@ -69,23 +70,23 @@ uv --version
 Use a CLI em `scripts/pert_cli.py` para o fluxo completo de plano/tarefas/análise.
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/pert_cli.py --help
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/pert_cli.py --help
 ```
 
 ### 1) Gerar prompt de decomposição
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/pert_cli.py prompt \
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/pert_cli.py prompt \
   --objective "Implementar autenticação JWT + dashboard Streamlit + testes"
 ```
 
 ### 2) Criar plano inicial a partir da decomposição
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/pert_cli.py from-decomposition \
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/pert_cli.py from-decomposition \
   --objective "Implementar autenticação JWT + dashboard Streamlit + testes" \
   --decomposition-file planner-output.json \
   --output plan.json
@@ -94,8 +95,8 @@ uv run --project .pi/skills/agentic-pert/package \
 ### 3) Adicionar/ajustar tarefas manualmente (opcional)
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/pert_cli.py add-task \
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/pert_cli.py add-task \
   --plan plan.json \
   --id T9 \
   --description "Validar integração final" \
@@ -108,8 +109,8 @@ uv run --project .pi/skills/agentic-pert/package \
 ### 4) Rodar análise PERT/CPM e gerar Mermaid
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/pert_cli.py analyze \
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/pert_cli.py analyze \
   --plan plan.json \
   --output plan-analyzed.json \
   --mermaid-output plan.mmd \
@@ -124,8 +125,8 @@ Estilos Mermaid disponíveis:
 No estilo `pert-gantt`, você pode customizar o marco final:
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/pert_cli.py analyze \
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/pert_cli.py analyze \
   --plan plan.json \
   --output plan-analyzed.json \
   --mermaid-output plan-gantt.mmd \
@@ -167,7 +168,7 @@ Para detalhes de integração OpenCode, ver:
 ## Instalação
 
 ```bash
-uv sync --project .pi/skills/agentic-pert/package \
+uv sync --project .claude/skills/agentic-pert/package \
   --extra dev \
   --extra visualization
 ```
@@ -175,13 +176,13 @@ uv sync --project .pi/skills/agentic-pert/package \
 ## Validação com uv
 
 ```bash
-cd .pi/skills/agentic-pert/package
+cd .claude/skills/agentic-pert/package
 uv run pytest -q
 ```
 
 ```bash
-uv run --project .pi/skills/agentic-pert/package \
-  python .pi/skills/agentic-pert/scripts/validate_opencode.py
+uv run --project .claude/skills/agentic-pert/package \
+  python .claude/skills/agentic-pert/scripts/validate_opencode.py
 ```
 
 ## Dependências

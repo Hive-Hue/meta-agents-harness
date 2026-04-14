@@ -1,11 +1,10 @@
 agent:
-  name: "creative-strategist"
-  role: "agent"
-  team: "marketing"
+  name: creative-strategist
+  role: worker
+  team: Creative
 meta:
-  version: 1
-  max_lines: 120
-  last_updated: "2026-04-07T02:00:00.000Z"
+  version: "1"
+  max_lines: "120"
 patterns: []
 risks: []
 tools: []

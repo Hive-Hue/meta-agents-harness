@@ -1,0 +1,831 @@
+name: MarketingMultiTeam
+mission: Plan, produce, refine, and validate communication assets, launch
+  narratives, campaign collateral, and supporting media for Meta Agents Harness.
+instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+  communication assets, launch narratives, campaign collateral, and supporting
+  media for Meta Agents Harness.
+session_dir: sessions
+expertise_dir: expertise
+domain_profiles:
+  read_only_repo:
+    - path: .
+      read: true
+  planning_delivery:
+    - path: .
+      read: true
+    - path: plan/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+  cli_operator_surface:
+    - path: .
+      read: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: assets/*
+      read: true
+      edit: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+  runtime_impl:
+    - path: .
+      read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+    - path: package.json
+      read: true
+      edit: true
+    - path: package-lock.json
+      read: true
+      edit: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: extensions/*
+      read: true
+      edit: true
+      bash: true
+    - path: .claude/*
+      read: true
+      edit: true
+      bash: true
+    - path: .opencode/*
+      read: true
+      edit: true
+      bash: true
+    - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: .hermes/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mcp.example.json
+      read: true
+      edit: true
+    - path: .env.sample
+      read: true
+      edit: true
+  validation_runtime:
+    - path: .
+      read: true
+      bash: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: .github/workflows/*
+      read: true
+      edit: true
+      bash: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+  bootstrap_generation:
+    - path: .
+      read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: bin/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: specs/*
+      read: true
+      edit: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
+      edit: true
+      bash: true
+  runtime_assets_sync:
+    - path: .claude/*
+      read: true
+      edit: true
+    - path: .opencode/*
+      read: true
+      edit: true
+    - path: .pi/*
+      read: true
+      edit: true
+    - path: .hermes/*
+      read: true
+      edit: true
+    - path: extensions/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mcp.example.json
+      read: true
+      edit: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
+  docs_authoring:
+    - path: .
+      read: true
+    - path: docs/*
+      read: true
+      edit: true
+    - path: README.md
+      read: true
+      edit: true
+    - path: CHANGELOG.md
+      read: true
+      edit: true
+    - path: examples/*
+      read: true
+      edit: true
+    - path: assets/*
+      read: true
+      edit: true
+orchestrator:
+  name: orchestrator
+  description: Orchestrator coordinator
+  instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+    communication assets, launch narratives, campaign collateral, and supporting
+    media for Meta Agents Harness.
+  prompt: .codex/crew/marketing/agents/orchestrator.md
+  expertise:
+    path: .codex/crew/marketing/expertise/orchestrator-expertise-model.yaml
+    use-when: Track durable learnings for orchestrator.
+    updatable: true
+    max-lines: 10000
+  model: gpt-5.4-mini
+  model_fallbacks:
+    - nvidia/nemotron-3-super-120b-a12b:free
+    - zai/glm-5
+    - zai/glm-4.5-air
+  tools:
+    - read
+    - grep
+    - find
+    - ls
+    - delegate_agent
+    - update_expertise_model
+    - mcp_servers
+    - mcp_tools
+    - mcp_call
+  skills:
+    - skills/delegate_bounded/SKILL.md
+    - skills/zero_micromanagement/SKILL.md
+    - skills/expertise_model/SKILL.md
+  routes_to:
+    - planning-lead
+    - creative-lead
+    - validation-lead
+  domain:
+    - path: .
+      read: true
+      upsert: false
+      delete: false
+teams:
+  - name: Planning
+    lead:
+      name: planning-lead
+      description: Planning Lead planning lead
+      instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+        communication assets, launch narratives, campaign collateral, and
+        supporting media for Meta Agents Harness.
+      prompt: .codex/crew/marketing/agents/planning_lead.md
+      expertise:
+        path: .codex/crew/marketing/expertise/planning-lead-expertise-model.yaml
+        use-when: Track durable learnings for planning-lead.
+        updatable: true
+        max-lines: 10000
+      model: gpt-5.4-mini
+      model_fallbacks:
+        - zai/glm-5
+        - zai/glm-4.5-air
+      tools:
+        - read
+        - grep
+        - find
+        - ls
+        - delegate_agent
+        - update_expertise_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
+      skills:
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
+      routes_to:
+        - market-researcher
+        - campaign-strategist
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+        - path: docs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: README.md
+          read: true
+          upsert: true
+          delete: false
+        - path: CHANGELOG.md
+          read: true
+          upsert: true
+          delete: false
+        - path: examples/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: assets/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+    members:
+      - name: market-researcher
+        description: Market Researcher planning worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/market_researcher.md
+        expertise:
+          path: .codex/crew/marketing/expertise/market-researcher-expertise-model.yaml
+          use-when: Track durable learnings for market-researcher.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+      - name: campaign-strategist
+        description: Campaign Strategist planning worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/campaign_strategist.md
+        expertise:
+          path: .codex/crew/marketing/expertise/campaign-strategist-expertise-model.yaml
+          use-when: Track durable learnings for campaign-strategist.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+  - name: Creative
+    lead:
+      name: creative-lead
+      description: Creative Lead creative lead
+      instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+        communication assets, launch narratives, campaign collateral, and
+        supporting media for Meta Agents Harness.
+      prompt: .codex/crew/marketing/agents/creative_lead.md
+      expertise:
+        path: .codex/crew/marketing/expertise/creative-lead-expertise-model.yaml
+        use-when: Track durable learnings for creative-lead.
+        updatable: true
+        max-lines: 10000
+      model: gpt-5.4-mini
+      model_fallbacks:
+        - zai/glm-5
+        - zai/glm-4.5-air
+      tools:
+        - read
+        - grep
+        - find
+        - ls
+        - delegate_agent
+        - update_expertise_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
+      skills:
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
+      routes_to:
+        - copywriter
+        - creative-strategist
+        - media-operator
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+        - path: docs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: README.md
+          read: true
+          upsert: true
+          delete: false
+        - path: CHANGELOG.md
+          read: true
+          upsert: true
+          delete: false
+        - path: examples/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: assets/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+    members:
+      - name: copywriter
+        description: Copywriter creative worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/copywriter.md
+        expertise:
+          path: .codex/crew/marketing/expertise/copywriter-expertise-model.yaml
+          use-when: Track durable learnings for copywriter.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+      - name: creative-strategist
+        description: Creative Strategist creative worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/creative_strategist.md
+        expertise:
+          path: .codex/crew/marketing/expertise/creative-strategist-expertise-model.yaml
+          use-when: Track durable learnings for creative-strategist.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+      - name: media-operator
+        description: Media Operator creative worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/media_operator.md
+        expertise:
+          path: .codex/crew/marketing/expertise/media-operator-expertise-model.yaml
+          use-when: Track durable learnings for media-operator.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+  - name: Validation
+    lead:
+      name: validation-lead
+      description: Validation Lead validation lead
+      instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+        communication assets, launch narratives, campaign collateral, and
+        supporting media for Meta Agents Harness.
+      prompt: .codex/crew/marketing/agents/validation_lead.md
+      expertise:
+        path: .codex/crew/marketing/expertise/validation-lead-expertise-model.yaml
+        use-when: Track durable learnings for validation-lead.
+        updatable: true
+        max-lines: 10000
+      model: gpt-5.4-mini
+      model_fallbacks:
+        - zai/glm-5
+        - zai/glm-4.5-air
+      tools:
+        - read
+        - grep
+        - find
+        - ls
+        - delegate_agent
+        - update_expertise_model
+        - mcp_servers
+        - mcp_tools
+        - mcp_call
+      skills:
+        - skills/delegate_bounded/SKILL.md
+        - skills/zero_micromanagement/SKILL.md
+        - skills/expertise_model/SKILL.md
+      routes_to:
+        - performance-analyst
+        - brand-safety-reviewer
+      domain:
+        - path: .
+          read: true
+          upsert: false
+          delete: false
+        - path: docs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: README.md
+          read: true
+          upsert: true
+          delete: false
+        - path: CHANGELOG.md
+          read: true
+          upsert: true
+          delete: false
+        - path: examples/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: assets/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+    members:
+      - name: performance-analyst
+        description: Performance Analyst validation worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/performance_analyst.md
+        expertise:
+          path: .codex/crew/marketing/expertise/performance-analyst-expertise-model.yaml
+          use-when: Track durable learnings for performance-analyst.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+      - name: brand-safety-reviewer
+        description: Brand Safety Reviewer validation worker
+        instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
+          communication assets, launch narratives, campaign collateral, and
+          supporting media for Meta Agents Harness.
+        prompt: .codex/crew/marketing/agents/brand_safety_reviewer.md
+        expertise:
+          path: .codex/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml
+          use-when: Track durable learnings for brand-safety-reviewer.
+          updatable: true
+          max-lines: 10000
+        model: gpt-5.4-mini
+        model_fallbacks:
+          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-4.7
+          - zai/glm-4.5-air
+        tools:
+          - write
+          - edit
+          - read
+          - grep
+          - find
+          - ls
+          - update_expertise_model
+          - mcp_servers
+          - mcp_tools
+          - mcp_call
+        skills:
+          - skills/expertise_model/SKILL.md
+        domain:
+          - path: .
+            read: true
+            upsert: false
+            delete: false
+          - path: docs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: README.md
+            read: true
+            upsert: true
+            delete: false
+          - path: CHANGELOG.md
+            read: true
+            upsert: true
+            delete: false
+          - path: examples/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: assets/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true

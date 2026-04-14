@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { createInterface } from "node:readline/promises"
 import { spawnSync } from "node:child_process"
 import YAML from "yaml"
+import { RUNTIME_ADAPTERS } from "./runtime-adapters.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -88,6 +89,41 @@ function loadTemplateDoc() {
   return null
 }
 
+/**
+ * Discover installed plugins from mah-plugins/ directory.
+ * Reads each plugin's plugin.json to get all runtime configuration hints.
+ * Returns a Map: pluginName -> { markerDir, directCli, wrapper, configRoot, configPattern }
+ */
+function discoverInstalledPlugins() {
+  const mahPluginsDir = path.join(repoRoot, "mah-plugins")
+  if (!existsSync(mahPluginsDir)) return new Map()
+  const plugins = new Map()
+  try {
+    const entries = readdirSync(mahPluginsDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const pluginJsonPath = path.join(mahPluginsDir, entry.name, "plugin.json")
+      if (!existsSync(pluginJsonPath)) continue
+      try {
+        const meta = JSON.parse(readFileSync(pluginJsonPath, "utf-8"))
+        if (!meta.name) continue
+        plugins.set(meta.name, {
+          markerDir: meta.markerDir || null,
+          directCli: meta.directCli || null,
+          wrapper: meta.wrapper || null,
+          configRoot: meta.configRoot || null,
+          configPattern: meta.configPattern || null
+        })
+      } catch {
+        // skip malformed plugin.json
+      }
+    }
+  } catch {
+    // mah-plugins dir not readable
+  }
+  return plugins
+}
+
 function ensureDefaults(doc) {
   const next = { ...(doc || {}) }
   delete next.domain_profiles
@@ -102,38 +138,36 @@ function ensureDefaults(doc) {
     args: ["--runtime=<name>", "--runtime <name>", "-r <name>", "-f <name>"],
     env: ["MAH_RUNTIME"]
   }
+  // Collect plugin entries from mah-plugins/ to merge into runtime_detection
+  const installedPlugins = discoverInstalledPlugins()
+
   next.runtime_detection.marker = {
     ...(next.runtime_detection.marker || {}),
     pi: ".pi",
     claude: ".claude",
+    kilo: ".kilo",
     opencode: ".opencode",
-    hermes: ".hermes"
+    hermes: ".hermes",
+    codex: ".codex",
+    // Plugin entries override nothing (built-ins above take priority by name),
+    // but we include them so the YAML documents all available markers
+    ...Object.fromEntries(
+      [...installedPlugins.entries()]
+        .filter(([, p]) => p.markerDir)
+        .map(([name, p]) => [name, p.markerDir])
+    )
   }
-  next.runtime_detection.cli = {
-    ...(next.runtime_detection.cli || {}),
-    pi: { ...(next.runtime_detection.cli?.pi || {}), direct_cli: "pi", wrapper: "pimh" },
-    claude: { ...(next.runtime_detection.cli?.claude || {}), direct_cli: "claude", wrapper: "ccmh" },
-    opencode: { ...(next.runtime_detection.cli?.opencode || {}), direct_cli: "opencode", wrapper: "ocmh" },
-    hermes: { ...(next.runtime_detection.cli?.hermes || {}), direct_cli: "hermes", wrapper: "hermesh" }
-  }
+  // cli: NOT generated — derived entirely from RUNTIME_ADAPTERS (built-ins) and
+  // plugin.json (plugins) at runtime. The YAML does not store this.
+  // Note: existing cli: entries in the YAML are NOT auto-removed here; they are
+  // simply ignored at runtime.
 
+  // runtimes: NOT generated from code. The YAML stores ONLY user-specific overrides
+  // (e.g. model_overrides for opencode). All runtime properties come from
+  // RUNTIME_ADAPTERS (built-ins) and plugin.json (plugins) — those are code, not config.
+  // Preserve existing YAML runtimes entries only if they contain user-specific config.
+  // Built-in/plugin entries should not be duplicated in YAML.
   next.runtimes = next.runtimes || {}
-  next.runtimes.pi = { ...(next.runtimes.pi || {}), wrapper: "pimh", config_root: ".pi", config_pattern: ".pi/crew/<crew>/multi-team.yaml" }
-  next.runtimes.claude = { ...(next.runtimes.claude || {}), wrapper: "ccmh", config_root: ".claude", config_pattern: ".claude/crew/<crew>/multi-team.yaml" }
-  next.runtimes.opencode = { ...(next.runtimes.opencode || {}), wrapper: "ocmh", config_root: ".opencode", config_pattern: ".opencode/crew/<crew>/multi-team.yaml" }
-  next.runtimes.hermes = {
-    ...(next.runtimes.hermes || {}),
-    wrapper: "hermesh",
-    config_root: ".hermes",
-    config_pattern: ".hermes/crew/<crew>/config.yaml",
-    capabilities: {
-      persistent_memory: true,
-      supports_background_operation: true,
-      supports_multi_backend_execution: true,
-      gateway_aware: true,
-      ...(next.runtimes.hermes?.capabilities || {})
-    }
-  }
 
   next.catalog = next.catalog || {}
   next.catalog.models = {
@@ -146,22 +180,28 @@ function ensureDefaults(doc) {
   next.catalog.skills.delegate_bounded = {
     pi: ".pi/skills/delegate-bounded/SKILL.md",
     claude: ".claude/skills/delegate-bounded/SKILL.md",
+    kilo: ".kilo/skills/delegate-bounded/SKILL.md",
     opencode: ".opencode/skills/delegate-bounded/SKILL.md",
     hermes: ".hermes/skills/delegate-bounded/SKILL.md",
+    codex: ".codex/skills/delegate-bounded/SKILL.md",
     ...(next.catalog.skills.delegate_bounded || {})
   }
   next.catalog.skills.zero_micromanagement = {
     pi: ".pi/skills/zero-micromanagement/SKILL.md",
     claude: ".claude/skills/zero-micromanagement/SKILL.md",
+    kilo: ".kilo/skills/zero-micromanagement/SKILL.md",
     opencode: ".opencode/skills/zero-micromanagement/SKILL.md",
     hermes: ".hermes/skills/zero-micromanagement/SKILL.md",
+    codex: ".codex/skills/zero-micromanagement/SKILL.md",
     ...(next.catalog.skills.zero_micromanagement || {})
   }
   next.catalog.skills.expertise_model = {
     pi: ".pi/skills/expertise-model/SKILL.md",
     claude: ".claude/skills/expertise-model/SKILL.md",
+    kilo: ".kilo/skills/expertise-model/SKILL.md",
     opencode: ".opencode/skills/expertise-model/SKILL.md",
     hermes: ".hermes/skills/expertise-model/SKILL.md",
+    codex: ".codex/skills/expertise-model/SKILL.md",
     ...(next.catalog.skills.expertise_model || {})
   }
   next.catalog.domain_profiles = next.catalog.domain_profiles || {}
@@ -173,24 +213,31 @@ function ensureDefaults(doc) {
     roles_to_runtime: {
       opencode: "agent files + permission.task",
       claude: "agent files + CCR route map + .mcp.json",
+      kilo: "crew multi-team.yaml + generated agents + generated expertise",
       pi: "crew multi-team.yaml + extensions/multi-team.ts",
-      hermes: "crew config + runtime capability projection"
+      hermes: "crew config + runtime capability projection",
+      codex: "crew multi-team.yaml + prompt execution"
     },
     expertise_to_runtime: {
       opencode: ".opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml",
       claude: ".claude/crew/<crew>/expertise/<agent>-expertise-model.yaml",
+      kilo: ".kilo/crew/<crew>/expertise/<agent>-expertise-model.yaml",
       pi: ".pi/crew/<crew>/expertise/<agent>-expertise-model.yaml",
-      hermes: ".hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml"
+      hermes: ".hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml",
+      codex: ".codex/crew/<crew>/expertise/<agent>-expertise-model.yaml"
     },
     skills_to_runtime: {
       opencode: ".opencode/skills/*/SKILL.md",
       claude: ".claude/skills/*/SKILL.md",
+      kilo: ".kilo/skills/*/SKILL.md",
       pi: ".pi/skills/*/SKILL.md",
-      hermes: ".hermes/skills/*/SKILL.md"
+      hermes: ".hermes/skills/*/SKILL.md",
+      codex: ".codex/skills/*/SKILL.md"
     },
     domain_to_runtime: {
       opencode: "permission.read/edit/bash",
       claude: "tool + routing scope",
+      kilo: "domain.read/upsert/delete + session scope",
       pi: "domain.read/upsert/delete + session scope",
       hermes: "capability and workspace scope projection"
     }
@@ -207,11 +254,15 @@ function buildMinimalCrew(crewId, mission) {
     source_configs: {
       pi: `.pi/crew/${crewId}/multi-team.yaml`,
       claude: `.claude/crew/${crewId}/multi-team.yaml`,
+      codex: `.codex/crew/${crewId}/multi-team.yaml`,
+      kilo: `.kilo/crew/${crewId}/multi-team.yaml`,
       opencode: `.opencode/crew/${crewId}/multi-team.yaml`
     },
     session: {
       pi_root: `.pi/crew/${crewId}/sessions`,
       claude_mirror_root: `.claude/crew/${crewId}/sessions`,
+      codex_root: `.codex/crew/${crewId}/sessions`,
+      kilo_root: `.kilo/crew/${crewId}/sessions`,
       hermes_root: `.hermes/crew/${crewId}/sessions`
     },
     topology: {
@@ -230,6 +281,8 @@ function buildMinimalCrew(crewId, mission) {
 function detectAvailableRuntime() {
   const runtimes = [
     { name: "pi", cli: "pi", skillFlag: "--skill", printFlag: "-p", usesSkillFlag: true },
+    { name: "codex", cli: "codex", runCommand: "exec", usesSkillFlag: false },
+    { name: "kilo", cli: "kilo", runCommand: "run", usesSkillFlag: false },
     { name: "opencode", cli: "opencode", fileFlag: "-f", runCommand: "run", usesSkillFlag: false }
   ]
   for (const runtime of runtimes) {
@@ -255,6 +308,8 @@ function getRepoContext() {
   if (existsSync(path.join(cwd, ".opencode"))) detectedMarkers.push("opencode")
   if (existsSync(path.join(cwd, ".pi"))) detectedMarkers.push("pi")
   if (existsSync(path.join(cwd, ".claude"))) detectedMarkers.push("claude")
+  if (existsSync(path.join(cwd, ".codex"))) detectedMarkers.push("codex")
+  if (existsSync(path.join(cwd, ".kilo"))) detectedMarkers.push("kilo")
   if (existsSync(path.join(cwd, ".hermes"))) detectedMarkers.push("hermes")
   return { readmeContent, detectedMarkers, cwd }
 }
@@ -282,14 +337,14 @@ CRITICAL OUTPUT REQUIREMENTS:
 3. The output must be valid, parseable YAML
 4. MUST include all required sections:
    - runtime_detection (order, forced, marker, cli)
-   - runtimes (pi, claude, opencode, hermes with wrapper/config_root/config_pattern)
+   - runtimes (pi, claude, kilo, opencode, hermes with wrapper/config_root/config_pattern)
    - catalog (models, skills, domain_profiles)
    - domain_profiles (at minimum: read_only_repo)
    - adapters (source_of_truth, mapping_rules)
    - crews (id, display_name, mission, topology, agents)
 5. Follow the skill guidelines for config quality
 6. Use appropriate topology based on project complexity
-7. Configure all runtimes (pi, claude, opencode, hermes) based on detected markers
+7. Configure all runtimes (pi, claude, kilo, opencode, hermes) based on detected markers
 
 Generate the complete meta-agents.yaml now:`
   return prompt
@@ -298,7 +353,7 @@ Generate the complete meta-agents.yaml now:`
 async function runAiAssistedGeneration(inputs, repoContext, skillPath) {
   const runtime = detectAvailableRuntime()
   if (!runtime) {
-    console.log("bootstrap: no AI runtime available (opencode or pi required for AI-assisted mode)")
+    console.log("bootstrap: no AI runtime available (opencode, kilo or pi required for AI-assisted mode)")
     return { success: false, reason: "no_runtime" }
   }
 
@@ -468,6 +523,7 @@ async function main() {
     const skillCandidates = [
       path.join(repoRoot, ".opencode", "skills", "bootstrap-config-architect", "SKILL.md"),
       path.join(repoRoot, ".claude", "skills", "bootstrap-config-architect", "SKILL.md"),
+      path.join(repoRoot, ".kilo", "skills", "bootstrap-config-architect", "SKILL.md"),
       path.join(repoRoot, ".pi", "skills", "bootstrap-config-architect", "SKILL.md")
     ]
     let skillPath = null

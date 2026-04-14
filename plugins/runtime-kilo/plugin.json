@@ -1,0 +1,12 @@
+{
+  "name": "kilo",
+  "version": "1.0.0",
+  "mahVersion": "^0.5.0",
+  "markerDir": ".kilo",
+  "directCli": "kilo",
+  "wrapper": null,
+  "configRoot": ".kilo",
+  "configPattern": ".kilo/crew/<crew>/multi-team.yaml",
+  "entry": "index.mjs",
+  "description": "Kilo Code CLI runtime plugin. Integrates @kilocode/cli directly with MAH core-managed crew context, sessions, and generated runtime artifacts."
+}

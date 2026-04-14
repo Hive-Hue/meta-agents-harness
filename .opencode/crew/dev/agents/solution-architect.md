@@ -9,13 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
+model: minimax-coding-plan/MiniMax-M2.7
 ---
 
 # Solution Architect
 
 Role: `worker`
 Team: `Planning`
-Model: `openai/gpt-5.2`
+Model: `minimax-coding-plan/MiniMax-M2.7`
 
 ## Mission
 Planning worker focused on scoped execution within assigned ownership boundaries.

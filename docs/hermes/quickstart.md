@@ -115,7 +115,7 @@ mah --runtime hermes run
 
 Starts an interactive Hermes session with the active crew.
 
-On a fresh run, the repo-local wrapper bootstraps the orchestrator context for the selected crew before continuing interactively.
+On a fresh run, the MAH core bootstraps the orchestrator context for the selected crew before continuing interactively.
 
 ### With session controls
 
@@ -133,7 +133,7 @@ mah --runtime hermes run --session-mode continue --session-id <id>
 mah --runtime hermes run --session-mode none
 ```
 
-`--session-root` is accepted by the wrapper as MAH metadata, but Hermes still manages its own global session storage.
+`--session-root` is accepted by MAH as session metadata, but Hermes still manages its own global session storage.
 
 ---
 
@@ -193,7 +193,7 @@ MAH_RUNTIME=hermes mah detect
 
 Hermes requires either:
 - The `.hermes/` marker directory, or
-- The `hermes` or `hermesh` executable in PATH
+- The `hermes` executable in PATH
 
 Fix:
 
@@ -206,12 +206,11 @@ mah init --runtime hermes
 
 # Option 3: Verify CLI available
 which hermes
-which hermesh
 ```
 
 ### "no executable available for command"
 
-The repo-local wrapper could not be resolved, or the global Hermes CLI is missing for commands that require it.
+The global Hermes CLI could not be resolved for commands that require it.
 
 Fix:
 
