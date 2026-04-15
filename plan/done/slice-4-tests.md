@@ -160,9 +160,9 @@ test("pi headless: simple echo exits 0", () => {
   assert.match(result.stdout, /test/)
 })
 
-// Test 2: mah run --runtime pi --headless "echo test" --output json
+// Test 2: mah run --runtime pi --headless "echo test" --output=json
 test("pi headless: json output envelope", () => {
-  const result = run(["--runtime", "pi", "run", "--headless", "echo test", "--output", "json"])
+  const result = run(["--runtime", "pi", "run", "--headless", "echo test", "--output=json"])
   assert.equal(result.status, 0, result.stderr)
   const envelope = JSON.parse(result.stdout)
   assert.equal(envelope.status, 0)

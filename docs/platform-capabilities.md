@@ -16,8 +16,8 @@ These capabilities are available and supported for evaluation, but are not yet d
 | pi | ✅ | ✅ | ✅ | ❌ | argv | stdout |
 | claude | ✅ | ✅ | ✅ | ❌ | argv | stdout |
 | opencode | ✅ | ✅ | ✅ | ❌ | argv | stdout |
-| hermes | ✅ | ✅ | ❌ | ✅ | argv | stdout |
-| codex (plugin) | ❌ | ❌ | ❌ | ❌ | unsupported | stdout |
+| hermes | ✅ | ✅ | ❌ | ✅ | argv | mixed |
+| codex (plugin) | ❌ | ❌ | ❌ | ❌ | unsupported | unsupported |
 
 ## Provenance Retention Policy
 

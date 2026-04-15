@@ -4,14 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-04-15
 
 ### Added
 - `RuntimeAdapter` extended with `capabilities.headless` schema (`supported`, `native`, `requiresSession`, `promptMode`, `outputMode`)
 - `prepareHeadlessRunContext()` method on all runtime adapters (built-in + plugins)
 - `mah run --headless "<task>"` CLI command with canonical JSON/text output envelope
 - `mah explain run --headless --trace` now shows headless execution plan
-- `--output json|text` flag for structured headless output
+- `--output=json|text` flag for structured headless output
 - `runCommand()` switches to `stdio: "pipe"` in headless mode for output capture
 - All 4 built-in adapters (pi, claude, opencode, hermes) have full headless support
 - All 5 plugin adapters have headless capability declared (unsupported placeholder until Slice 3)

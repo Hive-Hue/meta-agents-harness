@@ -213,7 +213,7 @@ mah explain run --runtime codex --headless --trace
 ### Flags
 
 - `--headless`
-- `--output json|text`
+- `--output=json|text`
 - `--stdin-prompt`
 - `--allow-unsupported-fallback` (se realmente necessário; default deve ser `false`)
 

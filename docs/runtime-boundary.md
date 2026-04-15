@@ -19,7 +19,7 @@
 ## Headless Execution
 
 - Headless behavior is adapter-owned and declared via `capabilities.headless`.
-- MAH core normalizes external UX (`mah run --headless`, `--output json|text`) while runtime-specific mechanics remain in adapter methods.
+- MAH core normalizes external UX (`mah run --headless`, `--output=json|text`, `-o=json|text`) while runtime-specific mechanics remain in adapter methods.
 - `prepareHeadlessRunContext()` is the contract boundary for runtime-specific non-interactive execution plans.
 
 ## Current status

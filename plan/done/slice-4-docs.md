@@ -2,7 +2,7 @@
 
 **Sprint**: v0.6.0-headless-and-sessions  
 **Created**: 2026-04-15  
-**Status**: Draft — for PLANNING review
+**Status**: Archived — implementation complete
 
 ---
 
@@ -143,9 +143,9 @@ stdout/stderr are written directly to the terminal:
 
 ### JSON Output
 
-Use `--output json` for machine-readable output:
+Use `--output=json` for machine-readable output:
 
-    mah run --runtime pi --headless "echo hello" --output json
+    mah run --runtime pi --headless "echo hello" --output=json
     {
       "runtime": "pi",
       "command": "run",
@@ -256,7 +256,7 @@ Also add a subsection:
 MAH supports headless execution across all runtimes via `mah run --runtime <x> --headless "<task>"`.
 Each runtime has a native headless mode that suppresses interactive TUIs and captures execution output.
 
-See [Headless Runtime Execution](./headless-runtime.md) for full documentation.
+See [Headless Runtime Execution](../../docs/headless-runtime.md) for full documentation.
 ```
 
 ---
@@ -277,14 +277,14 @@ is limited to receiving a task prompt and producing output — MAH handles:
 
 - stdio capture (via `spawnSync` with `stdio: pipe`)
 - exit code interpretation
-- JSON envelope formatting (`--output json`)
+- JSON envelope formatting (`--output=json`)
 - session context injection (where required by the runtime)
 
 The runtime adapter's `prepareHeadlessRunContext()` method is the boundary
 point — it defines what CLI arguments and environment variables are produced
 for a given headless task.
 
-See [Headless Runtime Execution](./headless-runtime.md) for per-runtime details.
+See [Headless Runtime Execution](../../docs/headless-runtime.md) for per-runtime details.
 ```
 
 ---
@@ -297,10 +297,10 @@ See [Headless Runtime Execution](./headless-runtime.md) for per-runtime details.
 
 ```
 ## Core Concepts
-- [Expertise Model Foundation](./expertise-model-foundation.md)
-- [Platform Capabilities](./platform-capabilities.md)
-- [Runtime Boundary](./runtime-boundary.md)
-- [Validate Semantics](./validate-semantics.md)
+- [Expertise Model Foundation](../../docs/expertise-model-foundation.md)
+- [Platform Capabilities](../../docs/platform-capabilities.md)
+- [Runtime Boundary](../../docs/runtime-boundary.md)
+- [Validate Semantics](../../docs/validate-semantics.md)
 ```
 
 ### Proposed change
@@ -310,7 +310,7 @@ Add under Core Concepts or create a new "Operations" section:
 ```markdown
 ## Operations
 
-- [Headless Runtime Execution](./headless-runtime.md) — Runtimes without TTY in CI/CD and scripts
+- [Headless Runtime Execution](../../docs/headless-runtime.md) — Runtimes without TTY in CI/CD and scripts
 ```
 
 ---

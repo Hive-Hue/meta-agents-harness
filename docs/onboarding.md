@@ -360,7 +360,7 @@ npm run sync:meta
    MAH_INIT_NAME="${{ github.event.repository.name }}" mah init --yes
    ```
 
-3. **Commit meta-agents.yaml** - It's configuration is source of truth
+3. **Commit `meta-agents.yaml`** - Its configuration is the source of truth
 
 4. **Never commit .mcp.json** - Contains secrets
 
@@ -372,9 +372,9 @@ npm run sync:meta
 
 ## Next Steps
 
-After bootstrap
+After bootstrap:
 
-- [Select a crew](./crew-operations.md)
-- [Run the demo](./demos.md)
-- [Configure MCP](./mcp-setup.md)
-- [Explore commands](./commands.md)
+- Select a crew with `mah use <crew>`
+- Run the demo with `mah demo <crew>`
+- Configure Codex MCP usage in [`plugins/mah/README.md`](../plugins/mah/README.md)
+- Explore the command surface in [`README.md`](../README.md) and [`docs/README.md`](./README.md)
