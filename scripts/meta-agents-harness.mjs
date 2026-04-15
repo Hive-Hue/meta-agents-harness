@@ -156,6 +156,9 @@ function printHelp() {
   console.log("  --run <id>")
   console.log("  --agent <name>")
   console.log("  --strict-markers")
+  console.log("  --headless")
+  console.log("  --output <json|text>")
+  console.log("  -o <json|text>")
 }
 
 function hasFlag(argv, flag) {
@@ -174,6 +177,20 @@ function parseValueArg(argv, flag, short = "") {
     if (token.startsWith(`${flag}=`)) return token.slice(flag.length + 1)
   }
   return ""
+}
+
+function hasHeadlessFlag(argv) {
+  return argv.includes("--headless")
+}
+
+function parseOutputMode(argv) {
+  if (argv.includes("--output=json") || argv.includes("-o=json")) return "json"
+  if (argv.includes("--output=text") || argv.includes("-o=text")) return "text"
+  return "text" // default
+}
+
+function stripHeadlessArgs(argv) {
+  return argv.filter((item) => item !== "--headless" && !item.startsWith("--output=") && !item.startsWith("-o="))
 }
 
 function parseFilterArgs(argv) {
@@ -656,12 +673,21 @@ function normalizeRunArgs(runtime, passthrough) {
   return { args, envOverrides, warnings }
 }
 
-function runCommand(command, args, passthrough = [], envOverrides = {}) {
+function runCommand(command, args, passthrough = [], envOverrides = {}, options = {}) {
+  const headless = options.headless === true
+  const stdio = headless ? "pipe" : "inherit"
   const child = spawnSync(command, [...args, ...passthrough], {
     cwd: repoRoot,
     env: { ...process.env, ...envOverrides },
-    stdio: "inherit"
+    stdio
   })
+  if (headless && child) {
+    return {
+      status: typeof child.status === "number" ? child.status : 1,
+      stdout: child.stdout ? child.stdout.toString() : "",
+      stderr: child.stderr ? child.stderr.toString() : ""
+    }
+  }
   if (typeof child.status === "number") return child.status
   if (child.error) {
     console.error(`ERROR: failed to run ${command}: ${child.error.message}`)
@@ -1676,6 +1702,81 @@ function dispatchCapture(runtime, command, passthrough) {
   }
 }
 
+function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
+  const adapter = runtimeProfiles[runtime]
+  if (!adapter) {
+    return {
+      status: 1,
+      stdout: "",
+      stderr: `unsupported runtime: ${runtime}`,
+      error: `unsupported runtime: ${runtime}`
+    }
+  }
+
+  // Check if adapter supports headless execution
+  const supportsHeadless = typeof adapter.prepareHeadlessRunContext === "function"
+  if (!supportsHeadless) {
+    // Fall back to dispatchCapture for non-headless-aware adapters
+    const captured = dispatchCapture(runtime, command, passthrough)
+    return captured
+  }
+
+  // Normalize args - strip headless/output flags for passthrough
+  const normalizedPassthrough = stripHeadlessArgs(passthrough)
+  const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
+  const envOverrides = { ...normalized.envOverrides }
+
+  // Get headless execution plan from adapter
+  const headlessPlan = adapter.prepareHeadlessRunContext({
+    repoRoot,
+    runtime,
+    adapter,
+    crew: normalizedPassthrough,
+    argv: normalized.args,
+    envOverrides
+  })
+
+  if (!headlessPlan || headlessPlan.error) {
+    return {
+      status: 1,
+      stdout: "",
+      stderr: headlessPlan?.error || "failed to prepare headless run context",
+      error: headlessPlan?.error || "failed to prepare headless run context"
+    }
+  }
+
+  // Execute with headless options
+  const result = runCommand(
+    headlessPlan.exec || adapter.directCli,
+    headlessPlan.args || [],
+    headlessPlan.passthrough || [],
+    { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
+    { headless: true }
+  )
+
+  // Format output based on output mode
+  if (outputMode === "json") {
+    const envelope = {
+      runtime,
+      command,
+      status: result.status,
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      crew: headlessPlan.crew || "",
+      session_id: headlessPlan.session_id || "",
+      execution_time_ms: headlessPlan.execution_time_ms || 0
+    }
+    return envelope
+  }
+
+  // Text mode output
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr || "")
+  }
+  process.stdout.write(result.stdout || "")
+  return result
+}
+
 function isSyncLikeCommand(command) {
   return ["plan", "diff", "sync", "generate", "generate:tree"].includes(command)
 }
@@ -1685,7 +1786,7 @@ function main() {
   const traceMode = hasFlag(argv, "--trace")
   const jsonMode = hasFlag(argv, "--json")
   const mermaidMode = hasFlag(argv, "--mermaid")
-  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"), "--mermaid"))
+  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"), "--mermaid"), "--headless"))
   const first = normalizedArgv[0]
 
   if (!first || first === "--help" || first === "-h" || first === "help") {
@@ -1915,6 +2016,7 @@ function main() {
   if (first === "explain") {
     const explainCommand = normalizedArgv[1] || "detect"
     const explainFilters = parseFilterArgs(normalizedArgv.slice(2))
+    const isHeadless = hasHeadlessFlag(argv)
     const crewContext = resolveCrewExecutionContext(explainFilters.crew)
     if (explainCommand === "detect") {
       if (jsonMode) {
@@ -1975,6 +2077,69 @@ function main() {
     }
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
       const passthrough = normalizedArgv.slice(2)
+
+      // Handle headless mode for run command
+      if (explainCommand === "run" && isHeadless) {
+        const adapter = runtimeProfiles[runtimeResult.runtime]
+        if (!adapter) {
+          console.error(`ERROR: runtime '${runtimeResult.runtime}' not found`)
+          process.exitCode = 1
+          return
+        }
+        const supportsHeadless = typeof adapter.prepareHeadlessRunContext === "function"
+        if (!supportsHeadless) {
+          console.error(`ERROR: runtime '${runtimeResult.runtime}' does not support headless execution`)
+          process.exitCode = 1
+          return
+        }
+
+        // Normalize args - strip headless/output flags for passthrough
+        const normalizedPassthrough = stripHeadlessArgs(passthrough)
+        const normalized = normalizeRunArgs(runtimeResult.runtime, normalizedPassthrough)
+        const envOverrides = { ...normalized.envOverrides }
+
+        // Get headless execution plan from adapter
+        const headlessPlan = adapter.prepareHeadlessRunContext({
+          repoRoot,
+          runtime: runtimeResult.runtime,
+          adapter,
+          task: normalized.args.join(" "),
+          argv: normalized.args,
+          envOverrides
+        })
+
+        if (!headlessPlan || headlessPlan.error) {
+          console.error(`ERROR: ${headlessPlan?.error || "failed to prepare headless run context"}`)
+          process.exitCode = 1
+          return
+        }
+
+        const payload = {
+          runtime: runtimeResult.runtime,
+          reason: runtimeResult.reason,
+          command: "run",
+          mode: "headless",
+          exec: headlessPlan.exec || adapter.directCli,
+          execArgs: headlessPlan.args || [],
+          passthrough: headlessPlan.passthrough || [],
+          env: { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
+          warnings: headlessPlan.warnings || [],
+          crewContext,
+          internal: headlessPlan.internal || {}
+        }
+        if (jsonMode) {
+          printDiagnosticPayload(createDiagnosticPayload("explain", {
+            status: 0,
+            runtime: runtimeResult.runtime,
+            reason: runtimeResult.reason,
+            data: { target: "run", mode: "headless", payload }
+          }))
+        } else {
+          printExplain(traceMode, payload)
+        }
+        return
+      }
+
       const plan = resolveDispatchPlan(runtimeResult.runtime, explainCommand, passthrough)
       if (plan.error) {
         console.error(`ERROR: ${plan.error}`)
@@ -2119,6 +2284,17 @@ function main() {
 
   const command = first
   const passthrough = normalizedArgv.slice(1)
+
+  // Check for headless mode on run command
+  if (command === "run" && hasHeadlessFlag(argv)) {
+    const outputMode = parseOutputMode(argv)
+    const result = dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
+    if (outputMode === "json") {
+      console.log(JSON.stringify(result, null, 2))
+    }
+    process.exitCode = typeof result.status === "number" ? result.status : 1
+    return
+  }
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)
   process.exitCode = status

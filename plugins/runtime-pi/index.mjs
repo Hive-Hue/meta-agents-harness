@@ -174,7 +174,14 @@ export const runtimePlugin = {
       sessionMirrorFlag: false,
       sessionNewArgs: ["--new-session"],
       sessionContinueArgs: ["-c"],
-      sessionNoneArgs: ["--no-session"]
+      sessionNoneArgs: ["--no-session"],
+      headless: {
+        supported: false,
+        native: false,
+        requiresSession: false,
+        promptMode: "unsupported",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -235,6 +242,13 @@ export const runtimePlugin = {
           sessionId: session.sessionId,
           sessionMode: session.sessionMode
         }
+      }
+    },
+
+    prepareHeadlessRunContext() {
+      return {
+        ok: false,
+        error: "headless not supported for this runtime"
       }
     },
 

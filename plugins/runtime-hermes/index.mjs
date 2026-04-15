@@ -177,7 +177,14 @@ export const runtimePlugin = {
       persistentMemory: true,
       supportsBackgroundOperation: true,
       supportsMultiBackendExecution: true,
-      gatewayAware: true
+      gatewayAware: true,
+      headless: {
+        supported: false,
+        native: false,
+        requiresSession: false,
+        promptMode: "unsupported",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -235,6 +242,13 @@ export const runtimePlugin = {
         internal: {
           crew, configPath, multiTeamPath, sessionRoot, newSessionRequested
         }
+      }
+    },
+
+    prepareHeadlessRunContext() {
+      return {
+        ok: false,
+        error: "headless not supported for this runtime"
       }
     },
 
