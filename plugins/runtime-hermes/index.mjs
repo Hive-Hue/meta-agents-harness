@@ -179,10 +179,10 @@ export const runtimePlugin = {
       supportsMultiBackendExecution: true,
       gatewayAware: true,
       headless: {
-        supported: false,
+        supported: true,
         native: false,
-        requiresSession: false,
-        promptMode: "unsupported",
+        requiresSession: true,
+        promptMode: "argv",
         outputMode: "stdout"
       }
     },
@@ -245,10 +245,29 @@ export const runtimePlugin = {
       }
     },
 
-    prepareHeadlessRunContext() {
+    prepareHeadlessRunContext({ repoRoot, task = "", crew, configPath, argv = [], envOverrides = {} }) {
+      const sessionId = `${envOverrides.HERMES_SESSION_ID || process.env.HERMES_SESSION_ID || ""}`.trim()
+      if (!crew && !sessionId) {
+        return {
+          ok: false,
+          error: "Hermes headless requires an active session. Use 'mah sessions new' to create one, or pass HERMES_SESSION_ID env var."
+        }
+      }
       return {
-        ok: false,
-        error: "headless not supported for this runtime"
+        ok: true,
+        exec: "hermes",
+        args: ["chat", "--no-input"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          HERMES_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "hermes"
+        }
       }
     },
 

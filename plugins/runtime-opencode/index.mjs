@@ -144,10 +144,10 @@ export const runtimePlugin = {
       sessionMirrorFlag: false,
       sessionContinueArgs: ["-c"],
       headless: {
-        supported: false,
-        native: false,
+        supported: true,
+        native: true,
         requiresSession: false,
-        promptMode: "unsupported",
+        promptMode: "argv",
         outputMode: "stdout"
       }
     },
@@ -192,10 +192,28 @@ export const runtimePlugin = {
       }
     },
 
-    prepareHeadlessRunContext() {
+    prepareHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!argv || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "OpenCode headless requires a task prompt"
+        }
+      }
       return {
-        ok: false,
-        error: "headless not supported for this runtime"
+        ok: true,
+        exec: "opencode",
+        args: ["--no-interactive"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          OPENCODE_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "opencode"
+        }
       }
     },
 

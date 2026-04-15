@@ -176,10 +176,10 @@ export const runtimePlugin = {
       sessionContinueArgs: ["-c"],
       sessionNoneArgs: ["--no-session"],
       headless: {
-        supported: false,
-        native: false,
+        supported: true,
+        native: true,
         requiresSession: false,
-        promptMode: "unsupported",
+        promptMode: "argv",
         outputMode: "stdout"
       }
     },
@@ -245,10 +245,28 @@ export const runtimePlugin = {
       }
     },
 
-    prepareHeadlessRunContext() {
+    prepareHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!argv || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "PI headless requires a task prompt"
+        }
+      }
       return {
-        ok: false,
-        error: "headless not supported for this runtime"
+        ok: true,
+        exec: "pi",
+        args: ["run", "--no-session"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          PI_MULTI_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "pi"
+        }
       }
     },
 
