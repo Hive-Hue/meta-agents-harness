@@ -1,4 +1,4 @@
-# Plugin API for Runtimes — v0.5.0
+# Plugin API for Runtimes — v0.6.0
 
 A formal plugin system for adding new runtimes to MAH without modifying core files. Installed plugins persist across MAH updates, are fully uninstallable, and integrate transparently with all MAH commands.
 
@@ -10,7 +10,7 @@ Plugins can integrate in two ways:
 
 ## Overview
 
-Before v0.5.0, adding a new runtime required editing two core files:
+Before v0.6.0, adding a new runtime required editing two core files:
 - `scripts/runtime-adapters.mjs` — add `createAdapter({...})`
 - `scripts/meta-agents-harness.mjs` — add the runtime to `RUNTIME_ORDER`
 
@@ -55,7 +55,7 @@ export const runtimePlugin = {
   // --- Identification (all required) ---
   name: "kilo",                      // unique string — used in mah detect, --runtime
   version: "1.0.0",                  // semver
-  mahVersion: "^0.5.0",             // semver range of MAH compatibility
+  mahVersion: "^0.6.0",             // semver range of MAH compatibility
 
   // --- RuntimeAdapter (required) ---
   adapter: {
@@ -189,7 +189,7 @@ mah-plugins/<name>/
 {
   "name": "kilo",
   "version": "1.0.0",
-  "mahVersion": "^0.5.0",
+  "mahVersion": "^0.6.0",
   "entry": "index.mjs"
 }
 ```
@@ -266,7 +266,7 @@ Validates a plugin at the given path without installing it. Returns detailed err
 
 ```
 $ mah plugins validate ./plugins/runtime-fake
-valid plugin=fake version=0.0.1 mahVersion=^0.5.0
+valid plugin=fake version=0.0.1 mahVersion=^0.6.0
 ```
 
 On error:
@@ -346,7 +346,7 @@ A plugin runtime is selected by `mah detect` if its marker directory is present 
 
 ```js
 import {
-  MAH_VERSION,          // "0.5.0" — current MAH version
+  MAH_VERSION,          // "0.6.0" — current MAH version
   getAllRuntimes,       // async () => { [name]: adapter }
   validatePlugin,       // async (path) => ValidationResult
   unloadPlugin          // (name) => boolean
@@ -368,7 +368,7 @@ Validates without registering:
 
 ```js
 const result = await validatePlugin('./mah-plugins/runtime-kilo')
-// { ok: true, name: "kilo", version: "1.0.0", mahVersion: "^0.5.0",
+// { ok: true, name: "kilo", version: "1.0.0", mahVersion: "^0.6.0",
 //   adapter: {...}, errors: [], warnings: [] }
 ```
 
@@ -395,7 +395,7 @@ mah plugins validate ./path/to/plugin
 
 ---
 
-## v0.5.0 scope
+## v0.6.0 scope
 
 **In scope:**
 - Plugin discovery from `mah-plugins/` and `node_modules/@mah/runtime-*`
@@ -404,7 +404,7 @@ mah plugins validate ./path/to/plugin
 - Retrocompatible with all existing commands
 - Lifecycle hooks (`init`, `teardown`)
 
-**Out of scope for v0.5.0:**
+**Out of scope for v0.6.0:**
 - Remote/plugin loading from URLs
 - Plugins that modify MAH core behavior (plugins are runtime-only)
 - Plugin marketplace or registry
