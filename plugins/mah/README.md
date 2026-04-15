@@ -4,28 +4,24 @@ Native Codex plugin that exposes bounded Meta Agents Harness operations as MCP t
 
 ## Installation
 
-The current supported installation path is as a Codex MCP server.
+No global Codex installation is required for MAH-managed Codex sessions.
 
-Add the server:
+When you run:
+
+```bash
+mah --runtime codex run
+```
+
+the Codex runtime now injects the local `mah` MCP server automatically via `codex -c mcp_servers.mah=...`, using:
+
+- the current Node executable
+- the repo-local server at `plugins/mah/mcp/server.mjs`
+- the MAH repo root as `cwd`
+
+Optional standalone installation remains available if you want the same server outside MAH-managed sessions:
 
 ```bash
 codex mcp add mah -- /home/alysson/.nvm/versions/node/v22.19.0/bin/node /home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs
-```
-
-Then make sure the generated entry in `~/.codex/config.toml` is pinned to the MAH repo as working directory:
-
-```toml
-[mcp_servers.mah]
-command = "/home/alysson/.nvm/versions/node/v22.19.0/bin/node"
-args = ["/home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs"]
-cwd = "/home/alysson/Github/meta-agents-harness"
-startup_timeout_sec = 120
-```
-
-If you need to remove it later:
-
-```bash
-codex mcp remove mah
 ```
 
 ## Usage
@@ -49,6 +45,20 @@ Typical flow:
 1. Call `mah_get_active_context` to confirm active crew and current agent.
 2. Call `mah_list_agents` to inspect valid routes from the current agent.
 3. Call `mah_delegate_agent` with a bounded task and a valid target.
+
+## Runtime Integration
+
+For MAH-managed Codex sessions, the runtime injects the `mah` MCP server directly into the Codex launch arguments. This keeps the integration scoped to:
+
+- the active MAH session
+- the current workspace
+- the current active crew and agent context
+
+It also means:
+
+- no manual edit of `~/.codex/config.toml` is required for `mah --runtime codex run`
+- the plugin does not depend on global Codex state to be available
+- standalone Codex sessions outside MAH can still use manual `codex mcp add` if desired
 
 ## Scope
 

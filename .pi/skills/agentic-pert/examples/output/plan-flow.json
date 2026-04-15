@@ -1,0 +1,156 @@
+{
+  "nodes": [
+    {
+      "id": "T1",
+      "type": "taskNode",
+      "data": {
+        "label": "Setup JWT library",
+        "duration": 2.0,
+        "critical": true,
+        "status": "pending"
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "style": {
+        "border": "2px solid #ff6b6b",
+        "background": "#f8f9fa",
+        "borderRadius": "8px",
+        "padding": "10px"
+      }
+    },
+    {
+      "id": "T2",
+      "type": "taskNode",
+      "data": {
+        "label": "Auth endpoints",
+        "duration": 3.1666666666666665,
+        "critical": true,
+        "status": "pending"
+      },
+      "position": {
+        "x": 200,
+        "y": 0
+      },
+      "style": {
+        "border": "2px solid #ff6b6b",
+        "background": "#f8f9fa",
+        "borderRadius": "8px",
+        "padding": "10px"
+      }
+    },
+    {
+      "id": "T3",
+      "type": "taskNode",
+      "data": {
+        "label": "Dashboard base",
+        "duration": 2.0,
+        "critical": false,
+        "status": "pending"
+      },
+      "position": {
+        "x": 200,
+        "y": 100
+      },
+      "style": {
+        "border": "1px solid #339af0",
+        "background": "#f8f9fa",
+        "borderRadius": "8px",
+        "padding": "10px"
+      }
+    },
+    {
+      "id": "T4",
+      "type": "taskNode",
+      "data": {
+        "label": "Auth integration",
+        "duration": 1.5,
+        "critical": true,
+        "status": "pending"
+      },
+      "position": {
+        "x": 400,
+        "y": 0
+      },
+      "style": {
+        "border": "2px solid #ff6b6b",
+        "background": "#f8f9fa",
+        "borderRadius": "8px",
+        "padding": "10px"
+      }
+    },
+    {
+      "id": "T5",
+      "type": "taskNode",
+      "data": {
+        "label": "Integration tests",
+        "duration": 2.6666666666666665,
+        "critical": true,
+        "status": "pending"
+      },
+      "position": {
+        "x": 600,
+        "y": 0
+      },
+      "style": {
+        "border": "2px solid #ff6b6b",
+        "background": "#f8f9fa",
+        "borderRadius": "8px",
+        "padding": "10px"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e0",
+      "source": "T1",
+      "target": "T2",
+      "animated": true,
+      "style": {
+        "stroke": "#ff6b6b"
+      }
+    },
+    {
+      "id": "e1",
+      "source": "T1",
+      "target": "T3",
+      "animated": false,
+      "style": {
+        "stroke": "#adb5bd"
+      }
+    },
+    {
+      "id": "e2",
+      "source": "T2",
+      "target": "T4",
+      "animated": true,
+      "style": {
+        "stroke": "#ff6b6b"
+      }
+    },
+    {
+      "id": "e3",
+      "source": "T3",
+      "target": "T4",
+      "animated": false,
+      "style": {
+        "stroke": "#adb5bd"
+      }
+    },
+    {
+      "id": "e4",
+      "source": "T4",
+      "target": "T5",
+      "animated": true,
+      "style": {
+        "stroke": "#ff6b6b"
+      }
+    }
+  ],
+  "viewport": {
+    "x": 0,
+    "y": 0,
+    "zoom": 1
+  }
+}

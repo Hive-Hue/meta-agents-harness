@@ -12,14 +12,14 @@ permission:
     planning-lead: allow
     engineering-lead: allow
     validation-lead: allow
-model: minimax-coding-plan/MiniMax-M2.7
+model: minimax/minimax-m2.7
 ---
 
 # Orchestrator
 
 Role: `ceo`
 Team: `Global`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Top-level orchestrator that routes work to team leads and controls execution order.

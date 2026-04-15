@@ -174,7 +174,14 @@ export const runtimePlugin = {
       sessionMirrorFlag: false,
       sessionNewArgs: ["--new-session"],
       sessionContinueArgs: ["-c"],
-      sessionNoneArgs: ["--no-session"]
+      sessionNoneArgs: ["--no-session"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -234,6 +241,31 @@ export const runtimePlugin = {
           sessionBaseRoot: session.sessionBaseRoot,
           sessionId: session.sessionId,
           sessionMode: session.sessionMode
+        }
+      }
+    },
+
+    prepareHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!argv || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "PI headless requires a task prompt"
+        }
+      }
+      return {
+        ok: true,
+        exec: "pi",
+        args: ["run", "--no-session"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          PI_MULTI_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "pi"
         }
       }
     },

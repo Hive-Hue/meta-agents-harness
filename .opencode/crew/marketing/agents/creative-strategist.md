@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: minimax-coding-plan/MiniMax-M2.7
+model: zai/glm-5
 ---
 
 # Creative Strategist
 
 Role: `worker`
 Team: `Creative`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `zai/glm-5`
 
 ## Mission
 Creative worker focused on scoped execution within assigned ownership boundaries.

@@ -142,7 +142,14 @@ export const runtimePlugin = {
       sessionIdFlag: "--session-id",
       sessionRootFlag: false,
       sessionMirrorFlag: false,
-      sessionContinueArgs: ["-c"]
+      sessionContinueArgs: ["-c"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -182,6 +189,31 @@ export const runtimePlugin = {
         envOverrides,
         warnings: [],
         internal: { crew, configPath, hierarchy: parsed.hierarchy }
+      }
+    },
+
+    prepareHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!argv || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "OpenCode headless requires a task prompt"
+        }
+      }
+      return {
+        ok: true,
+        exec: "opencode",
+        args: ["--no-interactive"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          OPENCODE_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "opencode"
+        }
       }
     },
 

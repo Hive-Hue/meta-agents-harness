@@ -1,0 +1,18 @@
+agent:
+  name: "product-lead"
+  role: "agent"
+  team: "bootstrap-config"
+meta:
+  version: "1"
+  max_lines: "120"
+  last_updated: "2026-04-07T15:57:58.314Z"
+patterns:
+  - date: "2026-04-07"
+    note: "Bootstrap CLI test spec has 68 test cases across 13 categories — prioritize P0 (structure, integration, environment) before P1 (edge cases, fallback, AI-assist)"
+risks: []
+tools: []
+workflows: []
+decisions: []
+lessons: []
+open_questions: []
+observations: []

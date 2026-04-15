@@ -1,0 +1,91 @@
+{
+  "default_policy": "balanced",
+  "policies": {
+    "economy": {
+      "roles": {
+        "orchestrator": "lmstudio,nvidia/nemotron-3-nano-4b",
+        "lead": "lmstudio,nvidia/nemotron-3-nano-4b",
+        "worker": "Zai Coding Plan,glm-5"
+      },
+      "intents": {
+        "coding": "Zai Coding Plan,glm-5-turbo",
+        "validation": "Zai Coding Plan,glm-4.7"
+      }
+    },
+    "quality": {
+      "roles": {
+        "orchestrator": "Zai Coding Plan,glm-5",
+        "lead": "Zai Coding Plan,glm-5",
+        "worker": "Zai Coding Plan,glm-5"
+      },
+      "intents": {
+        "status": "Zai Coding Plan,glm-4.7",
+        "research": "Zai Coding Plan,glm-5",
+        "planning": "Zai Coding Plan,glm-5",
+        "coding": "Zai Coding Plan,glm-5",
+        "validation": "Zai Coding Plan,glm-5"
+      }
+    },
+    "latency": {
+      "roles": {
+        "orchestrator": "Zai Coding Plan,glm-4.7",
+        "lead": "Zai Coding Plan,glm-4.7",
+        "worker": "Zai Coding Plan,glm-4.7"
+      },
+      "intents": {
+        "coding": "Zai Coding Plan,glm-5"
+      }
+    },
+    "local": {
+      "roles": {
+        "orchestrator": "lmstudio,nvidia/nemotron-3-nano-4b",
+        "lead": "lmstudio,nvidia/nemotron-3-nano-4b",
+        "worker": "lmstudio,nvidia/nemotron-3-nano-4b"
+      },
+      "intents": {
+        "coding": "lmstudio,nvidia/nemotron-3-nano-4b"
+      }
+    },
+    "balanced": {
+      "roles": {
+        "orchestrator": "Zai Coding Plan,glm-5-turbo",
+        "lead": "Zai Coding Plan,glm-4.7-flash",
+        "worker": "Zai Coding Plan,glm-5"
+      },
+      "intents": {
+        "coding": "Zai Coding Plan,glm-5",
+        "validation": "Zai Coding Plan,glm-4.7"
+      }
+    }
+  },
+  "systems": {
+    "marketingmultiteam": "Zai Coding Plan,glm-4.7"
+  },
+  "roles": {
+    "orchestrator": "Zai Coding Plan,glm-4.7",
+    "lead": "Zai Coding Plan,glm-4.7",
+    "worker": "Zai Coding Plan,glm-5"
+  },
+  "teams": {
+    "planning": "Zai Coding Plan,glm-5",
+    "creative": "Zai Coding Plan,glm-5",
+    "validation": "Zai Coding Plan,glm-4.7"
+  },
+  "team_roles": {
+    "planning:worker": "Zai Coding Plan,glm-5",
+    "creative:worker": "Zai Coding Plan,glm-5",
+    "validation:worker": "Zai Coding Plan,glm-4.7"
+  },
+  "intents": {
+    "status": "Zai Coding Plan,glm-4.7",
+    "research": "Zai Coding Plan,glm-5",
+    "planning": "Zai Coding Plan,glm-5",
+    "coding": "Zai Coding Plan,glm-5",
+    "validation": "Zai Coding Plan,glm-4.7",
+    "general": "Zai Coding Plan,glm-4.7"
+  },
+  "agents": {
+    "campaign-strategist": "Zai Coding Plan,glm-5",
+    "market-researcher": "Zai Coding Plan,glm-5"
+  }
+}

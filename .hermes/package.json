@@ -1,0 +1,18 @@
+{
+  "name": "multi-agents-hermes",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "hermesh": "bin/hermesh"
+  },
+  "scripts": {
+    "sync:meta": "npm --prefix .. run sync:meta",
+    "check:meta-sync": "npm --prefix .. run check:meta-sync",
+    "list:crews": "node scripts/hermesh.mjs list:crews",
+    "use:crew": "node scripts/hermesh.mjs use",
+    "clear:crew": "node scripts/hermesh.mjs clear",
+    "run:crew": "node scripts/hermesh.mjs run",
+    "check:runtime": "node scripts/hermesh.mjs check:runtime",
+    "doctor": "node scripts/hermesh.mjs doctor"
+  }
+}

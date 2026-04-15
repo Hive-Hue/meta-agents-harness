@@ -185,6 +185,20 @@ function buildCodexInitialMessagesPrompt(prompt) {
   return `initial_messages=[{ role = "system", content = ${JSON.stringify(prompt)} }]`
 }
 
+function buildCodexMahMcpConfigArg(repoRoot) {
+  const nodeExec = process.execPath
+  const serverPath = path.join(repoRoot, "plugins", "mah", "mcp", "server.mjs")
+  const payload = [
+    "mcp_servers.mah={",
+    `command=${JSON.stringify(nodeExec)},`,
+    `args=[${JSON.stringify(serverPath)}],`,
+    `cwd=${JSON.stringify(repoRoot)},`,
+    "startup_timeout_sec=120",
+    "}"
+  ].join(" ")
+  return ["-c", payload]
+}
+
 function loadCodexCrewConfig(repoRoot, configPath) {
   if (!configPath || !existsSync(configPath)) {
     return { ok: false, error: `crew config not found: ${configPath || "(empty)"}` }
@@ -315,7 +329,7 @@ function buildCodexRunContext({ repoRoot, crew, configPath, argv = [], envOverri
   })
 
   const model = `${selectedAgent.model || ""}`.trim()
-  const args = [buildCodexInitialMessagesPrompt(systemPrompt)]
+  const args = [...buildCodexMahMcpConfigArg(repoRoot), buildCodexInitialMessagesPrompt(systemPrompt)]
   if (model) args.push("--model", model)
   if (autonomous && taskPrompt) {
     args.push("exec", "--cd", repoRoot, "--full-auto", taskPrompt)
@@ -371,7 +385,14 @@ export const runtimePlugin = {
       sessionRootFlag: false,
       sessionMirrorFlag: false,
       sessionNewArgs: [],
-      sessionContinueArgs: []
+      sessionContinueArgs: [],
+      headless: {
+        supported: false,
+        native: false,
+        requiresSession: false,
+        promptMode: "unsupported",
+        outputMode: "stdout"
+      }
     },
     supportsSessions: false,
     sessionListCommand: null,
@@ -405,6 +426,13 @@ export const runtimePlugin = {
 
     prepareRunContext(context) {
       return buildCodexRunContext.call(this, context)
+    },
+
+    prepareHeadlessRunContext() {
+      return {
+        ok: false,
+        error: "headless not supported for this runtime"
+      }
     },
 
     resolveCommandPlan(command, commandExistsFn) {

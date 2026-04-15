@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: minimax-coding-plan/MiniMax-M2.7
+model: zai/glm-5
 ---
 
 # Performance Analyst
 
 Role: `worker`
 Team: `Validation`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `zai/glm-5`
 
 ## Mission
 Validation worker focused on scoped execution within assigned ownership boundaries.

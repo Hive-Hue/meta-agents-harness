@@ -884,3 +884,202 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
 
   return runCommand(plan.exec, plan.args || [], args, envOverrides)
 }
+
+// =============================================================================
+// Headless Run Context Preparers
+// =============================================================================
+
+/**
+ * Prepare headless execution context for PI runtime.
+ * PI supports native headless execution via direct CLI with task as argv.
+ */
+export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+  const warnings = []
+
+  if (!task && (!argv || argv.length === 0)) {
+    return {
+      ok: false,
+      error: "PI headless requires a task prompt. Pass task as argument or via -- task."
+    }
+  }
+
+  // PI can run headless with task passed as argument
+  // Extensions are still loaded but in non-interactive mode
+  const extensionParse = parsePiExtensionArgs(repoRoot, argv)
+  const extensionPaths = extensionParse.extensionPaths.length > 0
+    ? extensionParse.extensionPaths
+    : loadPiDefaultExtensions(repoRoot).map((item) => resolveFromRepo(repoRoot, item))
+
+  const loadedEnv = loadPiRuntimeEnv(repoRoot, envOverrides)
+
+  // Build task args - PI accepts task directly as argument in headless mode
+  const taskArgs = []
+  if (task) {
+    taskArgs.push(task)
+  } else if (argv.length > 0) {
+    taskArgs.push(...argv)
+  }
+
+  return {
+    ok: true,
+    exec: "pi",
+    args: [
+      ...extensionPaths.flatMap((item) => ["-e", item]),
+      "run"
+    ],
+    passthrough: taskArgs,
+    envOverrides: {
+      ...loadedEnv,
+      ...envOverrides,
+      PI_MULTI_HEADLESS: "1"
+    },
+    warnings: extensionPaths.some((item) => !existsSync(item))
+      ? [...warnings, "some PI extensions not found, headless run may lack full functionality"]
+      : warnings,
+    internal: {
+      mode: "headless",
+      promptMode: "argv",
+      runtime: "pi"
+    }
+  }
+}
+
+/**
+ * Prepare headless execution context for Claude runtime.
+ * Claude supports headless via --print flag for non-interactive output.
+ */
+export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+  const warnings = []
+
+  if (!task && (!argv || argv.length === 0)) {
+    return {
+      ok: false,
+      error: "Claude headless requires a task prompt. Pass task as argument or via -- task."
+    }
+  }
+
+  // Build task args for Claude headless
+  const taskArgs = []
+  if (task) {
+    taskArgs.push(task)
+  } else if (argv.length > 0) {
+    taskArgs.push(...argv)
+  }
+
+  // Claude in headless mode uses --print to avoid interactive TUI
+  return {
+    ok: true,
+    exec: "claude",
+    args: [
+      "--print",
+      "--no-session-persistence"
+    ],
+    passthrough: taskArgs,
+    envOverrides: {
+      ...envOverrides,
+      CLAUDE_HEADLESS: "1"
+    },
+    warnings: [...warnings],
+    internal: {
+      mode: "headless",
+      promptMode: "argv",
+      runtime: "claude"
+    }
+  }
+}
+
+/**
+ * Prepare headless execution context for OpenCode runtime.
+ * OpenCode supports headless execution with task passed as argument.
+ */
+export function prepareOpencodeHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+  const warnings = []
+
+  if (!task && (!argv || argv.length === 0)) {
+    return {
+      ok: false,
+      error: "OpenCode headless requires a task prompt. Pass task as argument or via -- task."
+    }
+  }
+
+  // Build task args for OpenCode headless
+  const taskArgs = []
+  if (task) {
+    taskArgs.push(task)
+  } else if (argv.length > 0) {
+    taskArgs.push(...argv)
+  }
+
+  return {
+    ok: true,
+    exec: "opencode",
+    args: [],
+    passthrough: taskArgs,
+    envOverrides: {
+      ...envOverrides,
+      OPENCODE_HEADLESS: "1"
+    },
+    warnings: [...warnings],
+    internal: {
+      mode: "headless",
+      promptMode: "argv",
+      runtime: "opencode"
+    }
+  }
+}
+
+/**
+ * Prepare headless execution context for Hermes runtime.
+ * Hermes requires an active session for headless execution (chat mode).
+ */
+export function prepareHermesHeadlessRunContext({ repoRoot, task = "", crew, configPath, argv = [], envOverrides = {} }) {
+  const warnings = []
+
+  // Hermes requires session for headless - check if we have session context
+  const sessionId = `${envOverrides.HERMES_SESSION_ID || process.env.HERMES_SESSION_ID || ""}`.trim()
+
+  if (!crew && !sessionId) {
+    return {
+      ok: false,
+      error: "Hermes headless requires an active session. Use 'mah sessions new' to create one, or pass HERMES_SESSION_ID env var."
+    }
+  }
+
+  if (!task && (!argv || argv.length === 0)) {
+    return {
+      ok: false,
+      error: "Hermes headless requires a task prompt. Pass task as argument or via -- task."
+    }
+  }
+
+  // Build task args for Hermes headless
+  const taskArgs = []
+  if (task) {
+    taskArgs.push(task)
+  } else if (argv.length > 0) {
+    taskArgs.push(...argv)
+  }
+
+  // Hermes headless uses chat mode with -c for continue
+  return {
+    ok: true,
+    exec: "hermes",
+    args: ["chat"],
+    passthrough: sessionId ? ["-c", ...taskArgs] : taskArgs,
+    envOverrides: {
+      ...envOverrides,
+      HERMES_HEADLESS: "1",
+      ...(crew ? { MAH_ACTIVE_CREW: crew } : {})
+    },
+    warnings: sessionId
+      ? [...warnings]
+      : [...warnings, "Hermes: running without explicit session-id, will use latest session"],
+    internal: {
+      mode: "headless",
+      promptMode: "argv",
+      outputMode: "mixed",
+      requiresSession: true,
+      runtime: "hermes"
+    }
+  }
+}

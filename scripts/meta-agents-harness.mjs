@@ -133,6 +133,7 @@ function printHelp() {
   console.log("  plugins [list|install <path>|uninstall <name>|validate <path>]")
   console.log("  use <crew>")
   console.log("  clear")
+  console.log("  delegate --target <agent> --task '<task>' [--runtime <target>] [--crew <id>] [--execute|-x]")
   console.log("  run [runtime-args]")
   console.log("  plan")
   console.log("  diff")
@@ -156,6 +157,9 @@ function printHelp() {
   console.log("  --run <id>")
   console.log("  --agent <name>")
   console.log("  --strict-markers")
+  console.log("  --headless                 run in non-interactive mode")
+  console.log("  --output <json|text>")
+  console.log("  -o <json|text>")
 }
 
 function hasFlag(argv, flag) {
@@ -174,6 +178,20 @@ function parseValueArg(argv, flag, short = "") {
     if (token.startsWith(`${flag}=`)) return token.slice(flag.length + 1)
   }
   return ""
+}
+
+function hasHeadlessFlag(argv) {
+  return argv.includes("--headless")
+}
+
+function parseOutputMode(argv) {
+  if (argv.includes("--output=json") || argv.includes("-o=json")) return "json"
+  if (argv.includes("--output=text") || argv.includes("-o=text")) return "text"
+  return "text" // default
+}
+
+function stripHeadlessArgs(argv) {
+  return argv.filter((item) => item !== "--headless" && !item.startsWith("--output=") && !item.startsWith("-o="))
 }
 
 function parseFilterArgs(argv) {
@@ -656,12 +674,21 @@ function normalizeRunArgs(runtime, passthrough) {
   return { args, envOverrides, warnings }
 }
 
-function runCommand(command, args, passthrough = [], envOverrides = {}) {
+function runCommand(command, args, passthrough = [], envOverrides = {}, options = {}) {
+  const headless = options.headless === true
+  const stdio = headless ? "pipe" : "inherit"
   const child = spawnSync(command, [...args, ...passthrough], {
     cwd: repoRoot,
     env: { ...process.env, ...envOverrides },
-    stdio: "inherit"
+    stdio
   })
+  if (headless && child) {
+    return {
+      status: typeof child.status === "number" ? child.status : 1,
+      stdout: child.stdout ? child.stdout.toString() : "",
+      stderr: child.stderr ? child.stderr.toString() : ""
+    }
+  }
   if (typeof child.status === "number") return child.status
   if (child.error) {
     console.error(`ERROR: failed to run ${command}: ${child.error.message}`)
@@ -956,7 +983,15 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error("ERROR: 'mah sessions export <id>' requires a session ID")
       return 1
     }
-    const exportResult = exportSessionFn(repoRoot, sessionId, allRuntimes)
+    // Add format parsing
+    const formatArgIndex = argv.indexOf("--format")
+    const format = formatArgIndex !== -1 ? argv[formatArgIndex + 1] : "mah-json"
+    if (!["mah-json", "summary-md", "runtime-raw"].includes(format)) {
+      console.error(`ERROR: unknown format '${format}'. Use: mah-json, summary-md, runtime-raw`)
+      return 1
+    }
+    const { exportSession } = await import("./session-export.mjs")
+    const exportResult = await exportSession(repoRoot, sessionId, format)
     if (!exportResult.ok) {
       console.error(`ERROR: ${exportResult.error}`)
       return 1
@@ -966,6 +1001,93 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     } else {
       console.log(`exported=${exportResult.path}`)
     }
+    return 0
+  }
+
+  if (subcommand === "inject") {
+    // mah sessions inject <id> --runtime <target> [--fidelity full|contextual|summary-only]
+    const sessionId = argv[0]
+    const runtimeIdx = argv.indexOf("--runtime")
+    const fidelityIdx = argv.indexOf("--fidelity")
+
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions inject <id>' requires a session ID")
+      return 1
+    }
+    if (runtimeIdx === -1) {
+      console.error("ERROR: 'mah sessions inject' requires --runtime <target>")
+      return 1
+    }
+
+    const targetRuntime = argv[runtimeIdx + 1]
+    const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
+
+    // Import and use session-injection
+    const { injectSessionContext } = await import("./session-injection.mjs")
+    const { parseSessionId } = await import("./m3-ops.mjs")
+    const { collectSessions } = await import("./m3-ops.mjs")
+    const { RUNTIME_ADAPTERS } = await import("./runtime-adapters.mjs")
+
+    const parsed = parseSessionId(sessionId)
+    if (!parsed) {
+      console.error(`ERROR: invalid session ID format: ${sessionId}`)
+      return 1
+    }
+
+    const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, RUNTIME_ADAPTERS)
+    const sessionRef = sessions.find(s => s.id === sessionId)
+    if (!sessionRef) {
+      console.error(`ERROR: session not found: ${sessionId}`)
+      return 1
+    }
+
+    // Build envelope from session ref
+    const { buildMahSessionEnvelope } = await import("./session-export.mjs")
+    const envelope = buildMahSessionEnvelope(sessionRef)
+
+    const result = await injectSessionContext(repoRoot, envelope, targetRuntime, fidelityLevel)
+
+    if (!result.ok) {
+      console.error(`ERROR: injection failed: ${result.error}`)
+      return 1
+    }
+
+    console.log(`✓ Session injected to '${targetRuntime}'`)
+    console.log(`  Strategy: ${result.strategy}`)
+    console.log(`  Fidelity: ${result.fidelity_level}`)
+    if (result.warnings.length > 0) {
+      for (const w of result.warnings) console.log(`  ⚠ ${w}`)
+    }
+    console.log(`  Projection: ${result.path}`)
+    return 0
+  } else if (subcommand === "bridge") {
+    // mah sessions bridge <id> --to <runtime> [--fidelity level]
+    const sessionId = argv[0]
+    const toIdx = argv.indexOf("--to")
+
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions bridge <id>' requires a session ID")
+      return 1
+    }
+    if (toIdx === -1) {
+      console.error("ERROR: 'mah sessions bridge' requires --to <target-runtime>")
+      return 1
+    }
+
+    const targetRuntime = argv[toIdx + 1]
+    const fidelityIdx = argv.indexOf("--fidelity")
+    const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
+
+    const { bridgeSession } = await import("./session-bridge.mjs")
+    const result = await bridgeSession(repoRoot, sessionId, targetRuntime, { fidelityLevel })
+
+    if (!result.ok) {
+      console.error(`ERROR: bridge failed: ${result.error}`)
+      return 1
+    }
+
+    console.log(`✓ Session bridged from '${sessionId}' to '${targetRuntime}'`)
+    console.log(result.explain)
     return 0
   }
 
@@ -1676,8 +1798,164 @@ function dispatchCapture(runtime, command, passthrough) {
   }
 }
 
+function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
+  const adapter = runtimeProfiles[runtime]
+  if (!adapter) {
+    return {
+      status: 1,
+      stdout: "",
+      stderr: `unsupported runtime: ${runtime}`,
+      error: `unsupported runtime: ${runtime}`
+    }
+  }
+
+  // Check if adapter supports headless execution
+  const supportsHeadless = typeof adapter.prepareHeadlessRunContext === "function"
+  if (!supportsHeadless) {
+    // Fall back to dispatchCapture for non-headless-aware adapters
+    const captured = dispatchCapture(runtime, command, passthrough)
+    return captured
+  }
+
+  // Normalize args - strip headless/output flags for passthrough
+  const normalizedPassthrough = stripHeadlessArgs(passthrough)
+  const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
+  const envOverrides = { ...normalized.envOverrides }
+
+  // Get headless execution plan from adapter
+  const headlessPlan = adapter.prepareHeadlessRunContext({
+    repoRoot,
+    runtime,
+    adapter,
+    crew: normalizedPassthrough,
+    argv: normalized.args,
+    envOverrides
+  })
+
+  if (!headlessPlan || headlessPlan.error) {
+    return {
+      status: 1,
+      stdout: "",
+      stderr: headlessPlan?.error || "failed to prepare headless run context",
+      error: headlessPlan?.error || "failed to prepare headless run context"
+    }
+  }
+
+  // Execute with headless options
+  const result = runCommand(
+    headlessPlan.exec || adapter.directCli,
+    headlessPlan.args || [],
+    headlessPlan.passthrough || [],
+    { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
+    { headless: true }
+  )
+
+  // Format output based on output mode
+  if (outputMode === "json") {
+    const envelope = {
+      runtime,
+      command,
+      status: result.status,
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+      crew: headlessPlan.crew || "",
+      session_id: headlessPlan.session_id || "",
+      execution_time_ms: headlessPlan.execution_time_ms || 0
+    }
+    return envelope
+  }
+
+  // Text mode output
+  if (result.status !== 0) {
+    process.stderr.write(result.stderr || "")
+  }
+  process.stdout.write(result.stdout || "")
+  return result
+}
+
 function isSyncLikeCommand(command) {
   return ["plan", "diff", "sync", "generate", "generate:tree"].includes(command)
+}
+
+/**
+ * Handle `mah delegate` command — exposes the child agent spawn planning surface.
+ * Parses --target, --task, --runtime, --crew flags; resolves delegation;
+ * prints the spawn plan (does NOT execute it).
+ */
+async function runDelegate(passthrough) {
+  const execute = passthrough.includes("--execute") || passthrough.includes("-x")
+  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x")
+  const target = parseValueArg(runArgs, "--target")
+  const task = parseValueArg(runArgs, "--task")
+  const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
+  const crew = parseValueArg(runArgs, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+
+  if (!target || !task) {
+    console.error("ERROR: --target and --task are required")
+    console.error("Usage: mah delegate --target <agent> --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]")
+    return 1
+  }
+
+  // Dynamic imports — keeps the delegate surface lazy-loaded
+  const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./child-agent-spawn.mjs")
+  const { codexSidecarAdapter } = await import("./child-agent-codex-sidecar.mjs")
+
+  // Register adapters (fresh each invocation)
+  clearAdapters()
+  registerChildAgentAdapter(codexSidecarAdapter)
+
+  const sourceAgent = process.env.MAH_AGENT || "orchestrator"
+  const sourceRuntime = process.env.MAH_RUNTIME || "pi"
+  const effectiveTargetRuntime = targetRuntime || sourceRuntime
+
+  const result = prepareChildSpawn({
+    crew,
+    sourceAgent,
+    sourceRuntime,
+    targetRuntime: effectiveTargetRuntime,
+    logicalTarget: target,
+    task,
+    repoRoot
+  })
+
+  if (!result.ok) {
+    console.error(`ERROR: ${result.error}`)
+    return 1
+  }
+
+  // Structured output (key=value, consistent with other mah commands)
+  console.log("ok=true")
+  console.log(`logical_target=${target}`)
+  console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
+  console.log(`mode=${result.context.mode}`)
+  console.log(`source_runtime=${result.context.sourceRuntime}`)
+  console.log(`target_runtime=${result.context.targetRuntime}`)
+  console.log(`exec=${result.plan.exec}`)
+  console.log(`args=${result.plan.args.join(" ")}`)
+  if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
+    console.log(`env_overrides=${Object.entries(result.plan.envOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
+  }
+  if (result.warnings && result.warnings.length > 0) {
+    for (const w of result.warnings) {
+      console.log(`warning=${w}`)
+    }
+  }
+
+  if (execute) {
+    console.log("--- executing ---")
+    const { spawnSync } = await import("node:child_process")
+    const child = spawnSync(result.plan.exec, result.plan.args, {
+      cwd: repoRoot,
+      env: { ...process.env, ...result.plan.envOverrides },
+      stdio: "inherit"
+    })
+    const exitCode = typeof child.status === "number" ? child.status : 1
+    console.log(`exit_code=${exitCode}`)
+    if (child.error) console.log(`error=${child.error.message}`)
+    return exitCode
+  }
+
+  return 0
 }
 
 function main() {
@@ -1685,7 +1963,7 @@ function main() {
   const traceMode = hasFlag(argv, "--trace")
   const jsonMode = hasFlag(argv, "--json")
   const mermaidMode = hasFlag(argv, "--mermaid")
-  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"), "--mermaid"))
+  const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"), "--mermaid"), "--headless"))
   const first = normalizedArgv[0]
 
   if (!first || first === "--help" || first === "-h" || first === "help") {
@@ -1757,6 +2035,17 @@ function main() {
 
   if (first === "graph") {
     process.exitCode = runGraph(normalizedArgv.slice(1), jsonMode, mermaidMode)
+    return
+  }
+
+  if (first === "delegate") {
+    ;(async () => {
+      // Use original argv (not normalizedArgv) because delegate needs --runtime for target runtime,
+      // not for MAH's own runtime detection. normalizedArgv strips --runtime.
+      // argv = process.argv.slice(2), so argv[0] = 'delegate'. Skip it.
+      const delegateArgv = argv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
+      process.exitCode = await runDelegate(delegateArgv)
+    })()
     return
   }
 
@@ -1915,6 +2204,7 @@ function main() {
   if (first === "explain") {
     const explainCommand = normalizedArgv[1] || "detect"
     const explainFilters = parseFilterArgs(normalizedArgv.slice(2))
+    const isHeadless = hasHeadlessFlag(argv)
     const crewContext = resolveCrewExecutionContext(explainFilters.crew)
     if (explainCommand === "detect") {
       if (jsonMode) {
@@ -1975,6 +2265,69 @@ function main() {
     }
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
       const passthrough = normalizedArgv.slice(2)
+
+      // Handle headless mode for run command
+      if (explainCommand === "run" && isHeadless) {
+        const adapter = runtimeProfiles[runtimeResult.runtime]
+        if (!adapter) {
+          console.error(`ERROR: runtime '${runtimeResult.runtime}' not found`)
+          process.exitCode = 1
+          return
+        }
+        const supportsHeadless = typeof adapter.prepareHeadlessRunContext === "function"
+        if (!supportsHeadless) {
+          console.error(`ERROR: runtime '${runtimeResult.runtime}' does not support headless execution`)
+          process.exitCode = 1
+          return
+        }
+
+        // Normalize args - strip headless/output flags for passthrough
+        const normalizedPassthrough = stripHeadlessArgs(passthrough)
+        const normalized = normalizeRunArgs(runtimeResult.runtime, normalizedPassthrough)
+        const envOverrides = { ...normalized.envOverrides }
+
+        // Get headless execution plan from adapter
+        const headlessPlan = adapter.prepareHeadlessRunContext({
+          repoRoot,
+          runtime: runtimeResult.runtime,
+          adapter,
+          task: normalized.args.join(" "),
+          argv: normalized.args,
+          envOverrides
+        })
+
+        if (!headlessPlan || headlessPlan.error) {
+          console.error(`ERROR: ${headlessPlan?.error || "failed to prepare headless run context"}`)
+          process.exitCode = 1
+          return
+        }
+
+        const payload = {
+          runtime: runtimeResult.runtime,
+          reason: runtimeResult.reason,
+          command: "run",
+          mode: "headless",
+          exec: headlessPlan.exec || adapter.directCli,
+          execArgs: headlessPlan.args || [],
+          passthrough: headlessPlan.passthrough || [],
+          env: { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
+          warnings: headlessPlan.warnings || [],
+          crewContext,
+          internal: headlessPlan.internal || {}
+        }
+        if (jsonMode) {
+          printDiagnosticPayload(createDiagnosticPayload("explain", {
+            status: 0,
+            runtime: runtimeResult.runtime,
+            reason: runtimeResult.reason,
+            data: { target: "run", mode: "headless", payload }
+          }))
+        } else {
+          printExplain(traceMode, payload)
+        }
+        return
+      }
+
       const plan = resolveDispatchPlan(runtimeResult.runtime, explainCommand, passthrough)
       if (plan.error) {
         console.error(`ERROR: ${plan.error}`)
@@ -2119,6 +2472,17 @@ function main() {
 
   const command = first
   const passthrough = normalizedArgv.slice(1)
+
+  // Check for headless mode on run command
+  if (command === "run" && hasHeadlessFlag(argv)) {
+    const outputMode = parseOutputMode(argv)
+    const result = dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
+    if (outputMode === "json") {
+      console.log(JSON.stringify(result, null, 2))
+    }
+    process.exitCode = typeof result.status === "number" ? result.status : 1
+    return
+  }
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)
   process.exitCode = status

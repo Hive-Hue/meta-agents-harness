@@ -1,48 +1,54 @@
 name: DevMultiTeam
-mission: Advance runtime support, validation, projection, and operator-facing
-  architecture for Meta Agents Harness while preserving bounded scope and
-  runtime-agnostic design.
+mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,
+  centered on cross-runtime headless execution and integrated session
+  interoperability, while preserving runtime-agnostic design and explicit
+  operational contracts.
 sprint_mode:
-  name: v0.5.0-runtime-evolution
+  name: v0.6.0-headless-and-sessions
   active: true
-  target_release: v0.5.0
-  objective: Advance runtime support with adapter completion, dispatcher
-    integration, and validation framework maturation for v0.5.0
+  target_release: v0.6.0
+  objective: "Define and implement two bounded v0.6.0 fronts: headless execution
+    across runtimes and integrated session export/injection interoperability."
   execution_mode: spec-bound-slice-driven
   directives:
     - spec-bound execution
     - no architecture-wave expansion
-    - no v0.6.0+ scope
+    - no v0.7.0+ scope
     - PR-sized slices
     - mandatory validation at each slice
-    - explicit deferred list for anything outside v0.5.0
+    - explicit deferred list for anything outside v0.6.0
   must_deliver:
-    - Hermes adapter implementation completion
-    - Full dispatcher integration with config
-    - Runtime compatibility matrix validation
-    - Validation framework expansion
-    - Diagnostics and explainability tooling
-    - Operator-facing CLI completion
-    - Integration test coverage
+    - Headless support matrix across runtimes
+    - Explicit headless capability and adapter contract
+    - Stable MAH headless execution envelope
+    - Canonical MAH session export format
+    - Bounded context injection between runtimes
+    - Session interoperability fidelity model
+    - Integration and contract test coverage
   must_not_deliver:
+    - full transcript replay portability
     - full multi-runtime parity
     - remote execution foundation
     - policy engine
     - federation/interconnect
     - confidential execution
-    - v0.6.0+ scope
-instruction_block: crew=dev | mission=Advance runtime support, validation,
-  projection, and operator-facing architecture for Meta Agents Harness while
-  preserving bounded scope and runtime-agnostic design. |
-  sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
-  | directives=spec-bound execution; no architecture-wave expansion; no v0.6.0+
+    - distributed session broker
+    - v0.7.0+ scope
+instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+  for Meta Agents Harness, centered on cross-runtime headless execution and
+  integrated session interoperability, while preserving runtime-agnostic design
+  and explicit operational contracts. |
+  sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
+  | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+
   scope; PR-sized slices; mandatory validation at each slice; explicit deferred
-  list for anything outside v0.5.0 | do=Hermes adapter implementation
-  completion; Full dispatcher integration with config; Runtime compatibility
-  matrix validation; Validation framework expansion; Diagnostics and
-  explainability tooling; Operator-facing CLI completion; Integration test
-  coverage | avoid=full multi-runtime parity; remote execution foundation;
-  policy engine; federation/interconnect; confidential execution; v0.6.0+ scope
+  list for anything outside v0.6.0 | do=Headless support matrix across runtimes;
+  Explicit headless capability and adapter contract; Stable MAH headless
+  execution envelope; Canonical MAH session export format; Bounded context
+  injection between runtimes; Session interoperability fidelity model;
+  Integration and contract test coverage | avoid=full transcript replay
+  portability; full multi-runtime parity; remote execution foundation; policy
+  engine; federation/interconnect; confidential execution; distributed session
+  broker; v0.7.0+ scope
 session_dir: sessions
 expertise_dir: expertise
 domain_profiles:
@@ -55,15 +61,18 @@ domain_profiles:
     - path: plan/*
       read: true
       edit: true
+      bash: true
     - path: specs/*
       read: true
       edit: true
     - path: docs/*
       read: true
       edit: true
+      bash: true
     - path: examples/*
       read: true
       edit: true
+      bash: true
     - path: README.md
       read: true
       edit: true
@@ -127,6 +136,10 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: plugins/*
+      read: true
+      edit: true
+      bash: true
     - path: .claude/*
       read: true
       edit: true
@@ -136,6 +149,10 @@ domain_profiles:
       edit: true
       bash: true
     - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: skills/*
       read: true
       edit: true
       bash: true
@@ -245,22 +262,25 @@ orchestrator:
     - control sprint scope
     - distribute slices
     - consolidate decisions
-    - prevent runtime capture by Hermes
-    - defer anything outside v0.5.0
-  instruction_block: crew=dev | mission=Advance runtime support, validation,
-    projection, and operator-facing architecture for Meta Agents Harness while
-    preserving bounded scope and runtime-agnostic design. |
-    sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+    - prevent runtime-specific capture of MAH architecture
+    - defer anything outside v0.6.0
+  instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+    for Meta Agents Harness, centered on cross-runtime headless execution and
+    integrated session interoperability, while preserving runtime-agnostic
+    design and explicit operational contracts. |
+    sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
     | directives=spec-bound execution; no architecture-wave expansion; no
-    v0.6.0+ scope; PR-sized slices; mandatory validation at each slice; explicit
-    deferred list for anything outside v0.5.0 | do=Hermes adapter implementation
-    completion; Full dispatcher integration with config; Runtime compatibility
-    matrix validation; Validation framework expansion; Diagnostics and
-    explainability tooling; Operator-facing CLI completion; Integration test
-    coverage | avoid=full multi-runtime parity; remote execution foundation;
-    policy engine; federation/interconnect; confidential execution; v0.6.0+
-    scope | role=control sprint scope; distribute slices; consolidate decisions;
-    prevent runtime capture by Hermes; defer anything outside v0.5.0
+    v0.7.0+ scope; PR-sized slices; mandatory validation at each slice; explicit
+    deferred list for anything outside v0.6.0 | do=Headless support matrix
+    across runtimes; Explicit headless capability and adapter contract; Stable
+    MAH headless execution envelope; Canonical MAH session export format;
+    Bounded context injection between runtimes; Session interoperability
+    fidelity model; Integration and contract test coverage | avoid=full
+    transcript replay portability; full multi-runtime parity; remote execution
+    foundation; policy engine; federation/interconnect; confidential execution;
+    distributed session broker; v0.7.0+ scope | role=control sprint scope;
+    distribute slices; consolidate decisions; prevent runtime-specific capture
+    of MAH architecture; defer anything outside v0.6.0
   prompt: .codex/crew/dev/agents/orchestrator.md
   expertise:
     path: .codex/crew/dev/expertise/orchestrator-expertise-model.yaml
@@ -271,7 +291,8 @@ orchestrator:
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
-    - zai/glm-4.5-air
+    - minimax/minimax-m2.7
+    - openai-codex/gpt-5.4-mini
   tools:
     - read
     - grep
@@ -304,20 +325,25 @@ teams:
         - translate spec into executable backlog
         - order slices
         - prevent backlog inflation
-      instruction_block: crew=dev | mission=Advance runtime support, validation,
-        projection, and operator-facing architecture for Meta Agents Harness
-        while preserving bounded scope and runtime-agnostic design. |
-        sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+        - separate headless execution work from session interop work
+      instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+        for Meta Agents Harness, centered on cross-runtime headless execution
+        and integrated session interoperability, while preserving
+        runtime-agnostic design and explicit operational contracts. |
+        sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
         | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-        implementation completion; Full dispatcher integration with config;
-        Runtime compatibility matrix validation; Validation framework expansion;
-        Diagnostics and explainability tooling; Operator-facing CLI completion;
-        Integration test coverage | avoid=full multi-runtime parity; remote
-        execution foundation; policy engine; federation/interconnect;
-        confidential execution; v0.6.0+ scope | role=translate spec into
-        executable backlog; order slices; prevent backlog inflation
+        v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.6.0 | do=Headless support
+        matrix across runtimes; Explicit headless capability and adapter
+        contract; Stable MAH headless execution envelope; Canonical MAH session
+        export format; Bounded context injection between runtimes; Session
+        interoperability fidelity model; Integration and contract test coverage
+        | avoid=full transcript replay portability; full multi-runtime parity;
+        remote execution foundation; policy engine; federation/interconnect;
+        confidential execution; distributed session broker; v0.7.0+ scope |
+        role=translate spec into executable backlog; order slices; prevent
+        backlog inflation; separate headless execution work from session interop
+        work
       prompt: .codex/crew/dev/agents/planning_lead.md
       expertise:
         path: .codex/crew/dev/expertise/planning-lead-expertise-model.yaml
@@ -327,7 +353,7 @@ teams:
       model: gpt-5.4-mini
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -353,7 +379,7 @@ teams:
         - path: plan/*
           read: true
           upsert: true
-          delete: false
+          delete: true
           recursive: true
         - path: specs/*
           read: true
@@ -363,12 +389,12 @@ teams:
         - path: docs/*
           read: true
           upsert: true
-          delete: false
+          delete: true
           recursive: true
         - path: examples/*
           read: true
           upsert: true
-          delete: false
+          delete: true
           recursive: true
         - path: README.md
           read: true
@@ -385,21 +411,25 @@ teams:
           - map real codebase integration points
           - locate affected files
           - surface regression and coupling risks
-        instruction_block: crew=dev | mission=Advance runtime support, validation,
-          projection, and operator-facing architecture for Meta Agents Harness
-          while preserving bounded scope and runtime-agnostic design. |
-          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+          - identify runtime-specific headless and session semantics
+        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+          for Meta Agents Harness, centered on cross-runtime headless execution
+          and integrated session interoperability, while preserving
+          runtime-agnostic design and explicit operational contracts. |
+          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-          implementation completion; Full dispatcher integration with config;
-          Runtime compatibility matrix validation; Validation framework
-          expansion; Diagnostics and explainability tooling; Operator-facing CLI
-          completion; Integration test coverage | avoid=full multi-runtime
-          parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; v0.6.0+ scope |
-          role=map real codebase integration points; locate affected files;
-          surface regression and coupling risks
+          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.6.0 | do=Headless
+          support matrix across runtimes; Explicit headless capability and
+          adapter contract; Stable MAH headless execution envelope; Canonical
+          MAH session export format; Bounded context injection between runtimes;
+          Session interoperability fidelity model; Integration and contract test
+          coverage | avoid=full transcript replay portability; full
+          multi-runtime parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; distributed session
+          broker; v0.7.0+ scope | role=map real codebase integration points;
+          locate affected files; surface regression and coupling risks; identify
+          runtime-specific headless and session semantics
         prompt: .codex/crew/dev/agents/repo_analyst.md
         expertise:
           path: .codex/crew/dev/expertise/repo-analyst-expertise-model.yaml
@@ -408,9 +438,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - read
           - grep
@@ -430,24 +461,27 @@ teams:
       - name: solution-architect
         description: Solution Architect planning worker
         sprint_responsibilities:
-          - define the adapter approach
-          - define minimal meta-agents.yaml compatibility
+          - define the runtime adapter evolution for headless mode
+          - define the session adapter and export/injection boundaries
           - identify the smallest technically correct slice
-        instruction_block: crew=dev | mission=Advance runtime support, validation,
-          projection, and operator-facing architecture for Meta Agents Harness
-          while preserving bounded scope and runtime-agnostic design. |
-          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+          for Meta Agents Harness, centered on cross-runtime headless execution
+          and integrated session interoperability, while preserving
+          runtime-agnostic design and explicit operational contracts. |
+          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-          implementation completion; Full dispatcher integration with config;
-          Runtime compatibility matrix validation; Validation framework
-          expansion; Diagnostics and explainability tooling; Operator-facing CLI
-          completion; Integration test coverage | avoid=full multi-runtime
-          parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; v0.6.0+ scope |
-          role=define the adapter approach; define minimal meta-agents.yaml
-          compatibility; identify the smallest technically correct slice
+          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.6.0 | do=Headless
+          support matrix across runtimes; Explicit headless capability and
+          adapter contract; Stable MAH headless execution envelope; Canonical
+          MAH session export format; Bounded context injection between runtimes;
+          Session interoperability fidelity model; Integration and contract test
+          coverage | avoid=full transcript replay portability; full
+          multi-runtime parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; distributed session
+          broker; v0.7.0+ scope | role=define the runtime adapter evolution for
+          headless mode; define the session adapter and export/injection
+          boundaries; identify the smallest technically correct slice
         prompt: .codex/crew/dev/agents/solution_architect.md
         expertise:
           path: .codex/crew/dev/expertise/solution-architect-expertise-model.yaml
@@ -457,7 +491,7 @@ teams:
         model: gpt-5.4-mini
         model_fallbacks:
           - zai/glm-5
-          - zai/glm-4.5-air
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -469,6 +503,7 @@ teams:
           - mcp_servers
           - mcp_tools
           - mcp_call
+          - bash
         skills:
           - skills/expertise_model/SKILL.md
         domain:
@@ -479,7 +514,7 @@ teams:
           - path: plan/*
             read: true
             upsert: true
-            delete: false
+            delete: true
             recursive: true
           - path: specs/*
             read: true
@@ -489,12 +524,12 @@ teams:
           - path: docs/*
             read: true
             upsert: true
-            delete: false
+            delete: true
             recursive: true
           - path: examples/*
             read: true
             upsert: true
-            delete: false
+            delete: true
             recursive: true
           - path: README.md
             read: true
@@ -511,22 +546,24 @@ teams:
       sprint_responsibilities:
         - coordinate implementation
         - split work into reviewable changesets
-        - preserve adapter and dispatcher boundaries
-      instruction_block: crew=dev | mission=Advance runtime support, validation,
-        projection, and operator-facing architecture for Meta Agents Harness
-        while preserving bounded scope and runtime-agnostic design. |
-        sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+        - preserve runtime adapter and session adapter boundaries
+      instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+        for Meta Agents Harness, centered on cross-runtime headless execution
+        and integrated session interoperability, while preserving
+        runtime-agnostic design and explicit operational contracts. |
+        sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
         | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-        implementation completion; Full dispatcher integration with config;
-        Runtime compatibility matrix validation; Validation framework expansion;
-        Diagnostics and explainability tooling; Operator-facing CLI completion;
-        Integration test coverage | avoid=full multi-runtime parity; remote
-        execution foundation; policy engine; federation/interconnect;
-        confidential execution; v0.6.0+ scope | role=coordinate implementation;
-        split work into reviewable changesets; preserve adapter and dispatcher
-        boundaries
+        v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.6.0 | do=Headless support
+        matrix across runtimes; Explicit headless capability and adapter
+        contract; Stable MAH headless execution envelope; Canonical MAH session
+        export format; Bounded context injection between runtimes; Session
+        interoperability fidelity model; Integration and contract test coverage
+        | avoid=full transcript replay portability; full multi-runtime parity;
+        remote execution foundation; policy engine; federation/interconnect;
+        confidential execution; distributed session broker; v0.7.0+ scope |
+        role=coordinate implementation; split work into reviewable changesets;
+        preserve runtime adapter and session adapter boundaries
       prompt: .codex/crew/dev/agents/engineering_lead.md
       expertise:
         path: .codex/crew/dev/expertise/engineering-lead-expertise-model.yaml
@@ -536,7 +573,7 @@ teams:
       model: gpt-5.4-mini
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -596,6 +633,11 @@ teams:
           upsert: true
           delete: true
           recursive: true
+        - path: plugins/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
         - path: .claude/*
           read: true
           upsert: true
@@ -607,6 +649,11 @@ teams:
           delete: true
           recursive: true
         - path: .pi/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: skills/*
           read: true
           upsert: true
           delete: true
@@ -630,21 +677,25 @@ teams:
         sprint_responsibilities:
           - update CLI and help surfaces
           - handle operator-facing explainability and docs changes
-        instruction_block: crew=dev | mission=Advance runtime support, validation,
-          projection, and operator-facing architecture for Meta Agents Harness
-          while preserving bounded scope and runtime-agnostic design. |
-          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+          - keep headless and session UX legible and explicit
+        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+          for Meta Agents Harness, centered on cross-runtime headless execution
+          and integrated session interoperability, while preserving
+          runtime-agnostic design and explicit operational contracts. |
+          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-          implementation completion; Full dispatcher integration with config;
-          Runtime compatibility matrix validation; Validation framework
-          expansion; Diagnostics and explainability tooling; Operator-facing CLI
-          completion; Integration test coverage | avoid=full multi-runtime
-          parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; v0.6.0+ scope |
-          role=update CLI and help surfaces; handle operator-facing
-          explainability and docs changes
+          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.6.0 | do=Headless
+          support matrix across runtimes; Explicit headless capability and
+          adapter contract; Stable MAH headless execution envelope; Canonical
+          MAH session export format; Bounded context injection between runtimes;
+          Session interoperability fidelity model; Integration and contract test
+          coverage | avoid=full transcript replay portability; full
+          multi-runtime parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; distributed session
+          broker; v0.7.0+ scope | role=update CLI and help surfaces; handle
+          operator-facing explainability and docs changes; keep headless and
+          session UX legible and explicit
         prompt: .codex/crew/dev/agents/frontend_dev.md
         expertise:
           path: .codex/crew/dev/expertise/frontend-dev-expertise-model.yaml
@@ -653,9 +704,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -749,6 +801,11 @@ teams:
             upsert: true
             delete: true
             recursive: true
+          - path: plugins/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
           - path: .claude/*
             read: true
             upsert: true
@@ -760,6 +817,11 @@ teams:
             delete: true
             recursive: true
           - path: .pi/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: skills/*
             read: true
             upsert: true
             delete: true
@@ -780,24 +842,27 @@ teams:
       - name: backend-dev
         description: Backend Dev engineering worker
         sprint_responsibilities:
-          - implement runtime adapter behavior
-          - integrate dispatcher and config changes
-          - own Hermes-aware runtime projection and tests
-        instruction_block: crew=dev | mission=Advance runtime support, validation,
-          projection, and operator-facing architecture for Meta Agents Harness
-          while preserving bounded scope and runtime-agnostic design. |
-          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+          - implement ruupdntime adapter headless behavior
+          - integrate dispatcher and session export/injection changes
+          - own runtime and session interoperability tests
+        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+          for Meta Agents Harness, centered on cross-runtime headless execution
+          and integrated session interoperability, while preserving
+          runtime-agnostic design and explicit operational contracts. |
+          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-          implementation completion; Full dispatcher integration with config;
-          Runtime compatibility matrix validation; Validation framework
-          expansion; Diagnostics and explainability tooling; Operator-facing CLI
-          completion; Integration test coverage | avoid=full multi-runtime
-          parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; v0.6.0+ scope |
-          role=implement runtime adapter behavior; integrate dispatcher and
-          config changes; own Hermes-aware runtime projection and tests
+          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.6.0 | do=Headless
+          support matrix across runtimes; Explicit headless capability and
+          adapter contract; Stable MAH headless execution envelope; Canonical
+          MAH session export format; Bounded context injection between runtimes;
+          Session interoperability fidelity model; Integration and contract test
+          coverage | avoid=full transcript replay portability; full
+          multi-runtime parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; distributed session
+          broker; v0.7.0+ scope | role=implement ruupdntime adapter headless
+          behavior; integrate dispatcher and session export/injection changes;
+          own runtime and session interoperability tests
         prompt: .codex/crew/dev/agents/backend_dev.md
         expertise:
           path: .codex/crew/dev/expertise/backend-dev-expertise-model.yaml
@@ -806,9 +871,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -902,6 +968,11 @@ teams:
             upsert: true
             delete: true
             recursive: true
+          - path: plugins/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
           - path: .claude/*
             read: true
             upsert: true
@@ -913,6 +984,11 @@ teams:
             delete: true
             recursive: true
           - path: .pi/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: skills/*
             read: true
             upsert: true
             delete: true
@@ -938,20 +1014,24 @@ teams:
         - define phase gates
         - validate spec adherence
         - block scope escape from the release boundary
-      instruction_block: crew=dev | mission=Advance runtime support, validation,
-        projection, and operator-facing architecture for Meta Agents Harness
-        while preserving bounded scope and runtime-agnostic design. |
-        sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+        - enforce explicit fidelity and fallback rules
+      instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+        for Meta Agents Harness, centered on cross-runtime headless execution
+        and integrated session interoperability, while preserving
+        runtime-agnostic design and explicit operational contracts. |
+        sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
         | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-        implementation completion; Full dispatcher integration with config;
-        Runtime compatibility matrix validation; Validation framework expansion;
-        Diagnostics and explainability tooling; Operator-facing CLI completion;
-        Integration test coverage | avoid=full multi-runtime parity; remote
-        execution foundation; policy engine; federation/interconnect;
-        confidential execution; v0.6.0+ scope | role=define phase gates;
-        validate spec adherence; block scope escape from the release boundary
+        v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+        explicit deferred list for anything outside v0.6.0 | do=Headless support
+        matrix across runtimes; Explicit headless capability and adapter
+        contract; Stable MAH headless execution envelope; Canonical MAH session
+        export format; Bounded context injection between runtimes; Session
+        interoperability fidelity model; Integration and contract test coverage
+        | avoid=full transcript replay portability; full multi-runtime parity;
+        remote execution foundation; policy engine; federation/interconnect;
+        confidential execution; distributed session broker; v0.7.0+ scope |
+        role=define phase gates; validate spec adherence; block scope escape
+        from the release boundary; enforce explicit fidelity and fallback rules
       prompt: .codex/crew/dev/agents/validation_lead.md
       expertise:
         path: .codex/crew/dev/expertise/validation-lead-expertise-model.yaml
@@ -961,7 +1041,7 @@ teams:
       model: gpt-5.4-mini
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -1011,31 +1091,33 @@ teams:
           - run smoke tests
           - run diagnostics tests
           - verify sync consistency
-        instruction_block: crew=dev | mission=Advance runtime support, validation,
-          projection, and operator-facing architecture for Meta Agents Harness
-          while preserving bounded scope and runtime-agnostic design. |
-          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+          - validate headless and session export/injection flows
+        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+          for Meta Agents Harness, centered on cross-runtime headless execution
+          and integrated session interoperability, while preserving
+          runtime-agnostic design and explicit operational contracts. |
+          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-          implementation completion; Full dispatcher integration with config;
-          Runtime compatibility matrix validation; Validation framework
-          expansion; Diagnostics and explainability tooling; Operator-facing CLI
-          completion; Integration test coverage | avoid=full multi-runtime
-          parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; v0.6.0+ scope |
-          role=run smoke tests; run diagnostics tests; verify sync consistency
+          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.6.0 | do=Headless
+          support matrix across runtimes; Explicit headless capability and
+          adapter contract; Stable MAH headless execution envelope; Canonical
+          MAH session export format; Bounded context injection between runtimes;
+          Session interoperability fidelity model; Integration and contract test
+          coverage | avoid=full transcript replay portability; full
+          multi-runtime parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; distributed session
+          broker; v0.7.0+ scope | role=run smoke tests; run diagnostics tests;
+          verify sync consistency; validate headless and session
+          export/injection flows
         prompt: .codex/crew/dev/agents/qa_reviewer.md
         expertise:
           path: .codex/crew/dev/expertise/qa-reviewer-expertise-model.yaml
           use-when: Track durable learnings for qa-reviewer.
           updatable: true
           max-lines: 10000
-        model: gpt-5.4-mini
-        model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
-          - zai/glm-4.7
-          - zai/glm-4.5-air
+        model: openai-codex/gpt-5.4-mini
+        model_fallbacks: []
         tools:
           - write
           - edit
@@ -1079,34 +1161,34 @@ teams:
         description: Security Reviewer validation worker
         sprint_responsibilities:
           - review runtime boundary and unsafe coupling
-          - flag runtime capture risks across runtimes
+          - flag runtime capture and false portability risks across runtimes
           - cut future-wave contamination from the sprint
-        instruction_block: crew=dev | mission=Advance runtime support, validation,
-          projection, and operator-facing architecture for Meta Agents Harness
-          while preserving bounded scope and runtime-agnostic design. |
-          sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
+        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+          for Meta Agents Harness, centered on cross-runtime headless execution
+          and integrated session interoperability, while preserving
+          runtime-agnostic design and explicit operational contracts. |
+          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
           | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.6.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.5.0 | do=Hermes adapter
-          implementation completion; Full dispatcher integration with config;
-          Runtime compatibility matrix validation; Validation framework
-          expansion; Diagnostics and explainability tooling; Operator-facing CLI
-          completion; Integration test coverage | avoid=full multi-runtime
-          parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; v0.6.0+ scope |
-          role=review runtime boundary and unsafe coupling; flag runtime capture
-          risks across runtimes; cut future-wave contamination from the sprint
+          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.6.0 | do=Headless
+          support matrix across runtimes; Explicit headless capability and
+          adapter contract; Stable MAH headless execution envelope; Canonical
+          MAH session export format; Bounded context injection between runtimes;
+          Session interoperability fidelity model; Integration and contract test
+          coverage | avoid=full transcript replay portability; full
+          multi-runtime parity; remote execution foundation; policy engine;
+          federation/interconnect; confidential execution; distributed session
+          broker; v0.7.0+ scope | role=review runtime boundary and unsafe
+          coupling; flag runtime capture and false portability risks across
+          runtimes; cut future-wave contamination from the sprint
         prompt: .codex/crew/dev/agents/security_reviewer.md
         expertise:
           path: .codex/crew/dev/expertise/security-reviewer-expertise-model.yaml
           use-when: Track durable learnings for security-reviewer.
           updatable: true
           max-lines: 10000
-        model: gpt-5.4-mini
-        model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
-          - zai/glm-4.7
-          - zai/glm-4.5-air
+        model: openai-codex/gpt-5.4-mini
+        model_fallbacks: []
         tools:
           - write
           - edit

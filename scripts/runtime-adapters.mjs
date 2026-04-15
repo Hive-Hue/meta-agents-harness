@@ -12,9 +12,13 @@ import {
   executeClaudePreparedRun,
   executeHermesPreparedRun,
   executeOpencodePreparedRun,
+  prepareClaudeHeadlessRunContext,
   prepareClaudeRunContext,
+  prepareHermesHeadlessRunContext,
   prepareHermesRunContext,
+  prepareOpencodeHeadlessRunContext,
   prepareOpencodeRunContext,
+  preparePiHeadlessRunContext,
   preparePiRunContext
 } from "./runtime-core-integrations.mjs"
 
@@ -104,7 +108,14 @@ export const RUNTIME_ADAPTERS = {
       sessionMirrorFlag: false,
       sessionNewArgs: ["--new-session"],
       sessionContinueArgs: ["-c"],
-      sessionNoneArgs: ["--no-session"]
+      sessionNoneArgs: ["--no-session"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
     supportsSessions: true,
     sessionListCommand: null,
@@ -125,6 +136,9 @@ export const RUNTIME_ADAPTERS = {
     },
     prepareRunContext(context) {
       return preparePiRunContext(context)
+    },
+    prepareHeadlessRunContext(context) {
+      return preparePiHeadlessRunContext(context)
     }
   }),
   claude: createAdapter({
@@ -141,7 +155,14 @@ export const RUNTIME_ADAPTERS = {
       sessionRootFlag: false,
       sessionMirrorFlag: true,
       sessionContinueArgs: ["--continue"],
-      sessionNoneArgs: ["--print", "--no-session-persistence"]
+      sessionNoneArgs: ["--print", "--no-session-persistence"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
     supportsSessions: true,
     sessionListCommand: null,
@@ -165,6 +186,9 @@ export const RUNTIME_ADAPTERS = {
     },
     executePreparedRun(context) {
       return executeClaudePreparedRun(context)
+    },
+    prepareHeadlessRunContext(context) {
+      return prepareClaudeHeadlessRunContext(context)
     }
   }),
   opencode: createAdapter({
@@ -180,7 +204,14 @@ export const RUNTIME_ADAPTERS = {
       sessionIdFlag: "--session-id",
       sessionRootFlag: false,
       sessionMirrorFlag: false,
-      sessionContinueArgs: ["-c"]
+      sessionContinueArgs: ["-c"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
     supportsSessions: true,
     sessionListCommand: null,
@@ -205,6 +236,9 @@ export const RUNTIME_ADAPTERS = {
     },
     executePreparedRun(context) {
       return executeOpencodePreparedRun(context)
+    },
+    prepareHeadlessRunContext(context) {
+      return prepareOpencodeHeadlessRunContext(context)
     }
   }),
   hermes: createAdapter({
@@ -225,7 +259,14 @@ export const RUNTIME_ADAPTERS = {
       persistentMemory: true,
       supportsBackgroundOperation: true,
       supportsMultiBackendExecution: true,
-      gatewayAware: true
+      gatewayAware: true,
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: true,
+        promptMode: "argv",
+        outputMode: "mixed"
+      }
     },
     supportsSessions: true,
     sessionListCommand: null,
@@ -249,6 +290,9 @@ export const RUNTIME_ADAPTERS = {
     },
     executePreparedRun(context) {
       return executeHermesPreparedRun(context)
+    },
+    prepareHeadlessRunContext(context) {
+      return prepareHermesHeadlessRunContext(context)
     }
   })
 }

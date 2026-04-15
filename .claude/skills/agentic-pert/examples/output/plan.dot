@@ -1,0 +1,16 @@
+digraph G {
+  rankdir=TB;
+  node [shape=box style=filled fontname=Arial];
+
+  T1 [label="Setup JWT library\n2.0h ⚠️" fillcolor="#ff6b6b"];
+  T2 [label="Auth endpoints\n3.2h ⚠️" fillcolor="#ff6b6b"];
+  T3 [label="Dashboard base\n2.0h" fillcolor="#74c0fc"];
+  T4 [label="Auth integration\n1.5h ⚠️" fillcolor="#ff6b6b"];
+  T5 [label="Integration tests\n2.7h ⚠️" fillcolor="#ff6b6b"];
+
+  T1 -> T2;
+  T1 -> T3 [style=dashed];
+  T2 -> T4;
+  T3 -> T4 [style=dashed];
+  T4 -> T5;
+}

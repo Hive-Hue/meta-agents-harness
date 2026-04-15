@@ -218,7 +218,14 @@ export const runtimePlugin = {
       sessionRootFlag: false,
       sessionMirrorFlag: true,
       sessionContinueArgs: ["--continue"],
-      sessionNoneArgs: ["--print", "--no-session-persistence"]
+      sessionNoneArgs: ["--print", "--no-session-persistence"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -275,6 +282,31 @@ export const runtimePlugin = {
           dryRun: parsed.dryRun,
           showLaunchInfo: parsed.showLaunchInfo,
           customAgents: Object.keys(agents).length
+        }
+      }
+    },
+
+    prepareHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!argv || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "Claude headless requires a task prompt"
+        }
+      }
+      return {
+        ok: true,
+        exec: "claude",
+        args: ["--print", "--no-session-persistence"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          CLAUDE_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "claude"
         }
       }
     },

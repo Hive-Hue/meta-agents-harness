@@ -16,15 +16,18 @@ domain_profiles:
     - path: plan/*
       read: true
       edit: true
+      bash: true
     - path: specs/*
       read: true
       edit: true
     - path: docs/*
       read: true
       edit: true
+      bash: true
     - path: examples/*
       read: true
       edit: true
+      bash: true
     - path: README.md
       read: true
       edit: true
@@ -88,6 +91,10 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: plugins/*
+      read: true
+      edit: true
+      bash: true
     - path: .claude/*
       read: true
       edit: true
@@ -97,6 +104,10 @@ domain_profiles:
       edit: true
       bash: true
     - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: skills/*
       read: true
       edit: true
       bash: true
@@ -215,7 +226,8 @@ orchestrator:
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
-    - zai/glm-4.5-air
+    - minimax/minimax-m2.7
+    - openai-codex/gpt-5.4-mini
   tools:
     - read
     - grep
@@ -256,7 +268,7 @@ teams:
       model: minimax/minimax-m2.7
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -314,11 +326,12 @@ teams:
           use-when: Track durable learnings for market-researcher.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -371,11 +384,12 @@ teams:
           use-when: Track durable learnings for campaign-strategist.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -433,7 +447,7 @@ teams:
       model: minimax/minimax-m2.7
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -492,11 +506,12 @@ teams:
           use-when: Track durable learnings for copywriter.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -549,11 +564,12 @@ teams:
           use-when: Track durable learnings for creative-strategist.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -606,11 +622,12 @@ teams:
           use-when: Track durable learnings for media-operator.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -668,7 +685,7 @@ teams:
       model: minimax/minimax-m2.7
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -726,11 +743,12 @@ teams:
           use-when: Track durable learnings for performance-analyst.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -783,11 +801,12 @@ teams:
           use-when: Track durable learnings for brand-safety-reviewer.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit

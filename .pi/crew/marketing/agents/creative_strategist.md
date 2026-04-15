@@ -1,6 +1,6 @@
 ---
 name: creative-strategist
-model: minimax/minimax-m2.7
+model: zai/glm-5
 role: worker
 team: Creative
 mission: Plan, produce, refine, and validate communication assets, launch

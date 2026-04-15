@@ -14,6 +14,7 @@ Meta Agents Harness (MAH) is a runtime-agnostic orchestration layer for multi-ag
 - [Expertise Model Foundation](./expertise-model-foundation.md) — Durable knowledge capture for agents
 - [Platform Capabilities](./platform-capabilities.md) — Feature overview across runtimes
 - [Runtime Boundary](./runtime-boundary.md) — What MAH owns vs. what runtime handles
+- [Headless Runtime](./headless-runtime.md) — Non-interactive execution model and support matrix
 - [Validate Semantics](./validate-semantics.md) — Configuration validation rules
 
 ## Runtimes
@@ -38,6 +39,7 @@ docs/
 ├── expertise-model-foundation.md # Durable knowledge for agents
 ├── platform-capabilities.md     # Feature matrix
 ├── runtime-boundary.md          # MAH vs. runtime responsibilities
+├── headless-runtime.md          # Headless execution guide
 ├── validate-semantics.md        # Config validation
 └── hermes/                     # Hermes-specific docs
     ├── quickstart.md

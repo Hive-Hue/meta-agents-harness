@@ -1,0 +1,315 @@
+# Decisões de Arquitetura em Aberto
+
+## Objetivo
+
+Registrar as decisões que precisam ser cravadas antes da implementação do M1B, para reduzir ambiguidade e evitar refactors estruturais em cascata.
+
+## D1 — Limite da responsabilidade declarativa do YAML
+
+### Pergunta
+
+Até onde o `meta-agents.yaml` deve descrever comportamento de runtime, e onde começa a responsabilidade dos adapters e do dispatcher?
+
+### Opções
+
+#### Opção A — YAML máximo
+
+O YAML descreve quase tudo:
+
+- runtimes suportados
+- wrappers
+- comandos
+- capabilities
+- regras de flags
+- níveis de validate
+
+**Prós**
+
+- reduz duplicação aparente
+- facilita adicionar runtime novo sem tocar tanto no core
+
+**Contras**
+
+- aumenta indireção
+- pode transformar config em pseudo-código
+- torna debugging mais difícil
+
+#### Opção B — YAML mínimo puro
+
+O YAML descreve só crews, modelos, skills, perfis e paths; quase todo comportamento fica em código.
+
+**Prós**
+
+- comportamento mais explícito no código
+- menor risco de config frágil
+
+**Contras**
+
+- contradiz a ambição de “fonte canônica”
+- mantém duplicação estrutural
+- dificulta extensibilidade
+
+#### Opção C — Modelo híbrido orientado a contrato
+
+O YAML descreve:
+
+- metadata de runtime
+- capabilities declarativas
+- comandos suportados
+- parâmetros configuráveis
+
+Os adapters implementam:
+
+- lógica operacional
+- integração com binários
+- semântica de execução
+
+O dispatcher resolve:
+
+- seleção do runtime
+- normalização baseada em capabilities
+- despacho para adapter
+
+#### Opção C — Modelo híbrido orientado a contrato
+
+O YAML descreve:
+
+- metadata de runtime
+- capabilities declarativas
+- comandos suportados
+- parâmetros configuráveis
+
+Os adapters implementam:
+
+- lógica operacional
+- integração com binários
+- semântica de execução
+
+O dispatcher resolve:
+
+- seleção do runtime
+- normalização baseada em capabilities
+- despacho para adapter
+
+#### Opção C1 — Híbrido conservador
+
+O YAML continua mínimo, mas não totalmente cego ao runtime.  
+Ele pode conter apenas um subconjunto seguro e não-executável de metadata operacional, como:
+
+- metadata estável
+- paths
+- capabilities de alto nível
+- configuração não-executável
+
+Enquanto isso, continuam em código:
+
+- resolução operacional
+- execução de binários
+- semântica de flags
+- dispatch
+
+### Recomendação
+
+**Escolher a Opção C1 — híbrido conservador.**
+
+Para o estado atual do projeto, é preferível manter o YAML focado naquilo que o produto realmente precisa versionar e sincronizar com segurança, sem torná-lo cego ao runtime:
+
+- crews
+- topologia
+- modelos
+- skills
+- perfis
+- paths
+- metadata estável de runtime
+- capabilities de alto nível
+- configuração não-executável
+
+Com isso:
+
+- o YAML continua sendo a fonte canônica do **conteúdo organizacional**
+- o YAML também pode carregar **metadata estável e segura** de runtime
+- os adapters e o dispatcher preservam a responsabilidade pelo **comportamento operacional**
+- evitamos transformar o YAML em uma camada indireta demais para regras de execução
+
+### Decisão — D1 Fechada
+
+- `meta-agents.yaml` permanece canônico para definição de crews e artefatos.
+- o YAML pode incluir apenas metadata estável, paths, capabilities de alto nível e configuração não-executável.
+- comportamento executável de runtime continua nos adapters/dispatcher.
+- o roadmap deve evitar meta-config excessiva para comandos, flags e semântica operacional até que exista necessidade concreta.
+
+## D2 — Escopo mínimo do contrato `RuntimeAdapter`
+
+### Pergunta
+
+Qual deve ser o contrato inicial obrigatório para todos os runtimes?
+
+### Opções
+
+#### Opção A — Contrato muito pequeno
+
+```ts
+detect()
+run()
+validate()
+```
+
+**Prós**
+
+- fácil de implementar
+- baixa barreira inicial
+
+**Contras**
+
+- não cobre casos reais da CLI atual
+- leva a exceções ad hoc fora do contrato
+
+#### Opção B — Contrato muito amplo
+
+```ts
+detect()
+validate()
+run()
+useCrew()
+clearCrew()
+listCrews()
+doctor()
+explain()
+resumeSession()
+normalizeArgs()
+capabilities()
+```
+
+**Prós**
+
+- visão completa desde o início
+
+**Contras**
+
+- risco de superprojetar cedo demais
+- maior custo de migração
+
+#### Opção C — Contrato mínimo evolutivo
+
+```ts
+interface RuntimeAdapter {
+  name: string
+  detect(context): DetectResult
+  validate(level): ValidationResult
+  run(args): RunResult
+  useCrew(crew): CommandResult
+  clearCrew(): CommandResult
+  capabilities(): CapabilityMatrix
+}
+```
+
+Com expansão planejada após M2 para:
+
+- `doctor()`
+- `listCrews()`
+- `explain()`
+- `resumeSession()` ou equivalente
+- `normalizeArgs()` ou resolução padronizada por capabilities
+
+### Recomendação
+
+**Escolher a Opção C.**
+
+É suficiente para tirar o dispatcher do hardcode sem inflar o contrato cedo demais.
+
+### Decisão — D2 Fechada
+
+- contrato inicial mínimo e estável em M1B
+- extensão formal do contrato apenas após estabilização de M2
+- `listCrews()` fica registrado como primeiro candidato natural à próxima expansão do contrato
+- toda evolução do contrato exige contract tests correspondentes
+
+## D3 — Definição exata dos níveis `validate:*`
+
+### Pergunta
+
+Como dividir `validate:runtime`, `validate:config`, `validate:sync` e `validate:all` sem sobreposição confusa?
+
+### Opções
+
+#### Opção A — Fronteiras soltas
+
+Cada runtime decide livremente o que validar em cada comando.
+
+**Prós**
+
+- flexível
+
+**Contras**
+
+- inconsistente
+- ruim para automação
+- difícil de documentar
+
+#### Opção B — Fronteiras fixas e semânticas
+
+- `validate:config`
+  - schema
+  - versão
+  - referências cruzadas
+  - coerência da topologia
+- `validate:runtime`
+  - binários
+  - wrappers
+  - compatibilidade do ambiente
+  - dependências necessárias
+- `validate:sync`
+  - drift entre config canônica e artefatos gerados
+  - prompts, links, symlinks, arquivos de runtime
+- `validate:all`
+  - composição ordenada:
+    1. config
+    2. runtime
+    3. sync
+
+**Prós**
+
+- previsível
+- fácil de documentar
+- ótimo para CI
+
+**Contras**
+
+- exige disciplina para evitar duplicação
+
+### Recomendação
+
+**Escolher a Opção B.**
+
+Essa separação é clara para operador, para CI e para evolução interna.
+
+### Decisão — D3 Fechada
+
+- `validate:config` é sempre semântico/declarativo
+- `validate:runtime` é sempre operacional/ambiental
+- `validate:sync` é sempre materialização/drift
+- `validate:all` encadeia os três nessa ordem
+- cada erro deve pertencer a um único nível principal de validação, evitando duplicação de mensagens e diagnósticos conflitantes
+
+### Regra de governança
+
+- referência inválida no YAML → `validate:config`
+- wrapper ausente ou binário indisponível → `validate:runtime`
+- artefato gerado fora de sync → `validate:sync`
+
+## Impacto — Decisões Aplicadas
+
+As decisões D1, D2 e D3 foram incorporadas na implementação de M1A, M1B, M2 e M3:
+
+- M1A segue com schema/versionamento sem risco de retrabalho conceitual.
+- M1B respeita frontreira arquiteturais claras — YAML como fonte canônica de conteúdo, adapters/dispatcher para comportamento operacional.
+- M2 constrói `explain`, `init` e `plan/diff` sobre core previsível — `validate:*` com fronteiras fixas.
+- M3 herda contrato extensível e validável — `RuntimeAdapter` mínimo evolutivo com contract tests.
+
+## Resumo Executivo — DECIDIDO
+
+- **D1:** adotar híbrido conservador, com YAML canônico para conteúdo e metadata estável, e comportamento operacional em código
+- **D2:** adotar contrato mínimo evolutivo para `RuntimeAdapter`
+- **D3:** adotar fronteiras fixas para `validate:*`
+
+**Status:** D1, D2, D3 fechadas e aplicadas em M1A, M1B, M2 e M3.
