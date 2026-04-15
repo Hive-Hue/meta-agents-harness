@@ -220,7 +220,7 @@ test("kilo explain run resolves to direct cli with injected crew context", () =>
   assert.match(kiloConfig.agent.orchestrator.prompt, /Current crew id: dev/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Crew name: DevMultiTeam/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Current role: orchestrator/)
-  assert.match(kiloConfig.agent.orchestrator.prompt, /Mission: Advance runtime support/)
+  assert.match(kiloConfig.agent.orchestrator.prompt, /Mission: Deliver bounded v0\.6\.0 runtime evolution/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Prompt source: \.kilo\/crew\/dev\/agents\/orchestrator\.md/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /\[MAH_CONTEXT\]/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /# Orchestrator/)

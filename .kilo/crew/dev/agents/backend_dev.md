@@ -39,7 +39,7 @@ sprint_mode:
     - distributed session broker
     - v0.7.0+ scope
 sprint_responsibilities:
-  - implement runtime adapter headless behavior
+  - implement ruupdntime adapter headless behavior
   - integrate dispatcher and session export/injection changes
   - own runtime and session interoperability tests
 instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
@@ -56,7 +56,7 @@ instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
   Integration and contract test coverage | avoid=full transcript replay
   portability; full multi-runtime parity; remote execution foundation; policy
   engine; federation/interconnect; confidential execution; distributed session
-  broker; v0.7.0+ scope | role=implement runtime adapter headless behavior;
+  broker; v0.7.0+ scope | role=implement ruupdntime adapter headless behavior;
   integrate dispatcher and session export/injection changes; own runtime and
   session interoperability tests
 expertise:
@@ -175,6 +175,11 @@ domain:
     upsert: true
     delete: true
     recursive: true
+  - path: skills/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
   - path: .hermes/*
     read: true
     upsert: true
@@ -191,7 +196,7 @@ domain:
 ---
 
 [MAH_CONTEXT]
-crew=dev | mission=Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness, centered on cross-runtime headless execution and integrated session interoperability, while preserving runtime-agnostic design and explicit operational contracts. | sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+ scope; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.6.0 | do=Headless support matrix across runtimes; Explicit headless capability and adapter contract; Stable MAH headless execution envelope; Canonical MAH session export format; Bounded context injection between runtimes; Session interoperability fidelity model; Integration and contract test coverage | avoid=full transcript replay portability; full multi-runtime parity; remote execution foundation; policy engine; federation/interconnect; confidential execution; distributed session broker; v0.7.0+ scope | role=implement runtime adapter headless behavior; integrate dispatcher and session export/injection changes; own runtime and session interoperability tests
+crew=dev | mission=Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness, centered on cross-runtime headless execution and integrated session interoperability, while preserving runtime-agnostic design and explicit operational contracts. | sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+ scope; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.6.0 | do=Headless support matrix across runtimes; Explicit headless capability and adapter contract; Stable MAH headless execution envelope; Canonical MAH session export format; Bounded context injection between runtimes; Session interoperability fidelity model; Integration and contract test coverage | avoid=full transcript replay portability; full multi-runtime parity; remote execution foundation; policy engine; federation/interconnect; confidential execution; distributed session broker; v0.7.0+ scope | role=implement ruupdntime adapter headless behavior; integrate dispatcher and session export/injection changes; own runtime and session interoperability tests
 [/MAH_CONTEXT]
 
 # Backend Dev

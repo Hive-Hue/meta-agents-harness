@@ -1,6 +1,6 @@
 ---
 name: qa-reviewer
-model: openai-codex/gpt-5.3-codex
+model: openai-codex/gpt-5.4-mini
 role: worker
 team: Validation
 mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,

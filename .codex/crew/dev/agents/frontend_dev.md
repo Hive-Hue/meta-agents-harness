@@ -175,6 +175,11 @@ domain:
     upsert: true
     delete: true
     recursive: true
+  - path: skills/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
   - path: .hermes/*
     read: true
     upsert: true

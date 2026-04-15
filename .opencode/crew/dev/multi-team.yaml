@@ -79,15 +79,18 @@ shared:
       - path: plan/*
         read: true
         edit: true
+        bash: true
       - path: specs/*
         read: true
         edit: true
       - path: docs/*
         read: true
         edit: true
+        bash: true
       - path: examples/*
         read: true
         edit: true
+        bash: true
       - path: README.md
         read: true
         edit: true
@@ -164,6 +167,10 @@ shared:
         edit: true
         bash: true
       - path: .pi/*
+        read: true
+        edit: true
+        bash: true
+      - path: skills/*
         read: true
         edit: true
         bash: true
@@ -386,7 +393,7 @@ teams:
         - path: plan/*
           read: true
           edit: true
-          bash: false
+          bash: true
           recursive: true
         - path: specs/*
           read: true
@@ -396,12 +403,12 @@ teams:
         - path: docs/*
           read: true
           edit: true
-          bash: false
+          bash: true
           recursive: true
         - path: examples/*
           read: true
           edit: true
-          bash: false
+          bash: true
           recursive: true
         - path: README.md
           read: true
@@ -437,7 +444,7 @@ teams:
           broker; v0.7.0+ scope | role=map real codebase integration points;
           locate affected files; surface regression and coupling risks; identify
           runtime-specific headless and session semantics
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -518,7 +525,7 @@ teams:
           - path: plan/*
             read: true
             edit: true
-            bash: false
+            bash: true
             recursive: true
           - path: specs/*
             read: true
@@ -528,12 +535,12 @@ teams:
           - path: docs/*
             read: true
             edit: true
-            bash: false
+            bash: true
             recursive: true
           - path: examples/*
             read: true
             edit: true
-            bash: false
+            bash: true
             recursive: true
           - path: README.md
             read: true
@@ -655,6 +662,11 @@ teams:
           edit: true
           bash: true
           recursive: true
+        - path: skills/*
+          read: true
+          edit: true
+          bash: true
+          recursive: true
         - path: .hermes/*
           read: true
           edit: true
@@ -693,7 +705,7 @@ teams:
           broker; v0.7.0+ scope | role=update CLI and help surfaces; handle
           operator-facing explainability and docs changes; keep headless and
           session UX legible and explicit
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -815,6 +827,11 @@ teams:
             edit: true
             bash: true
             recursive: true
+          - path: skills/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
           - path: .hermes/*
             read: true
             edit: true
@@ -831,7 +848,7 @@ teams:
       - id: backend-dev
         role: worker
         sprint_responsibilities:
-          - implement runtime adapter headless behavior
+          - implement ruupdntime adapter headless behavior
           - integrate dispatcher and session export/injection changes
           - own runtime and session interoperability tests
         instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
@@ -849,10 +866,10 @@ teams:
           coverage | avoid=full transcript replay portability; full
           multi-runtime parity; remote execution foundation; policy engine;
           federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=implement runtime adapter headless
+          broker; v0.7.0+ scope | role=implement ruupdntime adapter headless
           behavior; integrate dispatcher and session export/injection changes;
           own runtime and session interoperability tests
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -974,6 +991,11 @@ teams:
             edit: true
             bash: true
             recursive: true
+          - path: skills/*
+            read: true
+            edit: true
+            bash: true
+            recursive: true
           - path: .hermes/*
             read: true
             edit: true
@@ -1089,12 +1111,8 @@ teams:
           broker; v0.7.0+ scope | role=run smoke tests; run diagnostics tests;
           verify sync consistency; validate headless and session
           export/injection flows
-        model: openai-codex/gpt-5.3-codex
-        model_fallbacks:
-          - zai/glm-5
-          - zai/glm-4.7
-          - minimax/minimax-m2.7
-          - nvidia/nemotron-3-super-120b-a12b:free
+        model: openai-codex/gpt-5.4-mini
+        model_fallbacks: []
         agent_file: .opencode/crew/dev/agents/qa-reviewer.md
         expertise:
           path: .opencode/crew/dev/expertise/qa-reviewer-expertise-model.yaml
@@ -1161,12 +1179,8 @@ teams:
           broker; v0.7.0+ scope | role=review runtime boundary and unsafe
           coupling; flag runtime capture and false portability risks across
           runtimes; cut future-wave contamination from the sprint
-        model: openai-codex/gpt-5.3-codex
-        model_fallbacks:
-          - zai/glm-5
-          - zai/glm-4.7
-          - minimax/minimax-m2.7
-          - nvidia/nemotron-3-super-120b-a12b:free
+        model: openai-codex/gpt-5.4-mini
+        model_fallbacks: []
         agent_file: .opencode/crew/dev/agents/security-reviewer.md
         expertise:
           path: .opencode/crew/dev/expertise/security-reviewer-expertise-model.yaml

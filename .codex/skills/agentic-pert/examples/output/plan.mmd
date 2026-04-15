@@ -1,0 +1,15 @@
+flowchart TD
+  T1[Setup JWT library\n2.0h]:::critical
+  T2[Auth endpoints\n3.2h]:::critical
+  T3[Dashboard base\n2.0h]:::normal
+  T4[Auth integration\n1.5h]:::critical
+  T5[Integration tests\n2.7h]:::critical
+
+  T1-->T2
+  T1 -.-> T3
+  T2-->T4
+  T3 -.-> T4
+  T4-->T5
+
+  classDef critical fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
+  classDef normal fill:#74c0fc,stroke:#339af0,stroke-width:1px,color:#000

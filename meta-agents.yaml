@@ -42,7 +42,8 @@ catalog:
   models:
     orchestrator_default: minimax/minimax-m2.7
     lead_default: minimax/minimax-m2.7
-    worker_default: openai-codex/gpt-5.3-codex
+    worker_default: zai/glm-5
+    qa_default: openai-codex/gpt-5.4-mini
   model_fallbacks:
     orchestrator_default:
       - nvidia/nemotron-3-super-120b-a12b:free
@@ -131,15 +132,18 @@ domain_profiles:
     - path: plan/*
       read: true
       edit: true
+      bash: true
     - path: specs/*
       read: true
       edit: true
     - path: docs/*
       read: true
       edit: true
+      bash: true
     - path: examples/*
       read: true
       edit: true
+      bash: true
     - path: README.md
       read: true
       edit: true
@@ -216,6 +220,10 @@ domain_profiles:
       edit: true
       bash: true
     - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: skills/*
       read: true
       edit: true
       bash: true
@@ -497,7 +505,7 @@ crews:
       - id: qa-reviewer
         role: worker
         team: validation
-        model_ref: worker_default
+        model_ref: qa_default
         expertise: qa-reviewer-expertise-model
         skills:
           - expertise_model
@@ -510,7 +518,7 @@ crews:
       - id: security-reviewer
         role: worker
         team: validation
-        model_ref: worker_default
+        model_ref: qa_default
         expertise: security-reviewer-expertise-model
         skills:
           - expertise_model

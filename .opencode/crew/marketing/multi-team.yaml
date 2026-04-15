@@ -34,15 +34,18 @@ shared:
       - path: plan/*
         read: true
         edit: true
+        bash: true
       - path: specs/*
         read: true
         edit: true
       - path: docs/*
         read: true
         edit: true
+        bash: true
       - path: examples/*
         read: true
         edit: true
+        bash: true
       - path: README.md
         read: true
         edit: true
@@ -119,6 +122,10 @@ shared:
         edit: true
         bash: true
       - path: .pi/*
+        read: true
+        edit: true
+        bash: true
+      - path: skills/*
         read: true
         edit: true
         bash: true
@@ -327,7 +334,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -383,7 +390,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -501,7 +508,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -557,7 +564,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -613,7 +620,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -730,7 +737,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -786,7 +793,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7

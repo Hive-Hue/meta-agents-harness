@@ -1,6 +1,6 @@
 ---
 name: repo-analyst
-model: openai-codex/gpt-5.3-codex
+model: zai/glm-5
 role: worker
 team: Planning
 mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,

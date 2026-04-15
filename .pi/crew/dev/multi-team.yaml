@@ -61,15 +61,18 @@ domain_profiles:
     - path: plan/*
       read: true
       edit: true
+      bash: true
     - path: specs/*
       read: true
       edit: true
     - path: docs/*
       read: true
       edit: true
+      bash: true
     - path: examples/*
       read: true
       edit: true
+      bash: true
     - path: README.md
       read: true
       edit: true
@@ -146,6 +149,10 @@ domain_profiles:
       edit: true
       bash: true
     - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: skills/*
       read: true
       edit: true
       bash: true
@@ -372,7 +379,7 @@ teams:
         - path: plan/*
           read: true
           upsert: true
-          delete: false
+          delete: true
           recursive: true
         - path: specs/*
           read: true
@@ -382,12 +389,12 @@ teams:
         - path: docs/*
           read: true
           upsert: true
-          delete: false
+          delete: true
           recursive: true
         - path: examples/*
           read: true
           upsert: true
-          delete: false
+          delete: true
           recursive: true
         - path: README.md
           read: true
@@ -429,7 +436,7 @@ teams:
           use-when: Track durable learnings for repo-analyst.
           updatable: true
           max-lines: 10000
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -496,6 +503,7 @@ teams:
           - mcp_servers
           - mcp_tools
           - mcp_call
+          - bash
         skills:
           - skills/expertise_model/SKILL.md
         domain:
@@ -506,7 +514,7 @@ teams:
           - path: plan/*
             read: true
             upsert: true
-            delete: false
+            delete: true
             recursive: true
           - path: specs/*
             read: true
@@ -516,12 +524,12 @@ teams:
           - path: docs/*
             read: true
             upsert: true
-            delete: false
+            delete: true
             recursive: true
           - path: examples/*
             read: true
             upsert: true
-            delete: false
+            delete: true
             recursive: true
           - path: README.md
             read: true
@@ -645,6 +653,11 @@ teams:
           upsert: true
           delete: true
           recursive: true
+        - path: skills/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
         - path: .hermes/*
           read: true
           upsert: true
@@ -689,7 +702,7 @@ teams:
           use-when: Track durable learnings for frontend-dev.
           updatable: true
           max-lines: 10000
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -804,6 +817,11 @@ teams:
             delete: true
             recursive: true
           - path: .pi/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: skills/*
             read: true
             upsert: true
             delete: true
@@ -824,7 +842,7 @@ teams:
       - name: backend-dev
         description: Backend Dev engineering worker
         sprint_responsibilities:
-          - implement runtime adapter headless behavior
+          - implement ruupdntime adapter headless behavior
           - integrate dispatcher and session export/injection changes
           - own runtime and session interoperability tests
         instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
@@ -842,7 +860,7 @@ teams:
           coverage | avoid=full transcript replay portability; full
           multi-runtime parity; remote execution foundation; policy engine;
           federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=implement runtime adapter headless
+          broker; v0.7.0+ scope | role=implement ruupdntime adapter headless
           behavior; integrate dispatcher and session export/injection changes;
           own runtime and session interoperability tests
         prompt: .pi/crew/dev/agents/backend_dev.md
@@ -851,7 +869,7 @@ teams:
           use-when: Track durable learnings for backend-dev.
           updatable: true
           max-lines: 10000
-        model: openai-codex/gpt-5.3-codex
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -966,6 +984,11 @@ teams:
             delete: true
             recursive: true
           - path: .pi/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: skills/*
             read: true
             upsert: true
             delete: true
@@ -1093,12 +1116,8 @@ teams:
           use-when: Track durable learnings for qa-reviewer.
           updatable: true
           max-lines: 10000
-        model: openai-codex/gpt-5.3-codex
-        model_fallbacks:
-          - zai/glm-5
-          - zai/glm-4.7
-          - minimax/minimax-m2.7
-          - nvidia/nemotron-3-super-120b-a12b:free
+        model: openai-codex/gpt-5.4-mini
+        model_fallbacks: []
         tools:
           - write
           - edit
@@ -1168,12 +1187,8 @@ teams:
           use-when: Track durable learnings for security-reviewer.
           updatable: true
           max-lines: 10000
-        model: openai-codex/gpt-5.3-codex
-        model_fallbacks:
-          - zai/glm-5
-          - zai/glm-4.7
-          - minimax/minimax-m2.7
-          - nvidia/nemotron-3-super-120b-a12b:free
+        model: openai-codex/gpt-5.4-mini
+        model_fallbacks: []
         tools:
           - write
           - edit

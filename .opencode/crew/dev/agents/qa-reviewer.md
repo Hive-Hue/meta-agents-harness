@@ -8,14 +8,14 @@ permission:
   bash: ask
   task:
     "*": deny
-model: openai-codex/gpt-5.3-codex
+model: openai-codex/gpt-5.4-mini
 ---
 
 # Qa Reviewer
 
 Role: `worker`
 Team: `Validation`
-Model: `openai-codex/gpt-5.3-codex`
+Model: `openai-codex/gpt-5.4-mini`
 
 ## Mission
 Validation worker focused on validation findings with evidence and risk rating.

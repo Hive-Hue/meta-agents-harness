@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-model: minimax-coding-plan/MiniMax-M2.7
+model: openai-codex/gpt-5.4-mini
 role: worker
 team: Validation
 mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,

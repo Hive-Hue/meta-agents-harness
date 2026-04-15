@@ -87,7 +87,7 @@ domain:
   - path: plan/*
     read: true
     upsert: true
-    delete: false
+    delete: true
     recursive: true
   - path: specs/*
     read: true
@@ -97,12 +97,12 @@ domain:
   - path: docs/*
     read: true
     upsert: true
-    delete: false
+    delete: true
     recursive: true
   - path: examples/*
     read: true
     upsert: true
-    delete: false
+    delete: true
     recursive: true
   - path: README.md
     read: true

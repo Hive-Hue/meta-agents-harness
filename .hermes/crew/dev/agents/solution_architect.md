@@ -72,6 +72,7 @@ tools:
   - mcp_servers
   - mcp_tools
   - mcp_call
+  - bash
 skills:
   - path: skills/expertise_model/SKILL.md
     use-when: Use when relevant to current task.
@@ -83,7 +84,7 @@ domain:
   - path: plan/*
     read: true
     upsert: true
-    delete: false
+    delete: true
     recursive: true
   - path: specs/*
     read: true
@@ -93,12 +94,12 @@ domain:
   - path: docs/*
     read: true
     upsert: true
-    delete: false
+    delete: true
     recursive: true
   - path: examples/*
     read: true
     upsert: true
-    delete: false
+    delete: true
     recursive: true
   - path: README.md
     read: true

@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: openai-codex/gpt-5.3-codex
+model: zai/glm-5
 ---
 
 # Performance Analyst
 
 Role: `worker`
 Team: `Validation`
-Model: `openai-codex/gpt-5.3-codex`
+Model: `zai/glm-5`
 
 ## Mission
 Validation worker focused on scoped execution within assigned ownership boundaries.

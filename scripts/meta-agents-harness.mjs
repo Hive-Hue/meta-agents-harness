@@ -133,6 +133,7 @@ function printHelp() {
   console.log("  plugins [list|install <path>|uninstall <name>|validate <path>]")
   console.log("  use <crew>")
   console.log("  clear")
+  console.log("  delegate --target <agent> --task '<task>' [--runtime <target>] [--crew <id>] [--execute|-x]")
   console.log("  run [runtime-args]")
   console.log("  plan")
   console.log("  diff")
@@ -982,7 +983,15 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error("ERROR: 'mah sessions export <id>' requires a session ID")
       return 1
     }
-    const exportResult = exportSessionFn(repoRoot, sessionId, allRuntimes)
+    // Add format parsing
+    const formatArgIndex = argv.indexOf("--format")
+    const format = formatArgIndex !== -1 ? argv[formatArgIndex + 1] : "mah-json"
+    if (!["mah-json", "summary-md", "runtime-raw"].includes(format)) {
+      console.error(`ERROR: unknown format '${format}'. Use: mah-json, summary-md, runtime-raw`)
+      return 1
+    }
+    const { exportSession } = await import("./session-export.mjs")
+    const exportResult = await exportSession(repoRoot, sessionId, format)
     if (!exportResult.ok) {
       console.error(`ERROR: ${exportResult.error}`)
       return 1
@@ -992,6 +1001,93 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     } else {
       console.log(`exported=${exportResult.path}`)
     }
+    return 0
+  }
+
+  if (subcommand === "inject") {
+    // mah sessions inject <id> --runtime <target> [--fidelity full|contextual|summary-only]
+    const sessionId = argv[0]
+    const runtimeIdx = argv.indexOf("--runtime")
+    const fidelityIdx = argv.indexOf("--fidelity")
+
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions inject <id>' requires a session ID")
+      return 1
+    }
+    if (runtimeIdx === -1) {
+      console.error("ERROR: 'mah sessions inject' requires --runtime <target>")
+      return 1
+    }
+
+    const targetRuntime = argv[runtimeIdx + 1]
+    const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
+
+    // Import and use session-injection
+    const { injectSessionContext } = await import("./session-injection.mjs")
+    const { parseSessionId } = await import("./m3-ops.mjs")
+    const { collectSessions } = await import("./m3-ops.mjs")
+    const { RUNTIME_ADAPTERS } = await import("./runtime-adapters.mjs")
+
+    const parsed = parseSessionId(sessionId)
+    if (!parsed) {
+      console.error(`ERROR: invalid session ID format: ${sessionId}`)
+      return 1
+    }
+
+    const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, RUNTIME_ADAPTERS)
+    const sessionRef = sessions.find(s => s.id === sessionId)
+    if (!sessionRef) {
+      console.error(`ERROR: session not found: ${sessionId}`)
+      return 1
+    }
+
+    // Build envelope from session ref
+    const { buildMahSessionEnvelope } = await import("./session-export.mjs")
+    const envelope = buildMahSessionEnvelope(sessionRef)
+
+    const result = await injectSessionContext(repoRoot, envelope, targetRuntime, fidelityLevel)
+
+    if (!result.ok) {
+      console.error(`ERROR: injection failed: ${result.error}`)
+      return 1
+    }
+
+    console.log(`✓ Session injected to '${targetRuntime}'`)
+    console.log(`  Strategy: ${result.strategy}`)
+    console.log(`  Fidelity: ${result.fidelity_level}`)
+    if (result.warnings.length > 0) {
+      for (const w of result.warnings) console.log(`  ⚠ ${w}`)
+    }
+    console.log(`  Projection: ${result.path}`)
+    return 0
+  } else if (subcommand === "bridge") {
+    // mah sessions bridge <id> --to <runtime> [--fidelity level]
+    const sessionId = argv[0]
+    const toIdx = argv.indexOf("--to")
+
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions bridge <id>' requires a session ID")
+      return 1
+    }
+    if (toIdx === -1) {
+      console.error("ERROR: 'mah sessions bridge' requires --to <target-runtime>")
+      return 1
+    }
+
+    const targetRuntime = argv[toIdx + 1]
+    const fidelityIdx = argv.indexOf("--fidelity")
+    const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
+
+    const { bridgeSession } = await import("./session-bridge.mjs")
+    const result = await bridgeSession(repoRoot, sessionId, targetRuntime, { fidelityLevel })
+
+    if (!result.ok) {
+      console.error(`ERROR: bridge failed: ${result.error}`)
+      return 1
+    }
+
+    console.log(`✓ Session bridged from '${sessionId}' to '${targetRuntime}'`)
+    console.log(result.explain)
     return 0
   }
 
@@ -1781,6 +1877,87 @@ function isSyncLikeCommand(command) {
   return ["plan", "diff", "sync", "generate", "generate:tree"].includes(command)
 }
 
+/**
+ * Handle `mah delegate` command — exposes the child agent spawn planning surface.
+ * Parses --target, --task, --runtime, --crew flags; resolves delegation;
+ * prints the spawn plan (does NOT execute it).
+ */
+async function runDelegate(passthrough) {
+  const execute = passthrough.includes("--execute") || passthrough.includes("-x")
+  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x")
+  const target = parseValueArg(runArgs, "--target")
+  const task = parseValueArg(runArgs, "--task")
+  const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
+  const crew = parseValueArg(runArgs, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+
+  if (!target || !task) {
+    console.error("ERROR: --target and --task are required")
+    console.error("Usage: mah delegate --target <agent> --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]")
+    return 1
+  }
+
+  // Dynamic imports — keeps the delegate surface lazy-loaded
+  const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./child-agent-spawn.mjs")
+  const { codexSidecarAdapter } = await import("./child-agent-codex-sidecar.mjs")
+
+  // Register adapters (fresh each invocation)
+  clearAdapters()
+  registerChildAgentAdapter(codexSidecarAdapter)
+
+  const sourceAgent = process.env.MAH_AGENT || "orchestrator"
+  const sourceRuntime = process.env.MAH_RUNTIME || "pi"
+  const effectiveTargetRuntime = targetRuntime || sourceRuntime
+
+  const result = prepareChildSpawn({
+    crew,
+    sourceAgent,
+    sourceRuntime,
+    targetRuntime: effectiveTargetRuntime,
+    logicalTarget: target,
+    task,
+    repoRoot
+  })
+
+  if (!result.ok) {
+    console.error(`ERROR: ${result.error}`)
+    return 1
+  }
+
+  // Structured output (key=value, consistent with other mah commands)
+  console.log("ok=true")
+  console.log(`logical_target=${target}`)
+  console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
+  console.log(`mode=${result.context.mode}`)
+  console.log(`source_runtime=${result.context.sourceRuntime}`)
+  console.log(`target_runtime=${result.context.targetRuntime}`)
+  console.log(`exec=${result.plan.exec}`)
+  console.log(`args=${result.plan.args.join(" ")}`)
+  if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
+    console.log(`env_overrides=${Object.entries(result.plan.envOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
+  }
+  if (result.warnings && result.warnings.length > 0) {
+    for (const w of result.warnings) {
+      console.log(`warning=${w}`)
+    }
+  }
+
+  if (execute) {
+    console.log("--- executing ---")
+    const { spawnSync } = await import("node:child_process")
+    const child = spawnSync(result.plan.exec, result.plan.args, {
+      cwd: repoRoot,
+      env: { ...process.env, ...result.plan.envOverrides },
+      stdio: "inherit"
+    })
+    const exitCode = typeof child.status === "number" ? child.status : 1
+    console.log(`exit_code=${exitCode}`)
+    if (child.error) console.log(`error=${child.error.message}`)
+    return exitCode
+  }
+
+  return 0
+}
+
 function main() {
   const argv = process.argv.slice(2)
   const traceMode = hasFlag(argv, "--trace")
@@ -1858,6 +2035,17 @@ function main() {
 
   if (first === "graph") {
     process.exitCode = runGraph(normalizedArgv.slice(1), jsonMode, mermaidMode)
+    return
+  }
+
+  if (first === "delegate") {
+    ;(async () => {
+      // Use original argv (not normalizedArgv) because delegate needs --runtime for target runtime,
+      // not for MAH's own runtime detection. normalizedArgv strips --runtime.
+      // argv = process.argv.slice(2), so argv[0] = 'delegate'. Skip it.
+      const delegateArgv = argv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
+      process.exitCode = await runDelegate(delegateArgv)
+    })()
     return
   }
 

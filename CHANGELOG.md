@@ -26,9 +26,46 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `plugins/runtime-hermes` headless requires active session; returns error if no session available
 
 ### Fixed
+- Same-runtime (pi→pi) delegation correctly returns "no adapter found" instead of incorrectly routing through Codex sidecar
 - Missing explicit `--no-session` flag in PI headless mode
 - Missing explicit `--no-interactive` flag in OpenCode headless mode
 - Hermes headless test correctly handles session-required behavior
+
+### Added (Session Interop)
+- Canonical session envelope `mah.session.v1` schema in `types/session-types.mjs`
+- `FIDELITY_LEVELS` constants: `full`, `contextual`, `summary-only` (default: `contextual`)
+- `SessionAdapter` contract in `scripts/session-adapter-contract.mjs`
+- Structured session export with `mah-json`, `summary-md`, and `runtime-raw` formats in `scripts/session-export.mjs`
+- Context projection and injection with fidelity-aware strategy selection in `scripts/session-injection.mjs`
+- High-level `bridgeSession()` operation combining export + inject in `scripts/session-bridge.mjs`
+- `mah sessions inject <id> --runtime <target> [--fidelity level]` CLI command
+- `mah sessions bridge <id> --to <runtime> [--fidelity level]` CLI command
+- `mah sessions export <id> --format mah-json|summary-md|runtime-raw` format flag
+- Session interop test suite in `tests/session-interop.test.mjs`
+- Session interop documentation in `docs/sessions-interop.md`
+
+### Changed (Session Interop)
+- `mah sessions export` defaults to `mah-json` format (was `runtime-raw` tar.gz)
+- Default export format is now structured canonical envelope, not raw archive
+
+### Added (Cross-Runtime Child Agents)
+- `scripts/child-agent-adapter-contract.mjs` — ChildAgentAdapter contract with `SPAWN_MODES` constants, `SpawnSupportContext`, `SpawnContext`, `SpawnPlanResult`, `SpawnExecutionResult` types
+- `scripts/delegation-resolution.mjs` — Shared `resolveDelegationTarget()` service enforcing crew topology authorization (orchestrator→leads, lead→own-team-workers, workers cannot delegate)
+- `scripts/child-agent-spawn.mjs` — Strategy layer with `buildSpawnContext()`, `prepareChildSpawn()`, adapter registry, `selectAdapter()`, `determineSpawnMode()`, and `explainChildSpawn()`
+- `scripts/child-agent-codex-sidecar.mjs` — First cross-runtime sidecar adapter using direct `codex exec --full-auto` for headless non-interactive execution
+- `tests/child-agent-spawn.test.mjs` — Unit test suite (8 tests) covering SPAWN_MODES, resolveDelegationTarget authorization, codexSidecarAdapter contract, adapter registry
+- `docs/cross-runtime-child-agents.md` — Feature documentation with architecture overview, policy rules, CLI usage
+- `mah delegate` CLI command with `--target`, `--task`, `--runtime`, `--crew` flags and plan-only output
+- `--execute`/`-x` flag on `mah delegate` for actual cross-runtime spawn execution
+
+### Changed (Cross-Runtime Child Agents)
+- `selectAdapter()` in child-agent-spawn.mjs now filters by `targetRuntime` to prevent cross-runtime adapters from matching same-runtime requests
+- Codex sidecar now uses direct `codex exec --cd <repo> --full-auto <prompt>` instead of routing through `mah run --runtime codex`
+- `SpawnSupportContext` typedef updated to include `targetRuntime` field
+
+### Fixed (Cross-Runtime Child Agents)
+- Codex sidecar adapter was over-matching same-runtime (pi→pi) requests due to missing `targetRuntime` check in `selectAdapter()`
+- Codex sidecar now passes crew config via `MAH_ACTIVE_CREW` env var in `envOverrides` (no `--crew` CLI flag needed)
 
 ## [0.5.0] - 2026-04-10
 

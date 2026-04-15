@@ -1,6 +1,6 @@
 ---
 name: frontend-dev
-model: openai-codex/gpt-5.3-codex
+model: zai/glm-5
 role: worker
 team: Engineering
 mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,
@@ -171,6 +171,11 @@ domain:
     delete: true
     recursive: true
   - path: .pi/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: skills/*
     read: true
     upsert: true
     delete: true

@@ -16,15 +16,18 @@ domain_profiles:
     - path: plan/*
       read: true
       edit: true
+      bash: true
     - path: specs/*
       read: true
       edit: true
     - path: docs/*
       read: true
       edit: true
+      bash: true
     - path: examples/*
       read: true
       edit: true
+      bash: true
     - path: README.md
       read: true
       edit: true
@@ -101,6 +104,10 @@ domain_profiles:
       edit: true
       bash: true
     - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: skills/*
       read: true
       edit: true
       bash: true

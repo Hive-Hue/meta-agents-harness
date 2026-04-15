@@ -1,6 +1,6 @@
 ---
 name: copywriter
-model: openai-codex/gpt-5.3-codex
+model: zai/glm-5
 role: worker
 team: Creative
 mission: Plan, produce, refine, and validate communication assets, launch
