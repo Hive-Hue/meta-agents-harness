@@ -1,1 +1,0 @@
-/home/alysson/Github/meta-agents-harness/.kilo/crew/dev/agents/orchestrator.md
