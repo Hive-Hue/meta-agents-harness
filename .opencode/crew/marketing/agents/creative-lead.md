@@ -12,14 +12,14 @@ permission:
     copywriter: allow
     creative-strategist: allow
     media-operator: allow
-model: minimax-coding-plan/MiniMax-M2.7
+model: minimax/minimax-m2.7
 ---
 
 # Creative Lead
 
 Role: `lead`
 Team: `Creative`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Creative lead responsible for delegation, synthesis, and team-level coordination.

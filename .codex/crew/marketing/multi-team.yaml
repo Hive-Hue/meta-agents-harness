@@ -88,6 +88,10 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: plugins/*
+      read: true
+      edit: true
+      bash: true
     - path: .claude/*
       read: true
       edit: true
@@ -215,7 +219,8 @@ orchestrator:
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
-    - zai/glm-4.5-air
+    - minimax/minimax-m2.7
+    - openai-codex/gpt-5.4-mini
   tools:
     - read
     - grep
@@ -256,7 +261,7 @@ teams:
       model: gpt-5.4-mini
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -316,9 +321,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -373,9 +379,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -433,7 +440,7 @@ teams:
       model: gpt-5.4-mini
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -494,9 +501,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -551,9 +559,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -608,9 +617,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -668,7 +678,7 @@ teams:
       model: gpt-5.4-mini
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
@@ -728,9 +738,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit
@@ -785,9 +796,10 @@ teams:
           max-lines: 10000
         model: gpt-5.4-mini
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
           - edit

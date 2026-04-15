@@ -1,6 +1,15 @@
 # Dev Run Sprint — `v0.4.0` Hermes with MAH Itself  
 ## Refined Plan
 
+## Status
+
+- implementação da sprint: [done]
+- evidência:
+  - runtime Hermes entregue em `v0.4.0`
+  - fases e slices abaixo concluídos
+  - critérios de boundary preservados no release
+  - documentação, testes e changelog já incorporados ao repositório
+
 ## 1. Objective
 
 Execute a first delivery sprint for `v0.4.0` using Meta Agents Harness itself as the **canonical team for coordination, analysis, execution, and review**.

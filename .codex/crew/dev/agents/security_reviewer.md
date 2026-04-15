@@ -3,56 +3,62 @@ name: security-reviewer
 model: gpt-5.4-mini
 role: worker
 team: Validation
-mission: Advance runtime support, validation, projection, and operator-facing
-  architecture for Meta Agents Harness while preserving bounded scope and
-  runtime-agnostic design.
+mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,
+  centered on cross-runtime headless execution and integrated session
+  interoperability, while preserving runtime-agnostic design and explicit
+  operational contracts.
 sprint_mode:
-  name: v0.5.0-runtime-evolution
+  name: v0.6.0-headless-and-sessions
   active: true
-  target_release: v0.5.0
-  objective: Advance runtime support with adapter completion, dispatcher
-    integration, and validation framework maturation for v0.5.0
+  target_release: v0.6.0
+  objective: "Define and implement two bounded v0.6.0 fronts: headless execution
+    across runtimes and integrated session export/injection interoperability."
   execution_mode: spec-bound-slice-driven
   directives:
     - spec-bound execution
     - no architecture-wave expansion
-    - no v0.6.0+ scope
+    - no v0.7.0+ scope
     - PR-sized slices
     - mandatory validation at each slice
-    - explicit deferred list for anything outside v0.5.0
+    - explicit deferred list for anything outside v0.6.0
   must_deliver:
-    - Hermes adapter implementation completion
-    - Full dispatcher integration with config
-    - Runtime compatibility matrix validation
-    - Validation framework expansion
-    - Diagnostics and explainability tooling
-    - Operator-facing CLI completion
-    - Integration test coverage
+    - Headless support matrix across runtimes
+    - Explicit headless capability and adapter contract
+    - Stable MAH headless execution envelope
+    - Canonical MAH session export format
+    - Bounded context injection between runtimes
+    - Session interoperability fidelity model
+    - Integration and contract test coverage
   must_not_deliver:
+    - full transcript replay portability
     - full multi-runtime parity
     - remote execution foundation
     - policy engine
     - federation/interconnect
     - confidential execution
-    - v0.6.0+ scope
+    - distributed session broker
+    - v0.7.0+ scope
 sprint_responsibilities:
   - review runtime boundary and unsafe coupling
-  - flag runtime capture risks across runtimes
+  - flag runtime capture and false portability risks across runtimes
   - cut future-wave contamination from the sprint
-instruction_block: crew=dev | mission=Advance runtime support, validation,
-  projection, and operator-facing architecture for Meta Agents Harness while
-  preserving bounded scope and runtime-agnostic design. |
-  sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true
-  | directives=spec-bound execution; no architecture-wave expansion; no v0.6.0+
+instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
+  for Meta Agents Harness, centered on cross-runtime headless execution and
+  integrated session interoperability, while preserving runtime-agnostic design
+  and explicit operational contracts. |
+  sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
+  | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+
   scope; PR-sized slices; mandatory validation at each slice; explicit deferred
-  list for anything outside v0.5.0 | do=Hermes adapter implementation
-  completion; Full dispatcher integration with config; Runtime compatibility
-  matrix validation; Validation framework expansion; Diagnostics and
-  explainability tooling; Operator-facing CLI completion; Integration test
-  coverage | avoid=full multi-runtime parity; remote execution foundation;
-  policy engine; federation/interconnect; confidential execution; v0.6.0+ scope
-  | role=review runtime boundary and unsafe coupling; flag runtime capture risks
-  across runtimes; cut future-wave contamination from the sprint
+  list for anything outside v0.6.0 | do=Headless support matrix across runtimes;
+  Explicit headless capability and adapter contract; Stable MAH headless
+  execution envelope; Canonical MAH session export format; Bounded context
+  injection between runtimes; Session interoperability fidelity model;
+  Integration and contract test coverage | avoid=full transcript replay
+  portability; full multi-runtime parity; remote execution foundation; policy
+  engine; federation/interconnect; confidential execution; distributed session
+  broker; v0.7.0+ scope | role=review runtime boundary and unsafe coupling; flag
+  runtime capture and false portability risks across runtimes; cut future-wave
+  contamination from the sprint
 expertise:
   path: .codex/crew/dev/expertise/security-reviewer-expertise-model.yaml
 tools:
@@ -98,7 +104,7 @@ domain:
 ---
 
 [MAH_CONTEXT]
-crew=dev | mission=Advance runtime support, validation, projection, and operator-facing architecture for Meta Agents Harness while preserving bounded scope and runtime-agnostic design. | sprint=v0.5.0-runtime-evolution,release=v0.5.0,mode=spec-bound-slice-driven,active=true | directives=spec-bound execution; no architecture-wave expansion; no v0.6.0+ scope; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.5.0 | do=Hermes adapter implementation completion; Full dispatcher integration with config; Runtime compatibility matrix validation; Validation framework expansion; Diagnostics and explainability tooling; Operator-facing CLI completion; Integration test coverage | avoid=full multi-runtime parity; remote execution foundation; policy engine; federation/interconnect; confidential execution; v0.6.0+ scope | role=review runtime boundary and unsafe coupling; flag runtime capture risks across runtimes; cut future-wave contamination from the sprint
+crew=dev | mission=Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness, centered on cross-runtime headless execution and integrated session interoperability, while preserving runtime-agnostic design and explicit operational contracts. | sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+ scope; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.6.0 | do=Headless support matrix across runtimes; Explicit headless capability and adapter contract; Stable MAH headless execution envelope; Canonical MAH session export format; Bounded context injection between runtimes; Session interoperability fidelity model; Integration and contract test coverage | avoid=full transcript replay portability; full multi-runtime parity; remote execution foundation; policy engine; federation/interconnect; confidential execution; distributed session broker; v0.7.0+ scope | role=review runtime boundary and unsafe coupling; flag runtime capture and false portability risks across runtimes; cut future-wave contamination from the sprint
 [/MAH_CONTEXT]
 
 # Security Reviewer

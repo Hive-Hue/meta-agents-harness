@@ -11,14 +11,14 @@ permission:
     "*": deny
     qa-reviewer: allow
     security-reviewer: allow
-model: minimax-coding-plan/MiniMax-M2.7
+model: minimax/minimax-m2.7
 ---
 
 # Validation Lead
 
 Role: `lead`
 Team: `Validation`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Validation lead responsible for delegation, synthesis, and team-level coordination.

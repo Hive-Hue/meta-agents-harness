@@ -156,7 +156,7 @@ function printHelp() {
   console.log("  --run <id>")
   console.log("  --agent <name>")
   console.log("  --strict-markers")
-  console.log("  --headless")
+  console.log("  --headless                 run in non-interactive mode")
   console.log("  --output <json|text>")
   console.log("  -o <json|text>")
 }

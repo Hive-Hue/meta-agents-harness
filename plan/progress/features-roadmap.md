@@ -1,5 +1,14 @@
 # Roadmap de Features — Meta Agents Harness (Refinado)
 
+## Status Atual
+
+- M1A: [done]
+- M1B: [done]
+- M2: [done]
+- M3: [done]
+- nota:
+  - o arquivo permanece em `plan/progress/` como roadmap vivo, mas os milestones listados abaixo já têm cobertura material no repositório até `v0.5.0`
+
 ## Objetivo
 
 Consolidar o `meta-agents-harness` como camada interoperável de orquestração multi-runtime, com fonte canônica para crews, artefatos e metadata estável, validação forte, observabilidade operacional e extensibilidade via adapters.
@@ -295,7 +304,7 @@ Antes de implementar M1B, três decisões precisam ser fechadas:
 - [done] contrato mínimo de adapter formalizado + `contract:runtime` — `runtime-adapter-contract.mjs` valida campos, métodos e comandos por runtime
 - [done] `mah demo` implementado — `mah demo` é alias de `mah run --demo`
 - [done] `mah resume <id>` implementado como `mah sessions resume <id>` — ID format: `runtime:crew:sessionId`
-- [deferred] plugin API — contrato interno existe (`RuntimeAdapter`), mas mecanismo de carregamento externo de plugins não implementado (v0.5.0+)
+- [done] plugin API — loader, registry, install/uninstall, validação e integração no CLI entregues em `v0.5.0`
 
 ### Ações Recomendadas para Fechar Gaps
 
@@ -303,4 +312,4 @@ Antes de implementar M1B, três decisões precisam ser fechadas:
 - [done] desacoplar `validate:runtime` com precheck semântico próprio e relatório estruturado
 - [done] uniformização de `--json` em comandos de diagnóstico
 - [done] semântica diferenciada de `plan` e `diff` com relatórios dedicados
-- [pending] mecanismo de carregamento externo de plugins (v0.5.0+)
+- [done] mecanismo de carregamento externo de plugins (`scripts/plugin-loader.mjs`, `mah plugins ...`, testes e docs)

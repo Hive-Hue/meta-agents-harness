@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: minimax-coding-plan/MiniMax-M2.7
+model: openai-codex/gpt-5.3-codex
 ---
 
 # Campaign Strategist
 
 Role: `worker`
 Team: `Planning`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `openai-codex/gpt-5.3-codex`
 
 ## Mission
 Planning worker focused on scoped execution within assigned ownership boundaries.

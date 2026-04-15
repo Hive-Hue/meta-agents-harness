@@ -1,5 +1,16 @@
 # Plan — Plugin `mah` para Codex (v0.5.0)
 
+## Status
+
+- estado atual: [done]
+- pasta correta: `plan/done/`
+- slices 0, 1, 2, 3, 4 e 5: entregues
+- status operacional atual:
+  - plugin `mah` operacional como MCP local
+  - `mah --runtime codex run` injeta automaticamente o servidor `mah` via `codex -c mcp_servers.mah=...`
+  - uso validado sem depender de registro manual no `~/.codex/config.toml`
+  - testes cobrem o bootstrap automático do MCP na sessão Codex gerenciada pelo MAH
+
 ## Objetivo
 
 Adicionar um plugin local `mah` para o Codex que exponha ferramentas operacionais reais do Meta Agents Harness dentro da sessão `mah --runtime codex run`, sem substituir o adapter `codex` já existente e sem expandir escopo além de `v0.5.0`.

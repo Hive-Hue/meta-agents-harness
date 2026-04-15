@@ -106,6 +106,10 @@ shared:
         read: true
         edit: true
         bash: true
+      - path: plugins/*
+        read: true
+        edit: true
+        bash: true
       - path: .claude/*
         read: true
         edit: true
@@ -223,11 +227,12 @@ orchestrator:
   instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
     communication assets, launch narratives, campaign collateral, and supporting
     media for Meta Agents Harness.
-  model: minimax-coding-plan/MiniMax-M2.7
+  model: minimax/minimax-m2.7
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
-    - zai/glm-4.5-air
+    - minimax/minimax-m2.7
+    - openai-codex/gpt-5.4-mini
   agent_file: .opencode/crew/marketing/agents/orchestrator.md
   expertise:
     path: .opencode/crew/marketing/expertise/orchestrator-expertise-model.yaml
@@ -263,10 +268,10 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: minimax-coding-plan/MiniMax-M2.7
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       agent_file: .opencode/crew/marketing/agents/planning-lead.md
       expertise:
         path: .opencode/crew/marketing/expertise/planning-lead-expertise-model.yaml
@@ -322,11 +327,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/market-researcher.md
         expertise:
           path: .opencode/crew/marketing/expertise/market-researcher-expertise-model.yaml
@@ -377,11 +383,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/campaign-strategist.md
         expertise:
           path: .opencode/crew/marketing/expertise/campaign-strategist-expertise-model.yaml
@@ -434,10 +441,10 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: minimax-coding-plan/MiniMax-M2.7
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       agent_file: .opencode/crew/marketing/agents/creative-lead.md
       expertise:
         path: .opencode/crew/marketing/expertise/creative-lead-expertise-model.yaml
@@ -494,11 +501,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/copywriter.md
         expertise:
           path: .opencode/crew/marketing/expertise/copywriter-expertise-model.yaml
@@ -549,11 +557,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/creative-strategist.md
         expertise:
           path: .opencode/crew/marketing/expertise/creative-strategist-expertise-model.yaml
@@ -604,11 +613,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/media-operator.md
         expertise:
           path: .opencode/crew/marketing/expertise/media-operator-expertise-model.yaml
@@ -661,10 +671,10 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: minimax-coding-plan/MiniMax-M2.7
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - zai/glm-5
-        - zai/glm-4.5-air
+        - nvidia/nemotron-3-super-120b-a12b:free
       agent_file: .opencode/crew/marketing/agents/validation-lead.md
       expertise:
         path: .opencode/crew/marketing/expertise/validation-lead-expertise-model.yaml
@@ -720,11 +730,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/performance-analyst.md
         expertise:
           path: .opencode/crew/marketing/expertise/performance-analyst-expertise-model.yaml
@@ -775,11 +786,12 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: minimax-coding-plan/MiniMax-M2.7
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
-          - nvidia/nemotron-3-super-120b-a12b:free
+          - zai/glm-5
           - zai/glm-4.7
-          - zai/glm-4.5-air
+          - minimax/minimax-m2.7
+          - nvidia/nemotron-3-super-120b-a12b:free
         agent_file: .opencode/crew/marketing/agents/brand-safety-reviewer.md
         expertise:
           path: .opencode/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml

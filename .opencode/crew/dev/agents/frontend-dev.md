@@ -9,14 +9,14 @@ permission:
   bash: ask
   task:
     "*": deny
-model: minimax-coding-plan/MiniMax-M2.7
+model: openai-codex/gpt-5.3-codex
 ---
 
 # Frontend Dev
 
 Role: `worker`
 Team: `Engineering`
-Model: `minimax-coding-plan/MiniMax-M2.7`
+Model: `openai-codex/gpt-5.3-codex`
 
 ## Mission
 Engineering worker focused on scoped execution within assigned ownership boundaries.

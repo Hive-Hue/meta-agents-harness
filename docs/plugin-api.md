@@ -196,6 +196,39 @@ mah-plugins/<name>/
 
 The `plugin.json` metadata is informational. Validation is driven entirely by the `runtimePlugin` export in `index.mjs`.
 
+## Headless Capability
+
+Runtimes can declare headless execution support via `capabilities.headless`:
+
+```js
+capabilities: {
+  headless: {
+    supported: boolean,        // true if runtime has non-interactive path
+    native: boolean,          // true if headless is native
+    requiresSession: boolean, // true if session is required for headless
+    promptMode: "argv" | "stdin" | "env" | "unsupported",
+    outputMode: "stdout" | "file" | "mixed"
+  }
+}
+```
+
+Implement `prepareHeadlessRunContext(context)` to return:
+
+```js
+{
+  ok: boolean,
+  exec: string,        // command to run
+  args: string[],      // arguments
+  passthrough: string[],
+  envOverrides: object,
+  warnings: string[],
+  internal?: object,
+  error?: string       // only when ok:false
+}
+```
+
+Runtimes that don't support headless should return `{ ok: false, error: "..." }`.
+
 ---
 
 ## npm-style plugin (`node_modules/` format)

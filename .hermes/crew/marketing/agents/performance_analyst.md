@@ -1,6 +1,6 @@
 ---
 name: performance-analyst
-model: minimax/minimax-m2.7
+model: openai-codex/gpt-5.3-codex
 role: worker
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch

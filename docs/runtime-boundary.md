@@ -16,6 +16,12 @@
 - Add declarative data to YAML when it describes reusable crew/config intent.
 - Add operational behavior to adapters when it changes dispatch/runtime execution semantics.
 
+## Headless Execution
+
+- Headless behavior is adapter-owned and declared via `capabilities.headless`.
+- MAH core normalizes external UX (`mah run --headless`, `--output json|text`) while runtime-specific mechanics remain in adapter methods.
+- `prepareHeadlessRunContext()` is the contract boundary for runtime-specific non-interactive execution plans.
+
 ## Current status
 
 - Adapter model is stable enough for current harness usage, but still evolutive in `0.x`.

@@ -15,6 +15,20 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `runCommand()` switches to `stdio: "pipe"` in headless mode for output capture
 - All 4 built-in adapters (pi, claude, opencode, hermes) have full headless support
 - All 5 plugin adapters have headless capability declared (unsupported placeholder until Slice 3)
+- Headless test suite: 6 test files (~58 tests across runtime adapters)
+- Headless contract tests with graceful skip when runtime binary unavailable
+- `docs/headless-runtime.md` — operational guide for headless execution
+- `docs/plugin-api.md` — headless capability documentation for plugin developers
+
+### Changed
+- `plugins/runtime-pi` headless implementation now uses `pi run --no-session`
+- `plugins/runtime-opencode` headless implementation now uses `--no-interactive` flag
+- `plugins/runtime-hermes` headless requires active session; returns error if no session available
+
+### Fixed
+- Missing explicit `--no-session` flag in PI headless mode
+- Missing explicit `--no-interactive` flag in OpenCode headless mode
+- Hermes headless test correctly handles session-required behavior
 
 ## [0.5.0] - 2026-04-10
 
