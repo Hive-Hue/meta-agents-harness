@@ -380,7 +380,7 @@ Futuros:
 ### Runtime-specific
 
 - `plugins/runtime-pi/index.mjs`
-- `plugins/codex/index.mjs`
+- `plugins/runtime-codex/index.mjs`
 - `plugins/mah/mcp/handlers/delegate-agent.mjs`
 
 ### Testes

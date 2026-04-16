@@ -150,10 +150,11 @@ export function exportSession(repoRoot, sessionIdFull, runtimeRegistry = RUNTIME
   const targetDir = path.join(sessionsDir, parsed.runtime)
   const targetFile = path.join(targetDir, `${sessionIdFull}.tar.gz`)
 
-  // Check if source exists
-  const runtimeRoot = resolveRuntimeRoot(runtimeRegistry, parsed.runtime)
-  const sourcePath = path.join(repoRoot, runtimeRoot, "crew", parsed.crew, "sessions", parsed.sessionId)
-  if (!existsSync(sourcePath)) {
+  // Resolve source from session inventory to support custom/global runtime layouts.
+  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime, crew: parsed.crew }, runtimeRegistry)
+  const session = sessions.find((item) => item.id === sessionIdFull)
+  const sourcePath = session?.source_path || ""
+  if (!sourcePath || !existsSync(sourcePath)) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
   }
 
@@ -187,9 +188,11 @@ export function deleteSession(repoRoot, sessionIdFull, confirmed, runtimeRegistr
     return { ok: false, error: "confirmation required: enter 'y' or 'Y' to delete" }
   }
 
-  const runtimeRoot = resolveRuntimeRoot(runtimeRegistry, parsed.runtime)
-  const sourcePath = path.join(repoRoot, runtimeRoot, "crew", parsed.crew, "sessions", parsed.sessionId)
-  if (!existsSync(sourcePath)) {
+  // Resolve source from session inventory to support custom/global runtime layouts.
+  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime, crew: parsed.crew }, runtimeRegistry)
+  const session = sessions.find((item) => item.id === sessionIdFull)
+  const sourcePath = session?.source_path || ""
+  if (!sourcePath || !existsSync(sourcePath)) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
   }
 

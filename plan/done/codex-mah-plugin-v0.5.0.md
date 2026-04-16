@@ -37,8 +37,8 @@ Hoje o runtime Codex do MAH injeta contexto corretamente, mas não oferece a cam
 
 ### Evidência de código
 
-- `mah-plugins/codex/index.mjs` monta contexto textual e usa `initial_messages`
-- `mah-plugins/codex/index.mjs` remove frontmatter com `stripFrontmatter()`
+- `mah-plugins/runtime-codex/index.mjs` monta contexto textual e usa `initial_messages`
+- `mah-plugins/runtime-codex/index.mjs` remove frontmatter com `stripFrontmatter()`
 - `scripts/sync-meta-agents.mjs` injeta `delegate_agent` no frontmatter gerado
 - `extensions/multi-team.ts` implementa a tool real `delegate_agent`
 - `scripts/runtime-core-integrations.mjs` carrega `extensions/multi-team.ts` para o runtime PI, não para Codex
@@ -306,8 +306,8 @@ Se já houver helpers aproveitáveis no MAH, o plugin deve chamá-los ou invocar
 - documentação operacional mínima
 
 **Arquivos**
-- `mah-plugins/codex/index.mjs`
-- `plugins/codex/index.mjs`
+- `mah-plugins/runtime-codex/index.mjs`
+- `plugins/runtime-codex/index.mjs`
 - docs/changelog se aplicável
 
 **Gate**

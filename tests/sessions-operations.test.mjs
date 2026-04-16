@@ -7,11 +7,16 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { collectSessions, parseSessionId, exportSession, deleteSession, resumeSession, startSession } from "../scripts/m3-ops.mjs"
 import { RUNTIME_ADAPTERS } from "../scripts/runtime-adapters.mjs"
+import { runtimePlugin as kiloRuntimePlugin } from "../plugins/runtime-kilo/index.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
+const runtimeRegistryWithKilo = {
+  ...RUNTIME_ADAPTERS,
+  kilo: kiloRuntimePlugin.adapter
+}
 
 function run(args, opts = {}) {
   return spawnSync(process.execPath, [cliPath, ...args], {
@@ -264,6 +269,20 @@ test("resumeSession sets correct env var for hermes runtime", () => {
   }
 })
 
+test("resumeSession uses --session flag for kilo runtime", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-kilo-resume-"))
+  try {
+    const sessionPath = path.join(tempDir, ".kilo", "crew", "dev", "sessions", "kilo-session-1")
+    mkdirSync(sessionPath, { recursive: true })
+    const result = resumeSession(tempDir, "kilo:dev:kilo-session-1", "kilo", [], runtimeRegistryWithKilo)
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.envOverrides, {})
+    assert.deepEqual(result.args, ["--session", "kilo-session-1"])
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
 // ============================================================
 // Tests for startSession
 // ============================================================
@@ -294,6 +313,12 @@ test("startSession succeeds for hermes runtime", () => {
   assert.ok(result.args.includes("--new-session"))
 })
 
+test("startSession succeeds for kilo runtime", () => {
+  const result = startSession(repoRoot, "kilo", [], runtimeRegistryWithKilo)
+  assert.equal(result.ok, true)
+  assert.ok(Array.isArray(result.args))
+})
+
 // ============================================================
 // CLI Tests - sessions subcommands
 // ============================================================
@@ -316,8 +341,12 @@ test("mah sessions list --json returns JSON", () => {
 })
 
 test("mah sessions list --runtime filters correctly", () => {
-  const result = run(["sessions", "list", "--runtime", "hermes"])
+  const result = run(["sessions", "list", "--runtime", "hermes", "--json"])
   assert.equal(result.status, 0, result.stderr)
+  const parsed = JSON.parse(result.stdout)
+  for (const session of parsed.sessions || []) {
+    assert.equal(session.runtime, "hermes")
+  }
 })
 
 test("mah sessions list --crew filters correctly", () => {
@@ -369,6 +398,24 @@ test("mah sessions export with --json returns JSON", () => {
     // Either succeeds or fails with "not found" - both valid for this test
     assert.ok(result.stdout.includes("{") || result.stderr.includes("not found"))
   }
+})
+
+test("mah sessions inject parses session ID argument correctly", () => {
+  const result = run(["sessions", "inject", "pi:dev:nonexistent-session-xyz", "--runtime", "hermes"])
+  assert.notEqual(result.status, 0)
+  assert.ok(
+    result.stderr.includes("session not found") || result.stderr.includes("injection failed"),
+    `unexpected stderr: ${result.stderr}`
+  )
+})
+
+test("mah sessions bridge parses session ID argument correctly", () => {
+  const result = run(["sessions", "bridge", "pi:dev:nonexistent-session-xyz", "--to", "hermes"])
+  assert.notEqual(result.status, 0)
+  assert.ok(
+    result.stderr.includes("source session not found") || result.stderr.includes("bridge failed"),
+    `unexpected stderr: ${result.stderr}`
+  )
 })
 
 test("mah sessions delete without session ID shows error", () => {

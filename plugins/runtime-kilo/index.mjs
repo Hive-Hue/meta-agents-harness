@@ -320,7 +320,14 @@ export const runtimePlugin = {
       sessionRootFlag: false,
       sessionMirrorFlag: false,
       sessionNewArgs: [],
-      sessionContinueArgs: []
+      sessionContinueArgs: [],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -406,6 +413,32 @@ export const runtimePlugin = {
         passthrough: Array.isArray(argv) ? argv : [],
         envOverrides,
         warnings
+      }
+    },
+
+    prepareHeadlessRunContext({ task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!Array.isArray(argv) || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "Kilo headless requires a task prompt"
+        }
+      }
+
+      return {
+        ok: true,
+        exec: this.directCli,
+        args: ["--no-interactive"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          KILO_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "kilo"
+        }
       }
     },
 

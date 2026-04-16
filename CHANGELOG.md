@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
+## [0.6.1] - 2026-04-16
+
+### Added
+- Native runtime delegation adapter (`scripts/child-agent-native-runtime.mjs`) integrated into `mah delegate`
+- Kilo headless adapter test suite (`tests/headless-kilo.test.mjs`)
+- Additional `mah sessions` regression coverage for:
+  - `inject` and `bridge` argument parsing
+  - `--runtime` filtering behavior in CLI list output
+  - Kilo session resume/new capability paths in operations tests
+
+### Changed
+- Codex runtime plugin path standardized from `plugins/codex` to `plugins/runtime-codex`
+- `mah sessions --help` now renders runtime list and `sessions new` support dynamically from loaded runtime profiles
+- `mah sessions` now preserves `--runtime` semantics when provided as global flag or subcommand flag
+- Session interop pipeline (`export/inject/bridge`) now receives loaded runtime registry (built-ins + plugins), not built-ins only
+
+### Fixed
+- `mah sessions inject` and `mah sessions bridge` now parse `<id>` correctly (no longer reading subcommand token as session id)
+- `mah sessions list` now correctly applies effective runtime override
+- Global `--runtime` with `mah sessions` no longer breaks subcommand parsing
+- `m3-ops` `exportSession` and `deleteSession` now resolve session source from inventory (`collectSessions`) instead of assuming fixed `crew/<id>/sessions` path layout
+- Kilo runtime now declares full headless capability contract and implements `prepareHeadlessRunContext`
+
+### Validation
+- Verified with:
+  - `node --test tests/sessions-operations.test.mjs`
+  - `node --test tests/session-interop.test.mjs tests/runtime-core-integration.test.mjs`
+  - `node --test tests/headless-contract.test.mjs tests/headless-pi.test.mjs tests/headless-claude.test.mjs tests/headless-opencode.test.mjs tests/headless-kilo.test.mjs tests/headless-hermes.test.mjs tests/headless-codex.test.mjs`
+
 ## [0.6.0] - 2026-04-15
 
 ### Added

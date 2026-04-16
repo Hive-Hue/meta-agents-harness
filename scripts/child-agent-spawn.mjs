@@ -80,7 +80,7 @@ export function selectAdapter(ctx) {
     if (!sourceMatch) continue
 
     // NEW: Check targetRuntime compatibility
-    const targetMatch = adapter.targetRuntime === ctx.targetRuntime
+    const targetMatch = adapter.targetRuntime === "*" || adapter.targetRuntime === ctx.targetRuntime
     if (!targetMatch) continue
 
     // Check if adapter supports this spawn
@@ -140,7 +140,8 @@ export function buildSpawnContext({ crew, sourceAgent, sourceRuntime, targetRunt
     logicalTarget,
     effectiveLogicalTarget: resolution.effectiveTarget,
     task,
-    mode
+    mode,
+    repoRoot
   }
 
   return {

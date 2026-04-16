@@ -62,18 +62,20 @@ server.registerTool(
 server.registerTool(
   "mah_delegate_agent",
   {
-    description: "Delegate a bounded task through the MAH Codex runtime using the active crew graph.",
+    description: "Delegate a bounded task through the MAH delegation pipeline using the active crew graph.",
     inputSchema: {
       target: z.string().min(1).describe("Target lead or worker name."),
       task: z.string().min(1).describe("Focused delegation task."),
+      target_runtime: z.string().min(1).optional().describe("Optional runtime hint for where the delegated subagent should execute (for example: codex, hermes, pi)."),
       include_full_output: z.boolean().optional().describe("Include the full command output in the result.")
     }
   },
-  async ({ target, task, include_full_output }) => {
+  async ({ target, task, target_runtime, include_full_output }) => {
     const result = await delegateAgentHandler(
       {
         target,
         task,
+        target_runtime,
         include_full_output
       },
       {}

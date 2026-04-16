@@ -840,6 +840,12 @@ function runInit(argv) {
 }
 
 function printSessionsHelp() {
+  const runtimeNames = orderedRuntimeNames(runtimeProfiles)
+  const sessionNewSupported = runtimeNames
+    .filter((runtimeName) => runtimeProfiles[runtimeName]?.supportsSessionNew)
+  const sessionNewUnsupported = runtimeNames
+    .filter((runtimeName) => !runtimeProfiles[runtimeName]?.supportsSessionNew)
+
   console.log("")
   console.log("mah sessions — Unified session operations across all runtimes")
   console.log("")
@@ -850,23 +856,22 @@ function printSessionsHelp() {
   console.log("  mah sessions list --json             # JSON output")
   console.log("  mah sessions resume <id>             # Resume a session (format: runtime:crew:sessionId)")
   console.log("  mah sessions resume <id> --dry-run   # Preview resume command without spawning")
-  console.log("  mah sessions new --runtime <name>    # Start a new session (PI and Hermes only)")
+  console.log("  mah sessions new --runtime <name>    # Start a new session (runtime-dependent)")
   console.log("  mah sessions new --runtime <name> --dry-run  # Preview without spawning")
   console.log("  mah sessions export <id>             # Export session to $MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz")
   console.log("  mah sessions delete <id> --yes       # Delete session (requires --yes confirmation)")
   console.log("  mah sessions --help                  # Show this help")
   console.log("")
   console.log("Global flags:")
-  console.log("  --runtime <name>  Target a specific runtime (pi, claude, opencode, hermes)")
+  console.log(`  --runtime <name>  Target a specific runtime (${runtimeNames.join(", ")})`)
   console.log("  --json            Output results as JSON")
   console.log("  --dry-run         Preview the command that would be run without executing it")
   console.log("")
   console.log("Session ID format: runtime:crew:sessionId  (e.g., hermes:dev:2026-04-08T13-00-00-abc123)")
   console.log("")
   console.log("'mah sessions new' support per runtime:")
-  console.log("  PI, Hermes     — supported")
-  console.log("  Claude Code    — not supported (use 'mah sessions resume' instead)")
-  console.log("  OpenCode      — not supported (use 'mah sessions resume' instead)")
+  console.log(`  ${sessionNewSupported.length > 0 ? sessionNewSupported.join(", ") : "(none)"} — supported`)
+  console.log(`  ${sessionNewUnsupported.length > 0 ? sessionNewUnsupported.join(", ") : "(none)"} — not supported (use 'mah sessions resume' instead)`)
   console.log("")
 }
 
@@ -882,7 +887,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
 
   // Handle subcommands
   if (subcommand === "list") {
-    const rows = collectSessions(repoRoot, { runtime: filters.runtime, crew: filters.crew }, allRuntimes)
+    const rows = collectSessions(repoRoot, { runtime: effectiveRuntime, crew: filters.crew }, allRuntimes)
     if (filters.json) {
       console.log(JSON.stringify({ sessions: rows }, null, 2))
       return 0
@@ -991,7 +996,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       return 1
     }
     const { exportSession } = await import("./session-export.mjs")
-    const exportResult = await exportSession(repoRoot, sessionId, format)
+    const exportResult = await exportSession(repoRoot, sessionId, format, allRuntimes)
     if (!exportResult.ok) {
       console.error(`ERROR: ${exportResult.error}`)
       return 1
@@ -1006,7 +1011,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
 
   if (subcommand === "inject") {
     // mah sessions inject <id> --runtime <target> [--fidelity full|contextual|summary-only]
-    const sessionId = argv[0]
+    const sessionId = argv[1]
     const runtimeIdx = argv.indexOf("--runtime")
     const fidelityIdx = argv.indexOf("--fidelity")
 
@@ -1026,7 +1031,6 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const { injectSessionContext } = await import("./session-injection.mjs")
     const { parseSessionId } = await import("./m3-ops.mjs")
     const { collectSessions } = await import("./m3-ops.mjs")
-    const { RUNTIME_ADAPTERS } = await import("./runtime-adapters.mjs")
 
     const parsed = parseSessionId(sessionId)
     if (!parsed) {
@@ -1034,7 +1038,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       return 1
     }
 
-    const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, RUNTIME_ADAPTERS)
+    const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, allRuntimes)
     const sessionRef = sessions.find(s => s.id === sessionId)
     if (!sessionRef) {
       console.error(`ERROR: session not found: ${sessionId}`)
@@ -1045,7 +1049,9 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const { buildMahSessionEnvelope } = await import("./session-export.mjs")
     const envelope = buildMahSessionEnvelope(sessionRef)
 
-    const result = await injectSessionContext(repoRoot, envelope, targetRuntime, fidelityLevel)
+    const result = await injectSessionContext(repoRoot, envelope, targetRuntime, fidelityLevel, {
+      runtimeRegistry: allRuntimes
+    })
 
     if (!result.ok) {
       console.error(`ERROR: injection failed: ${result.error}`)
@@ -1062,7 +1068,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     return 0
   } else if (subcommand === "bridge") {
     // mah sessions bridge <id> --to <runtime> [--fidelity level]
-    const sessionId = argv[0]
+    const sessionId = argv[1]
     const toIdx = argv.indexOf("--to")
 
     if (!sessionId) {
@@ -1079,7 +1085,10 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
 
     const { bridgeSession } = await import("./session-bridge.mjs")
-    const result = await bridgeSession(repoRoot, sessionId, targetRuntime, { fidelityLevel })
+    const result = await bridgeSession(repoRoot, sessionId, targetRuntime, {
+      fidelityLevel,
+      runtimeRegistry: allRuntimes
+    })
 
     if (!result.ok) {
       console.error(`ERROR: bridge failed: ${result.error}`)
@@ -1899,9 +1908,11 @@ async function runDelegate(passthrough) {
   // Dynamic imports — keeps the delegate surface lazy-loaded
   const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./child-agent-spawn.mjs")
   const { codexSidecarAdapter } = await import("./child-agent-codex-sidecar.mjs")
+  const { nativeRuntimeAdapter } = await import("./child-agent-native-runtime.mjs")
 
   // Register adapters (fresh each invocation)
   clearAdapters()
+  registerChildAgentAdapter(nativeRuntimeAdapter)
   registerChildAgentAdapter(codexSidecarAdapter)
 
   const sourceAgent = process.env.MAH_AGENT || "orchestrator"
@@ -2021,7 +2032,12 @@ function main() {
 
   if (first === "sessions") {
     ;(async () => {
-      process.exitCode = await runSessions(normalizedArgv.slice(1), jsonMode, runtimeResult.runtime)
+      // Use original argv (not normalizedArgv) because sessions subcommands use --runtime
+      // as a first-class flag (filter/target runtime) and stripping it breaks parsing.
+      const sessionsCommandIndex = argv.findIndex((arg) => arg === "sessions")
+      const sessionsArgv = (sessionsCommandIndex >= 0 ? argv.slice(sessionsCommandIndex + 1) : normalizedArgv.slice(1))
+        .filter((arg) => !["--trace", "--json", "--mermaid", "--headless", "--strict-markers"].includes(arg))
+      process.exitCode = await runSessions(sessionsArgv, jsonMode, runtimeResult.runtime)
     })()
     return
   }

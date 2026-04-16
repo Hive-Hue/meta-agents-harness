@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { runtimePlugin } from "../plugins/codex/index.mjs"
+import { runtimePlugin } from "../plugins/runtime-codex/index.mjs"
 
 const adapter = runtimePlugin.adapter
 

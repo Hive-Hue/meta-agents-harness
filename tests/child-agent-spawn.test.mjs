@@ -12,9 +12,11 @@ import {
   clearAdapters,
   determineSpawnMode,
   getRegisteredAdapters,
+  prepareChildSpawn,
   registerChildAgentAdapter
 } from "../scripts/child-agent-spawn.mjs"
 import { codexSidecarAdapter } from "../scripts/child-agent-codex-sidecar.mjs"
+import { nativeRuntimeAdapter } from "../scripts/child-agent-native-runtime.mjs"
 
 const repoRoot = process.cwd()
 
@@ -65,6 +67,40 @@ test("codexSidecarAdapter interface", () => {
   assert.equal(spawnResult.exec, "codex")
   assert.deepStrictEqual(spawnResult.envOverrides, {
     MAH_ACTIVE_CREW: "dev"
+  })
+})
+
+test("nativeRuntimeAdapter interface", () => {
+  assert.equal(typeof nativeRuntimeAdapter.supportsSpawn === "function", true)
+  assert.equal(nativeRuntimeAdapter.supportsSpawn({
+    crew: "dev", sourceRuntime: "hermes", targetRuntime: "hermes", sourceAgent: "engineering-lead", logicalTarget: "backend-dev"
+  }), true)
+  assert.equal(nativeRuntimeAdapter.supportsSpawn({
+    crew: "dev", sourceRuntime: "hermes", targetRuntime: "codex", sourceAgent: "engineering-lead", logicalTarget: "backend-dev"
+  }), false)
+
+  const modes = nativeRuntimeAdapter.listSpawnModes({
+    crew: "dev", sourceRuntime: "hermes", targetRuntime: "hermes", sourceAgent: "engineering-lead", logicalTarget: "backend-dev"
+  })
+  assert.deepStrictEqual(modes, [SPAWN_MODES.NATIVE_SAME_RUNTIME])
+
+  const spawnResult = nativeRuntimeAdapter.prepareSpawn({
+    crew: "dev",
+    sourceRuntime: "hermes",
+    targetRuntime: "hermes",
+    sourceAgent: "engineering-lead",
+    logicalTarget: "backend-dev",
+    effectiveLogicalTarget: "backend-dev",
+    task: "Implement the parser",
+    mode: SPAWN_MODES.NATIVE_SAME_RUNTIME,
+    repoRoot
+  })
+  assert.equal(spawnResult.ok, true)
+  assert.equal(spawnResult.mode, SPAWN_MODES.NATIVE_SAME_RUNTIME)
+  assert.equal(spawnResult.exec, process.execPath)
+  assert.deepStrictEqual(spawnResult.envOverrides, {
+    MAH_ACTIVE_CREW: "dev",
+    MAH_AGENT: "backend-dev"
   })
 })
 
@@ -149,4 +185,24 @@ test("Adapter registry", () => {
   assert.ok(adapters.length >= 1)
   clearAdapters()
   assert.equal(getRegisteredAdapters().length, 0)
+})
+
+test("prepareChildSpawn picks native adapter for same runtime", () => {
+  clearAdapters()
+  registerChildAgentAdapter(nativeRuntimeAdapter)
+  registerChildAgentAdapter(codexSidecarAdapter)
+
+  const result = prepareChildSpawn({
+    crew: "dev",
+    sourceAgent: "engineering-lead",
+    sourceRuntime: "hermes",
+    targetRuntime: "hermes",
+    logicalTarget: "backend-dev",
+    task: "Implement parser",
+    repoRoot
+  })
+
+  assert.equal(result.ok, true)
+  assert.equal(result.adapter, "native-runtime")
+  assert.equal(result.plan.mode, SPAWN_MODES.NATIVE_SAME_RUNTIME)
 })
