@@ -1890,18 +1890,33 @@ function isSyncLikeCommand(command) {
  * Handle `mah delegate` command — exposes the child agent spawn planning surface.
  * Parses --target, --task, --runtime, --crew flags; resolves delegation;
  * prints the spawn plan (does NOT execute it).
+ *
+ * Supports two expertise-aware modes:
+ * - --auto: automatically select best candidate from policy-allowed set using expertise scoring
+ * - --target <agent>: verify explicit target against policy, then score all candidates
+ *                     and emit expertise_warning if explicit target isn't the best match
  */
 async function runDelegate(passthrough) {
+  const startTimeMs = Date.now()
   const execute = passthrough.includes("--execute") || passthrough.includes("-x")
-  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x")
+  const autoMode = passthrough.includes("--auto")
+  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x" && a !== "--auto")
   const target = parseValueArg(runArgs, "--target")
   const task = parseValueArg(runArgs, "--task")
   const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
   const crew = parseValueArg(runArgs, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
 
-  if (!target || !task) {
-    console.error("ERROR: --target and --task are required")
-    console.error("Usage: mah delegate --target <agent> --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]")
+  // --auto mode: task is required, target is not
+  // --target mode: both target and task are required
+  if (!task || (!autoMode && !target)) {
+    if (autoMode) {
+      console.error("ERROR: --task is required in --auto mode")
+      console.error("Usage: mah delegate --auto --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]")
+    } else {
+      console.error("ERROR: --target and --task are required")
+      console.error("Usage: mah delegate --target <agent> --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]")
+      console.error("       mah delegate --auto --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]")
+    }
     return 1
   }
 
@@ -1919,12 +1934,161 @@ async function runDelegate(passthrough) {
   const sourceRuntime = process.env.MAH_RUNTIME || "pi"
   const effectiveTargetRuntime = targetRuntime || sourceRuntime
 
+  // Initialize expertise-related variables
+  let expertiseSelected = null
+  let expertiseScore = null
+  let expertiseWarning = null
+
+  // Determine the logical target (either explicit or auto-selected)
+  let effectiveTarget = target
+
+  if (autoMode) {
+    // Mode A: Auto-selection using expertise scoring
+    try {
+      const { listDelegationTargets } = await import("./delegation-resolution.mjs")
+      const { scoreCandidates } = await import("./expertise-routing.mjs")
+      const { getRegistry } = await import("./expertise-registry.mjs")
+
+      // Get policy-allowed candidates
+      const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
+      if (!listResult.ok || listResult.targets.length === 0) {
+        console.error(`ERROR: no valid delegation targets found for '${sourceAgent}' in crew '${crew}'`)
+        if (listResult.error) console.error(`  ${listResult.error}`)
+        return 1
+      }
+
+      // Get expertise registry to find expertise for each candidate
+      const registry = await getRegistry()
+      const allowedIds = listResult.targets
+
+      // Build candidates list from registry entries matching allowed targets
+      // Registry entries have id like "crew:agent-name" but target is just "agent-name"
+      const candidates = registry.entries.filter(entry => {
+        const entryAgentId = entry.id.includes(":") ? entry.id.split(":")[1] : entry.id
+        return allowedIds.includes(entryAgentId)
+      }).map(entry => ({
+        id: entry.id.includes(":") ? entry.id.split(":")[1] : entry.id,
+        expertise: entry
+      }))
+
+      if (candidates.length === 0) {
+        // No expertise found for candidates - fall back to first allowed target
+        effectiveTarget = listResult.targets[0]
+        expertiseWarning = `no expertise entries found for crew '${crew}', defaulting to first allowed target`
+      } else {
+        // Score all candidates
+        const scoringResult = scoreCandidates({
+          task,
+          sourceAgent,
+          candidates,
+          options: { allowed_environments: [effectiveTargetRuntime] }
+        })
+
+        if (scoringResult.selected) {
+          expertiseSelected = scoringResult.selected
+          expertiseScore = scoringResult.scores[scoringResult.selected]?.final_score ?? 0
+
+          if (scoringResult.escalation) {
+            expertiseWarning = scoringResult.fallback_reason || `score ${expertiseScore.toFixed(3)} below threshold, escalation recommended`
+          }
+        } else {
+          // All candidates blocked - fall back to first allowed target
+          effectiveTarget = listResult.targets[0]
+          expertiseWarning = `all candidates blocked by filters, defaulting to first allowed target`
+        }
+      }
+    } catch (err) {
+      // Expertise scoring failed - log but continue with fallback
+      console.error(`WARNING: expertise scoring failed: ${err.message}`)
+      // Fall back to first allowed target if we have one
+      try {
+        const { listDelegationTargets } = await import("./delegation-resolution.mjs")
+        const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
+        if (listResult.ok && listResult.targets.length > 0) {
+          effectiveTarget = listResult.targets[0]
+          expertiseWarning = `expertise scoring unavailable, using fallback target`
+        }
+      } catch {
+        // Can't even get targets - return error
+        console.error(`ERROR: could not determine delegation target: ${err.message}`)
+        return 1
+      }
+    }
+  } else {
+    // Mode B: Explicit target with expertise review
+    // First, verify the explicit target is policy-allowed via delegation-resolution
+    try {
+      const { resolveDelegationTarget, listDelegationTargets } = await import("./delegation-resolution.mjs")
+      const { scoreCandidates } = await import("./expertise-routing.mjs")
+      const { getRegistry } = await import("./expertise-registry.mjs")
+
+      // Resolve explicit target against policy
+      const resolveResult = resolveDelegationTarget({
+        crew,
+        sourceAgent,
+        sourceRuntime,
+        logicalTarget: target,
+        repoRoot
+      })
+
+      if (!resolveResult.ok) {
+        console.error(`ERROR: delegation not allowed: ${resolveResult.error}`)
+        return 1
+      }
+
+      effectiveTarget = resolveResult.effectiveTarget
+
+      // Now score ALL policy-allowed candidates to check if explicit target is optimal
+      const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
+      if (listResult.ok && listResult.targets.length > 0) {
+        const registry = await getRegistry()
+        const allowedIds = listResult.targets
+
+        const candidates = registry.entries.filter(entry => {
+          const entryAgentId = entry.id.includes(":") ? entry.id.split(":")[1] : entry.id
+          return allowedIds.includes(entryAgentId)
+        }).map(entry => ({
+          id: entry.id.includes(":") ? entry.id.split(":")[1] : entry.id,
+          expertise: entry
+        }))
+
+        if (candidates.length > 0) {
+          const scoringResult = scoreCandidates({
+            task,
+            sourceAgent,
+            candidates,
+            options: { allowed_environments: [effectiveTargetRuntime] }
+          })
+
+          if (scoringResult.selected) {
+            const topCandidate = scoringResult.selected
+            const topScore = scoringResult.scores[topCandidate]?.final_score ?? 0
+            const explicitScore = scoringResult.scores[effectiveTarget]?.final_score ?? 0
+
+            expertiseSelected = effectiveTarget
+            expertiseScore = explicitScore
+
+            if (topCandidate !== effectiveTarget) {
+              expertiseWarning = `explicit target '${effectiveTarget}' has score ${explicitScore.toFixed(3)} but '${topCandidate}' has score ${topScore.toFixed(3)} (better match)`
+            }
+          }
+        }
+      }
+    } catch (err) {
+      // Expertise scoring failed - but we already validated the explicit target is policy-allowed
+      // Log warning but continue with the explicitly requested target
+      console.error(`WARNING: expertise scoring failed: ${err.message}`)
+      // expertiseSelected and expertiseScore remain null, expertiseWarning is set
+      expertiseWarning = `expertise scoring unavailable for target verification`
+    }
+  }
+
   const result = prepareChildSpawn({
     crew,
     sourceAgent,
     sourceRuntime,
     targetRuntime: effectiveTargetRuntime,
-    logicalTarget: target,
+    logicalTarget: effectiveTarget,
     task,
     repoRoot
   })
@@ -1936,7 +2100,7 @@ async function runDelegate(passthrough) {
 
   // Structured output (key=value, consistent with other mah commands)
   console.log("ok=true")
-  console.log(`logical_target=${target}`)
+  console.log(`logical_target=${effectiveTarget}`)
   console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
   console.log(`mode=${result.context.mode}`)
   console.log(`source_runtime=${result.context.sourceRuntime}`)
@@ -1952,6 +2116,17 @@ async function runDelegate(passthrough) {
     }
   }
 
+  // Expertise scoring output fields
+  if (expertiseSelected) {
+    console.log(`expertise_selected=${expertiseSelected}`)
+  }
+  if (expertiseScore !== null) {
+    console.log(`expertise_score=${expertiseScore.toFixed(3)}`)
+  }
+  if (expertiseWarning) {
+    console.log(`expertise_warning=${expertiseWarning}`)
+  }
+
   if (execute) {
     console.log("--- executing ---")
     const { spawnSync } = await import("node:child_process")
@@ -1963,10 +2138,625 @@ async function runDelegate(passthrough) {
     const exitCode = typeof child.status === "number" ? child.status : 1
     console.log(`exit_code=${exitCode}`)
     if (child.error) console.log(`error=${child.error.message}`)
+    // Record evidence for executed delegation
+    await recordDelegationEvidence({
+      crew,
+      expertiseId: effectiveTarget,
+      taskDescription: task,
+      outcome: exitCode === 0 ? "success" : "failure",
+      durationMs: Date.now() - startTimeMs,
+      sourceAgent,
+      isExecuted: true
+    })
     return exitCode
   }
 
+  // Plan-only mode: record evidence that delegation was planned
+  await recordDelegationEvidence({
+    crew,
+    expertiseId: effectiveTarget,
+    taskDescription: task,
+    outcome: "success",
+    durationMs: 0,
+    sourceAgent,
+    isExecuted: false
+  })
+
   return 0
+}
+
+/**
+ * Record delegation evidence to the evidence store.
+ * @param {Object} params
+ */
+async function recordDelegationEvidence({ crew, expertiseId, taskDescription, outcome, durationMs, sourceAgent, isExecuted }) {
+  try {
+    const { recordEvidence } = await import("./expertise-evidence-store.mjs")
+    const { randomUUID } = await import("node:crypto")
+
+    // Map task description to task type via simple keyword detection
+    const taskLower = (taskDescription || "").toLowerCase()
+    /** @type {string} */
+    let taskType = "general"
+    if (taskLower.includes("implement") || taskLower.includes("build") || taskLower.includes("write") || taskLower.includes("code")) {
+      taskType = "code-generation"
+    } else if (taskLower.includes("test") || taskLower.includes("verify")) {
+      taskType = "testing"
+    } else if (taskLower.includes("review") || taskLower.includes("audit")) {
+      taskType = "review"
+    } else if (taskLower.includes("plan") || taskLower.includes("design") || taskLower.includes("architecture")) {
+      taskType = "planning"
+    } else if (taskLower.includes("deploy") || taskLower.includes("release")) {
+      taskType = "deployment"
+    }
+
+    const evidence = {
+      id: `ev-${Date.now()}-${randomUUID().slice(0, 8)}`,
+      expertise_id: `${crew}:${expertiseId}`,
+      outcome,
+      task_type: taskType,
+      task_description: taskDescription,
+      duration_ms: durationMs,
+      quality_signals: {
+        review_pass: outcome === "success" && isExecuted ? true : undefined,
+        rejection_count: outcome === "failure" ? 1 : 0
+      },
+      source_agent: sourceAgent,
+      source_session: process.env.MAH_SESSION_ID || "cli",
+      recorded_at: new Date().toISOString()
+    }
+
+    await recordEvidence(evidence)
+  } catch (err) {
+    // Evidence recording is best-effort — never block delegation output
+    console.error(`[expertise-evidence] failed to record evidence: ${err.message}`)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Expertise CLI (M4 — Registry + Operator UX)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse --crew, --json, and other common flags from argv.
+ * @param {string[]} argv
+ * @returns {{ crew: string, json: boolean, extras: string[] }}
+ */
+function parseExpertiseFlags(argv) {
+  const crew = parseValueArg(argv, '--crew') || process.env.MAH_ACTIVE_CREW || 'dev'
+  const json = argv.includes('--json')
+  // Strip flags from extras
+  const extras = argv.filter(a => !a.startsWith('--') || a === '--json' || a.startsWith('--crew') || a.startsWith('--limit'))
+  return { crew, json, extras }
+}
+
+/**
+ * Format confidence band with visual indicator.
+ * @param {string} band
+ * @returns {string}
+ */
+function formatBand(band) {
+  const map = { low: '🔵 low', medium: '🟡 medium', high: '🟢 high', critical: '🔴 critical' }
+  return map[band] || band
+}
+
+/**
+ * Format lifecycle state.
+ * @param {string} state
+ * @returns {string}
+ */
+function formatLifecycle(state) {
+  const map = { draft: '📝 draft', active: '✅ active', experimental: '🧪 experimental', restricted: '⚠️ restricted', deprecated: '🚫 deprecated' }
+  return map[state] || state
+}
+
+/**
+ * Format validation status.
+ * @param {string} status
+ * @returns {string}
+ */
+function formatValidation(status) {
+  const map = { declared: '📋 declared', observed: '👁 observed', validated: '✓ validated', restricted: '⚠ restricted', revoked: '✗ revoked' }
+  return map[status] || status
+}
+
+/**
+ * Run expertise subcommand.
+ * @param {string[]} argv
+ * @param {boolean} jsonMode
+ * @returns {Promise<number>} exit code
+ */
+async function runExpertise(argv, jsonMode = false) {
+  const sub = argv[0]
+  const subArgv = argv.slice(1)
+  const defaultCrew = process.env.MAH_ACTIVE_CREW || 'dev'
+
+  // Load expertise modules lazily
+  const { getRegistry } = await import('./expertise-registry.mjs')
+  const { loadExpertiseById } = await import('./expertise-loader.mjs')
+  const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
+  const { computeConfidence, mergeConfidence } = await import('./expertise-confidence.mjs')
+
+  const resolveExpertiseId = (targetId, crew = defaultCrew) => (
+    targetId?.includes(':') ? targetId : `${crew}:${targetId}`
+  )
+
+  const loadCanonicalExpertise = async (targetId, crew = defaultCrew) => {
+    const resolvedId = resolveExpertiseId(targetId, crew)
+    const expertise = await loadExpertiseById(resolvedId)
+    return { resolvedId, expertise }
+  }
+
+  // ------------------------------------------------------------------
+  // expertise list [--crew <crew>] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'list') {
+    const { crew, json } = parseExpertiseFlags(subArgv)
+    const registry = await getRegistry()
+    const entries = registry.entries.filter(e => !crew || e.id.startsWith(`${crew}:`) || e.id === crew)
+
+    if (json || jsonMode) {
+      console.log(JSON.stringify({ expertise: entries, count: entries.length }, null, 2))
+      return 0
+    }
+
+    if (entries.length === 0) {
+      console.log(`No expertise entries found${crew ? ` for crew '${crew}'` : ''}.`)
+      return 0
+    }
+
+    console.log(`=== Expertise Catalog${crew ? ` (crew: ${crew})` : ''} ===`)
+    console.log(`Total: ${entries.length} entries\n`)
+    console.log(`${'ID'.padEnd(30)} ${'Lifecycle'.padEnd(16)} ${'Band'.padEnd(14)} ${'Validation'.padEnd(14)} Owner`)
+    console.log(`${'─'.repeat(30)} ${'─'.repeat(16)} ${'─'.repeat(14)} ${'─'.repeat(14)} ${'─'.repeat(20)}`)
+
+    for (const entry of entries.sort((a, b) => a.id.localeCompare(b.id))) {
+      const id = entry.id.padEnd(30)
+      const lc = formatLifecycle(entry.lifecycle).padEnd(16)
+      const band = entry.confidence ? formatBand(entry.confidence.band).padEnd(14) : '—'.padEnd(14)
+      const validation = entry.validation_status ? formatValidation(entry.validation_status).padEnd(14) : '—'.padEnd(14)
+      const owner = entry.owner?.agent || entry.owner?.team || '—'
+      console.log(`${id} ${lc} ${band} ${validation} ${owner}`)
+    }
+
+    console.log(`\n${entries.length} expertise entries.`)
+    console.log("\nUse 'mah expertise show <id>' for details.")
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise show <id> [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'show') {
+    const targetId = parseValueArg(subArgv, '') || subArgv[0]
+    if (!targetId) {
+      console.error("ERROR: usage: mah expertise show <id>")
+      return 1
+    }
+
+    const { resolvedId, expertise: entry } = await loadCanonicalExpertise(targetId)
+
+    if (!entry) {
+      console.error(`ERROR: expertise '${targetId}' not found.`)
+      return 1
+    }
+
+    // Compute live metrics + confidence
+    let metrics = null
+    let confidence = null
+    try {
+      metrics = await computeMetrics(entry.id)
+      if (metrics && metrics.total_invocations > 0) {
+        confidence = mergeConfidence(entry.confidence, computeConfidence(metrics))
+      }
+    } catch { /* ignore */ }
+
+    if (!confidence) confidence = entry.confidence || null
+
+    if (jsonMode) {
+      console.log(JSON.stringify({ expertise: entry, metrics, confidence }, null, 2))
+      return 0
+    }
+
+    console.log(`=== Expertise: ${entry.id} ===\n`)
+    console.log(`Lifecycle:    ${formatLifecycle(entry.lifecycle)}`)
+    console.log(`Validation:   ${formatValidation(entry.validation_status || 'declared')}`)
+    if (confidence) {
+      console.log(`Confidence:   ${formatBand(confidence.band)} (${(confidence.score * 100).toFixed(0)}%)`)
+      console.log(`Evidence:     ${metrics?.evidence_count ?? confidence.evidence_count ?? 0} invocation(s)`)
+    } else {
+      console.log(`Confidence:  no evidence yet`)
+    }
+    console.log(`Owner:        ${entry.owner?.agent || entry.owner?.team || '—'}`)
+    console.log(`Environments: ${(entry.allowed_environments || []).join(', ') || 'all'}`)
+    console.log(`Trust tier:   ${entry.trust_tier || 'internal'}`)
+    if (entry.domains?.length) console.log(`Domains:      ${entry.domains.join(', ')}`)
+    if (entry.capabilities?.length) console.log(`Capabilities: ${entry.capabilities.map(c => c.name || c).join(', ')}`)
+
+    if (metrics && metrics.total_invocations > 0) {
+      console.log(`\n--- Metrics (${metrics.window_start?.slice(0, 10)} → ${metrics.window_end?.slice(0, 10)}) ---`)
+      console.log(`Invocations:   ${metrics.total_invocations} total, ${metrics.successful_invocations} success, ${metrics.failed_invocations} failed`)
+      console.log(`Success rate:  ${(metrics.review_pass_rate * 100).toFixed(0)}% review pass`)
+      console.log(`Avg latency:   ${(metrics.avg_duration_ms / 1000).toFixed(1)}s  (p95: ${(metrics.p95_duration_ms / 1000).toFixed(1)}s)`)
+      console.log(`Last invoked: ${metrics.last_invoked || 'never'}`)
+    }
+
+    console.log("\nUse 'mah expertise evidence " + resolvedId + "' for full event log.")
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise recommend --task "<task>" [--crew <crew>] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'recommend') {
+    const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
+    const { crew, json } = parseExpertiseFlags(subArgv)
+    const effectiveCrew = crew || defaultCrew
+
+    if (!task) {
+      console.error("ERROR: usage: mah expertise recommend --task '<task description>' [--crew <crew>]")
+      return 1
+    }
+
+    const sourceAgent = process.env.MAH_AGENT || 'orchestrator'
+    const { listDelegationTargets } = await import('./delegation-resolution.mjs')
+    const { scoreCandidates } = await import('./expertise-routing.mjs')
+
+    const listResult = listDelegationTargets({ crew: effectiveCrew, sourceAgent, repoRoot })
+    if (!listResult.ok || listResult.targets.length === 0) {
+      console.error(`ERROR: no valid delegation targets for crew '${crew}'`)
+      return 1
+    }
+
+    const allowedIds = listResult.targets
+    const candidates = (await Promise.all(allowedIds.map(async (agentId) => {
+      const expertise = await loadExpertiseById(resolveExpertiseId(agentId, effectiveCrew))
+      return expertise ? { id: agentId, expertise } : null
+    }))).filter(Boolean)
+
+    if (candidates.length === 0) {
+      console.error(`ERROR: no expertise entries found for crew '${crew}'`)
+      return 1
+    }
+
+    const scoringResult = scoreCandidates({
+      task,
+      sourceAgent,
+      candidates,
+      options: {}
+    })
+
+    if (json || jsonMode) {
+      console.log(JSON.stringify({
+        task,
+        crew: effectiveCrew,
+        selected: scoringResult.selected,
+        escalation: scoringResult.escalation,
+        fallback_reason: scoringResult.fallback_reason,
+        scores: scoringResult.scores,
+        candidates_count: candidates.length
+      }, null, 2))
+      return 0
+    }
+
+    console.log(`=== Expertise Recommendation ===\n`)
+    console.log(`Task: "${task}"`)
+    console.log(`Crew: ${effectiveCrew}\n`)
+
+    const sortedScores = Object.entries(scoringResult.scores || {})
+      .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
+
+    console.log(`Candidates (${candidates.length}):\n`)
+    for (const [id, scoreData] of sortedScores) {
+      const bar = scoreData?.final_score > 0
+        ? `█`.repeat(Math.round(scoreData.final_score * 10)).padEnd(10, '░')
+        : '░'.repeat(10)
+      const marker = id === scoringResult.selected ? '→ ' : '  '
+      console.log(`${marker}${bar} ${(scoreData?.final_score || 0).toFixed(3)}  ${id}`)
+    }
+
+    console.log('')
+    if (scoringResult.selected) {
+      console.log(`Recommended: ${scoringResult.selected} (score: ${(scoringResult.scores[scoringResult.selected]?.final_score || 0).toFixed(3)})`)
+    }
+    if (scoringResult.escalation) {
+      console.log(`⚠ Escalation: ${scoringResult.fallback_reason || 'score below threshold'}`)
+    }
+    console.log("\nUse 'mah expertise explain --task \"<task>\"' for full decision trace.")
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise evidence <id> [--limit N] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'evidence') {
+    const targetId = parseValueArg(subArgv, '') || subArgv[0]
+    const limitArg = parseValueArg(subArgv, '--limit') || subArgv.find(a => !a.startsWith('--') && a !== targetId)
+    const limit = limitArg ? parseInt(limitArg, 10) : 50
+
+    if (!targetId) {
+      console.error("ERROR: usage: mah expertise evidence <id> [--limit N]")
+      return 1
+    }
+
+    const events = await loadEvidenceFor(targetId, { limit })
+
+    if (jsonMode) {
+      console.log(JSON.stringify({ expertise_id: targetId, events, count: events.length }, null, 2))
+      return 0
+    }
+
+    if (events.length === 0) {
+      console.log(`No evidence events found for '${targetId}'.`)
+      return 0
+    }
+
+    const metrics = await computeMetrics(targetId)
+    console.log(`=== Evidence: ${targetId} ===\n`)
+    console.log(`${events.length} event(s)${metrics ? ` | success rate: ${((metrics.successful_invocations / metrics.total_invocations) * 100).toFixed(0)}% | avg: ${(metrics.avg_duration_ms / 1000).toFixed(1)}s` : ''}\n`)
+    console.log(`${'Time'.padEnd(25)} ${'Outcome'.padEnd(10)} ${'Type'.padEnd(16)} Duration  Task`)
+    console.log(`${'─'.repeat(25)} ${'─'.repeat(10)} ${'─'.repeat(16)} ${'─'.repeat(8)} ${'─'.repeat(30)}`)
+
+    for (const ev of events) {
+      const ts = ev.recorded_at?.slice(0, 19).replace('T', ' ') || '—'
+      const outcome = (ev.outcome === 'success' ? '✅ success' : ev.outcome === 'failure' ? '❌ failure' : '⚠ partial').padEnd(10)
+      const type = (ev.task_type || 'unknown').padEnd(16)
+      const dur = ev.duration_ms > 0 ? `${(ev.duration_ms / 1000).toFixed(1)}s` : '—'
+      const desc = (ev.task_description || '').slice(0, 40)
+      console.log(`${ts} ${outcome} ${type} ${dur.padEnd(8)} ${desc}`)
+    }
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise explain --task "<task>" [--crew <crew>] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'explain') {
+    const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
+    const { crew, json } = parseExpertiseFlags(subArgv)
+    const effectiveCrew = crew || defaultCrew
+
+    if (!task) {
+      console.error("ERROR: usage: mah expertise explain --task '<task>' [--crew <crew>]")
+      return 1
+    }
+
+    const sourceAgent = process.env.MAH_AGENT || 'orchestrator'
+    const { listDelegationTargets } = await import('./delegation-resolution.mjs')
+    const { scoreCandidates } = await import('./expertise-routing.mjs')
+
+    const listResult = listDelegationTargets({ crew: effectiveCrew, sourceAgent, repoRoot })
+    if (!listResult.ok) {
+      console.error(`ERROR: ${listResult.error}`)
+      return 1
+    }
+
+    const candidates = (await Promise.all(listResult.targets.map(async (agentId) => {
+      const expertise = await loadExpertiseById(resolveExpertiseId(agentId, effectiveCrew))
+      return expertise ? { id: agentId, expertise } : null
+    }))).filter(Boolean)
+
+    const scoringResult = scoreCandidates({
+      task,
+      sourceAgent,
+      candidates,
+      options: {}
+    })
+
+    if (json || jsonMode) {
+      console.log(JSON.stringify({
+        task,
+        crew: effectiveCrew,
+        source_agent: sourceAgent,
+        routing: scoringResult,
+        explain: {
+          filters_run: scoringResult.explain?.filters_run || [],
+          blocking: scoringResult.explain?.blocking || {},
+          scoring_summary: scoringResult.explain?.scoring_summary || `${Object.keys(scoringResult.scores || {}).length} candidates scored`
+        }
+      }, null, 2))
+      return 0
+    }
+
+    console.log(`=== Expertise Routing Trace ===\n`)
+    console.log(`Task: "${task}"`)
+    console.log(`Source: ${sourceAgent}  |  Crew: ${effectiveCrew}\n`)
+
+    console.log('── Decision Filters ──')
+    console.log('  [1] policy/topology allowed set')
+    console.log('  [2] environment compatibility')
+    console.log('  [3] trust tier requirement')
+    console.log('  [4] lifecycle blocking (restricted/revoked)')
+    console.log('  [5] expertise match score')
+    console.log('  [6] confidence + evidence freshness\n')
+
+    const sorted = Object.entries(scoringResult.scores || {})
+      .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
+
+    console.log('── Scoring Breakdown ──')
+    for (const [id, scoreData] of sorted) {
+      if (!scoreData) continue
+      console.log(`\n  ${id}:`)
+      console.log(`    expertise_match: ${scoreData.match_score?.toFixed(3) || '—'}`)
+      console.log(`    confidence_adj:  ${scoreData.confidence_adjustment?.toFixed(3) || '—'}`)
+      console.log(`    penalty:         ${scoreData.penalty?.toFixed(3) || '—'}`)
+      console.log(`    ─ final:         ${scoreData.final_score?.toFixed(3) || '—'}`)
+      if (scoreData.penalties_applied?.length) {
+        console.log(`    penalties:       ${scoreData.penalties_applied.join(', ')}`)
+      }
+      if (scoreData.blocked_filters?.length) {
+        console.log(`    BLOCKED: ${scoreData.blocked_filters.join('; ')}`)
+      }
+    }
+
+    console.log('\n── Decision ──')
+    if (scoringResult.selected) {
+      const topScore = scoringResult.scores[scoringResult.selected]
+      console.log(`  Selected: ${scoringResult.selected}`)
+      console.log(`  Score: ${(topScore?.final_score || 0).toFixed(3)}`)
+      if (topScore?.confidence_band) console.log(`  Confidence band: ${topScore.confidence_band}`)
+    }
+    if (scoringResult.escalation) {
+      console.log(`  ⚠ ESCALATION RECOMMENDED: ${scoringResult.fallback_reason}`)
+    }
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise export <id> [--output <path>] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'export') {
+    const targetId = parseValueArg(subArgv, '') || subArgv[0]
+    const outputPath = parseValueArg(subArgv, '--output') || ''
+    const domain = parseValueArg(subArgv, '--domain') || ''
+    const normalizedId = resolveExpertiseId(targetId)
+
+    if (!targetId) {
+      console.error("ERROR: usage: mah expertise export <id> [--output <path>] [--domain <domain>]")
+      return 1
+    }
+
+    const { exportExpertiseToFile } = await import('./expertise-export.mjs')
+
+    if (outputPath) {
+      const result = await exportExpertiseToFile(normalizedId, outputPath, { domain })
+      if (!result.ok) {
+        console.error(`ERROR: export failed: ${result.errors.join('; ')}`)
+        return 1
+      }
+      if (jsonMode) {
+        console.log(JSON.stringify({ ok: true, id: normalizedId, output: outputPath, warnings: result.errors }, null, 2))
+      } else {
+        console.log(`✓ Exported '${normalizedId}' to '${outputPath}'`)
+        if (result.errors.length) console.log(`  warnings: ${result.errors.join(', ')}`)
+      }
+      return 0
+    }
+
+    // Interactive export to stdout
+    const { expertise: entry } = await loadCanonicalExpertise(targetId)
+    if (!entry) {
+      console.error(`ERROR: expertise '${targetId}' not found in catalog`)
+      return 1
+    }
+
+    const { exportExpertise } = await import('./expertise-export.mjs')
+    const result = exportExpertise(entry, { domain, skipPolicy: false })
+    if (!result.ok) {
+      console.error(`ERROR: export blocked by policy: ${result.error}`)
+      return 1
+    }
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result.payload, null, 2))
+    } else {
+      console.log(`=== Expertise Export: ${normalizedId} ===`)
+      console.log(JSON.stringify(result.payload, null, 2))
+      if (result.warnings?.length) console.log(`\n⚠ warnings: ${result.warnings.join(', ')}`)
+    }
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise import <file> [--dry-run] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'import') {
+    const filePath = parseValueArg(subArgv, '') || subArgv[0]
+    const dryRun = subArgv.includes('--dry-run')
+
+    if (!filePath) {
+      console.error("ERROR: usage: mah expertise import <file> [--dry-run]")
+      return 1
+    }
+
+    const { loadImportFile, importExpertise } = await import('./expertise-export.mjs')
+
+    const loadResult = await loadImportFile(filePath, { dryRun })
+    if (!loadResult.valid) {
+      if (jsonMode) {
+        console.log(JSON.stringify({ ok: false, errors: loadResult.errors, warnings: loadResult.warnings }, null, 2))
+      } else {
+        console.error(`ERROR: import validation failed:`)
+        for (const err of loadResult.errors) console.error(`  - ${err}`)
+        if (loadResult.warnings.length) console.log(`warnings: ${loadResult.warnings.join(', ')}`)
+      }
+      return 1
+    }
+
+    const impResult = importExpertise(loadResult.payload, { dryRun })
+
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        ok: true,
+        dry_run: dryRun,
+        imported: impResult.imported?.id,
+        message: impResult.message,
+        warnings: loadResult.warnings,
+      }, null, 2))
+    } else {
+      if (dryRun) {
+        console.log(`=== Import Dry-Run: ${loadResult.payload.id} ===`)
+        console.log(`  status: VALID (would import)`)
+        console.log(`  id:       ${loadResult.payload.id}`)
+        console.log(`  owner:    ${loadResult.payload.owner?.agent || loadResult.payload.owner?.team || '?'}`)
+        console.log(`  domains:  ${(loadResult.payload.domains || []).join(', ')}`)
+        console.log(`  policy:   federated_allowed=${loadResult.payload.policy?.federated_allowed ?? false}, approval_required=${loadResult.payload.policy?.approval_required ?? false}`)
+        if (loadResult.warnings.length) console.log(`\n⚠ warnings: ${loadResult.warnings.join(', ')}`)
+      } else {
+        console.log(`✓ Import validated: '${loadResult.payload.id}' (write not yet implemented — see message below)`)
+        console.log(`  note: ${impResult.message}`)
+      }
+    }
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise --help
+  // ------------------------------------------------------------------
+  if (sub === '--help' || sub === '-h' || sub === 'help' || !sub) {
+    console.log(`
+mah expertise — Expertise Catalog CLI (v0.7.0)
+
+Usage:
+  mah expertise list                        List all expertise entries
+  mah expertise list --crew <crew>         List expertise for a specific crew
+  mah expertise list --json                 JSON output
+
+  mah expertise show <id>                   Show detailed expertise entry
+  mah expertise show <id> --json            JSON output
+
+  mah expertise recommend --task '<desc>'   Recommend best candidate for task
+  mah expertise recommend --task '<desc>' --json   JSON output
+
+  mah expertise evidence <id>               Show evidence events for expertise
+  mah expertise evidence <id> --limit 20   Limit to 20 events
+  mah expertise evidence <id> --json        JSON output
+
+  mah expertise explain --task '<desc>'     Full routing decision trace
+  mah expertise explain --task '<desc>' --json   JSON output
+
+  mah expertise export <id>                 Export expertise to JSON
+  mah expertise export <id> --output <path>  Write to file
+  mah expertise export <id> --domain <domain>  Check domain policy
+  mah expertise export <id> --json          JSON output
+
+  mah expertise import <file>               Import expertise from JSON file
+  mah expertise import <file> --dry-run     Validate without writing
+
+Examples:
+  mah expertise list --crew dev
+  mah expertise show dev:backend-dev
+  mah expertise recommend --task "implement user authentication API"
+  mah expertise evidence dev:backend-dev --limit 10
+  mah expertise export dev:backend-dev --output .mah/expertise/exported/backend-dev.json
+  mah expertise import .mah/expertise/exported/backend-dev.json --dry-run
+`)
+    return 0
+  }
+
+  console.error(`ERROR: unknown expertise subcommand '${sub}'`)
+  console.error("Use 'mah expertise --help' for usage.")
+  return 1
 }
 
 function main() {
@@ -2065,6 +2855,13 @@ function main() {
     return
   }
 
+  if (first === "expertise") {
+    ;(async () => {
+      process.exitCode = await runExpertise(argv.slice(1), jsonMode)
+    })()
+    return
+  }
+
   if (first === "demo") {
     process.exitCode = runDemo(normalizedArgv.slice(1))
     return
@@ -2113,6 +2910,24 @@ function main() {
       return
     }
     process.exitCode = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    return
+  }
+
+  if (first === "validate:expertise") {
+    const expertiseArgs = argv.slice(1).filter((arg) => arg !== "--json")
+    if (jsonMode) {
+      const captured = runLocalScriptCapture(path.join("scripts", "expertise-validate.mjs"), [...expertiseArgs, "--json"])
+      let jsonPayload = null
+      try { jsonPayload = JSON.parse(captured.stdout || "{}") } catch { jsonPayload = null }
+      printDiagnosticPayload(createDiagnosticPayload("validate:expertise", {
+        status: captured.status,
+        data: jsonPayload || { stdout: captured.stdout.trim() },
+        errors: captured.status === 0 ? [] : ["expertise-validation-failed"]
+      }))
+      process.exitCode = captured.status
+      return
+    }
+    process.exitCode = runLocalScript(path.join("scripts", "expertise-validate.mjs"), expertiseArgs)
     return
   }
 
@@ -2179,9 +2994,12 @@ function main() {
       const runtime = runtimeResult.runtime
         ? dispatchCapture(runtimeResult.runtime, "check:runtime", [])
         : { status: 0, stdout: "", stderr: "skipped: no runtime detected" }
-      const status = config.status !== 0 ? config.status : sync.status !== 0 ? sync.status : runtime.status
+      const expertise = runLocalScriptCapture(path.join("scripts", "expertise-validate.mjs"), ["--json"])
+      const status = config.status !== 0 ? config.status : sync.status !== 0 ? sync.status : runtime.status !== 0 ? runtime.status : expertise.status
       let syncJson = null
+      let expertiseJson = null
       try { syncJson = JSON.parse(sync.stdout || "{}") } catch { syncJson = null }
+      try { expertiseJson = JSON.parse(expertise.stdout || "{}") } catch { expertiseJson = null }
       printDiagnosticPayload(createDiagnosticPayload("validate:all", {
         status,
         runtime: runtimeResult.runtime || "",
@@ -2190,7 +3008,8 @@ function main() {
           checks: {
             config: { status: config.status, stdout: config.stdout.trim(), stderr: config.stderr.trim() },
             sync: { status: sync.status, report: syncJson, stdout: sync.stdout.trim(), stderr: sync.stderr.trim() },
-            runtime: { status: runtime.status, stdout: runtime.stdout.trim(), stderr: runtime.stderr.trim() }
+            runtime: { status: runtime.status, stdout: runtime.stdout.trim(), stderr: runtime.stderr.trim() },
+            expertise: { status: expertise.status, report: expertiseJson, stdout: expertise.stdout.trim(), stderr: expertise.stderr.trim() },
           }
         },
         errors: status === 0 ? [] : ["composed-validation-failed"]
@@ -2279,6 +3098,207 @@ function main() {
         return
       }
     }
+
+// --- explain delegate ---
+    if (explainCommand === "delegate") {
+      ;(async () => {
+        const target = parseValueArg(normalizedArgv.slice(2), "--target")
+        const task = parseValueArg(normalizedArgv.slice(2), "--task")
+        const crew = parseValueArg(normalizedArgv.slice(2), "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+
+        if (!target || !task) {
+          if (jsonMode) {
+            printDiagnosticPayload(createDiagnosticPayload("explain", {
+              status: 1,
+              command: "delegate",
+              errors: ["--target and --task are required"]
+            }))
+          } else {
+            console.error("ERROR: explain delegate requires --target and --task")
+            console.error("Usage: mah explain delegate --target <agent> --task '<description>' [--crew <crew>] [--trace] [--json]")
+          }
+          process.exitCode = 1
+          return
+        }
+
+        const sourceAgent = process.env.MAH_AGENT || "orchestrator"
+
+        // Load delegation-resolution helpers (only listDelegationTargets and resolveDelegationTarget are exported)
+        let listDelegationTargets
+        try {
+          const dr = await import("./delegation-resolution.mjs")
+          listDelegationTargets = dr.listDelegationTargets
+        } catch (err) {
+          if (jsonMode) {
+            printDiagnosticPayload(createDiagnosticPayload("explain", {
+              status: 1,
+              command: "delegate",
+              errors: ["delegation-resolution.mjs not available: " + err.message]
+            }))
+          } else {
+            console.error("ERROR: delegation-resolution.mjs not available — " + err.message)
+          }
+          process.exitCode = 1
+          return
+        }
+
+        // Load meta config to get crew (crews is array, find by id)
+        const crewData = readMetaConfig(repoRoot)
+        const crewObj = Array.isArray(crewData?.crews)
+          ? crewData.crews.find(c => c.id === crew)
+          : crewData?.crews?.[crew]
+        if (!crewObj) {
+          if (jsonMode) {
+            printDiagnosticPayload(createDiagnosticPayload("explain", {
+              status: 1,
+              command: "delegate",
+              errors: [`crew '${crew}' not found in meta-agents.yaml`]
+            }))
+          } else {
+            console.error(`ERROR: crew '${crew}' not found in meta-agents.yaml`)
+          }
+          process.exitCode = 1
+          return
+        }
+
+        // Use listDelegationTargets to get role + valid targets
+        const dlResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
+        if (!dlResult.ok) {
+          if (jsonMode) {
+            printDiagnosticPayload(createDiagnosticPayload("explain", {
+              status: 1,
+              command: "delegate",
+              errors: [dlResult.error || "failed to resolve delegation targets"]
+            }))
+          } else {
+            console.error(`ERROR: ${dlResult.error || "failed to resolve delegation targets"}`)
+          }
+          process.exitCode = 1
+          return
+        }
+
+        const validTargets = dlResult.targets
+
+        if (validTargets.length === 0) {
+          if (jsonMode) {
+            printDiagnosticPayload(createDiagnosticPayload("explain", {
+              status: 0,
+              command: "delegate",
+              data: {
+                task,
+                source_agent: sourceAgent,
+                routing: { candidates_count: 0, filtered_count: 0, scores: {}, selected: null, escalation: false, fallback_reason: "no_valid_targets" },
+                explain: { filters_run: [], blocking: {}, scoring_summary: "no valid delegation targets for this role" }
+              }
+            }))
+          } else {
+            console.log("=== Expertise Routing Trace ===")
+            console.log(`Task: "${task}"`)
+            console.log(`Source: ${sourceAgent}`)
+            console.log(`Candidates considered: 0 (no policy-allowed targets)`)
+            console.log(`Selected: none`)
+            console.log(`Escalation: YES (no valid targets)`)
+            console.log(`Fallback: manual assignment required`)
+          }
+          process.exitCode = 0
+          return
+        }
+
+        // Load expertise-routing for scoreCandidates
+        let scoreCandidates
+        try {
+          const er = await import("./expertise-routing.mjs")
+          scoreCandidates = er.scoreCandidates
+        } catch (err) {
+          if (jsonMode) {
+            printDiagnosticPayload(createDiagnosticPayload("explain", {
+              status: 1,
+              command: "delegate",
+              errors: ["expertise-routing.mjs not available: " + err.message]
+            }))
+          } else {
+            console.error("ERROR: expertise-routing.mjs not available — " + err.message)
+            console.error("       Run: node scripts/expertise-routing.mjs to verify the module exists.")
+          }
+          process.exitCode = 1
+          return
+        }
+
+        // Build expertise objects from valid targets
+        const candidates = validTargets.map(id => {
+          const agentEntry = crewObj.topology?.agents?.[id] || crewObj.agents?.find(a => a.id === id)
+          return {
+            id,
+            expertise: agentEntry ? {
+              domains: agentEntry.domains || [],
+              capabilities: agentEntry.capabilities || [],
+              validation_status: agentEntry.validation_status || "declared"
+            } : { domains: [], capabilities: [], validation_status: "declared" }
+          }
+        })
+
+        const scoringResult = scoreCandidates({
+          task,
+          sourceAgent,
+          candidates,
+          options: { allowed_environments: ["production", "staging", "development"] }
+        })
+
+        const routingPayload = {
+          candidates_count: validTargets.length,
+          filtered_count: validTargets.length - Object.values(scoringResult.scores).filter(s => s.final_score > 0).length,
+          scores: scoringResult.scores,
+          selected: scoringResult.selected || null,
+          selection_reason: scoringResult.explain?.selected_reason || "",
+          escalation: scoringResult.escalation,
+          fallback_reason: scoringResult.fallback_reason || null
+        }
+
+        if (jsonMode) {
+          printDiagnosticPayload(createDiagnosticPayload("explain", {
+            status: 0,
+            command: "delegate",
+            data: {
+              schema_version: "mah.expertise.v1",
+              task,
+              source_agent: sourceAgent,
+              routing: routingPayload,
+              explain: {
+                filters_run: scoringResult.explain?.filters_run || [],
+                blocking: scoringResult.explain?.blocking || {},
+                scoring_summary: scoringResult.explain?.scoring_summary || ""
+              }
+            }
+          }))
+        } else {
+          // Console trace output
+          console.log("=== Expertise Routing Trace ===")
+          console.log(`Task: "${task}"`)
+          console.log(`Source: ${sourceAgent}`)
+          console.log(`Candidates considered: ${validTargets.length} (all policy/topology-allowed)`)
+          console.log("")
+          console.log("Filters applied:")
+
+          for (const [id, score] of Object.entries(scoringResult.scores)) {
+            if (score.blocked_filters?.length) {
+              console.log(`  ✗ ${id}: blocked — ${score.blocked_filters.join(", ")}`)
+            } else {
+              const caps = candidates.find(c => c.id === id)?.expertise?.capabilities || []
+              console.log(`  ✓ ${id}: match=${score.match_score?.toFixed(2) || "0.00"} + conf_adj=${score.confidence_adjustment != null ? score.confidence_adjustment.toFixed(2) : "0.00"} + penalty=${score.penalty != null ? score.penalty.toFixed(2) : "0.00"} → final=${score.final_score?.toFixed(2) || "0.00"}${caps.length ? ` [capabilities: ${caps.join(", ")}]` : ""}`)
+            }
+          }
+          console.log("")
+          console.log(`Selected: ${routingPayload.selected || "none"} (score=${routingPayload.selected ? scoringResult.scores[routingPayload.selected]?.final_score?.toFixed(2) || "0.00" : "n/a"})`)
+          console.log(`Escalation: ${routingPayload.escalation ? "YES" : "NO"} (score ${routingPayload.escalation ? "<" : ">="} threshold)`)
+          if (routingPayload.fallback_reason) {
+            console.log(`Fallback: ${routingPayload.fallback_reason}`)
+          }
+        }
+        process.exitCode = 0
+      })()
+      return
+    }
+
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
       const passthrough = normalizedArgv.slice(2)
 

@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
+## [0.7.0] - 2026-04-16
+
+### Added
+- Expertise Engine core modules for schema validation, catalog loading, registry generation, routing, evidence storage, confidence scoring, lifecycle control, export, and validation
+- `mah expertise` command group with `list`, `show`, `recommend`, `evidence`, `explain`, and `export` flows
+- Expertise contract and integration coverage for M3, M4, M5, routing, CLI, and export/import behavior
+
+### Changed
+- Expertise CLI flows now resolve canonical catalog documents by expertise id instead of operating on registry summary refs
+- Explainability output for `mah expertise explain` and `mah explain delegate` now reflects the routing engine's real score model and blocking metadata
+- Expertise metrics/schema/type contracts are now aligned with the evidence aggregation model used by the runtime
+
+### Fixed
+- `mah expertise show` and `mah expertise export` now preserve canonical governance fields such as `allowed_environments`, `metadata`, `policy`, and declared ownership
+- Registry path derivation now uses source-file provenance when available and falls back to the correct `.mah/expertise/catalog/<crew>/<name>.yaml` layout
+- `mah validate:expertise` now forwards passthrough flags correctly, including owner-filtered validation runs
+- `validate:expertise --owner <agent>` now works with the v0.7 owner object model and `metadata.owner_id`
+- Lifecycle transition `experimental -> active` now enforces `review_pass_rate >= 0.8` instead of using a placeholder approval path
+- Legacy expertise normalization now emits a v0.7-compatible shape for `owner`, `confidence`, `policy`, `input_contract`, and `evidence_refs`
+- CLI explain traces no longer render missing score placeholders such as `expertise_match: —` or `score=n/a` for valid routing decisions
+
+### Validation
+- Verified with:
+  - `node --test tests/expertise-contract.test.mjs tests/expertise-m3.test.mjs tests/expertise-routing.test.mjs tests/expertise-cli-m4.test.mjs tests/expertise-m5-export.test.mjs`
+
 ## [0.6.1] - 2026-04-16
 
 ### Added
