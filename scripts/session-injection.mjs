@@ -122,8 +122,15 @@ ${session.provenance.map(p => `- ${p.event}: ${p.timestamp}`).join("\n")}`,
  * @param {object} options
  * @returns {Promise<InjectionPayload>}
  */
-export async function buildInjectionPayload(repoRoot, sourceSession, targetRuntime, fidelityLevel = DEFAULT_FIDELITY_LEVEL, options = {}) {
-  const targetAdapter = RUNTIME_ADAPTERS[targetRuntime]
+export async function buildInjectionPayload(
+  repoRoot,
+  sourceSession,
+  targetRuntime,
+  fidelityLevel = DEFAULT_FIDELITY_LEVEL,
+  options = {}
+) {
+  const runtimeRegistry = options.runtimeRegistry || RUNTIME_ADAPTERS
+  const targetAdapter = runtimeRegistry[targetRuntime]
   
   if (!targetAdapter) {
     throw new Error(`Unknown target runtime: ${targetRuntime}`)
@@ -175,7 +182,13 @@ export function saveProjection(repoRoot, payload) {
  * @param {object} options
  * @returns {Promise<{ ok: boolean, payload?: InjectionPayload, path?: string, error?: string }>}
  */
-export async function injectSessionContext(repoRoot, sourceSession, targetRuntime, fidelityLevel = DEFAULT_FIDELITY_LEVEL, options = {}) {
+export async function injectSessionContext(
+  repoRoot,
+  sourceSession,
+  targetRuntime,
+  fidelityLevel = DEFAULT_FIDELITY_LEVEL,
+  options = {}
+) {
   try {
     const payload = await buildInjectionPayload(repoRoot, sourceSession, targetRuntime, fidelityLevel, options)
     const saveResult = saveProjection(repoRoot, payload)

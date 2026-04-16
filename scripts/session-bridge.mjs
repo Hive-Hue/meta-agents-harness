@@ -28,6 +28,7 @@ import { RUNTIME_ADAPTERS } from "./runtime-adapters.mjs"
  */
 export async function bridgeSession(repoRoot, sourceSessionId, targetRuntime, options = {}) {
   const { fidelityLevel = "contextual", targetCrew, targetAgent } = options
+  const runtimeRegistry = options.runtimeRegistry || RUNTIME_ADAPTERS
   
   // Parse source session ID
   const parsed = parseSessionId(sourceSessionId)
@@ -36,26 +37,32 @@ export async function bridgeSession(repoRoot, sourceSessionId, targetRuntime, op
   }
   
   // Get source session reference
-  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, RUNTIME_ADAPTERS)
+  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, runtimeRegistry)
   const sessionRef = sessions.find(s => s.id === sourceSessionId)
   if (!sessionRef) {
     return { ok: false, error: `source session not found: ${sourceSessionId}` }
   }
   
   // Verify target runtime is valid
-  const targetAdapter = RUNTIME_ADAPTERS[targetRuntime]
+  const targetAdapter = runtimeRegistry[targetRuntime]
   if (!targetAdapter) {
     return { ok: false, error: `unknown target runtime: ${targetRuntime}` }
   }
   
   // Step 1: Export source session (mah-json)
-  const exportResult = await exportSession(repoRoot, sourceSessionId, "mah-json")
+  const exportResult = await exportSession(repoRoot, sourceSessionId, "mah-json", runtimeRegistry)
   if (!exportResult.ok) {
     return { ok: false, error: `export failed: ${exportResult.error}` }
   }
   
   // Step 2: Build injection payload
-  const injectResult = await injectSessionContext(repoRoot, exportResult.session, targetRuntime, fidelityLevel)
+  const injectResult = await injectSessionContext(
+    repoRoot,
+    exportResult.session,
+    targetRuntime,
+    fidelityLevel,
+    { runtimeRegistry }
+  )
   if (!injectResult.ok) {
     return { ok: false, error: `injection failed: ${injectResult.error}` }
   }

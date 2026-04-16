@@ -117,7 +117,7 @@ test("resolveDelegationTarget reroutes orchestrator -> worker through owning lea
   }
 })
 
-test("delegateAgent executes the MAH CLI with autonomous mode", async () => {
+test("delegateAgent executes through the MAH delegate pipeline", async () => {
   const repoRoot = createFixtureRepo()
   try {
     let captured = null
@@ -147,9 +147,11 @@ test("delegateAgent executes the MAH CLI with autonomous mode", async () => {
     assert.equal(result.ok, true)
     assert.equal(result.effective_target, "engineering_lead")
     assert.equal(captured.command, process.execPath)
-    assert.equal(captured.execOptions.env.MAH_CODEX_AUTONOMOUS, "1")
-    assert.match(captured.args.join(" "), /--runtime codex/)
-    assert.match(captured.args.join(" "), /--agent engineering_lead/)
+    assert.equal(captured.execOptions.env.MAH_ACTIVE_CREW, "dev")
+    assert.deepEqual(captured.args.slice(0, 2), ["scripts/meta-agents-harness.mjs", "delegate"])
+    assert.match(captured.args.join(" "), /--target engineering_lead/)
+    assert.match(captured.args.join(" "), /--task/)
+    assert.match(captured.args.join(" "), /--execute/)
   } finally {
     rmSync(repoRoot, { recursive: true, force: true })
   }

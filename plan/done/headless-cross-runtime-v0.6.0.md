@@ -184,7 +184,7 @@ prepareHeadlessRunContext(context): {
 - `scripts/runtime-adapter-contract.mjs`
 - `scripts/meta-agents-harness.mjs`
 - `scripts/runtime-core-integrations.mjs`
-- `plugins/codex/index.mjs`
+- `plugins/runtime-codex/index.mjs`
 - `plugins/runtime-claude/index.mjs`
 - `plugins/runtime-opencode/index.mjs`
 - `plugins/runtime-hermes/index.mjs`

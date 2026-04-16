@@ -81,6 +81,7 @@ Or error:
 - **PI**: headless supported (`promptMode=argv`, `outputMode=stdout`)
 - **Claude**: headless supported (`promptMode=argv`, `outputMode=stdout`)
 - **OpenCode**: headless supported (`promptMode=argv`, `outputMode=stdout`)
+- **Kilo plugin**: headless supported (`promptMode=argv`, `outputMode=stdout`)
 - **Hermes**: headless supported but session-gated (`requiresSession=true`, `outputMode=mixed`)
 - **Codex plugin**: currently declares headless unsupported
 
@@ -98,6 +99,7 @@ Run runtime-specific tests:
 node --test tests/headless-pi.test.mjs
 node --test tests/headless-claude.test.mjs
 node --test tests/headless-opencode.test.mjs
+node --test tests/headless-kilo.test.mjs
 node --test tests/headless-hermes.test.mjs
 node --test tests/headless-codex.test.mjs
 ```

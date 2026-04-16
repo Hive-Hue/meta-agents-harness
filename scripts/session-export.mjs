@@ -110,6 +110,7 @@ export function buildMahSessionEnvelope(sessionRef) {
  * @returns {Promise<{ok: boolean, path?: string, error?: string}>}
  */
 export async function exportSessionMahJson(repoRoot, sessionIdFull, options = {}) {
+  const runtimeRegistry = options.runtimeRegistry || RUNTIME_ADAPTERS
   const { collectSessions, parseSessionId: parse } = await import("./m3-ops.mjs")
   
   const parsed = parse(sessionIdFull)
@@ -117,7 +118,7 @@ export async function exportSessionMahJson(repoRoot, sessionIdFull, options = {}
     return { ok: false, error: `invalid session ID format: ${sessionIdFull}` }
   }
   
-  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, RUNTIME_ADAPTERS)
+  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, runtimeRegistry)
   const sessionRef = sessions.find(s => s.id === sessionIdFull)
   if (!sessionRef) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
@@ -150,7 +151,8 @@ export async function exportSessionMahJson(repoRoot, sessionIdFull, options = {}
  * @param {string} sessionIdFull
  * @returns {Promise<{ok: boolean, path?: string, error?: string}>}
  */
-export async function exportSessionSummaryMd(repoRoot, sessionIdFull) {
+export async function exportSessionSummaryMd(repoRoot, sessionIdFull, options = {}) {
+  const runtimeRegistry = options.runtimeRegistry || RUNTIME_ADAPTERS
   const { collectSessions, parseSessionId: parse } = await import("./m3-ops.mjs")
   
   const parsed = parse(sessionIdFull)
@@ -158,7 +160,7 @@ export async function exportSessionSummaryMd(repoRoot, sessionIdFull) {
     return { ok: false, error: `invalid session ID format: ${sessionIdFull}` }
   }
   
-  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, RUNTIME_ADAPTERS)
+  const sessions = collectSessions(repoRoot, { runtime: parsed.runtime }, runtimeRegistry)
   const sessionRef = sessions.find(s => s.id === sessionIdFull)
   if (!sessionRef) {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
@@ -205,9 +207,10 @@ _Exported from MAH v0.6.0 at ${new Date().toISOString()}_
  * @param {string} sessionIdFull
  * @returns {Promise<{ok: boolean, path?: string, error?: string}>}
  */
-export async function exportSessionRaw(repoRoot, sessionIdFull) {
+export async function exportSessionRaw(repoRoot, sessionIdFull, options = {}) {
+  const runtimeRegistry = options.runtimeRegistry || RUNTIME_ADAPTERS
   const { exportSession } = await import("./m3-ops.mjs")
-  return exportSession(repoRoot, sessionIdFull, RUNTIME_ADAPTERS)
+  return exportSession(repoRoot, sessionIdFull, runtimeRegistry)
 }
 
 /**
@@ -217,14 +220,14 @@ export async function exportSessionRaw(repoRoot, sessionIdFull) {
  * @param {"mah-json"|"summary-md"|"runtime-raw"} format
  * @returns {Promise<{ok: boolean, path?: string, error?: string, session?: object}>}
  */
-export async function exportSession(repoRoot, sessionIdFull, format = "mah-json") {
+export async function exportSession(repoRoot, sessionIdFull, format = "mah-json", runtimeRegistry = RUNTIME_ADAPTERS) {
   switch (format) {
     case "mah-json":
-      return exportSessionMahJson(repoRoot, sessionIdFull)
+      return exportSessionMahJson(repoRoot, sessionIdFull, { runtimeRegistry })
     case "summary-md":
-      return exportSessionSummaryMd(repoRoot, sessionIdFull)
+      return exportSessionSummaryMd(repoRoot, sessionIdFull, { runtimeRegistry })
     case "runtime-raw":
-      return exportSessionRaw(repoRoot, sessionIdFull)
+      return exportSessionRaw(repoRoot, sessionIdFull, { runtimeRegistry })
     default:
       return { ok: false, error: `unknown export format: ${format}` }
   }

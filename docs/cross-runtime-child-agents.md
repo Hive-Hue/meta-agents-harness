@@ -41,6 +41,10 @@ The runtime where the child agent will actually execute.
 
 ## Usage
 
+### Logical Delegation API
+
+Use a single logical delegation call (`delegate_agent` / `mah_delegate_agent`) and let MAH resolve execution mode and runtime adapter.
+
 ### CLI
 
 ```bash
@@ -53,6 +57,8 @@ mah delegate --target backend-dev --runtime codex --task "Implement the parser"
 # Show delegation plan
 mah explain delegate --target backend-dev --runtime codex --task "..."
 ```
+
+`--runtime` is an optional execution hint. Authorization remains topology-based.
 
 ## Policy Rules
 

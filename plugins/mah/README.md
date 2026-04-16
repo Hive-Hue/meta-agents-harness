@@ -73,7 +73,7 @@ This plugin is responsible for:
 
 - reporting active MAH runtime context
 - listing the valid delegation topology for the current agent
-- dispatching explicit delegation requests through the MAH CLI
+- dispatching logical delegation requests through the MAH CLI delegation pipeline
 
 ## Tools
 
@@ -105,14 +105,15 @@ Receives:
 
 - `target`
 - `task`
+- optional `target_runtime`
 - optional `include_full_output`
 
 Behavior:
 
 - validates the target against the active crew graph
 - reroutes orchestrator-to-worker requests through the owning lead
-- executes `node scripts/meta-agents-harness.mjs run --runtime codex --agent <target> <task>`
-- forces autonomous execution with `MAH_CODEX_AUTONOMOUS=1`
+- executes `node scripts/meta-agents-harness.mjs delegate --target <effective-target> [--runtime <target_runtime>] --task <task> --execute`
+- lets MAH select native same-runtime or cross-runtime sidecar adapter
 - returns target resolution, status, elapsed time, summary, and optional full output
 
 ## Notes

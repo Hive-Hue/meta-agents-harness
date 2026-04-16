@@ -133,7 +133,7 @@ Slice 0 correctly identified that all runtimes were "unsupported" in their **plu
 
 ---
 
-### Priority 5 — Codex (`plugins/codex/index.mjs`)
+### Priority 5 — Codex (`plugins/runtime-codex/index.mjs`)
 
 **Why last**: Most complex. Uses MCP server config (`-c`) for context injection. No built-in implementation to port.
 
@@ -265,7 +265,7 @@ capabilities: {
 // prepareHeadlessRunContext: replace stub with port of prepareHermesHeadlessRunContext
 ```
 
-### `plugins/codex/index.mjs`
+### `plugins/runtime-codex/index.mjs`
 ```js
 // Before
 capabilities: {

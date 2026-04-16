@@ -14,6 +14,7 @@ function defaultExec(command, args, execOptions) {
 export async function delegateAgentHandler(args = {}, options = {}) {
   const target = `${args?.target || ""}`.trim()
   const task = `${args?.task || ""}`.trim()
+  const targetRuntime = `${args?.target_runtime || ""}`.trim()
   const includeFullOutput = args?.include_full_output === true
   const state = loadActiveContext({
     repoRoot: options.repoRoot,
@@ -61,21 +62,20 @@ export async function delegateAgentHandler(args = {}, options = {}) {
     process.execPath,
     [
       scriptPath,
-      "run",
-      "--runtime",
-      "codex",
-      "--agent",
+      "delegate",
+      "--target",
       resolution.effectiveTarget,
-      effectiveTask
+      ...(targetRuntime ? ["--runtime", targetRuntime] : []),
+      "--task",
+      effectiveTask,
+      "--execute"
     ],
     {
       cwd: state.repoRoot,
       env: {
         ...process.env,
         ...options.env,
-        MAH_ACTIVE_CREW: state.crew,
-        MAH_AGENT: resolution.effectiveTarget,
-        MAH_CODEX_AUTONOMOUS: "1"
+        MAH_ACTIVE_CREW: state.crew
       },
       encoding: "utf-8"
     }
@@ -94,8 +94,9 @@ export async function delegateAgentHandler(args = {}, options = {}) {
     elapsed_ms: elapsed,
     requested_target: target,
     effective_target: resolution.effectiveTarget,
+    requested_target_runtime: targetRuntime || null,
     rerouted: resolution.rerouted,
-    mechanism: "mah-cli-codex-runtime",
+    mechanism: "mah-cli-delegate-pipeline",
     summary,
     output: includeFullOutput ? combinedOutput : null,
     context: summarizeActiveContext(state)

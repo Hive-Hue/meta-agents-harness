@@ -50,6 +50,7 @@ export const SPAWN_MODES = Object.freeze({
  * @property {string} effectiveLogicalTarget  - Resolved logical target (after any rerouting)
  * @property {string} task                    - Task description / prompt for the child agent
  * @property {SpawnMode} mode                 - Spawn mode to use
+ * @property {string} [repoRoot]              - Repository root, if known
  */
 
 /**
@@ -93,7 +94,7 @@ export const SPAWN_MODES = Object.freeze({
  * |----------------|---------------------|--------------------------------------------------|
  * | `name`         | `string`            | Unique adapter identifier                         |
  * | `sourceRuntime`| `string \| "*"`     | Runtime this adapter produces spawns FROM ("*" = any) |
- * | `targetRuntime`| `string`            | Runtime this adapter produces spawns INTO          |
+ * | `targetRuntime`| `string \| "*"`     | Runtime this adapter produces spawns INTO ("*" = any) |
  *
  * ## Required methods
  *
@@ -137,7 +138,7 @@ export const SPAWN_MODES = Object.freeze({
  * @typedef {Object} ChildAgentAdapter
  * @property {string} name
  * @property {string|'*'} sourceRuntime
- * @property {string} targetRuntime
+ * @property {string|'*'} targetRuntime
  * @property {(ctx: SpawnSupportContext) => boolean} supportsSpawn
  * @property {(ctx: SpawnSupportContext) => SpawnMode[]} listSpawnModes
  * @property {(ctx: SpawnContext) => SpawnPlanResult} prepareSpawn
