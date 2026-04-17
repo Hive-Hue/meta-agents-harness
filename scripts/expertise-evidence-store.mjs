@@ -5,13 +5,17 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const repoRoot = join(__dirname, '..')
+
+// SECURITY: v0.7.0-patch — evidence loading bounds
+const MAX_EVIDENCE_FILES = 10000
+const MAX_EVIDENCE_FILE_SIZE = 1 * 1024 * 1024 // 1MB
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -24,6 +28,18 @@ const repoRoot = join(__dirname, '..')
  */
 function resolvePath(relPath) {
   return join(repoRoot, relPath)
+}
+
+/**
+ * Resolve the evidence root directory, optionally overridden by env/config.
+ * @param {string} [overrideRoot]
+ * @returns {string}
+ */
+function resolveEvidenceRoot(overrideRoot = process.env.MAH_EXPERTISE_EVIDENCE_ROOT) {
+  if (overrideRoot && typeof overrideRoot === 'string' && overrideRoot.trim()) {
+    return resolve(overrideRoot)
+  }
+  return resolvePath('.mah/expertise/evidence')
 }
 
 /**
@@ -43,6 +59,44 @@ function ensureDir(dirPath) {
  */
 function toDateStamp(date) {
   return date.toISOString().slice(0, 10)
+}
+
+// SECURITY: v0.7.0-patch — sanitize expertise_id to prevent path traversal
+const EXPERTISE_ID_REGEX = /^[a-z0-9._-]+:[a-z0-9._-]+$/
+
+/**
+ * Validate and sanitize an expertise ID.
+ * Rejects path separators, '..' traversal, and invalid formats.
+ * @param {string} id
+ * @returns {string} The validated ID
+ * @throws {Error} If the ID is invalid
+ */
+function sanitizeExpertiseId(id) {
+  if (typeof id !== 'string' || !id) {
+    throw new Error(`Invalid expertise_id: must be a non-empty string, got '${id}'`)
+  }
+  if (id.includes('/') || id.includes('\\') || id.includes('..')) {
+    throw new Error(`Invalid expertise_id: path separators and '..' are not allowed in '${id}'`)
+  }
+  if (!EXPERTISE_ID_REGEX.test(id)) {
+    throw new Error(`Invalid expertise_id: must match ${EXPERTISE_ID_REGEX.source}, got '${id}'`)
+  }
+  return id
+}
+
+/**
+ * Verify that a resolved path stays under a base directory.
+ * @param {string} resolvedPath
+ * @param {string} basePath
+ * @returns {{ ok: boolean, error?: string }}
+ */
+function ensurePathUnderBase(resolvedPath, basePath) {
+  const normalizedBase = resolve(basePath).replace(/\/+$/, '') + '/'
+  const normalizedTarget = resolve(resolvedPath).replace(/\/+$/, '') + '/'
+  if (!normalizedTarget.startsWith(normalizedBase)) {
+    return { ok: false, error: `path escapes base directory: '${resolvedPath}' is not under '${basePath}'` }
+  }
+  return { ok: true }
 }
 
 /**
@@ -82,16 +136,41 @@ function percentile(arr, p) {
  * File named `{timestamp}-{shortuuid}.json` for chronological ordering.
  *
  * @param {object} evidence - Evidence object (see task spec for fields)
+ * @param {{ evidenceRoot?: string }} [options]
  * @returns {Promise<{ ok: boolean, path?: string, error?: string }>}
  */
-export async function recordEvidence(evidence) {
+export async function recordEvidence(evidence, options = {}) {
   try {
     const { expertise_id } = evidence
     if (!expertise_id) {
       return { ok: false, error: 'expertise_id is required' }
     }
 
-    const baseDir = resolvePath(`.mah/expertise/evidence/${expertise_id}`)
+    // SECURITY: v0.7.0-patch — sanitize expertise_id
+    try {
+      sanitizeExpertiseId(expertise_id)
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+
+    // SECURITY: v0.7.0-patch
+    // Enforce provenance minimums so confidence scoring has attributable evidence.
+    if (typeof evidence.source_agent !== 'string' || evidence.source_agent.trim().length === 0) {
+      return { ok: false, error: 'source_agent is required and must be a non-empty string' }
+    }
+    if (evidence.source_session !== undefined) {
+      if (typeof evidence.source_session !== 'string' || evidence.source_session.trim().length === 0) {
+        return { ok: false, error: 'source_session must be a non-empty string when provided' }
+      }
+    }
+
+    const evidenceRoot = resolveEvidenceRoot(options.evidenceRoot)
+    const baseDir = join(evidenceRoot, expertise_id)
+    // SECURITY: v0.7.0-patch — verify path stays under evidence root
+    const pathCheck = ensurePathUnderBase(baseDir, evidenceRoot)
+    if (!pathCheck.ok) {
+      return { ok: false, error: pathCheck.error }
+    }
     ensureDir(baseDir)
 
     // Use recorded_at or now as timestamp
@@ -114,7 +193,7 @@ export async function recordEvidence(evidence) {
         test_coverage_delta: evidence.quality_signals?.test_coverage_delta ?? null,
         rejection_count: evidence.quality_signals?.rejection_count ?? evidence.evidence_data?.error_type ? 1 : 0,
       },
-      source_agent: evidence.source_agent || evidence.recorded_by || 'unknown',
+      source_agent: evidence.source_agent,
       source_session: evidence.source_session || 'unknown',
       recorded_at: ts,
     }
@@ -130,23 +209,43 @@ export async function recordEvidence(evidence) {
  * Load evidence events for a specific expertise, sorted by timestamp.
  *
  * @param {string} expertiseId
- * @param {{ since?: Date, limit?: number }} [options]
+ * @param {{ since?: Date, limit?: number, evidenceRoot?: string }} [options]
  * @returns {Promise<object[]>} Array of evidence events
  */
 export async function loadEvidenceFor(expertiseId, options = {}) {
   try {
     const { since, limit } = options
-    const baseDir = resolvePath(`.mah/expertise/evidence/${expertiseId}`)
+    // SECURITY: v0.7.0-patch — sanitize expertiseId
+    try {
+      sanitizeExpertiseId(expertiseId)
+    } catch (err) {
+      console.warn('[expertise-evidence-store]', err.message)
+      return []
+    }
+    const evidenceRoot = resolveEvidenceRoot(options.evidenceRoot)
+    const baseDir = join(evidenceRoot, expertiseId)
 
     if (!existsSync(baseDir)) return []
 
     const files = listEvidenceFiles(baseDir)
+    // SECURITY: v0.7.0-patch — unbounded evidence loading protection
+    if (files.length > MAX_EVIDENCE_FILES) {
+      console.warn(`[expertise-evidence-store] too many evidence files (${files.length}) for '${expertiseId}', limit is ${MAX_EVIDENCE_FILES}`)
+      return []
+    }
     /** @type {object[]} */
     const evidence = []
 
     for (const file of files) {
       const filePath = join(baseDir, file)
       try {
+        // SECURITY: v0.7.0-patch — check file size before reading
+        const { statSync } = await import('node:fs')
+        const stat = statSync(filePath)
+        if (stat.size > MAX_EVIDENCE_FILE_SIZE) {
+          console.warn(`[expertise-evidence-store] skipping oversized evidence file '${file}' (${stat.size} bytes, limit ${MAX_EVIDENCE_FILE_SIZE})`)
+          continue
+        }
         const raw = readFileSync(filePath, 'utf-8')
         const event = JSON.parse(raw)
         evidence.push(event)
@@ -180,10 +279,19 @@ export async function loadEvidenceFor(expertiseId, options = {}) {
  * Get aggregated metrics for an expertise (reads from computed metrics file).
  *
  * @param {string} expertiseId
+ * @param {{ evidenceRoot?: string }} [options]
  * @returns {Promise<object|null>}
  */
-export async function getMetricsFor(expertiseId) {
-  const metricsPath = resolvePath(`.mah/expertise/evidence/${expertiseId}/metrics.json`)
+export async function getMetricsFor(expertiseId, options = {}) {
+  // SECURITY: v0.7.0-patch — sanitize expertiseId
+  try {
+    sanitizeExpertiseId(expertiseId)
+  } catch (err) {
+    return null
+  }
+
+  const evidenceRoot = resolveEvidenceRoot(options.evidenceRoot)
+  const metricsPath = join(evidenceRoot, expertiseId, 'metrics.json')
   if (!existsSync(metricsPath)) return null
   try {
     const raw = readFileSync(metricsPath, 'utf-8')
@@ -198,10 +306,26 @@ export async function getMetricsFor(expertiseId) {
  * Computes p95_duration_ms, review_pass_rate, rejection_rate, etc.
  *
  * @param {string} expertiseId
+ * @param {{ evidenceRoot?: string }} [options]
  * @returns {Promise<object>} ExpertiseMetrics object
  */
-export async function computeMetrics(expertiseId) {
-  const evidence = await loadEvidenceFor(expertiseId)
+export async function computeMetrics(expertiseId, options = {}) {
+  // SECURITY: v0.7.0-patch — sanitize expertiseId
+  try {
+    sanitizeExpertiseId(expertiseId)
+  } catch (err) {
+    console.warn('[expertise-evidence-store]', err.message)
+    return {
+      expertise_id: expertiseId,
+      total_invocations: 0, successful_invocations: 0, failed_invocations: 0,
+      avg_duration_ms: 0, p95_duration_ms: 0, total_cost_units: 0,
+      review_pass_rate: 0, rejection_rate: 0,
+      last_invoked: null, last_successful: null, last_failed: null,
+      evidence_count: 0, window_start: null, window_end: null,
+    }
+  }
+
+  const evidence = await loadEvidenceFor(expertiseId, options)
 
   if (evidence.length === 0) {
     return {
@@ -373,6 +497,50 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('\n[6] getMetricsFor()...')
   const stored = await getMetricsFor(TEST_ID)
   console.log(`    result: ${stored === null ? 'null (no pre-computed file)' : 'found'}`)
+
+  // 7. SECURITY: provenance validation checks
+  console.log('\n[7] provenance validation...')
+  const badProvenance = await recordEvidence({
+    expertise_id: TEST_ID,
+    outcome: 'success',
+    task_type: 'orchestration',
+    task_description: 'missing source_agent should be rejected',
+    duration_ms: 1,
+    source_agent: '   ',
+    source_session: TEST_SESSION,
+    recorded_at: '2026-04-16T09:45:00.000Z',
+  })
+  console.log(`    empty source_agent rejected: ${badProvenance.ok === false ? 'YES' : 'NO (ERROR)'}`)
+
+  const badSession = await recordEvidence({
+    expertise_id: TEST_ID,
+    outcome: 'success',
+    task_type: 'orchestration',
+    task_description: 'empty source_session should be rejected when provided',
+    duration_ms: 1,
+    source_agent: 'orchestrator',
+    source_session: '   ',
+    recorded_at: '2026-04-16T09:46:00.000Z',
+  })
+  console.log(`    empty source_session rejected: ${badSession.ok === false ? 'YES' : 'NO (ERROR)'}`)
+
+  // 7. Security: sanitizeExpertiseId rejects path traversal
+  console.log('\n[7] sanitizeExpertiseId security tests...')
+  const traversalTests = [
+    { id: '../../.ssh', desc: 'path traversal ../' },
+    { id: '../etc/passwd', desc: 'path traversal with slash' },
+    { id: 'foo/bar:baz', desc: 'slash in segment' },
+    { id: 'dev\\orchestrator', desc: 'backslash' },
+    { id: 'dev:..', desc: 'dotdot segment' },
+  ]
+  for (const tt of traversalTests) {
+    const r = await recordEvidence({ expertise_id: tt.id, outcome: 'success' })
+    const blocked = !r.ok && r.error?.includes('not allowed')
+    console.log(`    ${blocked ? '✓' : '✗'} ${tt.desc}: ${blocked ? 'blocked' : 'NOT BLOCKED'}`)
+  }
+  // Valid ID should still work
+  const validR = await recordEvidence({ expertise_id: 'dev:orchestrator', outcome: 'success', source_agent: 'orchestrator' })
+  console.log(`    ${validR.ok ? '✓' : '✗'} valid ID 'dev:orchestrator' still works`)
 
   console.log('\n=== Self-Test Passed ===')
 }

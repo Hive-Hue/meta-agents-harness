@@ -19,6 +19,10 @@ const __dirname = dirname(__filename)
 const repoRoot = resolve(__dirname, '..')
 const DEFAULT_CATALOG_PATH = '.mah/expertise/catalog'
 
+// SECURITY: v0.7.0-patch — catalog traversal bounds
+const MAX_RECURSION_DEPTH = 5
+const MAX_CATALOG_FILES = 1000
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------- -----------
@@ -31,24 +35,54 @@ function warn(...args) {
   console.warn('[expertise-loader]', ...args)
 }
 
+// SECURITY: v0.7.0-patch — sanitize ID segments to prevent path traversal
+const ID_SEGMENT_REGEX = /^[a-z0-9._-]+$/
+
+/**
+ * Validate a single segment of an expertise ID (crew or name).
+ * @param {string} segment
+ * @returns {string}
+ * @throws {Error}
+ */
+function sanitizeIdSegment(segment) {
+  if (typeof segment !== 'string' || !segment) {
+    throw new Error(`Invalid ID segment: must be a non-empty string, got '${segment}'`)
+  }
+  if (segment.includes('/') || segment.includes('\\') || segment.includes('..')) {
+    throw new Error(`Invalid ID segment: path separators and '..' not allowed in '${segment}'`)
+  }
+  if (!ID_SEGMENT_REGEX.test(segment)) {
+    throw new Error(`Invalid ID segment: must match ${ID_SEGMENT_REGEX.source}, got '${segment}'`)
+  }
+  return segment
+}
+
 /**
  * Recursively collect all file paths under a directory matching extensions.
  * @param {string} dir
  * @param {string[]} extensions
  * @returns {string[]}
  */
-function collectFiles(dir, extensions) {
+function collectFiles(dir, extensions, depth = 0) {
   /** @type {string[]} */
   const results = []
+  // SECURITY: v0.7.0-patch — limit recursion depth
+  if (depth >= MAX_RECURSION_DEPTH) return results
   if (!existsSync(dir)) return results
   const entries = readdirSync(dir, { withFileTypes: true })
   for (const entry of entries) {
+    // SECURITY: v0.7.0-patch — skip symlinks
+    if (entry.isSymbolicLink()) continue
     const full = join(dir, entry.name)
     if (entry.isDirectory()) {
-      results.push(...collectFiles(full, extensions))
+      results.push(...collectFiles(full, extensions, depth + 1))
     } else if (extensions.includes(extname(entry.name).toLowerCase())) {
+      // SECURITY: v0.7.0-patch — limit total files
+      if (results.length >= MAX_CATALOG_FILES) break
       results.push(full)
     }
+    // SECURITY: v0.7.0-patch — limit total files across recursion
+    if (results.length >= MAX_CATALOG_FILES) break
   }
   return results
 }
@@ -204,9 +238,25 @@ export async function findExpertiseFileById(expertiseId, catalogPath = DEFAULT_C
   const catalogRoot = resolveCatalogPath(catalogPath)
   const [crew, name] = normalizedId.split(':')
 
+  // SECURITY: v0.7.0-patch — validate ID segments prevent path traversal
   if (crew && name) {
+    try {
+      sanitizeIdSegment(crew)
+      sanitizeIdSegment(name)
+    } catch (err) {
+      warn(`invalid expertise ID '${expertiseId}': ${err.message}`)
+      return null
+    }
+
     for (const ext of extensions) {
       const candidatePath = join(catalogRoot, crew, `${name}${ext}`)
+      // SECURITY: v0.7.0-patch — verify candidate path stays under catalogRoot
+      const resolvedCandidate = resolve(candidatePath)
+      const resolvedRoot = resolve(catalogRoot)
+      if (!resolvedCandidate.startsWith(resolvedRoot + '/') && resolvedCandidate !== resolvedRoot) {
+        warn(`candidate path '${candidatePath}' escapes catalog root`)
+        continue
+      }
       if (!existsSync(candidatePath)) continue
       const expertise = await loadExpertiseFile(candidatePath)
       if (expertise?.id === normalizedId) return candidatePath
@@ -386,6 +436,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   test.equal(normalized.metadata.risks[0].note, 'overload risk')
   test.equal(normalized.metadata.lessons[0].note, 'lesson one')
   test.equal(normalized.metadata.workflows[0].name, 'wf1')
+
+  // Security: path traversal rejection tests
+  console.log('\nPath traversal rejection tests:')
+  const traversalIds = ['dev:../../etc', 'dev:../secret', '../:name', 'dev\\test:name']
+  for (const badId of traversalIds) {
+    const f = await findExpertiseFileById(badId)
+    console.log(`  ${f === null ? '✓' : '✗'} '${badId}' ${f === null ? 'rejected' : `should have been rejected but returned: ${f}`}`)
+  }
 
   console.log('=== Expertise Loader Smoke Test Passed ===')
   console.log('normalizeLegacyExpertise:', JSON.stringify(normalized, null, 2))

@@ -2,12 +2,39 @@
  * M4 — Registry + Operator UX (CLI) Integration Tests
  */
 
-import { describe, it } from 'node:test'
+import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert'
 import { execSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+
+const { recordEvidence } = await import('../scripts/expertise-evidence-store.mjs')
 
 const repoRoot = process.cwd()
 const mah = 'node bin/mah'
+const evidenceRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-cli-m4-'))
+
+before(async () => {
+  const base = {
+    expertise_id: 'dev:orchestrator',
+    outcome: 'success',
+    task_type: 'delegation',
+    task_description: 'seed evidence for CLI tests',
+    duration_ms: 2500,
+    quality_signals: { review_pass: true, rejection_count: 0 },
+    source_agent: 'orchestrator',
+    source_session: 'cli-m4-test',
+    recorded_at: '2026-04-16T10:00:00.000Z',
+  }
+  await recordEvidence(base, { evidenceRoot })
+  await recordEvidence({ ...base, recorded_at: '2026-04-16T10:05:00.000Z', duration_ms: 3000 }, { evidenceRoot })
+  await recordEvidence({ ...base, recorded_at: '2026-04-16T10:10:00.000Z', duration_ms: 3500 }, { evidenceRoot })
+})
+
+after(() => {
+  rmSync(evidenceRoot, { recursive: true, force: true })
+})
 
 /**
  * Run a mah expertise command and return { stdout, stderr, status }.
@@ -19,7 +46,7 @@ function runExpertise(args) {
       encoding: 'utf-8',
       timeout: 15000,
       cwd: repoRoot,
-      env: { ...process.env, MAH_ACTIVE_CREW: 'dev' }
+      env: { ...process.env, MAH_ACTIVE_CREW: 'dev', MAH_EXPERTISE_EVIDENCE_ROOT: evidenceRoot }
     })
     return { stdout, stderr: '', status: 0 }
   } catch (err) {

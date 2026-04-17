@@ -1,6 +1,6 @@
 ---
 name: performance-analyst
-model: gpt-5.4-mini
+model: gpt-5.3-codex
 role: worker
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch

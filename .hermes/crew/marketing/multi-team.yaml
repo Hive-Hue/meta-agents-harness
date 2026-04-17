@@ -13,17 +13,40 @@ domain_profiles:
   planning_delivery:
     - path: .
       read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
     - path: plan/*
+      read: true
+      edit: true
+      bash: true
+    - path: plan/progress/*
+      read: true
+      edit: true
+      bash: true
+    - path: plan/done/*
       read: true
       edit: true
       bash: true
     - path: specs/*
       read: true
       edit: true
+    - path: specs/specs/*
+      read: true
+      edit: true
     - path: docs/*
       read: true
       edit: true
       bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
     - path: examples/*
       read: true
       edit: true
@@ -107,6 +130,14 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: .codex/*
+      read: true
+      edit: true
+      bash: true
+    - path: .kilo/*
+      read: true
+      edit: true
+      bash: true
     - path: skills/*
       read: true
       edit: true
@@ -121,11 +152,52 @@ domain_profiles:
     - path: .env.sample
       read: true
       edit: true
+    - path: .mah/expertise/*
+      read: true
+      edit: true
+      bash: true
   validation_runtime:
     - path: .
       read: true
       bash: true
+    - path: meta-agents.yaml
+      read: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
     - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mah/expertise/*
+      read: true
+      edit: true
+      bash: true
+    - path: .codex/*
+      read: true
+      edit: true
+      bash: true
+    - path: .kilo/*
+      read: true
+      edit: true
+      bash: true
+    - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: .hermes/*
+      read: true
+      edit: true
+      bash: true
+    - path: .claude/*
+      read: true
+      edit: true
+      bash: true
+    - path: .opencode/*
       read: true
       edit: true
       bash: true
@@ -137,6 +209,12 @@ domain_profiles:
       read: true
       edit: true
     - path: specs/*
+      read: true
+      edit: true
+    - path: specs/specs/*
+      read: true
+      edit: true
+    - path: plan/progress/*
       read: true
       edit: true
   bootstrap_generation:
@@ -233,7 +311,6 @@ orchestrator:
     - grep
     - find
     - ls
-    - delegate_agent
     - update_expertise_model
     - mcp_servers
     - mcp_tools
@@ -265,16 +342,15 @@ teams:
         use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
         - find
         - ls
-        - delegate_agent
         - update_expertise_model
         - mcp_servers
         - mcp_tools
@@ -326,7 +402,7 @@ teams:
           use-when: Track durable learnings for market-researcher.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -384,7 +460,7 @@ teams:
           use-when: Track durable learnings for campaign-strategist.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -444,16 +520,15 @@ teams:
         use-when: Track durable learnings for creative-lead.
         updatable: true
         max-lines: 10000
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
         - find
         - ls
-        - delegate_agent
         - update_expertise_model
         - mcp_servers
         - mcp_tools
@@ -506,7 +581,7 @@ teams:
           use-when: Track durable learnings for copywriter.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -564,7 +639,7 @@ teams:
           use-when: Track durable learnings for creative-strategist.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -622,7 +697,7 @@ teams:
           use-when: Track durable learnings for media-operator.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -682,16 +757,15 @@ teams:
         use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
         - find
         - ls
-        - delegate_agent
         - update_expertise_model
         - mcp_servers
         - mcp_tools
@@ -743,7 +817,7 @@ teams:
           use-when: Track durable learnings for performance-analyst.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -801,7 +875,7 @@ teams:
           use-when: Track durable learnings for brand-safety-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7

@@ -74,6 +74,13 @@ Practical defaults:
 - implementation workers: add `write` / `edit` and scoped `upsert` permissions
 - validation workers: add `bash` for checks, usually keep write disabled
 
+Expertise update policy:
+
+- prefer `lessons`, `decisions`, `risks`, and `workflows` for durable learning
+- use `observations` only for short-lived facts, measurements, or state changes
+- keep each note short enough to be useful on re-read; move long narratives to session artifacts
+- prune weak `observations` first when the expertise file grows
+
 ## Example Mental Model
 
 The `dev` crew follows this baseline:

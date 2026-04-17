@@ -71,6 +71,10 @@ const DEFAULT_THRESHOLD = 0.3
 
 const BLOCKED_VALIDATION_STATUSES = ['restricted', 'revoked']
 
+// SECURITY: v0.7.0-patch — trust tier enforcement
+const TRUST_TIER_ORDER = { internal: 3, trusted: 2, federated: 1, untrusted: 0 }
+const TRUST_TIER_MISMATCH_PENALTY = -0.2
+
 // ---------------------------------------------------------------------------
 // Internal scoring helpers
 // ---------------------------------------------------------------------------
@@ -228,6 +232,27 @@ function checkValidationStatusFilter(validation_status) {
   return { passes: true, reason: null }
 }
 
+/**
+ * Check if candidate passes trust tier filter.
+ * @param {Object} expertise
+ * @param {string} [requiredTrustTier]
+ * @returns {{ passes: boolean, reason: string|null }}
+ */
+function checkTrustTierFilter(expertise, requiredTrustTier) {
+  // SECURITY: v0.7.0-patch
+  if (!requiredTrustTier) return { passes: true, reason: null }
+  const candidateTier = expertise.trust_tier || 'untrusted'
+  const requiredLevel = TRUST_TIER_ORDER[requiredTrustTier] ?? 0
+  const candidateLevel = TRUST_TIER_ORDER[candidateTier] ?? 0
+  if (candidateLevel < requiredLevel) {
+    return {
+      passes: false,
+      reason: `trust_tier '${candidateTier}' (level ${candidateLevel}) below required '${requiredTrustTier}' (level ${requiredLevel})`
+    }
+  }
+  return { passes: true, reason: null }
+}
+
 // ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
@@ -249,6 +274,7 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
   const {
     allowed_environments: allowedEnvs,
     threshold = DEFAULT_THRESHOLD,
+    requiredTrustTier,
   } = options
 
   const inputCandidates = candidates.map(c => c.id || c.expertise_id || String(c))
@@ -306,8 +332,18 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
     }
     passed_filters.push('validation_status')
 
-    // Filter 3: trust_tier_required (if set in candidate expertise)
-    // v0.7.0: no trust_tier_required field on candidate; skip
+    // Filter 3: trust_tier — SECURITY: v0.7.0-patch
+    const tierCheck = checkTrustTierFilter(expertise, requiredTrustTier)
+    if (!tierCheck.passes) {
+      blocked_filters.push(`trust_tier: ${tierCheck.reason}`)
+      scores[id] = {
+        agent_id: id, match_score: 0, confidence_adjustment: 0, penalty: 0, final_score: 0,
+        confidence_band: expertise.confidence?.band || 'medium', penalties_applied: [],
+        passed_filters, blocked_filters,
+      }
+      continue
+    }
+    passed_filters.push('trust_tier')
 
     // Compute match_score
     const match_score = calculateMatchScore(
@@ -326,7 +362,17 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
 
     // Compute penalties
     // In v0.7.0 evidence store is not integrated; use empty array
-    const { penalty, penalties_applied } = computePenalties(expertise, [])
+    let { penalty, penalties_applied } = computePenalties(expertise, [])
+
+    // SECURITY: v0.7.0-patch — trust tier mismatch penalty
+    const topTier = candidates.length > 0
+      ? Math.max(...candidates.map(c => TRUST_TIER_ORDER[c.expertise?.trust_tier || c.trust_tier || 'untrusted'] ?? 0))
+      : 0
+    const candidateTierLevel = TRUST_TIER_ORDER[expertise.trust_tier || 'untrusted'] ?? 0
+    if (candidateTierLevel < topTier) {
+      penalty += TRUST_TIER_MISMATCH_PENALTY
+      penalties_applied.push(`trust_tier_mismatch:${expertise.trust_tier || 'untrusted'}`)
+    }
 
     // Final score
     const final_score = Math.max(0, match_score + confidence_adjustment + penalty)
@@ -390,7 +436,7 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
     source_agent: sourceAgent,
     input_candidates: inputCandidates,
     filtered_count: filteredCount,
-    filters_run: ['allowed_environments', 'validation_status', 'expertise_match', 'confidence', 'lifecycle_penalties'],
+    filters_run: ['allowed_environments', 'validation_status', 'trust_tier', 'expertise_match', 'confidence', 'lifecycle_penalties'],
     blocking: Object.fromEntries(
       Object.entries(scores)
         .filter(([, score]) => score.blocked_filters.length > 0)
@@ -551,6 +597,45 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`  Selected: ${result5.selected}`)
   console.log(`  Escalation: ${result5.escalation}`)
   console.log(`  Fallback reason: ${result5.fallback_reason}\n`)
+
+  // Test 6: SECURITY trust tier filter enforcement
+  console.log('Test 6: Trust tier filtering (requiredTrustTier=internal)')
+  const trustTierCandidates = [
+    {
+      id: 'internal-agent',
+      expertise: {
+        id: 'internal-agent',
+        capabilities: ['planning'],
+        domains: ['software-engineering'],
+        input_contract: { required_fields: [], optional_fields: [], field_types: {} },
+        validation_status: 'validated',
+        lifecycle: 'active',
+        confidence: { score: 0.7, band: 'high', evidence_count: 10 },
+        trust_tier: 'internal',
+      },
+    },
+    {
+      id: 'federated-agent',
+      expertise: {
+        id: 'federated-agent',
+        capabilities: ['planning'],
+        domains: ['software-engineering'],
+        input_contract: { required_fields: [], optional_fields: [], field_types: {} },
+        validation_status: 'validated',
+        lifecycle: 'active',
+        confidence: { score: 0.9, band: 'high', evidence_count: 10 },
+        trust_tier: 'federated',
+      },
+    },
+  ]
+  const result6 = scoreCandidates({
+    task: 'planning',
+    sourceAgent: 'orchestrator-1',
+    candidates: trustTierCandidates,
+    options: { requiredTrustTier: 'internal' },
+  })
+  console.log(`  selected: ${result6.selected}`)
+  console.log(`  federated blocked: ${result6.scores['federated-agent']?.blocked_filters.some(f => f.includes('trust_tier')) ? 'YES' : 'NO (ERROR)'}`)
 
   console.log('=== All Self-Tests Passed ===')
 }

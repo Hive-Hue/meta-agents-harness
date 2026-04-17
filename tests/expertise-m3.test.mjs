@@ -3,11 +3,12 @@
  * Integration tests covering evidence store, confidence calculation, lifecycle state machine.
  */
 
-import { describe, it } from 'node:test'
+import { describe, it, after } from 'node:test'
 import assert from 'node:assert'
 import { randomUUID } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,12 @@ const { canTransition, transitionExpertise, describeLifecycle, getSuggestedNextS
 
 const TEST_EXPERTISE = `test:${randomUUID().slice(0, 8)}`
 const repoRoot = process.cwd()
+const evidenceRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-m3-'))
+const evidenceOptions = { evidenceRoot }
+
+after(() => {
+  rmSync(evidenceRoot, { recursive: true, force: true })
+})
 
 // ---------------------------------------------------------------------------
 // Evidence Store tests
@@ -41,7 +48,7 @@ describe('M3 — Evidence Store', () => {
       source_agent: 'orchestrator',
       source_session: 'test-session',
       recorded_at: new Date().toISOString(),
-    })
+    }, evidenceOptions)
     assert.equal(result.ok, true)
     assert.ok(result.path?.includes(TEST_EXPERTISE), 'path should contain expertise_id')
   })
@@ -56,21 +63,21 @@ describe('M3 — Evidence Store', () => {
       task_description: 'task 2', duration_ms: 5000,
       quality_signals: { review_pass: false, rejection_count: 1 },
       source_agent: 'orchestrator', source_session: 'test-session', recorded_at: ts1,
-    })
+    }, evidenceOptions)
     await recordEvidence({
       expertise_id: TEST_EXPERTISE, outcome: 'success', task_type: 'testing',
       task_description: 'task 1', duration_ms: 8000,
       quality_signals: { review_pass: true, rejection_count: 0 },
       source_agent: 'orchestrator', source_session: 'test-session', recorded_at: ts2,
-    })
+    }, evidenceOptions)
     await recordEvidence({
       expertise_id: TEST_EXPERTISE, outcome: 'success', task_type: 'planning',
       task_description: 'task 3', duration_ms: 3000,
       quality_signals: { review_pass: true, rejection_count: 0 },
       source_agent: 'orchestrator', source_session: 'test-session', recorded_at: ts3,
-    })
+    }, evidenceOptions)
 
-    const events = await loadEvidenceFor(TEST_EXPERTISE)
+    const events = await loadEvidenceFor(TEST_EXPERTISE, evidenceOptions)
     assert.equal(events.length, 4, 'should have 4 events total (1 + 3)')
     assert.ok(events[0].recorded_at <= events[1].recorded_at)
     assert.ok(events[1].recorded_at <= events[2].recorded_at)
@@ -78,17 +85,17 @@ describe('M3 — Evidence Store', () => {
   })
 
   it('loadEvidenceFor respects limit option', async () => {
-    const events = await loadEvidenceFor(TEST_EXPERTISE, { limit: 2 })
+    const events = await loadEvidenceFor(TEST_EXPERTISE, { ...evidenceOptions, limit: 2 })
     assert.equal(events.length, 2, 'should return only 2 events')
   })
 
   it('loadEvidenceFor returns empty array for non-existent expertise', async () => {
-    const events = await loadEvidenceFor(`nonexistent:${randomUUID().slice(0, 8)}`)
+    const events = await loadEvidenceFor(`nonexistent:${randomUUID().slice(0, 8)}`, evidenceOptions)
     assert.equal(events.length, 0)
   })
 
   it('computeMetrics aggregates evidence correctly', async () => {
-    const metrics = await computeMetrics(TEST_EXPERTISE)
+    const metrics = await computeMetrics(TEST_EXPERTISE, evidenceOptions)
     assert.equal(metrics.expertise_id, TEST_EXPERTISE)
     assert.equal(metrics.total_invocations, 4)
     assert.ok(metrics.successful_invocations >= 3)
@@ -249,8 +256,10 @@ describe('M3 — Lifecycle State Machine', () => {
     const exp = {
       id: 'test:agent', owner: { agent: 'agent' }, lifecycle: 'active',
       schema_version: 'mah.expertise.v1', capabilities: [], domains: [],
+      validation_status: 'validated',
+      confidence: { score: 0.7, band: 'high', evidence_count: 3 },
     }
-    const result = transitionExpertise(exp, 'restricted', undefined)
+    const result = transitionExpertise(exp, 'restricted', undefined, null, { id: 'gov-1', role: 'governance' })
     assert.equal(result.ok, false, 'should require reason for →restricted')
     assert.ok(result.errors?.some(e => e.toLowerCase().includes('reason') || e.toLowerCase().includes('restricted')))
   })
@@ -259,8 +268,10 @@ describe('M3 — Lifecycle State Machine', () => {
     const exp = {
       id: 'test:agent', owner: { agent: 'agent' }, lifecycle: 'active',
       schema_version: 'mah.expertise.v1', capabilities: [], domains: [],
+      validation_status: 'validated',
+      confidence: { score: 0.7, band: 'high', evidence_count: 3 },
     }
-    const result = transitionExpertise(exp, 'restricted', 'policy review in progress')
+    const result = transitionExpertise(exp, 'restricted', 'policy review in progress', null, { id: 'gov-1', role: 'governance' })
     assert.equal(result.ok, true)
     assert.equal(result.expertise.lifecycle, 'restricted')
   })
@@ -332,7 +343,16 @@ describe('M3 — Evidence Hook Integration', () => {
     try {
       execSync(
         `node bin/mah delegate --target engineering-lead --task "Implement search feature for v0.8" --crew dev`,
-        { encoding: 'utf-8', timeout: 15000, cwd: repoRoot }
+        {
+          encoding: 'utf-8',
+          timeout: 15000,
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            MAH_ACTIVE_CREW: 'dev',
+            MAH_EXPERTISE_EVIDENCE_ROOT: evidenceRoot,
+          },
+        }
       )
     } catch {
       // May fail due to runtime but evidence should still be recorded
@@ -342,7 +362,7 @@ describe('M3 — Evidence Hook Integration', () => {
     await new Promise(r => setTimeout(r, 200))
 
     // Check evidence was recorded for the delegated target
-    const evidenceDir = join(repoRoot, '.mah/expertise/evidence/dev:engineering-lead')
+    const evidenceDir = join(evidenceRoot, 'dev:engineering-lead')
     if (existsSync(evidenceDir)) {
       const { readdirSync, statSync } = await import('node:fs')
       const files = readdirSync(evidenceDir).filter(f => f.endsWith('.json'))

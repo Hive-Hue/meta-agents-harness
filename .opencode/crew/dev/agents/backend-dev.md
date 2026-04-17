@@ -9,14 +9,14 @@ permission:
   bash: ask
   task:
     "*": deny
-model: zai/glm-5
+model: openai-codex/gpt-5.3-codex
 ---
 
 # Backend Dev
 
 Role: `worker`
 Team: `Engineering`
-Model: `zai/glm-5`
+Model: `openai-codex/gpt-5.3-codex`
 
 ## Mission
 Engineering worker focused on scoped execution within assigned ownership boundaries.

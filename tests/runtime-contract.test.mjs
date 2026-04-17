@@ -99,9 +99,32 @@ test("hermes run preparation resolves to hermes chat with MAH-managed context", 
   })
   assert.equal(result.ok, true)
   assert.equal(result.exec, "hermes")
-  assert.deepEqual(result.args, ["chat"])
+  assert.equal(result.args[0], "chat")
   assert.equal(result.envOverrides.MAH_HERMES_CONFIG, configPath)
   assert.equal(result.envOverrides.MAH_ACTIVE_CREW, "dev")
+})
+
+test("hermes run preparation resolves model from MAH_AGENT", () => {
+  const adapter = RUNTIME_ADAPTERS.hermes
+  const configPath = path.join(repoRoot, ".hermes", "crew", "dev", "config.yaml")
+  const result = adapter.prepareRunContext({
+    repoRoot,
+    runtime: "hermes",
+    adapter,
+    crew: "dev",
+    requestedCrew: "dev",
+    activeCrew: null,
+    configPath,
+    argv: [],
+    envOverrides: { MAH_AGENT: "backend-dev" }
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.args[0], "chat")
+  assert.ok(result.args.includes("-m"))
+  const modelIndex = result.args.indexOf("-m")
+  assert.ok(modelIndex >= 0)
+  assert.ok(typeof result.args[modelIndex + 1] === "string" && result.args[modelIndex + 1].trim().length > 0)
+  assert.equal(result.internal?.agentCtx?.agentName, "backend-dev")
 })
 
 test("hermes adapter validateRuntime checks all fields", () => {

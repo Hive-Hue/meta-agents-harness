@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: minimax/minimax-m2.7
+model: zai/glm-5
 ---
 
 # Solution Architect
 
 Role: `worker`
 Team: `Planning`
-Model: `minimax/minimax-m2.7`
+Model: `zai/glm-5`
 
 ## Mission
 Planning worker focused on scoped execution within assigned ownership boundaries.

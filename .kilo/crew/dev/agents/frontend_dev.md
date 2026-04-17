@@ -3,62 +3,64 @@ name: frontend-dev
 model: minimax-coding-plan/MiniMax-M2.7
 role: worker
 team: Engineering
-mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,
-  centered on cross-runtime headless execution and integrated session
-  interoperability, while preserving runtime-agnostic design and explicit
-  operational contracts.
+mission: Deliver bounded v0.7.0 Expertise Engine evolution for Meta Agents
+  Harness, transforming expertise from passive memory into operational routing
+  intelligence while preserving policy-first constraints and runtime-agnostic
+  contracts.
 sprint_mode:
-  name: v0.6.0-headless-and-sessions
+  name: v0.7.0-expertise-engine
   active: true
-  target_release: v0.6.0
-  objective: "Define and implement two bounded v0.6.0 fronts: headless execution
-    across runtimes and integrated session export/injection interoperability."
-  execution_mode: spec-bound-slice-driven
+  target_release: v0.7.0
+  objective: "Define and implement bounded v0.7.0 Expertise Engine foundations:
+    structured expertise model, expertise-aware delegation, trust/evidence
+    signals, and operator-facing registry workflows."
+  execution_mode: spec-bound-milestone-driven
   directives:
     - spec-bound execution
-    - no architecture-wave expansion
-    - no v0.7.0+ scope
+    - policy-first routing guardrails
+    - no ontology-wave expansion
+    - conservative rollout with explicit fallback
     - PR-sized slices
     - mandatory validation at each slice
-    - explicit deferred list for anything outside v0.6.0
+    - explicit deferred list for anything outside v0.7.0
   must_deliver:
-    - Headless support matrix across runtimes
-    - Explicit headless capability and adapter contract
-    - Stable MAH headless execution envelope
-    - Canonical MAH session export format
-    - Bounded context injection between runtimes
-    - Session interoperability fidelity model
-    - Integration and contract test coverage
+    - Structured expertise schema and validation
+    - Expertise catalog, evidence, and metrics persistence
+    - Expertise-aware delegation scoring and explain payload
+    - Confidence, validation status, and lifecycle transitions
+    - Operator-facing expertise CLI surfaces
+    - Bounded expertise export and import contracts
+    - Integration, contract, and non-regression coverage
   must_not_deliver:
-    - full transcript replay portability
-    - full multi-runtime parity
-    - remote execution foundation
-    - policy engine
-    - federation/interconnect
-    - confidential execution
-    - distributed session broker
-    - v0.7.0+ scope
+    - full ontology engine
+    - automatic trust promotion without evidence or policy
+    - unrestricted cross-organization federation
+    - implicit permission grants from expertise metadata
+    - mandatory dedicated UI dashboard
+    - v0.8.0+ scope
 sprint_responsibilities:
-  - update CLI and help surfaces
-  - handle operator-facing explainability and docs changes
-  - keep headless and session UX legible and explicit
-instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-  for Meta Agents Harness, centered on cross-runtime headless execution and
-  integrated session interoperability, while preserving runtime-agnostic design
-  and explicit operational contracts. |
-  sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-  | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+
-  scope; PR-sized slices; mandatory validation at each slice; explicit deferred
-  list for anything outside v0.6.0 | do=Headless support matrix across runtimes;
-  Explicit headless capability and adapter contract; Stable MAH headless
-  execution envelope; Canonical MAH session export format; Bounded context
-  injection between runtimes; Session interoperability fidelity model;
-  Integration and contract test coverage | avoid=full transcript replay
-  portability; full multi-runtime parity; remote execution foundation; policy
-  engine; federation/interconnect; confidential execution; distributed session
-  broker; v0.7.0+ scope | role=update CLI and help surfaces; handle
-  operator-facing explainability and docs changes; keep headless and session UX
-  legible and explicit
+  - implement expertise CLI and help surfaces
+  - improve operator-facing explainability outputs
+  - keep UX legible for recommendation and delegation flows
+instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+  evolution for Meta Agents Harness, transforming expertise from passive memory
+  into operational routing intelligence while preserving policy-first
+  constraints and runtime-agnostic contracts. |
+  sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+  | directives=spec-bound execution; policy-first routing guardrails; no
+  ontology-wave expansion; conservative rollout with explicit fallback; PR-sized
+  slices; mandatory validation at each slice; explicit deferred list for
+  anything outside v0.7.0 | do=Structured expertise schema and validation;
+  Expertise catalog, evidence, and metrics persistence; Expertise-aware
+  delegation scoring and explain payload; Confidence, validation status, and
+  lifecycle transitions; Operator-facing expertise CLI surfaces; Bounded
+  expertise export and import contracts; Integration, contract, and
+  non-regression coverage | avoid=full ontology engine; automatic trust
+  promotion without evidence or policy; unrestricted cross-organization
+  federation; implicit permission grants from expertise metadata; mandatory
+  dedicated UI dashboard; v0.8.0+ scope | role=implement expertise CLI and help
+  surfaces; improve operator-facing explainability outputs; keep UX legible for
+  recommendation and delegation flows
 expertise:
   path: .kilo/crew/dev/expertise/frontend-dev-expertise-model.yaml
 tools:
@@ -175,6 +177,16 @@ domain:
     upsert: true
     delete: true
     recursive: true
+  - path: .codex/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
+  - path: .kilo/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
   - path: skills/*
     read: true
     upsert: true
@@ -193,10 +205,15 @@ domain:
     read: true
     upsert: true
     delete: false
+  - path: .mah/expertise/*
+    read: true
+    upsert: true
+    delete: true
+    recursive: true
 ---
 
 [MAH_CONTEXT]
-crew=dev | mission=Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness, centered on cross-runtime headless execution and integrated session interoperability, while preserving runtime-agnostic design and explicit operational contracts. | sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+ scope; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.6.0 | do=Headless support matrix across runtimes; Explicit headless capability and adapter contract; Stable MAH headless execution envelope; Canonical MAH session export format; Bounded context injection between runtimes; Session interoperability fidelity model; Integration and contract test coverage | avoid=full transcript replay portability; full multi-runtime parity; remote execution foundation; policy engine; federation/interconnect; confidential execution; distributed session broker; v0.7.0+ scope | role=update CLI and help surfaces; handle operator-facing explainability and docs changes; keep headless and session UX legible and explicit
+crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine evolution for Meta Agents Harness, transforming expertise from passive memory into operational routing intelligence while preserving policy-first constraints and runtime-agnostic contracts. | sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true | directives=spec-bound execution; policy-first routing guardrails; no ontology-wave expansion; conservative rollout with explicit fallback; PR-sized slices; mandatory validation at each slice; explicit deferred list for anything outside v0.7.0 | do=Structured expertise schema and validation; Expertise catalog, evidence, and metrics persistence; Expertise-aware delegation scoring and explain payload; Confidence, validation status, and lifecycle transitions; Operator-facing expertise CLI surfaces; Bounded expertise export and import contracts; Integration, contract, and non-regression coverage | avoid=full ontology engine; automatic trust promotion without evidence or policy; unrestricted cross-organization federation; implicit permission grants from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope | role=implement expertise CLI and help surfaces; improve operator-facing explainability outputs; keep UX legible for recommendation and delegation flows
 [/MAH_CONTEXT]
 
 # Frontend Dev

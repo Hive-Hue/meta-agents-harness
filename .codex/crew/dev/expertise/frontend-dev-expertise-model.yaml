@@ -5,7 +5,7 @@ agent:
 meta:
   version: "1"
   max_lines: "120"
-  last_updated: "2026-04-15T16:06:31.042Z"
+  last_updated: "2026-04-17T01:31:32.600Z"
 patterns: []
 risks: []
 tools: []
@@ -29,4 +29,8 @@ observations:
     note: "Create a unified bootstrap skill at /home/alysson/Github/meta-agents-harness/skills/bootstrap/SKILL.md -> Now I have both source files. Let me create the unified bootstrap skill."
   - date: "2026-04-15"
     note: "Use bash to create the file directly -> I'll attempt the bash commands as directed, but based on previous attempts, I expect the ownership guardrail may block skills/ paths since they're not in my declared ownership domain. Let me try:"
+  - date: "2026-04-17"
+    note: "## Security Patch Implementation: Expertise Model v0.7.0 ### Instructions Apply the following security patches to the specified files -> 1. Outcome (one sentence)"
+  - date: "2026-04-17"
+    note: "IMPORTANT: Use model zai/glm-5 for this task -> 1. Outcome (one sentence)"
 open_questions: []

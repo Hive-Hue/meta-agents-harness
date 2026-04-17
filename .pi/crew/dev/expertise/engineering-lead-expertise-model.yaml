@@ -5,7 +5,7 @@ agent:
 meta:
   version: "1"
   max_lines: "120"
-  last_updated: "2026-04-15T16:30:04.278Z"
+  last_updated: "2026-04-17T01:35:23.452Z"
 patterns: []
 risks: []
 tools: []
@@ -18,6 +18,10 @@ lessons:
     note: "Implemented Slices 2-3 for cross-runtime child agents: scripts/child-agent-spawn.mjs (strategy layer with buildSpawnContext, prepareChildSpawn pipeline, a [...]"
   - date: "2026-04-15"
     note: "Implemented Slice 4 CLI surface: added `mah delegate --target <agent> --task '<task>' [--runtime <target-runtime>] [--crew <crew-id>]` command to scripts/ [...]"
+  - date: "2026-04-17"
+    note: "Security patches v0.7.0: Applied 1 CRITICAL + 3 HIGH + 4 MEDIUM + 2 LOW fixes across expertise-evidence-store.mjs, expertise-loader.mjs, expertise-export. [...]"
+  - date: "2026-04-17"
+    note: "Residual security patches v0.7.0: Applied 3 residual fixes — (1) lifecycle hard enforcement: isAuthorizedTransition() now BLOCKS sensitive transitions (re [...]"
 observations:
   - date: "2026-04-09"
     note: "Implement theme artifact sync for PI runtime in sync-meta-agents.mjs Goal: mah generate must also copy extensions/themes/*.json → .pi/the... -> Now I unde [...]"
@@ -96,13 +100,17 @@ observations:
   - date: "2026-04-15"
     note: "## Fix: Codex sidecar should use direct codex exec --full-auto instead of mah run The Codex sidecar is currently going through mah run --... -> 1. Outcome [...]"
   - date: "2026-04-15"
-    note: "## Fix Documentation: Update Codex Sidecar command format In docs/cross-runtime-child-agents.md, find the \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Codex Sidecar\\\\\\ [...]"
+    note: "## Fix Documentation: Update Codex Sidecar command format In docs/cross-runtime-child-agents.md, find the \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ [...]"
   - date: "2026-04-15"
-    note: "## Fix 2 Stale References ### Issue 1: CHANGELOG.md In CHANGELOG.md, find the line in \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"### Fixed (Cross-Runtime Child Agents)\\\\\\\\\\\\\\\\\\\\\\\\\\\\ [...]"
+    note: "## Fix 2 Stale References ### Issue 1: CHANGELOG.md In CHANGELOG.md, find the line in \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ [...]"
   - date: "2026-04-15"
     note: "## Task: Create Unified Bootstrap Skill Create skills/bootstrap/SKILL.md by merging .pi/skills/mission-bootstrap/SKILL.md and skills/mult... -> 1. Outcome [...]"
   - date: "2026-04-15"
     note: "Write the unified bootstrap skill to skills/bootstrap/SKILL.md using a direct write approach -> The file exists with placeholder content. The orchestrator [...]"
   - date: "2026-04-15"
     note: "Write the unified bootstrap skill to skills/bootstrap/SKILL.md -> 1. Outcome: Created the unified bootstrap skill at skills/bootstrap/SKILL.md (639 lines, [...]"
+  - date: "2026-04-17"
+    note: "## Security Patch Implementation: Expertise Model v0.7.0 ### Contexto O time de Validation realizou security assessment completo do Exper... -> Now let me [...]"
+  - date: "2026-04-17"
+    note: "## Residual Security Fixes: Expertise Model v0.7.0 ### Contexto O time de Validation verificou os patches de segurança e aprovou 7 de 10 ... -> Now I have [...]"
 open_questions: []

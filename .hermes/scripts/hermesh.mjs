@@ -264,26 +264,68 @@ function stripPromptFrontmatter(raw) {
   return (match?.[1] || `${raw || ""}`).trim()
 }
 
-function buildBootstrapQuery(resolved) {
-  const promptPath = path.join(repoRoot, resolved.config.orchestrator?.prompt || "")
+function hasModelFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "-m" || token === "--model" || token.startsWith("--model=")) return true
+  }
+  return false
+}
+
+function resolveAgentContext(resolved, env = process.env) {
+  const multiTeam = readYaml(resolved.multiTeamPath)
+  const requestedAgent = `${env.MAH_AGENT || resolved.config.orchestrator?.name || "orchestrator"}`.trim()
+  const byName = new Map()
+
+  if (multiTeam?.orchestrator?.name) {
+    byName.set(multiTeam.orchestrator.name, { role: "orchestrator", team: "orchestration", ...multiTeam.orchestrator })
+  }
+  for (const team of Array.isArray(multiTeam?.teams) ? multiTeam.teams : []) {
+    if (team?.lead?.name) byName.set(team.lead.name, { role: "lead", team: `${team.name || ""}`.trim(), ...team.lead })
+    for (const member of Array.isArray(team?.members) ? team.members : []) {
+      if (member?.name) byName.set(member.name, { role: "worker", team: `${team.name || ""}`.trim(), ...member })
+    }
+  }
+
+  const agent =
+    byName.get(requestedAgent) ||
+    (resolved.config?.orchestrator?.name ? byName.get(resolved.config.orchestrator.name) : null) ||
+    { name: requestedAgent || "orchestrator", role: "orchestrator", team: "orchestration" }
+
+  return {
+    ...agent,
+    name: `${agent?.name || requestedAgent || "orchestrator"}`.trim(),
+    role: `${agent?.role || "orchestrator"}`.trim(),
+    team: `${agent?.team || ""}`.trim(),
+    model: `${agent?.model || resolved.config?.orchestrator?.model || ""}`.trim(),
+    instruction_block: `${agent?.instruction_block || resolved.config?.instruction_block || ""}`.trim()
+  }
+}
+
+function buildBootstrapQuery(resolved, agentCtx) {
+  const promptPath = path.join(repoRoot, agentCtx?.prompt || resolved.config.orchestrator?.prompt || "")
   const promptRaw = readTextIfExists(promptPath)
   const promptBody = stripPromptFrontmatter(promptRaw)
-  const instructionBlock = `${resolved.config.instruction_block || ""}`.trim()
+  const instructionBlock = `${agentCtx?.instruction_block || resolved.config.instruction_block || ""}`.trim()
   const mission = `${resolved.config.mission || ""}`.trim()
   const sprintMode = resolved.config.sprint_mode || {}
-  const tools = Array.isArray(resolved.config.orchestrator?.tools) ? resolved.config.orchestrator.tools : []
-  const skills = readYaml(resolved.multiTeamPath)?.orchestrator?.skills || []
+  const tools = Array.isArray(agentCtx?.tools) ? agentCtx.tools : []
+  const skills = Array.isArray(agentCtx?.skills) ? agentCtx.skills : []
   const skillList = Array.isArray(skills) ? skills.map((item) => `- ${item}`).join("\n") : ""
-  const responsibilities = Array.isArray(readYaml(resolved.multiTeamPath)?.orchestrator?.sprint_responsibilities)
-    ? readYaml(resolved.multiTeamPath).orchestrator.sprint_responsibilities.map((item) => `- ${item}`).join("\n")
+  const responsibilities = Array.isArray(agentCtx?.sprint_responsibilities)
+    ? agentCtx.sprint_responsibilities.map((item) => `- ${item}`).join("\n")
     : ""
   return [
     "Load the following runtime context for this session and keep it active unless the user explicitly overrides it.",
     "",
     "You are not a generic assistant in this session.",
-    "You are the Meta Agents Harness crew orchestrator for the current repository.",
+    "You are a Meta Agents Harness crew member for the current repository.",
     "",
     `Crew: ${resolved.crewId}`,
+    `Current agent: ${agentCtx?.name || "orchestrator"}`,
+    `Role: ${agentCtx?.role || "orchestrator"}`,
+    `Team: ${agentCtx?.team || "n/a"}`,
+    `Model: ${agentCtx?.model || "n/a"}`,
     `Mission: ${mission || "n/a"}`,
     `Sprint: ${sprintMode.name || "n/a"}`,
     `Target release: ${sprintMode.target_release || "n/a"}`,
@@ -291,7 +333,7 @@ function buildBootstrapQuery(resolved) {
     "Instruction block:",
     instructionBlock || "n/a",
     "",
-    "Orchestrator responsibilities:",
+    "Agent responsibilities:",
     responsibilities || "- n/a",
     "",
     "Expected tools in this role:",
@@ -396,7 +438,11 @@ function main() {
   if (command === "run" || command === "run:crew" || command === "chat") {
     const resolved = resolveCrewConfig(resolveCrewId(parsed))
     const env = buildHermesEnv(resolved, `${parsed.flags.get("session-root") || ""}`)
+    const agentCtx = resolveAgentContext(resolved, { ...process.env, ...env })
     let args = forwardedArgs(parsed, new Set(["crew", "json", "new-session", "session-root"]))
+    if (agentCtx.model && !hasModelFlag(args)) {
+      args.unshift("-m", agentCtx.model)
+    }
     const active = readActiveCrew()
     const continueRequested = args.includes("-c") || args.includes("--continue") || parsed.flags.has("-c") || parsed.flags.has("continue")
     const envSessionId = `${process.env.HERMES_SESSION_ID || ""}`.trim()
@@ -412,7 +458,7 @@ function main() {
       }
     }
     if (shouldBootstrapContext(parsed)) {
-      const bootstrap = runHermesCapture(["chat", "-Q", "-q", buildBootstrapQuery(resolved), ...args], env)
+      const bootstrap = runHermesCapture(["chat", "-Q", "-q", buildBootstrapQuery(resolved, agentCtx), ...args], env)
       if (bootstrap.error?.code === "ENOENT") {
         console.error("Hermes CLI not found in PATH.")
         process.exitCode = 1

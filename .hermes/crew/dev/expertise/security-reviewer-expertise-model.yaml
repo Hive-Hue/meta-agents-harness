@@ -5,13 +5,15 @@ agent:
 meta:
   version: "1"
   max_lines: "120"
-  last_updated: "2026-04-15T15:39:09.960Z"
+  last_updated: "2026-04-17T01:37:01.760Z"
 patterns: []
 risks: []
 tools: []
 workflows: []
 decisions: []
-lessons: []
+lessons:
+  - date: "2026-04-17"
+    note: "Security review of expertise model v0.7.0 found path traversal risks in evidence-store and export file helpers due to unvalidated expertise IDs/output paths, plus a trust-tier enforcement gap in routing. Legacy normalization also infers owner/crew from path context without strict validation."
 observations:
   - date: "2026-04-15"
     note: "Inspect the codebase for Slice 1 headless capability implementation -> I'll inspect the codebase for the security-reviewer specific items. Let me start by examining the relevant files."
@@ -25,4 +27,6 @@ observations:
     note: "## Task: Implement Slice 5 — Tests and Documentation for Cross-Runtime Child Agents You are working on the Validation team (lead: validat... -> Outcome: Created and sanity-checked docs/cross-runtime-child-agents.md for the cross-runtime child agents feature."
   - date: "2026-04-15"
     note: "## Security Review: Cross-Runtime Child Agents v0.6.0 You are security-reviewer -> 1. Command Injection Issues:"
+  - date: "2026-04-17"
+    note: "## Final Security Patch Re-Verification: 3 Residual Findings You must verify fixes for the 3 residual findings from the v0.7.0 security a... -> Outcome: Re-verified the three residual findings, confirmed the patches and self-tests pass, and updated the verification report with an APPROVED verdict."
 open_questions: []

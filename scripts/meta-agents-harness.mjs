@@ -1,5 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, cpSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
+import { resolve, dirname } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
@@ -205,6 +206,52 @@ function parseFilterArgs(argv) {
     mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities"),
     dryRun: hasFlag(argv, "--dry-run")
   }
+}
+
+// SECURITY: v0.7.0-patch
+function validateCliPath(inputPath, intent) {
+  if (!inputPath || typeof inputPath !== "string") {
+    return { ok: false, error: "path must be a non-empty string" }
+  }
+  if (intent !== "read" && intent !== "write") {
+    return { ok: false, error: `invalid path intent '${intent}'` }
+  }
+
+  const trimmed = inputPath.trim()
+  if (!trimmed) {
+    return { ok: false, error: "path must be a non-empty string" }
+  }
+
+  const currentRepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+  const resolvedPath = path.isAbsolute(trimmed) ? resolve(trimmed) : resolve(currentRepoRoot, trimmed)
+  const rel = path.relative(currentRepoRoot, resolvedPath)
+  const escapesRepoRoot = rel.startsWith("..") || path.isAbsolute(rel)
+
+  if (escapesRepoRoot) {
+    return {
+      ok: false,
+      error: `${intent} path escapes repository root and is not allowed: '${inputPath}'`
+    }
+  }
+
+  return { ok: true, resolvedPath }
+}
+
+function runCliPathSecuritySelfTest() {
+  // SECURITY: v0.7.0-patch
+  const cases = [
+    { path: '.mah/expertise/export.json', intent: 'write', expectOk: true },
+    { path: '../../etc/passwd', intent: 'read', expectOk: false },
+    { path: '/etc/passwd', intent: 'read', expectOk: false },
+  ]
+  let failed = 0
+  for (const t of cases) {
+    const result = validateCliPath(t.path, t.intent)
+    const pass = result.ok === t.expectOk
+    if (!pass) failed += 1
+    console.log(`[cli-path-selftest] ${t.intent} '${t.path}' => ok=${result.ok} (expected ${t.expectOk})`)
+  }
+  return failed === 0 ? 0 : 1
 }
 
 function runLocalScript(scriptPath, scriptArgs = []) {
@@ -2619,15 +2666,22 @@ async function runExpertise(argv, jsonMode = false) {
     const { exportExpertiseToFile } = await import('./expertise-export.mjs')
 
     if (outputPath) {
-      const result = await exportExpertiseToFile(normalizedId, outputPath, { domain })
+      // SECURITY: v0.7.0-patch
+      const outputValidation = validateCliPath(outputPath, 'write')
+      if (!outputValidation.ok) {
+        console.error(`ERROR: invalid --output path: ${outputValidation.error}`)
+        return 1
+      }
+
+      const result = await exportExpertiseToFile(normalizedId, outputValidation.resolvedPath, { domain })
       if (!result.ok) {
         console.error(`ERROR: export failed: ${result.errors.join('; ')}`)
         return 1
       }
       if (jsonMode) {
-        console.log(JSON.stringify({ ok: true, id: normalizedId, output: outputPath, warnings: result.errors }, null, 2))
+        console.log(JSON.stringify({ ok: true, id: normalizedId, output: outputValidation.resolvedPath, warnings: result.errors }, null, 2))
       } else {
-        console.log(`✓ Exported '${normalizedId}' to '${outputPath}'`)
+        console.log(`✓ Exported '${normalizedId}' to '${outputValidation.resolvedPath}'`)
         if (result.errors.length) console.log(`  warnings: ${result.errors.join(', ')}`)
       }
       return 0
@@ -2663,15 +2717,23 @@ async function runExpertise(argv, jsonMode = false) {
   if (sub === 'import') {
     const filePath = parseValueArg(subArgv, '') || subArgv[0]
     const dryRun = subArgv.includes('--dry-run')
+    const lenient = subArgv.includes('--lenient')
 
     if (!filePath) {
-      console.error("ERROR: usage: mah expertise import <file> [--dry-run]")
+      console.error("ERROR: usage: mah expertise import <file> [--dry-run] [--lenient]")
       return 1
     }
 
     const { loadImportFile, importExpertise } = await import('./expertise-export.mjs')
 
-    const loadResult = await loadImportFile(filePath, { dryRun })
+    // SECURITY: v0.7.0-patch
+    const fileValidation = validateCliPath(filePath, 'read')
+    if (!fileValidation.ok) {
+      console.error(`ERROR: invalid import file path: ${fileValidation.error}`)
+      return 1
+    }
+
+    const loadResult = await loadImportFile(fileValidation.resolvedPath, { dryRun, strict: !lenient })
     if (!loadResult.valid) {
       if (jsonMode) {
         console.log(JSON.stringify({ ok: false, errors: loadResult.errors, warnings: loadResult.warnings }, null, 2))
@@ -2740,8 +2802,9 @@ Usage:
   mah expertise export <id> --domain <domain>  Check domain policy
   mah expertise export <id> --json          JSON output
 
-  mah expertise import <file>               Import expertise from JSON file
+  mah expertise import <file>               Import expertise from JSON file (strict by default)
   mah expertise import <file> --dry-run     Validate without writing
+  mah expertise import <file> --lenient     Allow unknown fields (forward-compat mode)
 
 Examples:
   mah expertise list --crew dev
@@ -2812,6 +2875,11 @@ function main() {
       console.log(`runtime=${runtimeResult.runtime}`)
       console.log(`reason=${runtimeResult.reason}`)
     }
+    return
+  }
+
+  if (first === "selftest:cli-path") {
+    process.exitCode = runCliPathSecuritySelfTest()
     return
   }
 

@@ -15,6 +15,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Expertise CLI flows now resolve canonical catalog documents by expertise id instead of operating on registry summary refs
 - Explainability output for `mah expertise explain` and `mah explain delegate` now reflects the routing engine's real score model and blocking metadata
 - Expertise metrics/schema/type contracts are now aligned with the evidence aggregation model used by the runtime
+- Expertise evidence storage now supports `MAH_EXPERTISE_EVIDENCE_ROOT`, so tests and temporary runs can stay out of `.mah/expertise/evidence`
+- Expertise writing guidance now prefers `lessons`, `decisions`, `risks`, and `workflows` for durable knowledge, keeping `observations` narrow and short-lived
 
 ### Fixed
 - `mah expertise show` and `mah expertise export` now preserve canonical governance fields such as `allowed_environments`, `metadata`, `policy`, and declared ownership
@@ -24,6 +26,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Lifecycle transition `experimental -> active` now enforces `review_pass_rate >= 0.8` instead of using a placeholder approval path
 - Legacy expertise normalization now emits a v0.7-compatible shape for `owner`, `confidence`, `policy`, `input_contract`, and `evidence_refs`
 - CLI explain traces no longer render missing score placeholders such as `expertise_match: —` or `score=n/a` for valid routing decisions
+- Evidence-store and export/import tests now use temporary directories, leaving `.mah` clean for real runtime-generated evidence
 
 ### Validation
 - Verified with:

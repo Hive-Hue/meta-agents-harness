@@ -248,14 +248,14 @@ See [`docs/hermes/`](./docs/hermes/) for the complete Hermes integration guide.
 
 ### 6. Expertise model foundation
 
-In `v0.3.0`, expertise model is treated as a normalized foundation concept:
+In `v0.7.0`, the expertise model is treated as an operational foundation concept:
 
-- consistent naming in paths, scripts, tools, and generated artifacts
-- consistent runtime references in configs and prompts
-- visibility in graph and documentation
+- canonical catalog loading by expertise id
+- evidence-backed routing and explainability
+- validation, lifecycle, export/import, and governance boundaries
+- runtime evidence storage that can be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`
 
-This phase is intentionally structural.  
-It does not yet add expertise-aware routing/scoring/governance behavior.
+The checked-in `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
 
 See: `docs/expertise-model-foundation.md`
 

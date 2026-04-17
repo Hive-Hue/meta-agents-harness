@@ -17,8 +17,33 @@
 
 import { readFileSync, existsSync } from 'fs'
 import { resolve, isAbsolute } from 'path'
+import { resolve as resolvePathExport, dirname as dirnameExport } from 'path'
+import { fileURLToPath as fileURLToPathExport } from 'url'
 import { EXPERTISE_SCHEMA_VERSION, VALIDATION_STATUSES, LIFECYCLE_STATES, TRUST_TIERS } from '../types/expertise-types.mjs'
 import { validateExpertise } from './expertise-schema.mjs'
+
+const __filenameExport = fileURLToPathExport(import.meta.url)
+const __dirnameExport = dirnameExport(__filenameExport)
+const repoRootExport = resolvePathExport(__dirnameExport, '..')
+
+// SECURITY: v0.7.0-patch — validate export output path stays under repo root
+/**
+ * Validate that an export output path is safe.
+ * @param {string} basePath - Base directory (repo root)
+ * @param {string} outputPath - User-provided output path
+ * @returns {{ ok: boolean, resolvedPath?: string, error?: string }}
+ */
+export function validateExportPath(basePath, outputPath) {
+  if (!outputPath || typeof outputPath !== 'string') {
+    return { ok: false, error: 'outputPath must be a non-empty string' }
+  }
+  const resolved = resolvePathExport(basePath, outputPath)
+  const normalizedBase = resolvePathExport(basePath).replace(/\/+$/, '') + '/'
+  if (!resolved.startsWith(normalizedBase)) {
+    return { ok: false, error: `output path '${outputPath}' resolves outside repo root` }
+  }
+  return { ok: true, resolvedPath: resolved }
+}
 
 // ---------------------------------------------------------------------------
 // Export contract: allowed fields
@@ -243,7 +268,7 @@ export function exportExpertiseBundle(expertiseList, options = {}) {
  * requires owner_id to be a string.
  * 
  * @param {Object} payload - Raw imported JSON (will NOT be mutated)
- * @param {{ strict?: boolean, skipValidation?: boolean }} [options]
+ * @param {{ strict?: boolean, skipValidation?: boolean }} [options] — strict defaults to true
  * @returns {{ valid: boolean, errors: string[], warnings: string[], normalized?: Object }}
  */
 export function validateImportPayload(payload, options = {}) {
@@ -251,6 +276,8 @@ export function validateImportPayload(payload, options = {}) {
   const errors = []
   /** @type {string[]} */
   const warnings = []
+  // SECURITY: v0.7.0-patch — strict mode is now default; use { strict: false } for lenient
+  const strict = options.strict !== false
 
   // Must be an object
   if (!payload || typeof payload !== 'object') {
@@ -375,7 +402,10 @@ export function validateImportPayload(payload, options = {}) {
     warnings.push("Expertise: unknown field '_export' — this is an export stamp, not a canonical field")
   }
 
-  // Warn about unknown fields (but don't error — forward compatibility)
+  // Warn about unknown fields (default: forward compatibility).
+  // SECURITY: v0.7.0-patch
+  // In strict mode, unknown fields are promoted to errors. Downstream consumers
+  // must still re-validate imported payloads against their local policy.
   const known = new Set([
     'id', 'owner', 'schema_version', 'capabilities', 'domains',
     'input_contract', 'allowed_environments', 'validation_status',
@@ -384,7 +414,12 @@ export function validateImportPayload(payload, options = {}) {
   ])
   for (const key of Object.keys(payload)) {
     if (!known.has(key)) {
-      warnings.push(`import payload contains unknown field '${key}' — this may not be supported in v0.7.0`)
+      const message = `import payload contains unknown field '${key}' — this may not be supported in v0.7.0`
+      if (strict) {
+        errors.push(message)
+      } else {
+        warnings.push(message)
+      }
     }
   }
 
@@ -507,10 +542,17 @@ export async function exportExpertiseToFile(expertiseId, outputPath, options = {
     return { ok: false, errors: [result.error] }
   }
 
+  // SECURITY: v0.7.0-patch — validate export path stays under repo root
+  const pathValidation = validateExportPath(repoRootExport, outputPath)
+  if (!pathValidation.ok) {
+    return { ok: false, errors: [pathValidation.error] }
+  }
+  const safeOutputPath = pathValidation.resolvedPath
+
   // Write to file
-  const outputDir = outputPath.substring(0, outputPath.lastIndexOf('/'))
+  const outputDir = safeOutputPath.substring(0, safeOutputPath.lastIndexOf('/'))
   if (outputDir) mkdirSync(outputDir, { recursive: true })
-  writeFileSync(outputPath, JSON.stringify(result.payload, null, 2), 'utf-8')
+  writeFileSync(safeOutputPath, JSON.stringify(result.payload, null, 2), 'utf-8')
 
   return { ok: true, written: 1, errors: result.warnings || [] }
 }
@@ -519,10 +561,13 @@ export async function exportExpertiseToFile(expertiseId, outputPath, options = {
  * Load and validate an import file.
  * 
  * @param {string} filePath
- * @param {{ strict?: boolean, dryRun?: boolean }} [options]
+ * @param {{ strict?: boolean, dryRun?: boolean }} [options] — strict defaults to true
  * @returns {Promise<{ valid: boolean, payload?: Object, errors: string[], warnings: string[] }>}
  */
 export async function loadImportFile(filePath, options = {}) {
+  // SECURITY: v0.7.0-patch — strict is default
+  const strict = options.strict !== false
+
   if (!existsSync(filePath)) {
     return { valid: false, errors: [`import file not found: '${filePath}'`] }
   }
@@ -541,7 +586,7 @@ export async function loadImportFile(filePath, options = {}) {
     return { valid: false, errors: [`import file is not valid JSON: '${filePath}'`] }
   }
 
-  const validation = validateImportPayload(payload, options)
+  const validation = validateImportPayload(payload, { ...options, strict })
   if (!validation.valid) {
     return { valid: false, errors: validation.errors, warnings: validation.warnings }
   }
@@ -663,6 +708,38 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`  ok: ${bundleResult.ok}`)
   console.log(`  exported count: ${bundleResult.exported.length}`)
   console.log(`  errors: ${bundleResult.errors.join(', ') || 'none'}`)
+  console.log('')
+
+  // Test 6: Strict import mode rejects unknown fields
+  console.log('Test 6: Strict import mode (unknown fields => error)')
+  const strictPayload = { ...importPayload, unknown_field: true }
+  const strictResult = validateImportPayload(strictPayload, { strict: true })
+  console.log(`  valid: ${strictResult.valid} (expected false)`)
+  console.log(`  unknown field promoted to error: ${strictResult.errors.some(e => e.includes("unknown field 'unknown_field'")) ? 'YES' : 'NO (ERROR)'}`)
+  console.log('')
+
+  // Test 6b: Default strict mode rejects unknown fields (no explicit strict option)
+  console.log('Test 6b: Default strict mode (no explicit option) rejects unknown fields')
+  const defaultStrictPayload = { ...importPayload, rogue_field: 'bad' }
+  const defaultStrictResult = validateImportPayload(defaultStrictPayload) // no options
+  console.log(`  valid: ${defaultStrictResult.valid} (expected false — strict is default)`)
+  console.log(`  error about unknown field: ${defaultStrictResult.errors.some(e => e.includes("unknown field 'rogue_field'")) ? 'YES' : 'NO'}`)
+  console.log('')
+
+  // Test 6c: Explicit lenient mode allows unknown fields
+  console.log('Test 6c: Lenient mode (explicit { strict: false }) allows unknown fields')
+  const lenientPayload = { ...importPayload, extra_field: 'ok' }
+  const lenientResult = validateImportPayload(lenientPayload, { strict: false })
+  console.log(`  valid: ${lenientResult.valid} (expected true — lenient mode)`)
+  console.log(`  warning about unknown field: ${lenientResult.warnings.some(w => w.includes("unknown field 'extra_field'")) ? 'YES' : 'NO'}`)
+  console.log('')
+
+  // Test 7: SECURITY path validation for export output
+  console.log('Test 7: Export path validation')
+  const safePath = validateExportPath(repoRootExport, '.mah/expertise/exports/self-test.json')
+  console.log(`  safe path valid: ${safePath.ok}`)
+  const blockedPath = validateExportPath(repoRootExport, '../../etc/passwd')
+  console.log(`  traversal blocked: ${blockedPath.ok === false}`)
 
   console.log('\n=== Self-Test Complete ===')
 }

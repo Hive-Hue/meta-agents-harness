@@ -3,10 +3,11 @@
  * Tests bounded export/import for MAH v0.7.0 Expertise Engine
  */
 
-import { describe, it } from 'node:test'
+import { describe, it, after } from 'node:test'
 import assert from 'node:assert'
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, rmSync, mkdtempSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { tmpdir } from 'node:os'
 
 const repoRoot = process.cwd()
 
@@ -272,7 +273,7 @@ describe('M5 — validateImportPayload', () => {
   it('warns about unknown fields (forward compatibility)', () => {
     const payload = { ...makeImportPayload({ policy: { federated_allowed: true, allowed_domains: ['*'], approval_required: false } }) }
     payload.unknown_field = 'should warn'
-    const result = validateImportPayload(payload)
+    const result = validateImportPayload(payload, { strict: false })
     assert.ok(result.valid, 'must still be valid')
     assert.ok(result.warnings?.some(w => w.includes('unknown_field')), 'must warn about unknown field')
   })
@@ -354,9 +355,8 @@ describe('M5 — importExpertise', () => {
 // ---------------------------------------------------------------------------
 
 // Module-level tmp directories (created once per process)
-const tmpDir1 = resolve(repoRoot, '.mah/test-m5')
+const tmpDir1 = mkdtempSync(resolve(tmpdir(), 'mah-test-m5-'))
 const tmpFile = resolve(tmpDir1, 'import-test.json')
-mkdirSync(tmpDir1, { recursive: true })
 
 describe('M5 — loadImportFile (disk I/O)', () => {
   it('loads and validates a valid JSON file', async () => {
@@ -396,7 +396,7 @@ describe('M5 — loadImportFile (disk I/O)', () => {
     payload.custom_field = 'ignored'
     writeFileSync(tmpFile, JSON.stringify(payload), 'utf-8')
 
-    const result = await loadImportFile(tmpFile)
+    const result = await loadImportFile(tmpFile, { strict: false })
     assert.ok(result.valid, 'must still be valid')
     assert.ok(result.warnings?.some(w => w.includes('custom_field')), 'must warn about unknown field')
   })
@@ -406,9 +406,8 @@ describe('M5 — loadImportFile (disk I/O)', () => {
 // exportExpertiseToFile (disk I/O)
 // ---------------------------------------------------------------------------
 
-const tmpDir2 = resolve(repoRoot, '.mah/test-m5-export')
+const tmpDir2 = mkdtempSync(resolve(tmpdir(), 'mah-test-m5-export-'))
 const outputFile = resolve(tmpDir2, 'exported-agent.json')
-mkdirSync(tmpDir2, { recursive: true })
 
 describe('M5 — exportExpertiseToFile (disk I/O)', () => {
   it('writes export to file when federated_allowed=true', async () => {
@@ -437,9 +436,14 @@ describe('M5 — exportExpertiseToFile (disk I/O)', () => {
 // Integration: export then import round-trip
 // ---------------------------------------------------------------------------
 
-const tmpDir3 = resolve(repoRoot, '.mah/test-m5-roundtrip')
+const tmpDir3 = mkdtempSync(resolve(tmpdir(), 'mah-test-m5-roundtrip-'))
 const exportFile = resolve(tmpDir3, 'roundtrip-export.json')
-mkdirSync(tmpDir3, { recursive: true })
+
+after(() => {
+  rmSync(tmpDir1, { recursive: true, force: true })
+  rmSync(tmpDir2, { recursive: true, force: true })
+  rmSync(tmpDir3, { recursive: true, force: true })
+})
 
 describe('M5 — Export/Import Round-Trip', () => {
   it('exported payload can be validated and re-imported', async () => {

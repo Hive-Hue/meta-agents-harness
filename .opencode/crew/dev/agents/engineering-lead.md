@@ -11,14 +11,14 @@ permission:
     "*": deny
     frontend-dev: allow
     backend-dev: allow
-model: minimax/minimax-m2.7
+model: zai/glm-5
 ---
 
 # Engineering Lead
 
 Role: `lead`
 Team: `Engineering`
-Model: `minimax/minimax-m2.7`
+Model: `zai/glm-5`
 
 ## Mission
 Engineering lead responsible for delegation, synthesis, and team-level coordination.

@@ -127,6 +127,43 @@ function checkRequirements(expertise, from, to, metrics = null) {
 }
 
 /**
+ * Check if an actor is authorized to perform a given lifecycle transition.
+ * Sensitive transitions require actor with role 'admin' or 'governance'.
+ * Non-sensitive transitions are always authorized (with optional warning).
+ * // SECURITY: v0.7.0-patch
+ * @param {{ id?: string, role?: string } | null} actor
+ * @param {LifecycleState} fromState
+ * @param {LifecycleState} toState
+ * @returns {{ authorized: boolean, reason?: string }}
+ */
+export function isAuthorizedTransition(actor, fromState, toState) {
+  const SENSITIVE_TRANSITIONS = new Set([
+    'restricted:active',
+    'active:restricted',
+  ])
+  const key = `${fromState}:${toState}`
+
+  if (!SENSITIVE_TRANSITIONS.has(key)) {
+    return { authorized: true }
+  }
+
+  // Sensitive transition — require authorized actor
+  if (!actor) {
+    return { authorized: false, reason: `sensitive transition '${key}' requires an actor with role 'admin' or 'governance' — no actor provided` }
+  }
+
+  if (!actor.role && !actor.id) {
+    return { authorized: false, reason: `sensitive transition '${key}' requires actor with .role or .id field` }
+  }
+
+  if (actor.role !== 'admin' && actor.role !== 'governance') {
+    return { authorized: false, reason: `sensitive transition '${key}' requires actor with role 'admin' or 'governance', got '${actor.role || 'none'}'` }
+  }
+
+  return { authorized: true }
+}
+
+/**
  * Execute a lifecycle transition (validate + update)
  * @param {Expertise} expertise
  * @param {LifecycleState} targetState
@@ -134,10 +171,23 @@ function checkRequirements(expertise, from, to, metrics = null) {
  * @param {{ review_pass_rate?: number } | null} [metrics]
  * @returns {{ ok: boolean, expertise?: Expertise, errors?: string[], warnings?: string[] }}
  */
-export function transitionExpertise(expertise, targetState, reason, metrics = null) {
+export function transitionExpertise(expertise, targetState, reason, metrics = null, actor = null) {
   const currentState = expertise.lifecycle;
   const errors = [];
   const warnings = [];
+
+  // SECURITY: v0.7.0-patch — hard authorization enforcement for sensitive transitions
+  const authCheck = isAuthorizedTransition(actor, currentState, targetState)
+  if (!authCheck.authorized) {
+    errors.push(authCheck.reason)
+  } else {
+    // Non-blocking warning for non-sensitive transitions without actor
+    const SENSITIVE_TRANSITIONS = new Set(['restricted:active', 'active:restricted'])
+    const transitionKey = `${currentState}:${targetState}`
+    if (!SENSITIVE_TRANSITIONS.has(transitionKey) && !actor) {
+      warnings.push(`transition '${transitionKey}' performed without actor context — consider providing an actor for audit trail`)
+    }
+  }
 
   // Validate target state is valid
   if (!LIFECYCLE_STATES.includes(targetState)) {
@@ -184,6 +234,8 @@ export function transitionExpertise(expertise, targetState, reason, metrics = nu
     metadata: {
       ...expertise.metadata,
       updated: new Date().toISOString(),
+      // SECURITY: v0.7.0-patch — transition audit trail
+      ...(actor ? { _transition_actor: actor.id || actor.role, _transition_at: new Date().toISOString() } : {}),
     },
   };
 
@@ -287,8 +339,28 @@ function runTests() {
   };
   const result6 = transitionExpertise(restrictedExpertise, 'active', 'wrong_reason');
   assert(result6.ok === false, 'transitionExpertise(restricted, active) fails with wrong reason');
-  const result7 = transitionExpertise(restrictedExpertise, 'active', 'restriction_lifted');
-  assert(result7.ok === true, 'transitionExpertise(restricted, active, restriction_lifted) succeeds');
+  // SECURITY: v0.7.0-patch — restricted→active now requires authorized actor
+  const result7 = transitionExpertise(restrictedExpertise, 'active', 'restriction_lifted', null, { id: 'admin-1', role: 'admin' });
+  assert(result7.ok === true, 'transitionExpertise(restricted, active, restriction_lifted) succeeds with authorized actor');
+
+  // SECURITY: v0.7.0-patch — hard enforcement tests
+  const sensitiveNoActor = transitionExpertise(activeExpertise, 'restricted', 'policy_violation');
+  assert(sensitiveNoActor.ok === false, 'sensitive transition without actor is BLOCKED (hard enforcement)');
+  assert((sensitiveNoActor.errors || []).some(e => e.includes('no actor provided')), 'error message mentions missing actor');
+
+  const sensitiveWrongActor = transitionExpertise(activeExpertise, 'restricted', 'policy_violation', null, { id: 'user-1', role: 'worker' });
+  assert(sensitiveWrongActor.ok === false, 'sensitive transition with non-admin actor is BLOCKED');
+  assert((sensitiveWrongActor.errors || []).some(e => e.includes("'admin' or 'governance'")), 'error message mentions required roles');
+
+  const restrictedAgain = { ...activeExpertise, lifecycle: 'restricted' };
+  const sensitiveAdmin = transitionExpertise(restrictedAgain, 'active', 'restriction_lifted', null, { id: 'gov-1', role: 'governance' });
+  assert(sensitiveAdmin.ok === true, 'sensitive transition with governance actor succeeds');
+  assert(!!sensitiveAdmin.expertise.metadata._transition_actor, 'transition actor is stored in metadata');
+  assert(!!sensitiveAdmin.expertise.metadata._transition_at, 'transition timestamp is stored in metadata');
+
+  // Non-sensitive transition should still work without actor (backward compat)
+  const nonSensitiveNoActor = transitionExpertise(draftExpertise, 'experimental');
+  assert(nonSensitiveNoActor.ok === true, 'non-sensitive transition without actor still succeeds');
 
   // Test getSuggestedNextStates
   const suggestions = getSuggestedNextStates('draft');

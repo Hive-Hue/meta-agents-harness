@@ -45,6 +45,52 @@ export function scoreToBand(score) {
 }
 
 /**
+ * Assess the provenance/trustworthiness of evidence metrics.
+ * Detects suspicious patterns that may indicate fabricated or low-quality evidence.
+ * // SECURITY: v0.7.0-patch
+ * @param {object} metrics - ExpertiseMetrics object
+ * @returns {{ source: 'verified' | 'unverified' | 'fabricated_risk', trust_score: number, flags: string[] }}
+ */
+export function assessProvenance(metrics) {
+  const flags = []
+  const {
+    total_invocations = 0,
+    successful_invocations = 0,
+    evidence_count: rawEvidenceCount,
+    last_invoked = null,
+    review_pass_rate = 0,
+  } = metrics
+  const evidence_count = typeof rawEvidenceCount === 'number' ? rawEvidenceCount : total_invocations
+
+  // Check: evidence_count > 0 but last_invoked is null → suspicious
+  if (evidence_count > 0 && (last_invoked === null || last_invoked === undefined)) {
+    flags.push('evidence_present_but_never_invoked')
+  }
+
+  // Check: success rate > 0.99 with evidence_count < 5 → fabricated_risk
+  if (total_invocations > 0) {
+    const successRate = successful_invocations / total_invocations
+    if (successRate > 0.99 && evidence_count < 5) {
+      flags.push('suspiciously_high_success_rate_with_low_evidence')
+    }
+  }
+
+  // Check: very high review pass rate with very low evidence → flag
+  if (review_pass_rate >= 1.0 && evidence_count > 0 && evidence_count < 3) {
+    flags.push('perfect_review_with_minimal_evidence')
+  }
+
+  // Determine provenance level
+  if (flags.length === 0) {
+    return { source: 'verified', trust_score: 1.0, flags }
+  }
+  if (flags.some(f => f.includes('suspiciously_high') || f.includes('perfect_review'))) {
+    return { source: 'fabricated_risk', trust_score: 0.3, flags }
+  }
+  return { source: 'unverified', trust_score: 0.7, flags }
+}
+
+/**
  * Compute confidence from evidence metrics.
  * @param {object} metrics - ExpertiseMetrics from computeMetrics()
  * @param {ComputeConfidenceOptions} [options]
@@ -88,16 +134,27 @@ export function computeConfidence(metrics, options = {}) {
   // 5. Final score
   const score = clamp(baseScore + qualityScore + recencyPenalty - rejectionPenalty, 0, 1)
 
+  // SECURITY: v0.7.0-patch — provenance-based trust cap
+  const provenance = assessProvenance(metrics)
+  let trustCappedScore = score
+  if (provenance.source === 'unverified') {
+    trustCappedScore = score * 0.7
+  } else if (provenance.source === 'fabricated_risk') {
+    trustCappedScore = Math.min(score, 0.2)
+  }
+  const finalScore = clamp(trustCappedScore, 0, 1)
+
   // 6. Band
-  const band = scoreToBand(score)
+  const band = scoreToBand(finalScore)
 
   // 7. Evidence count from total_invocations
   const evidenceCount = total_invocations
 
   return {
-    score,
+    score: finalScore,
     band,
     evidence_count: evidenceCount,
+    provenance: { source: provenance.source, trust_score: provenance.trust_score, flags: provenance.flags },
   }
 }
 
@@ -257,9 +314,41 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     rejection_rate: 0,
     last_invoked: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(), // 60 days ago
   }
-  const oldConf = computeConfidence(oldMetrics)
+  const oldConf = computeConfidence({ ...oldMetrics, evidence_count: oldMetrics.total_invocations })
   console.log(`    60-day-old metrics score=${oldConf.score.toFixed(3)} (should have -0.05 penalty)`)
   console.assert(oldConf.score < 0.8, 'Old evidence should have penalty')
+  console.log('    PASS')
+
+  // Test 9: Provenance assessment — verified metrics
+  console.log('\n[9] assessProvenance — verified metrics...')
+  const verifiedMetrics = { total_invocations: 10, successful_invocations: 8, evidence_count: 10, last_invoked: new Date().toISOString(), review_pass_rate: 0.8 }
+  const provVerified = assessProvenance(verifiedMetrics)
+  console.log(`    source=${provVerified.source} (expected verified), flags=${JSON.stringify(provVerified.flags)}`)
+  console.assert(provVerified.source === 'verified', 'Normal metrics should be verified')
+  console.log('    PASS')
+
+  // Test 10: Provenance — suspiciously high success rate
+  console.log('\n[10] assessProvenance — fabricated_risk...')
+  const fabMetrics = { total_invocations: 4, successful_invocations: 4, evidence_count: 4, last_invoked: new Date().toISOString(), review_pass_rate: 0.5 }
+  const provFab = assessProvenance(fabMetrics)
+  console.log(`    source=${provFab.source} (expected fabricated_risk), flags=${JSON.stringify(provFab.flags)}`)
+  console.assert(provFab.source === 'fabricated_risk', '4/4 success with < 5 evidence should be fabricated_risk')
+  console.log('    PASS')
+
+  // Test 11: Provenance — evidence but never invoked
+  console.log('\n[11] assessProvenance — unverified (evidence but no last_invoked)...')
+  const unprovMetrics = { total_invocations: 5, successful_invocations: 3, evidence_count: 5, last_invoked: null, review_pass_rate: 0.6 }
+  const provUnprov = assessProvenance(unprovMetrics)
+  console.log(`    source=${provUnprov.source} (expected unverified), flags=${JSON.stringify(provUnprov.flags)}`)
+  console.assert(provUnprov.source === 'unverified', 'Evidence but null last_invoked should be unverified')
+  console.log('    PASS')
+
+  // Test 12: computeConfidence caps provenance
+  console.log('\n[12] computeConfidence provenance cap...')
+  const fabConf = computeConfidence(fabMetrics)
+  console.log(`    score=${fabConf.score.toFixed(3)} (should be capped at 0.2), provenance=${fabConf.provenance?.source}`)
+  console.assert(fabConf.score <= 0.2, 'Fabricated risk should cap at 0.2')
+  console.assert(fabConf.provenance?.source === 'fabricated_risk', 'Provenance should be in result')
   console.log('    PASS')
 
   console.log('\n=== All Self-Tests Passed ===')
