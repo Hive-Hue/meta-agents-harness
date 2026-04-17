@@ -6,8 +6,11 @@
 - M1B: [done]
 - M2: [done]
 - M3: [done]
+- M4: [planned]
 - nota:
-  - o arquivo permanece em `plan/progress/` como roadmap vivo, mas os milestones listados abaixo já têm cobertura material no repositório até `v0.5.0`
+  - o arquivo permanece em `plan/progress/` como roadmap vivo
+  - os milestones `M1A` a `M3` já têm cobertura material no repositório
+  - o próximo ciclo proposto passa a incluir `Context Memory` como base para evolução do MAH em direção a uma assistant layer de alto nível
 
 ## Objetivo
 
@@ -165,6 +168,44 @@ Esse modelo evita meta-config excessiva, mas também não deixa o YAML totalment
 - `test(runtime): contract tests por adapter`
 - `feat(demo): modo demo guiado`
 
+### M4 — Context Memory e Assistant Layer Base
+
+**Meta:** adicionar uma camada canônica de memória operacional pós-roteamento, reutilizável entre sessões e runtimes, fortalecendo o MAH como layer de assistência de alto nível sem contaminar o roteamento por expertise.
+
+**Escopo**
+
+- Novo namespace `mah context` para corpus operacional curado.
+- Suporte a `.md` e `.qmd` com frontmatter estruturado.
+- Indexação local bounded do corpus operacional.
+- Retrieval explainable por:
+  - `crew`
+  - `agent`
+  - `capability`
+  - `task`
+  - `systems/tools` disponíveis
+- Integração opcional com bootstrap de runtime, priorizando Hermes.
+- Proposal flow para transformar sinais de `sessions`, `provenance` e `evidence` em memória persistente curada.
+- Boundary explícito entre:
+  - `Expertise`
+  - `Context Memory`
+  - `Sessions`
+  - `Evidence`
+  - `Provenance`
+
+**Princípio central**
+
+- `Expertise` decide quem deve receber a tarefa.
+- `Context Memory` decide o que esse agente precisa lembrar para executar bem.
+
+**Issues sugeridas**
+
+- `feat(context): schema e validação para context memory`
+- `feat(context): index local e retrieval bounded`
+- `feat(context-cli): namespace mah context`
+- `feat(runtime): injeção de context memory no bootstrap Hermes`
+- `feat(context): proposal flow a partir de sessions/provenance`
+- `docs(product): MAH como assistant layer runtime-agnostic`
+
 ## Contrato de Runtime (Proposta)
 
 ```ts
@@ -241,12 +282,22 @@ Notas:
 - contract tests cobrindo todos os adapters
 - `mah demo` pronto para onboarding
 
+### DoD M4
+
+- `mah context` existe como namespace separado de `mah expertise`
+- corpus operacional suporta `.md` e `.qmd` com schema validável
+- retrieval bounded e explainable funcionando por agent/tarefa/capability
+- bootstrap do runtime pode consumir contexto operacional resumido sem inflar prompt fixo
+- existe proposal flow para persistência de memória derivada
+- a feature preserva o roteamento por expertise como source of truth para seleção de agente
+
 ## Priorização Recomendada
 
 1. M1A — segurança imediata
 2. M1B — arquitetura canônica
 3. M2 — UX e troubleshooting
 4. M3 — diferenciação de plataforma
+5. M4 — context memory e base da assistant layer
 
 ## Decisões de Arquitetura em Aberto
 
@@ -313,3 +364,15 @@ Antes de implementar M1B, três decisões precisam ser fechadas:
 - [done] uniformização de `--json` em comandos de diagnóstico
 - [done] semântica diferenciada de `plan` e `diff` com relatórios dedicados
 - [done] mecanismo de carregamento externo de plugins (`scripts/plugin-loader.mjs`, `mah plugins ...`, testes e docs)
+
+### M4 — Context Memory e Assistant Layer Base
+
+- [planned] documento de execução salvo em [`plan/context-memory-v0.8.0.md`](../context-memory-v0.8.0.md)
+- [todo] definir naming final da feature (`Context Memory` vs `Operational Context Memory`)
+- [todo] modelar schema e contratos em `types/` e `scripts/`
+- [todo] criar storage canônico em `.mah/context/operational/`
+- [todo] implementar `mah context validate` e `mah context index`
+- [todo] implementar retrieval bounded e explainable
+- [todo] integrar contexto recuperado ao bootstrap Hermes
+- [todo] definir proposal flow para persistência derivada de `sessions`/`provenance`
+- [todo] documentar boundary com `Expertise` para evitar sobreposição semântica
