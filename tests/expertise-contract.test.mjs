@@ -5,8 +5,9 @@
 
 import { describe, it, before, after } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { parse as yamlParse } from 'yaml'
 
@@ -380,6 +381,24 @@ describe('expertise contract', () => {
     assert.equal(typeof registry.generated_at, 'string')
     assert.ok(registry.total_count >= 0)
     assert.ok(Array.isArray(registry.entries))
+  })
+
+  it('buildRegistry deduplicates duplicate expertise ids and prefers canonical path', async () => {
+    const tmpCatalog = mkdtempSync(join(tmpdir(), 'mah-expertise-dedupe-'))
+    const canonicalPath = join(tmpCatalog, 'orchestrator.yaml')
+    const duplicatePath = join(tmpCatalog, 'dev-orchestrator.yaml')
+
+    writeFileSync(canonicalPath, readFileSync(join(fixturesDir, 'valid-minimal.yaml'), 'utf-8'), 'utf-8')
+    writeFileSync(duplicatePath, readFileSync(join(fixturesDir, 'valid-minimal.yaml'), 'utf-8'), 'utf-8')
+
+    const registry = await buildRegistry({ catalogPath: tmpCatalog })
+
+    assert.equal(registry.total_count, 1)
+    assert.equal(registry.entries.length, 1)
+    assert.equal(registry.entries[0].id, 'dev:orchestrator')
+    assert.equal(registry.entries[0].registry_path, '.mah/expertise/catalog/dev/orchestrator.yaml')
+
+    rmSync(tmpCatalog, { recursive: true, force: true })
   })
 
   // -------------------------------------------------------------------------

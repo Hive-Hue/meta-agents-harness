@@ -171,6 +171,73 @@ function toExpertiseRef(expertise) {
 }
 
 /**
+ * Compute the canonical registry path for an expertise id.
+ * Canonical catalog layout is `.mah/expertise/catalog/{crew}/{name}.yaml`.
+ * @param {string} expertiseId
+ * @returns {string}
+ */
+function canonicalRegistryPathForId(expertiseId) {
+  const [crew, name] = String(expertiseId || '').split(':')
+  if (crew && name) return `.mah/expertise/catalog/${crew}/${name}.yaml`
+  return `.mah/expertise/catalog/${expertiseId}.yaml`
+}
+
+/**
+ * Choose the preferred registry ref when multiple files declare the same expertise id.
+ * Prefer the canonical crew/name file path, then validated entries, then higher confidence.
+ * @param {ExpertiseRef} current
+ * @param {ExpertiseRef} candidate
+ * @returns {ExpertiseRef}
+ */
+function choosePreferredRef(current, candidate) {
+  const canonicalPath = canonicalRegistryPathForId(current.id)
+  const currentIsCanonical = current.registry_path === canonicalPath
+  const candidateIsCanonical = candidate.registry_path === canonicalPath
+
+  if (currentIsCanonical && !candidateIsCanonical) return current
+  if (candidateIsCanonical && !currentIsCanonical) return candidate
+
+  const currentValidated = current.validation_status === 'validated'
+  const candidateValidated = candidate.validation_status === 'validated'
+  if (currentValidated && !candidateValidated) return current
+  if (candidateValidated && !currentValidated) return candidate
+
+  const currentScore = Number(current.confidence?.score || 0)
+  const candidateScore = Number(candidate.confidence?.score || 0)
+  if (candidateScore > currentScore) return candidate
+  if (currentScore > candidateScore) return current
+
+  return current
+}
+
+/**
+ * Deduplicate registry refs by expertise id.
+ * @param {ExpertiseRef[]} entries
+ * @returns {ExpertiseRef[]}
+ */
+function dedupeExpertiseRefs(entries) {
+  /** @type {Map<string, ExpertiseRef>} */
+  const seen = new Map()
+
+  for (const entry of entries) {
+    const existing = seen.get(entry.id)
+    if (!existing) {
+      seen.set(entry.id, entry)
+      continue
+    }
+    const preferred = choosePreferredRef(existing, entry)
+    if (preferred !== existing) {
+      warn(`duplicate expertise id '${entry.id}' detected, preferring '${preferred.registry_path}' over '${existing.registry_path}'`)
+    } else {
+      warn(`duplicate expertise id '${entry.id}' detected, ignoring '${entry.registry_path}' in favor of '${existing.registry_path}'`)
+    }
+    seen.set(entry.id, preferred)
+  }
+
+  return Array.from(seen.values())
+}
+
+/**
  * Group an array of ExpertiseRef by a key derived from each entry.
  * @param {ExpertiseRef[]} entries
  * @param {(ExpertiseRef) => string} keyFn
@@ -208,7 +275,7 @@ export async function buildRegistry(options = {}) {
 
   // Convert to refs
   /** @type {ExpertiseRef[]} */
-  const entries = expertiseList.map(toExpertiseRef)
+  const entries = dedupeExpertiseRefs(expertiseList.map(toExpertiseRef))
 
   // Group by various dimensions
   /** @type {Registry} */
@@ -275,6 +342,12 @@ export async function readRegistry(registryPath) {
 
     if (ageMs > STALE_THRESHOLD_MS) {
       warn(`registry is stale (age ${Math.round(ageMs / 60000)} min), treating as stale`)
+      return null
+    }
+
+    const dedupedEntries = dedupeExpertiseRefs(Array.isArray(registry.entries) ? registry.entries : [])
+    if (dedupedEntries.length !== registry.entries.length) {
+      warn('registry contains duplicate expertise ids, treating cache as stale')
       return null
     }
 
