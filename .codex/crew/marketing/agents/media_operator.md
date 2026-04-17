@@ -1,6 +1,6 @@
 ---
 name: media-operator
-model: gpt-5.4-mini
+model: gpt-5.3-codex
 role: worker
 team: Creative
 mission: Plan, produce, refine, and validate communication assets, launch

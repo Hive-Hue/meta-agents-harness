@@ -15,7 +15,6 @@ tools:
   - grep
   - find
   - ls
-  - delegate_agent
   - update_expertise_model
   - mcp_servers
   - mcp_tools

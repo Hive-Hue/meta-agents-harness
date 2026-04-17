@@ -1,54 +1,56 @@
 name: DevMultiTeam
-mission: Deliver bounded v0.6.0 runtime evolution for Meta Agents Harness,
-  centered on cross-runtime headless execution and integrated session
-  interoperability, while preserving runtime-agnostic design and explicit
-  operational contracts.
+mission: Deliver bounded v0.7.0 Expertise Engine evolution for Meta Agents
+  Harness, transforming expertise from passive memory into operational routing
+  intelligence while preserving policy-first constraints and runtime-agnostic
+  contracts.
 sprint_mode:
-  name: v0.6.0-headless-and-sessions
+  name: v0.7.0-expertise-engine
   active: true
-  target_release: v0.6.0
-  objective: "Define and implement two bounded v0.6.0 fronts: headless execution
-    across runtimes and integrated session export/injection interoperability."
-  execution_mode: spec-bound-slice-driven
+  target_release: v0.7.0
+  objective: "Define and implement bounded v0.7.0 Expertise Engine foundations:
+    structured expertise model, expertise-aware delegation, trust/evidence
+    signals, and operator-facing registry workflows."
+  execution_mode: spec-bound-milestone-driven
   directives:
     - spec-bound execution
-    - no architecture-wave expansion
-    - no v0.7.0+ scope
+    - policy-first routing guardrails
+    - no ontology-wave expansion
+    - conservative rollout with explicit fallback
     - PR-sized slices
     - mandatory validation at each slice
-    - explicit deferred list for anything outside v0.6.0
+    - explicit deferred list for anything outside v0.7.0
   must_deliver:
-    - Headless support matrix across runtimes
-    - Explicit headless capability and adapter contract
-    - Stable MAH headless execution envelope
-    - Canonical MAH session export format
-    - Bounded context injection between runtimes
-    - Session interoperability fidelity model
-    - Integration and contract test coverage
+    - Structured expertise schema and validation
+    - Expertise catalog, evidence, and metrics persistence
+    - Expertise-aware delegation scoring and explain payload
+    - Confidence, validation status, and lifecycle transitions
+    - Operator-facing expertise CLI surfaces
+    - Bounded expertise export and import contracts
+    - Integration, contract, and non-regression coverage
   must_not_deliver:
-    - full transcript replay portability
-    - full multi-runtime parity
-    - remote execution foundation
-    - policy engine
-    - federation/interconnect
-    - confidential execution
-    - distributed session broker
-    - v0.7.0+ scope
-instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-  for Meta Agents Harness, centered on cross-runtime headless execution and
-  integrated session interoperability, while preserving runtime-agnostic design
-  and explicit operational contracts. |
-  sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-  | directives=spec-bound execution; no architecture-wave expansion; no v0.7.0+
-  scope; PR-sized slices; mandatory validation at each slice; explicit deferred
-  list for anything outside v0.6.0 | do=Headless support matrix across runtimes;
-  Explicit headless capability and adapter contract; Stable MAH headless
-  execution envelope; Canonical MAH session export format; Bounded context
-  injection between runtimes; Session interoperability fidelity model;
-  Integration and contract test coverage | avoid=full transcript replay
-  portability; full multi-runtime parity; remote execution foundation; policy
-  engine; federation/interconnect; confidential execution; distributed session
-  broker; v0.7.0+ scope
+    - full ontology engine
+    - automatic trust promotion without evidence or policy
+    - unrestricted cross-organization federation
+    - implicit permission grants from expertise metadata
+    - mandatory dedicated UI dashboard
+    - v0.8.0+ scope
+instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+  evolution for Meta Agents Harness, transforming expertise from passive memory
+  into operational routing intelligence while preserving policy-first
+  constraints and runtime-agnostic contracts. |
+  sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+  | directives=spec-bound execution; policy-first routing guardrails; no
+  ontology-wave expansion; conservative rollout with explicit fallback; PR-sized
+  slices; mandatory validation at each slice; explicit deferred list for
+  anything outside v0.7.0 | do=Structured expertise schema and validation;
+  Expertise catalog, evidence, and metrics persistence; Expertise-aware
+  delegation scoring and explain payload; Confidence, validation status, and
+  lifecycle transitions; Operator-facing expertise CLI surfaces; Bounded
+  expertise export and import contracts; Integration, contract, and
+  non-regression coverage | avoid=full ontology engine; automatic trust
+  promotion without evidence or policy; unrestricted cross-organization
+  federation; implicit permission grants from expertise metadata; mandatory
+  dedicated UI dashboard; v0.8.0+ scope
 session_dir: ../../../.opencode/crew/dev/sessions
 expertise_dir: expertise
 domain_profiles:
@@ -58,17 +60,40 @@ domain_profiles:
   planning_delivery:
     - path: .
       read: true
+    - path: meta-agents.yaml
+      read: true
+      edit: true
     - path: plan/*
+      read: true
+      edit: true
+      bash: true
+    - path: plan/progress/*
+      read: true
+      edit: true
+      bash: true
+    - path: plan/done/*
       read: true
       edit: true
       bash: true
     - path: specs/*
       read: true
       edit: true
+    - path: specs/specs/*
+      read: true
+      edit: true
     - path: docs/*
       read: true
       edit: true
       bash: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
+    - path: tests/*
+      read: true
     - path: examples/*
       read: true
       edit: true
@@ -152,6 +177,14 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: .codex/*
+      read: true
+      edit: true
+      bash: true
+    - path: .kilo/*
+      read: true
+      edit: true
+      bash: true
     - path: skills/*
       read: true
       edit: true
@@ -166,11 +199,52 @@ domain_profiles:
     - path: .env.sample
       read: true
       edit: true
+    - path: .mah/expertise/*
+      read: true
+      edit: true
+      bash: true
   validation_runtime:
     - path: .
       read: true
       bash: true
+    - path: meta-agents.yaml
+      read: true
+    - path: scripts/*
+      read: true
+      edit: true
+      bash: true
+    - path: types/*
+      read: true
+      edit: true
     - path: tests/*
+      read: true
+      edit: true
+      bash: true
+    - path: .mah/expertise/*
+      read: true
+      edit: true
+      bash: true
+    - path: .codex/*
+      read: true
+      edit: true
+      bash: true
+    - path: .kilo/*
+      read: true
+      edit: true
+      bash: true
+    - path: .pi/*
+      read: true
+      edit: true
+      bash: true
+    - path: .hermes/*
+      read: true
+      edit: true
+      bash: true
+    - path: .claude/*
+      read: true
+      edit: true
+      bash: true
+    - path: .opencode/*
       read: true
       edit: true
       bash: true
@@ -182,6 +256,12 @@ domain_profiles:
       read: true
       edit: true
     - path: specs/*
+      read: true
+      edit: true
+    - path: specs/specs/*
+      read: true
+      edit: true
+    - path: plan/progress/*
       read: true
       edit: true
   bootstrap_generation:
@@ -259,28 +339,31 @@ orchestrator:
   name: orchestrator
   description: Orchestrator coordinator
   sprint_responsibilities:
-    - control sprint scope
-    - distribute slices
-    - consolidate decisions
-    - prevent runtime-specific capture of MAH architecture
-    - defer anything outside v0.6.0
-  instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-    for Meta Agents Harness, centered on cross-runtime headless execution and
-    integrated session interoperability, while preserving runtime-agnostic
-    design and explicit operational contracts. |
-    sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-    | directives=spec-bound execution; no architecture-wave expansion; no
-    v0.7.0+ scope; PR-sized slices; mandatory validation at each slice; explicit
-    deferred list for anything outside v0.6.0 | do=Headless support matrix
-    across runtimes; Explicit headless capability and adapter contract; Stable
-    MAH headless execution envelope; Canonical MAH session export format;
-    Bounded context injection between runtimes; Session interoperability
-    fidelity model; Integration and contract test coverage | avoid=full
-    transcript replay portability; full multi-runtime parity; remote execution
-    foundation; policy engine; federation/interconnect; confidential execution;
-    distributed session broker; v0.7.0+ scope | role=control sprint scope;
-    distribute slices; consolidate decisions; prevent runtime-specific capture
-    of MAH architecture; defer anything outside v0.6.0
+    - control v0.7.0 scope
+    - sequence milestones and distribute slices
+    - enforce policy-first and fallback-safe decisions
+    - preserve runtime-agnostic MAH architecture
+    - defer anything outside v0.7.0
+  instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+    evolution for Meta Agents Harness, transforming expertise from passive
+    memory into operational routing intelligence while preserving policy-first
+    constraints and runtime-agnostic contracts. |
+    sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+    | directives=spec-bound execution; policy-first routing guardrails; no
+    ontology-wave expansion; conservative rollout with explicit fallback;
+    PR-sized slices; mandatory validation at each slice; explicit deferred list
+    for anything outside v0.7.0 | do=Structured expertise schema and validation;
+    Expertise catalog, evidence, and metrics persistence; Expertise-aware
+    delegation scoring and explain payload; Confidence, validation status, and
+    lifecycle transitions; Operator-facing expertise CLI surfaces; Bounded
+    expertise export and import contracts; Integration, contract, and
+    non-regression coverage | avoid=full ontology engine; automatic trust
+    promotion without evidence or policy; unrestricted cross-organization
+    federation; implicit permission grants from expertise metadata; mandatory
+    dedicated UI dashboard; v0.8.0+ scope | role=control v0.7.0 scope; sequence
+    milestones and distribute slices; enforce policy-first and fallback-safe
+    decisions; preserve runtime-agnostic MAH architecture; defer anything
+    outside v0.7.0
   prompt: .hermes/crew/dev/agents/orchestrator.md
   expertise:
     path: .hermes/crew/dev/expertise/orchestrator-expertise-model.yaml
@@ -298,7 +381,6 @@ orchestrator:
     - grep
     - find
     - ls
-    - delegate_agent
     - update_expertise_model
     - mcp_servers
     - mcp_tools
@@ -322,44 +404,45 @@ teams:
       name: planning-lead
       description: Planning Lead planning lead
       sprint_responsibilities:
-        - translate spec into executable backlog
-        - order slices
-        - prevent backlog inflation
-        - separate headless execution work from session interop work
-      instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-        for Meta Agents Harness, centered on cross-runtime headless execution
-        and integrated session interoperability, while preserving
-        runtime-agnostic design and explicit operational contracts. |
-        sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-        | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.6.0 | do=Headless support
-        matrix across runtimes; Explicit headless capability and adapter
-        contract; Stable MAH headless execution envelope; Canonical MAH session
-        export format; Bounded context injection between runtimes; Session
-        interoperability fidelity model; Integration and contract test coverage
-        | avoid=full transcript replay portability; full multi-runtime parity;
-        remote execution foundation; policy engine; federation/interconnect;
-        confidential execution; distributed session broker; v0.7.0+ scope |
-        role=translate spec into executable backlog; order slices; prevent
-        backlog inflation; separate headless execution work from session interop
-        work
+        - translate Expertise Engine spec into executable backlog
+        - maintain milestone ordering and acceptance criteria
+        - prevent ontology and governance over-expansion
+        - keep M1-M5 boundaries explicit
+      instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+        evolution for Meta Agents Harness, transforming expertise from passive
+        memory into operational routing intelligence while preserving
+        policy-first constraints and runtime-agnostic contracts. |
+        sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+        | directives=spec-bound execution; policy-first routing guardrails; no
+        ontology-wave expansion; conservative rollout with explicit fallback;
+        PR-sized slices; mandatory validation at each slice; explicit deferred
+        list for anything outside v0.7.0 | do=Structured expertise schema and
+        validation; Expertise catalog, evidence, and metrics persistence;
+        Expertise-aware delegation scoring and explain payload; Confidence,
+        validation status, and lifecycle transitions; Operator-facing expertise
+        CLI surfaces; Bounded expertise export and import contracts;
+        Integration, contract, and non-regression coverage | avoid=full ontology
+        engine; automatic trust promotion without evidence or policy;
+        unrestricted cross-organization federation; implicit permission grants
+        from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope
+        | role=translate Expertise Engine spec into executable backlog; maintain
+        milestone ordering and acceptance criteria; prevent ontology and
+        governance over-expansion; keep M1-M5 boundaries explicit
       prompt: .hermes/crew/dev/agents/planning_lead.md
       expertise:
         path: .hermes/crew/dev/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
         - find
         - ls
-        - delegate_agent
         - update_expertise_model
         - mcp_servers
         - mcp_tools
@@ -376,7 +459,21 @@ teams:
           read: true
           upsert: false
           delete: false
+        - path: meta-agents.yaml
+          read: true
+          upsert: true
+          delete: false
         - path: plan/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: plan/progress/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: plan/done/*
           read: true
           upsert: true
           delete: true
@@ -386,10 +483,30 @@ teams:
           upsert: true
           delete: false
           recursive: true
+        - path: specs/specs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
         - path: docs/*
           read: true
           upsert: true
           delete: true
+          recursive: true
+        - path: scripts/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: types/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: tests/*
+          read: true
+          upsert: false
+          delete: false
           recursive: true
         - path: examples/*
           read: true
@@ -408,35 +525,38 @@ teams:
       - name: repo-analyst
         description: Repo Analyst planning worker
         sprint_responsibilities:
-          - map real codebase integration points
-          - locate affected files
+          - map real codebase integration points for Expertise Engine
+          - locate affected files and dependency edges
           - surface regression and coupling risks
-          - identify runtime-specific headless and session semantics
-        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-          for Meta Agents Harness, centered on cross-runtime headless execution
-          and integrated session interoperability, while preserving
-          runtime-agnostic design and explicit operational contracts. |
-          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-          | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.6.0 | do=Headless
-          support matrix across runtimes; Explicit headless capability and
-          adapter contract; Stable MAH headless execution envelope; Canonical
-          MAH session export format; Bounded context injection between runtimes;
-          Session interoperability fidelity model; Integration and contract test
-          coverage | avoid=full transcript replay portability; full
-          multi-runtime parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=map real codebase integration points;
-          locate affected files; surface regression and coupling risks; identify
-          runtime-specific headless and session semantics
+          - identify runtime and plugin compatibility constraints
+        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+          evolution for Meta Agents Harness, transforming expertise from passive
+          memory into operational routing intelligence while preserving
+          policy-first constraints and runtime-agnostic contracts. |
+          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; policy-first routing guardrails; no
+          ontology-wave expansion; conservative rollout with explicit fallback;
+          PR-sized slices; mandatory validation at each slice; explicit deferred
+          list for anything outside v0.7.0 | do=Structured expertise schema and
+          validation; Expertise catalog, evidence, and metrics persistence;
+          Expertise-aware delegation scoring and explain payload; Confidence,
+          validation status, and lifecycle transitions; Operator-facing
+          expertise CLI surfaces; Bounded expertise export and import contracts;
+          Integration, contract, and non-regression coverage | avoid=full
+          ontology engine; automatic trust promotion without evidence or policy;
+          unrestricted cross-organization federation; implicit permission grants
+          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
+          scope | role=map real codebase integration points for Expertise
+          Engine; locate affected files and dependency edges; surface regression
+          and coupling risks; identify runtime and plugin compatibility
+          constraints
         prompt: .hermes/crew/dev/agents/repo_analyst.md
         expertise:
           path: .hermes/crew/dev/expertise/repo-analyst-expertise-model.yaml
           use-when: Track durable learnings for repo-analyst.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -461,36 +581,38 @@ teams:
       - name: solution-architect
         description: Solution Architect planning worker
         sprint_responsibilities:
-          - define the runtime adapter evolution for headless mode
-          - define the session adapter and export/injection boundaries
-          - identify the smallest technically correct slice
-        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-          for Meta Agents Harness, centered on cross-runtime headless execution
-          and integrated session interoperability, while preserving
-          runtime-agnostic design and explicit operational contracts. |
-          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-          | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.6.0 | do=Headless
-          support matrix across runtimes; Explicit headless capability and
-          adapter contract; Stable MAH headless execution envelope; Canonical
-          MAH session export format; Bounded context injection between runtimes;
-          Session interoperability fidelity model; Integration and contract test
-          coverage | avoid=full transcript replay portability; full
-          multi-runtime parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=define the runtime adapter evolution for
-          headless mode; define the session adapter and export/injection
-          boundaries; identify the smallest technically correct slice
+          - define expertise object and storage contracts
+          - define routing score and fallback semantics
+          - define bounded export and import policy envelope
+        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+          evolution for Meta Agents Harness, transforming expertise from passive
+          memory into operational routing intelligence while preserving
+          policy-first constraints and runtime-agnostic contracts. |
+          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; policy-first routing guardrails; no
+          ontology-wave expansion; conservative rollout with explicit fallback;
+          PR-sized slices; mandatory validation at each slice; explicit deferred
+          list for anything outside v0.7.0 | do=Structured expertise schema and
+          validation; Expertise catalog, evidence, and metrics persistence;
+          Expertise-aware delegation scoring and explain payload; Confidence,
+          validation status, and lifecycle transitions; Operator-facing
+          expertise CLI surfaces; Bounded expertise export and import contracts;
+          Integration, contract, and non-regression coverage | avoid=full
+          ontology engine; automatic trust promotion without evidence or policy;
+          unrestricted cross-organization federation; implicit permission grants
+          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
+          scope | role=define expertise object and storage contracts; define
+          routing score and fallback semantics; define bounded export and import
+          policy envelope
         prompt: .hermes/crew/dev/agents/solution_architect.md
         expertise:
           path: .hermes/crew/dev/expertise/solution-architect-expertise-model.yaml
           use-when: Track durable learnings for solution-architect.
           updatable: true
           max-lines: 10000
-        model: minimax/minimax-m2.7
+        model: zai/glm-5
         model_fallbacks:
-          - zai/glm-5
+          - minimax/minimax-m2.7
           - nvidia/nemotron-3-super-120b-a12b:free
         tools:
           - write
@@ -511,7 +633,21 @@ teams:
             read: true
             upsert: false
             delete: false
+          - path: meta-agents.yaml
+            read: true
+            upsert: true
+            delete: false
           - path: plan/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: plan/progress/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: plan/done/*
             read: true
             upsert: true
             delete: true
@@ -521,10 +657,30 @@ teams:
             upsert: true
             delete: false
             recursive: true
+          - path: specs/specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
           - path: docs/*
             read: true
             upsert: true
             delete: true
+            recursive: true
+          - path: scripts/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: types/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: tests/*
+            read: true
+            upsert: false
+            delete: false
             recursive: true
           - path: examples/*
             read: true
@@ -544,42 +700,44 @@ teams:
       name: engineering-lead
       description: Engineering Lead engineering lead
       sprint_responsibilities:
-        - coordinate implementation
+        - coordinate model, routing, and CLI implementation streams
         - split work into reviewable changesets
-        - preserve runtime adapter and session adapter boundaries
-      instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-        for Meta Agents Harness, centered on cross-runtime headless execution
-        and integrated session interoperability, while preserving
-        runtime-agnostic design and explicit operational contracts. |
-        sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-        | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.6.0 | do=Headless support
-        matrix across runtimes; Explicit headless capability and adapter
-        contract; Stable MAH headless execution envelope; Canonical MAH session
-        export format; Bounded context injection between runtimes; Session
-        interoperability fidelity model; Integration and contract test coverage
-        | avoid=full transcript replay portability; full multi-runtime parity;
-        remote execution foundation; policy engine; federation/interconnect;
-        confidential execution; distributed session broker; v0.7.0+ scope |
-        role=coordinate implementation; split work into reviewable changesets;
-        preserve runtime adapter and session adapter boundaries
+        - preserve adapter boundaries and backward compatibility
+      instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+        evolution for Meta Agents Harness, transforming expertise from passive
+        memory into operational routing intelligence while preserving
+        policy-first constraints and runtime-agnostic contracts. |
+        sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+        | directives=spec-bound execution; policy-first routing guardrails; no
+        ontology-wave expansion; conservative rollout with explicit fallback;
+        PR-sized slices; mandatory validation at each slice; explicit deferred
+        list for anything outside v0.7.0 | do=Structured expertise schema and
+        validation; Expertise catalog, evidence, and metrics persistence;
+        Expertise-aware delegation scoring and explain payload; Confidence,
+        validation status, and lifecycle transitions; Operator-facing expertise
+        CLI surfaces; Bounded expertise export and import contracts;
+        Integration, contract, and non-regression coverage | avoid=full ontology
+        engine; automatic trust promotion without evidence or policy;
+        unrestricted cross-organization federation; implicit permission grants
+        from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope
+        | role=coordinate model, routing, and CLI implementation streams; split
+        work into reviewable changesets; preserve adapter boundaries and
+        backward compatibility
       prompt: .hermes/crew/dev/agents/engineering_lead.md
       expertise:
         path: .hermes/crew/dev/expertise/engineering-lead-expertise-model.yaml
         use-when: Track durable learnings for engineering-lead.
         updatable: true
         max-lines: 10000
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
         - find
         - ls
-        - delegate_agent
         - update_expertise_model
         - mcp_servers
         - mcp_tools
@@ -653,6 +811,16 @@ teams:
           upsert: true
           delete: true
           recursive: true
+        - path: .codex/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .kilo/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
         - path: skills/*
           read: true
           upsert: true
@@ -671,38 +839,45 @@ teams:
           read: true
           upsert: true
           delete: false
+        - path: .mah/expertise/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
     members:
       - name: frontend-dev
         description: Frontend Dev engineering worker
         sprint_responsibilities:
-          - update CLI and help surfaces
-          - handle operator-facing explainability and docs changes
-          - keep headless and session UX legible and explicit
-        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-          for Meta Agents Harness, centered on cross-runtime headless execution
-          and integrated session interoperability, while preserving
-          runtime-agnostic design and explicit operational contracts. |
-          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-          | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.6.0 | do=Headless
-          support matrix across runtimes; Explicit headless capability and
-          adapter contract; Stable MAH headless execution envelope; Canonical
-          MAH session export format; Bounded context injection between runtimes;
-          Session interoperability fidelity model; Integration and contract test
-          coverage | avoid=full transcript replay portability; full
-          multi-runtime parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=update CLI and help surfaces; handle
-          operator-facing explainability and docs changes; keep headless and
-          session UX legible and explicit
+          - implement expertise CLI and help surfaces
+          - improve operator-facing explainability outputs
+          - keep UX legible for recommendation and delegation flows
+        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+          evolution for Meta Agents Harness, transforming expertise from passive
+          memory into operational routing intelligence while preserving
+          policy-first constraints and runtime-agnostic contracts. |
+          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; policy-first routing guardrails; no
+          ontology-wave expansion; conservative rollout with explicit fallback;
+          PR-sized slices; mandatory validation at each slice; explicit deferred
+          list for anything outside v0.7.0 | do=Structured expertise schema and
+          validation; Expertise catalog, evidence, and metrics persistence;
+          Expertise-aware delegation scoring and explain payload; Confidence,
+          validation status, and lifecycle transitions; Operator-facing
+          expertise CLI surfaces; Bounded expertise export and import contracts;
+          Integration, contract, and non-regression coverage | avoid=full
+          ontology engine; automatic trust promotion without evidence or policy;
+          unrestricted cross-organization federation; implicit permission grants
+          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
+          scope | role=implement expertise CLI and help surfaces; improve
+          operator-facing explainability outputs; keep UX legible for
+          recommendation and delegation flows
         prompt: .hermes/crew/dev/agents/frontend_dev.md
         expertise:
           path: .hermes/crew/dev/expertise/frontend-dev-expertise-model.yaml
           use-when: Track durable learnings for frontend-dev.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -821,6 +996,16 @@ teams:
             upsert: true
             delete: true
             recursive: true
+          - path: .codex/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .kilo/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
           - path: skills/*
             read: true
             upsert: true
@@ -839,37 +1024,44 @@ teams:
             read: true
             upsert: true
             delete: false
+          - path: .mah/expertise/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
       - name: backend-dev
         description: Backend Dev engineering worker
         sprint_responsibilities:
-          - implement ruupdntime adapter headless behavior
-          - integrate dispatcher and session export/injection changes
-          - own runtime and session interoperability tests
-        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-          for Meta Agents Harness, centered on cross-runtime headless execution
-          and integrated session interoperability, while preserving
-          runtime-agnostic design and explicit operational contracts. |
-          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-          | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.6.0 | do=Headless
-          support matrix across runtimes; Explicit headless capability and
-          adapter contract; Stable MAH headless execution envelope; Canonical
-          MAH session export format; Bounded context injection between runtimes;
-          Session interoperability fidelity model; Integration and contract test
-          coverage | avoid=full transcript replay portability; full
-          multi-runtime parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=implement ruupdntime adapter headless
-          behavior; integrate dispatcher and session export/injection changes;
-          own runtime and session interoperability tests
+          - implement expertise persistence and evidence pipeline
+          - integrate routing engine with dispatcher and MCP delegation surfaces
+          - own core expertise routing and interoperability tests
+        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+          evolution for Meta Agents Harness, transforming expertise from passive
+          memory into operational routing intelligence while preserving
+          policy-first constraints and runtime-agnostic contracts. |
+          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; policy-first routing guardrails; no
+          ontology-wave expansion; conservative rollout with explicit fallback;
+          PR-sized slices; mandatory validation at each slice; explicit deferred
+          list for anything outside v0.7.0 | do=Structured expertise schema and
+          validation; Expertise catalog, evidence, and metrics persistence;
+          Expertise-aware delegation scoring and explain payload; Confidence,
+          validation status, and lifecycle transitions; Operator-facing
+          expertise CLI surfaces; Bounded expertise export and import contracts;
+          Integration, contract, and non-regression coverage | avoid=full
+          ontology engine; automatic trust promotion without evidence or policy;
+          unrestricted cross-organization federation; implicit permission grants
+          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
+          scope | role=implement expertise persistence and evidence pipeline;
+          integrate routing engine with dispatcher and MCP delegation surfaces;
+          own core expertise routing and interoperability tests
         prompt: .hermes/crew/dev/agents/backend_dev.md
         expertise:
           path: .hermes/crew/dev/expertise/backend-dev-expertise-model.yaml
           use-when: Track durable learnings for backend-dev.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -988,6 +1180,16 @@ teams:
             upsert: true
             delete: true
             recursive: true
+          - path: .codex/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .kilo/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
           - path: skills/*
             read: true
             upsert: true
@@ -1006,48 +1208,55 @@ teams:
             read: true
             upsert: true
             delete: false
+          - path: .mah/expertise/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
   - name: Validation
     lead:
       name: validation-lead
       description: Validation Lead validation lead
       sprint_responsibilities:
-        - define phase gates
-        - validate spec adherence
-        - block scope escape from the release boundary
-        - enforce explicit fidelity and fallback rules
-      instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-        for Meta Agents Harness, centered on cross-runtime headless execution
-        and integrated session interoperability, while preserving
-        runtime-agnostic design and explicit operational contracts. |
-        sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-        | directives=spec-bound execution; no architecture-wave expansion; no
-        v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-        explicit deferred list for anything outside v0.6.0 | do=Headless support
-        matrix across runtimes; Explicit headless capability and adapter
-        contract; Stable MAH headless execution envelope; Canonical MAH session
-        export format; Bounded context injection between runtimes; Session
-        interoperability fidelity model; Integration and contract test coverage
-        | avoid=full transcript replay portability; full multi-runtime parity;
-        remote execution foundation; policy engine; federation/interconnect;
-        confidential execution; distributed session broker; v0.7.0+ scope |
-        role=define phase gates; validate spec adherence; block scope escape
-        from the release boundary; enforce explicit fidelity and fallback rules
+        - define quality gates for schema, routing, and evidence
+        - validate spec adherence and release boundary
+        - enforce explainability and JSON contract stability
+        - block policy/topology bypass risk
+      instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+        evolution for Meta Agents Harness, transforming expertise from passive
+        memory into operational routing intelligence while preserving
+        policy-first constraints and runtime-agnostic contracts. |
+        sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+        | directives=spec-bound execution; policy-first routing guardrails; no
+        ontology-wave expansion; conservative rollout with explicit fallback;
+        PR-sized slices; mandatory validation at each slice; explicit deferred
+        list for anything outside v0.7.0 | do=Structured expertise schema and
+        validation; Expertise catalog, evidence, and metrics persistence;
+        Expertise-aware delegation scoring and explain payload; Confidence,
+        validation status, and lifecycle transitions; Operator-facing expertise
+        CLI surfaces; Bounded expertise export and import contracts;
+        Integration, contract, and non-regression coverage | avoid=full ontology
+        engine; automatic trust promotion without evidence or policy;
+        unrestricted cross-organization federation; implicit permission grants
+        from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope
+        | role=define quality gates for schema, routing, and evidence; validate
+        spec adherence and release boundary; enforce explainability and JSON
+        contract stability; block policy/topology bypass risk
       prompt: .hermes/crew/dev/agents/validation_lead.md
       expertise:
         path: .hermes/crew/dev/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       tools:
         - read
         - grep
         - find
         - ls
-        - delegate_agent
         - update_expertise_model
         - mcp_servers
         - mcp_tools
@@ -1064,7 +1273,56 @@ teams:
           read: true
           upsert: false
           delete: true
+        - path: meta-agents.yaml
+          read: true
+          upsert: false
+          delete: false
+        - path: scripts/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: types/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
         - path: tests/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .mah/expertise/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .codex/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .kilo/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .pi/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .hermes/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .claude/*
+          read: true
+          upsert: true
+          delete: true
+          recursive: true
+        - path: .opencode/*
           read: true
           upsert: true
           delete: true
@@ -1084,32 +1342,44 @@ teams:
           upsert: true
           delete: false
           recursive: true
+        - path: specs/specs/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
+        - path: plan/progress/*
+          read: true
+          upsert: true
+          delete: false
+          recursive: true
     members:
       - name: qa-reviewer
         description: Qa Reviewer validation worker
         sprint_responsibilities:
-          - run smoke tests
-          - run diagnostics tests
-          - verify sync consistency
-          - validate headless and session export/injection flows
-        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-          for Meta Agents Harness, centered on cross-runtime headless execution
-          and integrated session interoperability, while preserving
-          runtime-agnostic design and explicit operational contracts. |
-          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-          | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.6.0 | do=Headless
-          support matrix across runtimes; Explicit headless capability and
-          adapter contract; Stable MAH headless execution envelope; Canonical
-          MAH session export format; Bounded context injection between runtimes;
-          Session interoperability fidelity model; Integration and contract test
-          coverage | avoid=full transcript replay portability; full
-          multi-runtime parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=run smoke tests; run diagnostics tests;
-          verify sync consistency; validate headless and session
-          export/injection flows
+          - run expertise unit, integration, and contract tests
+          - run diagnostics and regression suites
+          - verify sync consistency and output contracts
+          - validate recommendation and delegation explain flows
+        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+          evolution for Meta Agents Harness, transforming expertise from passive
+          memory into operational routing intelligence while preserving
+          policy-first constraints and runtime-agnostic contracts. |
+          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; policy-first routing guardrails; no
+          ontology-wave expansion; conservative rollout with explicit fallback;
+          PR-sized slices; mandatory validation at each slice; explicit deferred
+          list for anything outside v0.7.0 | do=Structured expertise schema and
+          validation; Expertise catalog, evidence, and metrics persistence;
+          Expertise-aware delegation scoring and explain payload; Confidence,
+          validation status, and lifecycle transitions; Operator-facing
+          expertise CLI surfaces; Bounded expertise export and import contracts;
+          Integration, contract, and non-regression coverage | avoid=full
+          ontology engine; automatic trust promotion without evidence or policy;
+          unrestricted cross-organization federation; implicit permission grants
+          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
+          scope | role=run expertise unit, integration, and contract tests; run
+          diagnostics and regression suites; verify sync consistency and output
+          contracts; validate recommendation and delegation explain flows
         prompt: .hermes/crew/dev/agents/qa_reviewer.md
         expertise:
           path: .hermes/crew/dev/expertise/qa-reviewer-expertise-model.yaml
@@ -1137,7 +1407,56 @@ teams:
             read: true
             upsert: false
             delete: true
+          - path: meta-agents.yaml
+            read: true
+            upsert: false
+            delete: false
+          - path: scripts/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: types/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
           - path: tests/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .mah/expertise/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .codex/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .kilo/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .pi/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .hermes/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .claude/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .opencode/*
             read: true
             upsert: true
             delete: true
@@ -1157,30 +1476,42 @@ teams:
             upsert: true
             delete: false
             recursive: true
+          - path: specs/specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: plan/progress/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
       - name: security-reviewer
         description: Security Reviewer validation worker
         sprint_responsibilities:
-          - review runtime boundary and unsafe coupling
-          - flag runtime capture and false portability risks across runtimes
-          - cut future-wave contamination from the sprint
-        instruction_block: crew=dev | mission=Deliver bounded v0.6.0 runtime evolution
-          for Meta Agents Harness, centered on cross-runtime headless execution
-          and integrated session interoperability, while preserving
-          runtime-agnostic design and explicit operational contracts. |
-          sprint=v0.6.0-headless-and-sessions,release=v0.6.0,mode=spec-bound-slice-driven,active=true
-          | directives=spec-bound execution; no architecture-wave expansion; no
-          v0.7.0+ scope; PR-sized slices; mandatory validation at each slice;
-          explicit deferred list for anything outside v0.6.0 | do=Headless
-          support matrix across runtimes; Explicit headless capability and
-          adapter contract; Stable MAH headless execution envelope; Canonical
-          MAH session export format; Bounded context injection between runtimes;
-          Session interoperability fidelity model; Integration and contract test
-          coverage | avoid=full transcript replay portability; full
-          multi-runtime parity; remote execution foundation; policy engine;
-          federation/interconnect; confidential execution; distributed session
-          broker; v0.7.0+ scope | role=review runtime boundary and unsafe
-          coupling; flag runtime capture and false portability risks across
-          runtimes; cut future-wave contamination from the sprint
+          - review policy gating and unsafe coupling risks
+          - flag privilege escalation via expertise metadata
+          - validate bounded export and confidential constraints
+        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
+          evolution for Meta Agents Harness, transforming expertise from passive
+          memory into operational routing intelligence while preserving
+          policy-first constraints and runtime-agnostic contracts. |
+          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; policy-first routing guardrails; no
+          ontology-wave expansion; conservative rollout with explicit fallback;
+          PR-sized slices; mandatory validation at each slice; explicit deferred
+          list for anything outside v0.7.0 | do=Structured expertise schema and
+          validation; Expertise catalog, evidence, and metrics persistence;
+          Expertise-aware delegation scoring and explain payload; Confidence,
+          validation status, and lifecycle transitions; Operator-facing
+          expertise CLI surfaces; Bounded expertise export and import contracts;
+          Integration, contract, and non-regression coverage | avoid=full
+          ontology engine; automatic trust promotion without evidence or policy;
+          unrestricted cross-organization federation; implicit permission grants
+          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
+          scope | role=review policy gating and unsafe coupling risks; flag
+          privilege escalation via expertise metadata; validate bounded export
+          and confidential constraints
         prompt: .hermes/crew/dev/agents/security_reviewer.md
         expertise:
           path: .hermes/crew/dev/expertise/security-reviewer-expertise-model.yaml
@@ -1208,7 +1539,56 @@ teams:
             read: true
             upsert: false
             delete: true
+          - path: meta-agents.yaml
+            read: true
+            upsert: false
+            delete: false
+          - path: scripts/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: types/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
           - path: tests/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .mah/expertise/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .codex/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .kilo/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .pi/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .hermes/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .claude/*
+            read: true
+            upsert: true
+            delete: true
+            recursive: true
+          - path: .opencode/*
             read: true
             upsert: true
             delete: true
@@ -1224,6 +1604,16 @@ teams:
             delete: false
             recursive: true
           - path: specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: specs/specs/*
+            read: true
+            upsert: true
+            delete: false
+            recursive: true
+          - path: plan/progress/*
             read: true
             upsert: true
             delete: false

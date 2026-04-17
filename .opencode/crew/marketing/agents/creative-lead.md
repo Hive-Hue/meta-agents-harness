@@ -12,14 +12,14 @@ permission:
     copywriter: allow
     creative-strategist: allow
     media-operator: allow
-model: minimax/minimax-m2.7
+model: zai/glm-5
 ---
 
 # Creative Lead
 
 Role: `lead`
 Team: `Creative`
-Model: `minimax/minimax-m2.7`
+Model: `zai/glm-5`
 
 ## Mission
 Creative lead responsible for delegation, synthesis, and team-level coordination.

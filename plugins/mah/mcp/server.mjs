@@ -32,7 +32,7 @@ function asTextResult(result) {
 
 const server = new McpServer({
   name: "mah-codex-plugin",
-  version: "0.5.0"
+  version: "0.7.0"
 })
 
 server.registerTool(

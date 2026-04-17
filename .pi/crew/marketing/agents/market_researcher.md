@@ -1,6 +1,6 @@
 ---
 name: market-researcher
-model: zai/glm-5
+model: openai-codex/gpt-5.3-codex
 role: worker
 team: Planning
 mission: Plan, produce, refine, and validate communication assets, launch

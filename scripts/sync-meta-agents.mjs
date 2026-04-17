@@ -737,7 +737,8 @@ function domainFromProfile(meta, profileNameOrNames, runtime) {
 function runtimeTools(agent, runtime) {
   const safeTools = ["read", "grep", "find", "ls"]
   if (agent.role === "orchestrator" || agent.role === "lead") {
-    const tools = [...safeTools, "delegate_agent", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
+    const delegationTool = runtime === "hermes" ? null : "delegate_agent"
+    const tools = [...safeTools, delegationTool, "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"].filter(Boolean)
     return runtime === "kilo" ? Object.fromEntries(tools.map((tool) => [tool, true])) : tools
   }
   const base = ["read", "grep", "find", "ls", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]

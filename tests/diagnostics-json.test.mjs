@@ -74,7 +74,7 @@ test("doctor and explain detect support json envelope", () => {
   assert.equal(doctor.json.schema, "mah.diagnostics.v1")
   assert.equal(doctor.json.command, "doctor")
   assert.equal(doctor.json.data?.crew_context?.crew_id, "dev")
-  assert.equal(doctor.json.data?.crew_context?.sprint_mode?.target_release, "v0.6.0")
+  assert.equal(doctor.json.data?.crew_context?.sprint_mode?.target_release, "v0.7.0")
   const explain = runJson(["explain", "detect", "--json", "--crew", "dev"])
   assert.equal(explain.json.schema, "mah.diagnostics.v1")
   assert.equal(explain.json.command, "explain")

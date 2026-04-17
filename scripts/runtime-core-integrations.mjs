@@ -512,33 +512,100 @@ function latestHermesSessionId(repoRoot, envOverrides = {}) {
   return `${tokens[tokens.length - 1] || ""}`.trim()
 }
 
-function buildHermesBootstrapQuery(repoRoot, configPath, multiTeamPath) {
+function hasHermesModelFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "-m" || token === "--model" || token.startsWith("--model=")) return true
+  }
+  return false
+}
+
+function readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides = {}) {
   const config = readYaml(configPath)
   const multiTeam = readYaml(multiTeamPath)
-  const orchestratorPromptPath = resolveFromRepo(repoRoot, config?.orchestrator?.prompt || "")
-  const orchestratorPromptBody = stripFrontmatter(safeReadText(orchestratorPromptPath))
-  const responsibilities = Array.isArray(multiTeam?.orchestrator?.sprint_responsibilities)
-    ? multiTeam.orchestrator.sprint_responsibilities.map((item) => `- ${item}`).join("\n")
+  const requestedAgent = `${envOverrides.MAH_AGENT || process.env.MAH_AGENT || config?.orchestrator?.name || "orchestrator"}`.trim()
+
+  const byName = new Map()
+  const orchestrator = multiTeam?.orchestrator || null
+  if (orchestrator?.name) byName.set(orchestrator.name, { role: "orchestrator", team: "orchestration", ...orchestrator })
+  for (const team of Array.isArray(multiTeam?.teams) ? multiTeam.teams : []) {
+    if (team?.lead?.name) {
+      byName.set(team.lead.name, { role: "lead", team: `${team?.name || ""}`.trim(), ...team.lead })
+    }
+    for (const member of Array.isArray(team?.members) ? team.members : []) {
+      if (member?.name) byName.set(member.name, { role: "worker", team: `${team?.name || ""}`.trim(), ...member })
+    }
+  }
+
+  const resolvedAgent =
+    byName.get(requestedAgent) ||
+    (config?.orchestrator?.name ? byName.get(config.orchestrator.name) : null) ||
+    { name: requestedAgent || "orchestrator", role: "orchestrator", team: "orchestration" }
+
+  const promptPath = resolveFromRepo(repoRoot, resolvedAgent?.prompt || config?.orchestrator?.prompt || "")
+  const promptBody = stripFrontmatter(safeReadText(promptPath))
+  const responsibilities = Array.isArray(resolvedAgent?.sprint_responsibilities)
+    ? resolvedAgent.sprint_responsibilities.map((item) => `- ${item}`).join("\n")
     : "- n/a"
+  const tools = Array.isArray(resolvedAgent?.tools) ? resolvedAgent.tools : []
+  const skills = Array.isArray(resolvedAgent?.skills) ? resolvedAgent.skills : []
+
+  return {
+    config,
+    agentName: `${resolvedAgent?.name || requestedAgent || "orchestrator"}`.trim(),
+    agentRole: `${resolvedAgent?.role || "orchestrator"}`.trim(),
+    agentTeam: `${resolvedAgent?.team || ""}`.trim(),
+    agentModel: `${resolvedAgent?.model || config?.orchestrator?.model || ""}`.trim(),
+    instructionBlock: `${resolvedAgent?.instruction_block || config?.instruction_block || ""}`.trim(),
+    responsibilities,
+    tools,
+    skills,
+    promptBody
+  }
+}
+
+function buildHermesBootstrapQuery(agentCtx) {
+  const mission = `${agentCtx?.config?.mission || ""}`.trim()
+  const sprintName = `${agentCtx?.config?.sprint_mode?.name || ""}`.trim() || "n/a"
+  const targetRelease = `${agentCtx?.config?.sprint_mode?.target_release || ""}`.trim() || "n/a"
+  const roleLabel = `${agentCtx?.agentRole || "agent"}`.trim()
+  const teamLabel = `${agentCtx?.agentTeam || "n/a"}`.trim()
+  const toolLines = Array.isArray(agentCtx?.tools) && agentCtx.tools.length > 0
+    ? agentCtx.tools.map((item) => `- ${item}`).join("\n")
+    : "- n/a"
+  const skillLines = Array.isArray(agentCtx?.skills) && agentCtx.skills.length > 0
+    ? agentCtx.skills.map((item) => `- ${item}`).join("\n")
+    : "- n/a"
+
   return [
     "Load the following runtime context for this session and keep it active unless the user explicitly overrides it.",
     "",
     "You are not a generic assistant in this session.",
-    "You are the Meta Agents Harness crew orchestrator for the current repository.",
+    "You are a Meta Agents Harness crew member for the current repository.",
     "",
-    `Crew: ${config?.crew || ""}`,
-    `Mission: ${config?.mission || "n/a"}`,
-    `Sprint: ${config?.sprint_mode?.name || "n/a"}`,
-    `Target release: ${config?.sprint_mode?.target_release || "n/a"}`,
+    `Crew: ${agentCtx?.config?.crew || ""}`,
+    `Current agent: ${agentCtx?.agentName || "orchestrator"}`,
+    `Role: ${roleLabel}`,
+    `Team: ${teamLabel}`,
+    `Model: ${agentCtx?.agentModel || "n/a"}`,
+    `Mission: ${mission || "n/a"}`,
+    `Sprint: ${sprintName}`,
+    `Target release: ${targetRelease}`,
     "",
     "Instruction block:",
-    `${config?.instruction_block || ""}`.trim() || "n/a",
+    agentCtx?.instructionBlock || "n/a",
     "",
-    "Orchestrator responsibilities:",
-    responsibilities,
+    "Agent responsibilities:",
+    agentCtx?.responsibilities || "- n/a",
+    "",
+    "Expected tools in this role:",
+    toolLines,
+    "",
+    "Crew skills referenced by the runtime:",
+    skillLines,
     "",
     "Prompt body:",
-    orchestratorPromptBody || "n/a",
+    agentCtx?.promptBody || "n/a",
     "",
     "Acknowledge with exactly: CONTEXT LOADED"
   ].join("\n")
@@ -801,11 +868,15 @@ export function prepareHermesRunContext({ repoRoot, crew, configPath, argv = [],
   const configuredSessionRoot = `${sessionRootParse.values.at(-1) || config?.session_dir || `.hermes/crew/${crew}/sessions`}`.trim()
   const sessionRoot = resolveFromRepo(repoRoot, configuredSessionRoot)
   const multiTeamPath = resolveFromRepo(repoRoot, config?.multi_team || `.hermes/crew/${crew}/multi-team.yaml`)
+  const agentCtx = readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides)
+  const modelArgs = agentCtx.agentModel && !hasHermesModelFlag(remaining)
+    ? ["-m", agentCtx.agentModel]
+    : []
 
   return {
     ok: true,
     exec: "hermes",
-    args: ["chat"],
+    args: ["chat", ...modelArgs],
     passthrough: remaining,
     envOverrides: {
       ...envOverrides,
@@ -821,7 +892,8 @@ export function prepareHermesRunContext({ repoRoot, crew, configPath, argv = [],
       configPath,
       multiTeamPath,
       sessionRoot,
-      newSessionRequested
+      newSessionRequested,
+      agentCtx
     }
   }
 }
@@ -852,8 +924,10 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
   }
 
   if (shouldBootstrapHermes(args, envOverrides)) {
-    const bootstrapQuery = buildHermesBootstrapQuery(repoRoot, internal.configPath, internal.multiTeamPath)
-    const bootstrap = spawnSync("hermes", ["chat", "-Q", "-q", bootstrapQuery, ...args], {
+    const agentCtx = internal.agentCtx || readHermesAgentContext(repoRoot, internal.configPath, internal.multiTeamPath, envOverrides)
+    const bootstrapQuery = buildHermesBootstrapQuery(agentCtx)
+    const bootstrapModelArgs = agentCtx.agentModel && !hasHermesModelFlag(args) ? ["-m", agentCtx.agentModel] : []
+    const bootstrap = spawnSync("hermes", ["chat", ...bootstrapModelArgs, "-Q", "-q", bootstrapQuery, ...args], {
       cwd: repoRoot,
       env: { ...process.env, ...envOverrides },
       encoding: "utf-8"

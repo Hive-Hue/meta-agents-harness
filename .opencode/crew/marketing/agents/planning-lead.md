@@ -11,14 +11,14 @@ permission:
     "*": deny
     market-researcher: allow
     campaign-strategist: allow
-model: minimax/minimax-m2.7
+model: zai/glm-5
 ---
 
 # Planning Lead
 
 Role: `lead`
 Team: `Planning`
-Model: `minimax/minimax-m2.7`
+Model: `zai/glm-5`
 
 ## Mission
 Planning lead responsible for delegation, synthesis, and team-level coordination.

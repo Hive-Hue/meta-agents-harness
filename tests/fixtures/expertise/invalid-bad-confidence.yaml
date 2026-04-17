@@ -1,0 +1,15 @@
+id: dev:orchestrator
+owner:
+  agent: orchestrator
+schema_version: mah.expertise.v1
+capabilities:
+  - task-planning
+domains:
+  - software-engineering
+validation_status: declared
+lifecycle: active
+trust_tier: internal
+confidence:
+  score: 1.5
+  band: high
+  evidence_count: 10

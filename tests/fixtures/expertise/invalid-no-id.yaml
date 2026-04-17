@@ -1,0 +1,10 @@
+owner:
+  agent: orchestrator
+schema_version: mah.expertise.v1
+capabilities:
+  - task-planning
+domains:
+  - software-engineering
+validation_status: declared
+lifecycle: draft
+trust_tier: internal

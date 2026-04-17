@@ -1,0 +1,19 @@
+agent:
+  name: orchestrator
+  role: orchestrator
+  team: global
+meta:
+  version: '1'
+  max_lines: '120'
+  last_updated: '2026-04-15T15:43:54.527Z'
+patterns:
+  - note: task-planning
+  - note: crew-coordination
+risks:
+  - date: '2026-04-15'
+    note: overload risk
+lessons:
+  - note: lesson one
+workflows:
+  - name: wf1
+    description: desc

@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: zai/glm-5
+model: openai-codex/gpt-5.3-codex
 ---
 
 # Market Researcher
 
 Role: `worker`
 Team: `Planning`
-Model: `zai/glm-5`
+Model: `openai-codex/gpt-5.3-codex`
 
 ## Mission
 Planning worker focused on scoped execution within assigned ownership boundaries.

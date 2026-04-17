@@ -1,0 +1,44 @@
+id: dev:orchestrator
+owner:
+  agent: orchestrator
+  team: dev
+schema_version: mah.expertise.v1
+capabilities:
+  - task-planning
+  - crew-coordination
+domains:
+  - software-engineering
+  - multi-agent-systems
+input_contract:
+  required_fields:
+    - task_description
+  optional_fields:
+    - context
+  field_types:
+    task_description: string
+    context: string
+allowed_environments:
+  - production
+  - staging
+validation_status: validated
+confidence:
+  score: 0.87
+  band: high
+  evidence_count: 42
+trust_tier: org
+lifecycle: active
+policy:
+  federated_allowed: false
+  allowed_domains:
+    - engineering
+  approval_required: true
+evidence_refs:
+  - ev-001
+  - ev-002
+metadata:
+  created: '2026-01-01T00:00:00Z'
+  updated: '2026-04-01T00:00:00Z'
+  owner_id: 'dev/orchestrator'
+  tags:
+    - orchestration
+    - planning

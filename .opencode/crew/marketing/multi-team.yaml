@@ -31,17 +31,40 @@ shared:
     planning_delivery:
       - path: .
         read: true
+      - path: meta-agents.yaml
+        read: true
+        edit: true
       - path: plan/*
+        read: true
+        edit: true
+        bash: true
+      - path: plan/progress/*
+        read: true
+        edit: true
+        bash: true
+      - path: plan/done/*
         read: true
         edit: true
         bash: true
       - path: specs/*
         read: true
         edit: true
+      - path: specs/specs/*
+        read: true
+        edit: true
       - path: docs/*
         read: true
         edit: true
         bash: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+      - path: types/*
+        read: true
+        edit: true
+      - path: tests/*
+        read: true
       - path: examples/*
         read: true
         edit: true
@@ -125,6 +148,14 @@ shared:
         read: true
         edit: true
         bash: true
+      - path: .codex/*
+        read: true
+        edit: true
+        bash: true
+      - path: .kilo/*
+        read: true
+        edit: true
+        bash: true
       - path: skills/*
         read: true
         edit: true
@@ -139,11 +170,52 @@ shared:
       - path: .env.sample
         read: true
         edit: true
+      - path: .mah/expertise/*
+        read: true
+        edit: true
+        bash: true
     validation_runtime:
       - path: .
         read: true
         bash: true
+      - path: meta-agents.yaml
+        read: true
+      - path: scripts/*
+        read: true
+        edit: true
+        bash: true
+      - path: types/*
+        read: true
+        edit: true
       - path: tests/*
+        read: true
+        edit: true
+        bash: true
+      - path: .mah/expertise/*
+        read: true
+        edit: true
+        bash: true
+      - path: .codex/*
+        read: true
+        edit: true
+        bash: true
+      - path: .kilo/*
+        read: true
+        edit: true
+        bash: true
+      - path: .pi/*
+        read: true
+        edit: true
+        bash: true
+      - path: .hermes/*
+        read: true
+        edit: true
+        bash: true
+      - path: .claude/*
+        read: true
+        edit: true
+        bash: true
+      - path: .opencode/*
         read: true
         edit: true
         bash: true
@@ -155,6 +227,12 @@ shared:
         read: true
         edit: true
       - path: specs/*
+        read: true
+        edit: true
+      - path: specs/specs/*
+        read: true
+        edit: true
+      - path: plan/progress/*
         read: true
         edit: true
     bootstrap_generation:
@@ -275,9 +353,9 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       agent_file: .opencode/crew/marketing/agents/planning-lead.md
       expertise:
@@ -334,7 +412,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -390,7 +468,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -448,9 +526,9 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       agent_file: .opencode/crew/marketing/agents/creative-lead.md
       expertise:
@@ -508,7 +586,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -564,7 +642,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -620,7 +698,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -678,9 +756,9 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: minimax/minimax-m2.7
+      model: zai/glm-5
       model_fallbacks:
-        - zai/glm-5
+        - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
       agent_file: .opencode/crew/marketing/agents/validation-lead.md
       expertise:
@@ -737,7 +815,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -793,7 +871,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7

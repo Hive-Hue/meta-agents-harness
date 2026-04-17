@@ -9,14 +9,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: zai/glm-5
+model: openai-codex/gpt-5.3-codex
 ---
 
 # Creative Strategist
 
 Role: `worker`
 Team: `Creative`
-Model: `zai/glm-5`
+Model: `openai-codex/gpt-5.3-codex`
 
 ## Mission
 Creative worker focused on scoped execution within assigned ownership boundaries.

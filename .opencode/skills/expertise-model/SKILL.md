@@ -25,6 +25,35 @@ When there is a durable new lesson, call `update-expertise-model` with a concise
 
 Do not finish meaningful work without deciding whether something durable was learned.
 
+## Write Policy
+
+Use the most specific category that matches the signal. Do not default everything to `observations`.
+
+### Category Selection
+
+- `patterns`: repeatable approaches that are likely to be useful again.
+- `workflows`: step sequences that consistently work end to end.
+- `risks`: failure modes, regressions, and boundary conditions that can break work.
+- `tools`: tool quirks, limits, or runtime-specific behavior.
+- `decisions`: explicit choices with rationale and tradeoffs.
+- `lessons`: durable insights, gotchas, and reusable constraints.
+- `observations`: narrow factual state only, with no narrative padding.
+- `open_questions`: unresolved items worth revisiting later.
+
+### Observation Policy
+
+- Keep `observations` short and specific.
+- Use them for current state, measurements, or concrete facts that may expire.
+- Do not store session logs, task summaries, or copied output.
+- Do not let `observations` become the default bucket for durable learnings.
+- If a note is reusable next week, move it to `lessons`, `patterns`, `decisions`, `risks`, or `workflows` instead.
+
+### Retention Policy
+
+- Prefer rewriting an existing note over appending a vague duplicate.
+- If a note exceeds roughly 120 characters, compress it and reference the artifact path instead.
+- If a file starts filling with `observations`, prune the oldest weak notes first and promote durable content into other categories.
+
 ## How To Write High-Signal Notes
 
 A good expertise note is **dense, specific, and actionable on re-read**. It should tell future-you exactly what to do differently.
@@ -78,6 +107,8 @@ A good expertise note is **dense, specific, and actionable on re-read**. It shou
 | `observations` | Factual notes about system state or behavior |
 | `open_questions` | Unresolved questions worth investigating in future sessions |
 
+The default bias should be toward `lessons`, `decisions`, `risks`, and `workflows`, not `observations`.
+
 ## Compactness Rules
 
 Your expertise file has a hard budget (120 lines, 32KB). Every byte counts because it's loaded into your context on every turn.
@@ -87,6 +118,7 @@ Your expertise file has a hard budget (120 lines, 32KB). Every byte counts becau
 3. **Prefer ~40-120 chars per note.** Longer is acceptable only when the detail is essential.
 4. **Don't repeat yourself.** Similar notes are automatically merged — but write distinct insights from the start.
 5. **Open questions auto-expire** after 14 days. Don't re-add resolved questions.
+6. **Keep `observations` as the smallest bucket.** If a note is durable, move it out of observations immediately.
 
 ## Revise, Don't Just Append
 
