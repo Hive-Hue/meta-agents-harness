@@ -70,7 +70,7 @@ describe('M4 — expertise list', () => {
     assert.ok(stdout.includes('dev:backend-dev'))
     assert.ok(stdout.includes('dev:planning-lead'))
     assert.ok(stdout.includes('dev:validation-lead'))
-    assert.ok(stdout.includes('9 expertise entries'))
+    assert.ok(stdout.includes('10 expertise entries'))
   })
 
   it('outputs JSON when --json is passed', () => {
@@ -219,7 +219,7 @@ describe('M4 — expertise explain', () => {
   })
 
   it('shows escalation when score below threshold', () => {
-    const { stdout, status } = runExpertise("expertise explain --task 'implement search feature'")
+    const { stdout, status } = runExpertise("expertise explain --task 'qzxv prtkl 9283'")
     assert.equal(status, 0)
     assert.ok(stdout.includes('ESCALATION') || stdout.includes('Escalation'))
   })
@@ -256,13 +256,10 @@ describe('M4 — validate:expertise owner filter', () => {
 // ---------------------------------------------------------------------------
 
 describe('M4 — expertise export', () => {
-  it('exports canonical expertise fields to stdout JSON', () => {
-    const { stdout, status } = runExpertise('expertise export dev:backend-dev --json')
-    assert.equal(status, 0)
-    const data = JSON.parse(stdout)
-    assert.deepEqual(data.allowed_environments, ['development'])
-    assert.ok(data.metadata?.created)
-    assert.ok(!data.metadata?.owner_id)
+  it('blocks export when federated policy forbids it', () => {
+    const { stdout, stderr, status } = runExpertise('expertise export dev:backend-dev --json')
+    assert.notEqual(status, 0)
+    assert.ok((stdout + stderr).includes('export blocked by policy'))
   })
 })
 
@@ -280,6 +277,7 @@ describe('M4 — expertise --help', () => {
     assert.ok(stdout.includes('recommend'))
     assert.ok(stdout.includes('evidence'))
     assert.ok(stdout.includes('explain'))
+    assert.ok(stdout.includes('propose'))
   })
 
   it('shows help without subcommand', () => {

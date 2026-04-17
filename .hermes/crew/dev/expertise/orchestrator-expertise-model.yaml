@@ -1,26 +1,15 @@
 agent:
-  name: "orchestrator"
-  role: "orchestrator"
-  team: "global"
+  name: orchestrator
+  role: orchestrator
+  team: Orchestration
 meta:
   version: "1"
   max_lines: "120"
-  last_updated: "2026-04-17T01:38:04.597Z"
 patterns: []
-risks:
-  - date: "2026-04-15"
-    note: "File merge issue: backend-dev repeatedly fails to properly overwrite files. types/session-types.mjs and scripts/session-adapter-contract.mjs remain merged despite 4+ fix attempts. Workaround: treat types/session-types.mjs as the source of truth for types; session-adapter-contract.mjs needs manual separation or use explicit cat/tee commands with > operator."
+risks: []
 tools: []
 workflows: []
 decisions: []
-lessons:
-  - date: "2026-04-15"
-    note: "sessions-interop-v0.6.0 implementation complete. Files created: types/session-types.mjs, scripts/session-adapter-contract.mjs, scripts/session-export.mjs, scripts/session-injection.mjs, scripts/session-bridge.mjs, tests/session-interop.test.mjs, docs/sessions-interop.md. Known issue: types/session-types.mjs has session-adapter-contract content merged at end (harmless, both exports available). Gate: validation required at each slice."
-  - date: "2026-04-15"
-    note: "cross-runtime-child-agents-v0.6.0 implementation complete. Files created: scripts/child-agent-adapter-contract.mjs, scripts/delegation-resolution.mjs, scripts/child-agent-spawn.mjs, scripts/child-agent-codex-sidecar.mjs, tests/child-agent-spawn.test.mjs (8 tests pass), docs/cross-runtime-child-agents.md. meta-agents-harness.mjs modified to add `mah delegate` command. Gate: validation at each slice completed successfully."
-  - date: "2026-04-15"
-    note: "QA review completed for cross-runtime-child-agents-v0.6.0. All 8 tests pass, syntax checks pass, functional tests pass, security is clean. Two QA \\\"blockers\\\" were resolved as non-issues: (1) --crew flag is intentionally passed via MAH_ACTIVE_CREW env var, not CLI arg (codex exec doesn't accept --crew); (2) documentation already showed correct codex exec format. Verdict: APPROVED."
-  - date: "2026-04-17"
-    note: "Security assessment cycle completo para Expertise Model v0.7.0: 10 findings (1 CRITICAL, 3 HIGH, 4 MEDIUM, 2 LOW) identificados, todos patched e verificados. Arquivos: docs/security/expertise-model-v0.7.0-security-assessment.md e docs/security/expertise-model-v0.7.0-patch-verification.md. Workers zai/glm-5 usados para fixes residuais com sucesso. Veredicto: APPROVED."
+lessons: []
 observations: []
 open_questions: []

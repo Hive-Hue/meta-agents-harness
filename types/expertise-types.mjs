@@ -19,6 +19,9 @@ export const LIFECYCLE_STATES = ["draft", "active", "experimental", "restricted"
 /** @type {string[]} */
 export const TRUST_TIERS = ["internal", "team", "org", "federated"]
 
+/** @type {string} */
+export const PROPOSAL_SCHEMA_VERSION = "mah.expertise.proposal.v1"
+
 /** @type {string[]} */
 export const EVIDENCE_TYPES = ["execution", "review", "cost", "latency"]
 
@@ -128,4 +131,37 @@ export const OUTCOMES = ["success", "failure", "partial"]
  * @property {string} validated_by
  * @property {string[]} restrictions
  * @property {string} [revocation_reason]
+ */
+
+/**
+ * @typedef {Object} ProposalGeneratedBy
+ * @property {string} actor
+ * @property {string} role
+ * @property {string} team
+ */
+
+/**
+ * @typedef {Object} ProposalGovernance
+ * @property {string[]} generated_by_roles
+ * @property {string[]} review_required_by
+ * @property {boolean} auto_apply
+ */
+
+/**
+ * @typedef {Object} ExpertiseProposal
+ * @property {"mah.expertise.proposal.v1"} proposal_version
+ * @property {string} id
+ * @property {"draft"|"reviewed"|"approved"|"rejected"|"applied"} status
+ * @property {string} generated_at
+ * @property {ProposalGeneratedBy} generated_by
+ * @property {string} target_expertise_id
+ * @property {ExpertiseOwner} target_owner
+ * @property {Object} target_snapshot
+ * @property {string} summary
+ * @property {string} rationale
+ * @property {Record<string, unknown>} proposed_changes
+ * @property {string[]} evidence_refs
+ * @property {string[]} reviewers
+ * @property {ProposalGovernance} governance
+ * @property {{ catalog_path: string | null }} source
  */
