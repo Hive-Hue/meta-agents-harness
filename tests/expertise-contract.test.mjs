@@ -406,10 +406,26 @@ describe('expertise contract', () => {
   // -------------------------------------------------------------------------
   it('readRegistry returns cached registry when fresh', async () => {
     const registryPath = join(repoRoot, '.mah', 'expertise', 'registry.json')
-    assert.ok(existsSync(registryPath), 'registry.json must exist from previous test')
-    const cached = await readRegistry(registryPath)
+    const canonicalCatalog = join(repoRoot, '.mah', 'expertise', 'catalog')
+    await buildRegistry({ catalogPath: canonicalCatalog, outputPath: registryPath })
+    assert.ok(existsSync(registryPath), 'registry.json must exist after rebuild')
+    const cached = await readRegistry(registryPath, { catalogPath: canonicalCatalog })
     assert.ok(cached !== null, 'should return cached registry (not stale yet)')
     assert.equal(cached.schema_version, 'mah.expertise.v1')
+  })
+
+  it('readRegistry treats cache as stale when catalog_root mismatches', async () => {
+    const tmpCatalog = mkdtempSync(join(tmpdir(), 'mah-expertise-registry-catalog-'))
+    const tmpOutput = join(tmpdir(), `mah-registry-${Date.now()}.json`)
+    writeFileSync(join(tmpCatalog, 'orchestrator.yaml'), readFileSync(join(fixturesDir, 'valid-minimal.yaml'), 'utf-8'), 'utf-8')
+
+    await buildRegistry({ catalogPath: tmpCatalog, outputPath: tmpOutput })
+    const cached = await readRegistry(tmpOutput, { catalogPath: join(repoRoot, '.mah', 'expertise', 'catalog', 'dev') })
+
+    assert.equal(cached, null)
+
+    rmSync(tmpCatalog, { recursive: true, force: true })
+    rmSync(tmpOutput, { force: true })
   })
 
   // -------------------------------------------------------------------------
@@ -417,7 +433,9 @@ describe('expertise contract', () => {
   // -------------------------------------------------------------------------
   it('Registry has correct shape with all required grouping keys', async () => {
     const registryPath = join(repoRoot, '.mah', 'expertise', 'registry.json')
-    const cached = await readRegistry(registryPath)
+    const canonicalCatalog = join(repoRoot, '.mah', 'expertise', 'catalog')
+    await buildRegistry({ catalogPath: canonicalCatalog, outputPath: registryPath })
+    const cached = await readRegistry(registryPath, { catalogPath: canonicalCatalog })
     assert.ok(cached !== null)
     assert.ok('by_owner' in cached, 'should have by_owner')
     assert.ok('by_domain' in cached, 'should have by_domain')

@@ -36,6 +36,7 @@ const repoRoot = join(__dirname, '..')
  * @typedef {Object} Registry
  * @property {string} schema_version
  * @property {string} generated_at
+ * @property {string} catalog_root
  * @property {number} total_count
  * @property {{ [owner: string]: ExpertiseRef[] }} by_owner
  * @property {{ [domain: string]: ExpertiseRef[] }} by_domain
@@ -63,6 +64,17 @@ function warn(...args) {
  */
 function resolvePath(relPath) {
   return join(repoRoot, relPath)
+}
+
+/**
+ * Normalize a catalog path into a stable repo-relative string when possible.
+ * @param {string} catalogPath
+ * @returns {string}
+ */
+function normalizeCatalogRoot(catalogPath) {
+  const relPath = relative(repoRoot, catalogPath).replace(/\\/g, '/')
+  if (relPath && !relPath.startsWith('..')) return relPath
+  return catalogPath.replace(/\\/g, '/')
 }
 
 /**
@@ -282,6 +294,7 @@ export async function buildRegistry(options = {}) {
   const registry = {
     schema_version: EXPERTISE_SCHEMA_VERSION,
     generated_at: new Date().toISOString(),
+    catalog_root: normalizeCatalogRoot(catalog),
     total_count: entries.length,
     by_owner: groupBy(entries, (e) => extractOwnerLabel(e)),
     by_domain: groupBy(entries, (e) => e.domains.join(',') || 'unknown'),
@@ -313,10 +326,12 @@ export async function buildRegistry(options = {}) {
  * If the cached registry is older than 1 hour, it is considered stale.
  *
  * @param {string} [registryPath]
+ * @param {{ catalogPath?: string }} [options]
  * @returns {Promise<Registry | null>} null if file does not exist or is stale
  */
-export async function readRegistry(registryPath) {
+export async function readRegistry(registryPath, options = {}) {
   const resolved = registryPath || resolvePath('.mah/expertise/registry.json')
+  const expectedCatalogRoot = normalizeCatalogRoot(options.catalogPath || resolvePath('.mah/expertise/catalog'))
 
   if (!existsSync(resolved)) {
     warn(`registry not found at '${resolved}'`)
@@ -329,8 +344,13 @@ export async function readRegistry(registryPath) {
     const registry = JSON.parse(raw)
 
     // Validate basic structure
-    if (!registry.schema_version || !registry.generated_at) {
+    if (!registry.schema_version || !registry.generated_at || !registry.catalog_root) {
       warn('registry missing required fields, treating as stale')
+      return null
+    }
+
+    if (registry.catalog_root !== expectedCatalogRoot) {
+      warn(`registry catalog_root '${registry.catalog_root}' does not match expected '${expectedCatalogRoot}', treating as stale`)
       return null
     }
 
@@ -367,7 +387,7 @@ export async function readRegistry(registryPath) {
  */
 export async function getRegistry(options = {}) {
   const output = options.outputPath || resolvePath('.mah/expertise/registry.json')
-  const cached = await readRegistry(output)
+  const cached = await readRegistry(output, { catalogPath: options.catalogPath })
   if (cached !== null) return cached
   return buildRegistry(options)
 }
