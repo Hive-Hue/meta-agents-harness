@@ -305,7 +305,7 @@ orchestrator:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
     - minimax/minimax-m2.7
-    - openai-codex/gpt-5.4-mini
+    - openai/gpt-5.4-mini
   tools:
     - read
     - grep
@@ -357,6 +357,7 @@ teams:
         - mcp_servers
         - mcp_tools
         - mcp_call
+        - bash
       skills:
         - skills/delegate_bounded/SKILL.md
         - skills/zero_micromanagement/SKILL.md
@@ -536,6 +537,7 @@ teams:
         - mcp_servers
         - mcp_tools
         - mcp_call
+        - bash
       skills:
         - skills/delegate_bounded/SKILL.md
         - skills/zero_micromanagement/SKILL.md
@@ -774,6 +776,7 @@ teams:
         - mcp_servers
         - mcp_tools
         - mcp_call
+        - bash
       skills:
         - skills/delegate_bounded/SKILL.md
         - skills/zero_micromanagement/SKILL.md

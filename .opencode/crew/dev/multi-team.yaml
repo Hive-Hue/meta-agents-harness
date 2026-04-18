@@ -1,57 +1,59 @@
 version: 1
 name: dev-multi-team-harness
-mission: Deliver bounded v0.7.0 Expertise Engine evolution for Meta Agents
-  Harness, transforming expertise from passive memory into operational routing
-  intelligence while preserving policy-first constraints and runtime-agnostic
-  contracts.
+mission: Deliver bounded v0.8.0 Context Memory evolution for Meta Agents
+  Harness, adding operational context retrieval and persistent memory primitives
+  while preserving expertise-first routing and runtime-agnostic contracts.
 sprint_mode:
-  name: v0.7.0-expertise-engine
+  name: v0.8.0-context-memory
   active: true
-  target_release: v0.7.0
-  objective: "Define and implement bounded v0.7.0 Expertise Engine foundations:
-    structured expertise model, expertise-aware delegation, trust/evidence
-    signals, and operator-facing registry workflows."
+  target_release: v0.8.0
+  objective: "Define and implement bounded v0.8.0 Context Memory foundations:
+    operational context schema, corpus/index lifecycle, bounded retrieval,
+    runtime injection, and proposal flow for persistent operational memory."
   execution_mode: spec-bound-milestone-driven
   directives:
     - spec-bound execution
-    - policy-first routing guardrails
-    - no ontology-wave expansion
+    - expertise remains source-of-truth for routing
+    - bounded retrieval and prompt budgets
+    - no mandatory vector store or obsidian dependency
     - conservative rollout with explicit fallback
     - PR-sized slices
     - mandatory validation at each slice
-    - explicit deferred list for anything outside v0.7.0
+    - explicit deferred list for anything outside v0.8.0
   must_deliver:
-    - Structured expertise schema and validation
-    - Expertise catalog, evidence, and metrics persistence
-    - Expertise-aware delegation scoring and explain payload
-    - Confidence, validation status, and lifecycle transitions
-    - Operator-facing expertise CLI surfaces
-    - Bounded expertise export and import contracts
+    - Context Memory schema and validation for .md and .qmd sources
+    - Canonical context corpus, index, and retrieval contracts
+    - Explainable retrieval output by agent, capability, and task
+    - Optional runtime bootstrap injection with bounded context payloads
+    - Proposal flow from sessions and provenance into curated context memory
+    - Operator-facing mah context CLI surfaces
     - Integration, contract, and non-regression coverage
   must_not_deliver:
-    - full ontology engine
-    - automatic trust promotion without evidence or policy
-    - unrestricted cross-organization federation
-    - implicit permission grants from expertise metadata
-    - mandatory dedicated UI dashboard
-    - v0.8.0+ scope
-instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-  evolution for Meta Agents Harness, transforming expertise from passive memory
-  into operational routing intelligence while preserving policy-first
-  constraints and runtime-agnostic contracts. |
-  sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-  | directives=spec-bound execution; policy-first routing guardrails; no
-  ontology-wave expansion; conservative rollout with explicit fallback; PR-sized
+    - context memory as routing authority
+    - automatic memory promotion from raw transcripts without review
+    - mandatory vector database or obsidian dependency
+    - unrestricted vault scanning or prompt inflation
+    - runtime-locked memory behavior
+    - v0.9.0+ scope
+instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+  evolution for Meta Agents Harness, adding operational context retrieval and
+  persistent memory primitives while preserving expertise-first routing and
+  runtime-agnostic contracts. |
+  sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+  | directives=spec-bound execution; expertise remains source-of-truth for
+  routing; bounded retrieval and prompt budgets; no mandatory vector store or
+  obsidian dependency; conservative rollout with explicit fallback; PR-sized
   slices; mandatory validation at each slice; explicit deferred list for
-  anything outside v0.7.0 | do=Structured expertise schema and validation;
-  Expertise catalog, evidence, and metrics persistence; Expertise-aware
-  delegation scoring and explain payload; Confidence, validation status, and
-  lifecycle transitions; Operator-facing expertise CLI surfaces; Bounded
-  expertise export and import contracts; Integration, contract, and
-  non-regression coverage | avoid=full ontology engine; automatic trust
-  promotion without evidence or policy; unrestricted cross-organization
-  federation; implicit permission grants from expertise metadata; mandatory
-  dedicated UI dashboard; v0.8.0+ scope
+  anything outside v0.8.0 | do=Context Memory schema and validation for .md and
+  .qmd sources; Canonical context corpus, index, and retrieval contracts;
+  Explainable retrieval output by agent, capability, and task; Optional runtime
+  bootstrap injection with bounded context payloads; Proposal flow from sessions
+  and provenance into curated context memory; Operator-facing mah context CLI
+  surfaces; Integration, contract, and non-regression coverage | avoid=context
+  memory as routing authority; automatic memory promotion from raw transcripts
+  without review; mandatory vector database or obsidian dependency; unrestricted
+  vault scanning or prompt inflation; runtime-locked memory behavior; v0.9.0+
+  scope
 runtime:
   harness: opencode
   source_of_truth: meta-agents.yaml
@@ -357,37 +359,39 @@ orchestrator:
   id: orchestrator
   role: ceo
   sprint_responsibilities:
-    - control v0.7.0 scope
-    - sequence milestones and distribute slices
-    - enforce policy-first and fallback-safe decisions
+    - control v0.8.0 scope
+    - sequence foundation, retrieval, and runtime slices
+    - enforce expertise/context boundary and fallback-safe decisions
     - preserve runtime-agnostic MAH architecture
-    - defer anything outside v0.7.0
-  instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-    evolution for Meta Agents Harness, transforming expertise from passive
-    memory into operational routing intelligence while preserving policy-first
-    constraints and runtime-agnostic contracts. |
-    sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-    | directives=spec-bound execution; policy-first routing guardrails; no
-    ontology-wave expansion; conservative rollout with explicit fallback;
-    PR-sized slices; mandatory validation at each slice; explicit deferred list
-    for anything outside v0.7.0 | do=Structured expertise schema and validation;
-    Expertise catalog, evidence, and metrics persistence; Expertise-aware
-    delegation scoring and explain payload; Confidence, validation status, and
-    lifecycle transitions; Operator-facing expertise CLI surfaces; Bounded
-    expertise export and import contracts; Integration, contract, and
-    non-regression coverage | avoid=full ontology engine; automatic trust
-    promotion without evidence or policy; unrestricted cross-organization
-    federation; implicit permission grants from expertise metadata; mandatory
-    dedicated UI dashboard; v0.8.0+ scope | role=control v0.7.0 scope; sequence
-    milestones and distribute slices; enforce policy-first and fallback-safe
-    decisions; preserve runtime-agnostic MAH architecture; defer anything
-    outside v0.7.0
+    - defer broader assistant-layer ambitions outside v0.8.0
+  instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+    evolution for Meta Agents Harness, adding operational context retrieval and
+    persistent memory primitives while preserving expertise-first routing and
+    runtime-agnostic contracts. |
+    sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+    | directives=spec-bound execution; expertise remains source-of-truth for
+    routing; bounded retrieval and prompt budgets; no mandatory vector store or
+    obsidian dependency; conservative rollout with explicit fallback; PR-sized
+    slices; mandatory validation at each slice; explicit deferred list for
+    anything outside v0.8.0 | do=Context Memory schema and validation for .md
+    and .qmd sources; Canonical context corpus, index, and retrieval contracts;
+    Explainable retrieval output by agent, capability, and task; Optional
+    runtime bootstrap injection with bounded context payloads; Proposal flow
+    from sessions and provenance into curated context memory; Operator-facing
+    mah context CLI surfaces; Integration, contract, and non-regression coverage
+    | avoid=context memory as routing authority; automatic memory promotion from
+    raw transcripts without review; mandatory vector database or obsidian
+    dependency; unrestricted vault scanning or prompt inflation; runtime-locked
+    memory behavior; v0.9.0+ scope | role=control v0.8.0 scope; sequence
+    foundation, retrieval, and runtime slices; enforce expertise/context
+    boundary and fallback-safe decisions; preserve runtime-agnostic MAH
+    architecture; defer broader assistant-layer ambitions outside v0.8.0
   model: minimax/minimax-m2.7
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
     - minimax/minimax-m2.7
-    - openai-codex/gpt-5.4-mini
+    - openai/gpt-5.4-mini
   agent_file: .opencode/crew/dev/agents/orchestrator.md
   expertise:
     path: .opencode/crew/dev/expertise/orchestrator-expertise-model.yaml
@@ -421,30 +425,34 @@ teams:
       id: planning-lead
       role: lead
       sprint_responsibilities:
-        - translate Expertise Engine spec into executable backlog
+        - translate Context Memory plan into executable backlog
         - maintain milestone ordering and acceptance criteria
-        - prevent ontology and governance over-expansion
-        - keep M1-M5 boundaries explicit
-      instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-        evolution for Meta Agents Harness, transforming expertise from passive
-        memory into operational routing intelligence while preserving
-        policy-first constraints and runtime-agnostic contracts. |
-        sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-        | directives=spec-bound execution; policy-first routing guardrails; no
-        ontology-wave expansion; conservative rollout with explicit fallback;
+        - keep routing, memory, session, and provenance boundaries explicit
+        - prevent scope creep into autonomous knowledge systems
+      instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+        evolution for Meta Agents Harness, adding operational context retrieval
+        and persistent memory primitives while preserving expertise-first
+        routing and runtime-agnostic contracts. |
+        sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+        | directives=spec-bound execution; expertise remains source-of-truth for
+        routing; bounded retrieval and prompt budgets; no mandatory vector store
+        or obsidian dependency; conservative rollout with explicit fallback;
         PR-sized slices; mandatory validation at each slice; explicit deferred
-        list for anything outside v0.7.0 | do=Structured expertise schema and
-        validation; Expertise catalog, evidence, and metrics persistence;
-        Expertise-aware delegation scoring and explain payload; Confidence,
-        validation status, and lifecycle transitions; Operator-facing expertise
-        CLI surfaces; Bounded expertise export and import contracts;
-        Integration, contract, and non-regression coverage | avoid=full ontology
-        engine; automatic trust promotion without evidence or policy;
-        unrestricted cross-organization federation; implicit permission grants
-        from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope
-        | role=translate Expertise Engine spec into executable backlog; maintain
-        milestone ordering and acceptance criteria; prevent ontology and
-        governance over-expansion; keep M1-M5 boundaries explicit
+        list for anything outside v0.8.0 | do=Context Memory schema and
+        validation for .md and .qmd sources; Canonical context corpus, index,
+        and retrieval contracts; Explainable retrieval output by agent,
+        capability, and task; Optional runtime bootstrap injection with bounded
+        context payloads; Proposal flow from sessions and provenance into
+        curated context memory; Operator-facing mah context CLI surfaces;
+        Integration, contract, and non-regression coverage | avoid=context
+        memory as routing authority; automatic memory promotion from raw
+        transcripts without review; mandatory vector database or obsidian
+        dependency; unrestricted vault scanning or prompt inflation;
+        runtime-locked memory behavior; v0.9.0+ scope | role=translate Context
+        Memory plan into executable backlog; maintain milestone ordering and
+        acceptance criteria; keep routing, memory, session, and provenance
+        boundaries explicit; prevent scope creep into autonomous knowledge
+        systems
       model: zai/glm-5
       model_fallbacks:
         - minimax/minimax-m2.7
@@ -541,32 +549,34 @@ teams:
       - id: repo-analyst
         role: worker
         sprint_responsibilities:
-          - map real codebase integration points for Expertise Engine
+          - map real codebase integration points for Context Memory
           - locate affected files and dependency edges
           - surface regression and coupling risks
           - identify runtime and plugin compatibility constraints
-        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-          evolution for Meta Agents Harness, transforming expertise from passive
-          memory into operational routing intelligence while preserving
-          policy-first constraints and runtime-agnostic contracts. |
-          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-          | directives=spec-bound execution; policy-first routing guardrails; no
-          ontology-wave expansion; conservative rollout with explicit fallback;
-          PR-sized slices; mandatory validation at each slice; explicit deferred
-          list for anything outside v0.7.0 | do=Structured expertise schema and
-          validation; Expertise catalog, evidence, and metrics persistence;
-          Expertise-aware delegation scoring and explain payload; Confidence,
-          validation status, and lifecycle transitions; Operator-facing
-          expertise CLI surfaces; Bounded expertise export and import contracts;
-          Integration, contract, and non-regression coverage | avoid=full
-          ontology engine; automatic trust promotion without evidence or policy;
-          unrestricted cross-organization federation; implicit permission grants
-          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
-          scope | role=map real codebase integration points for Expertise
-          Engine; locate affected files and dependency edges; surface regression
-          and coupling risks; identify runtime and plugin compatibility
-          constraints
-        model: openai-codex/gpt-5.3-codex
+        instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+          evolution for Meta Agents Harness, adding operational context
+          retrieval and persistent memory primitives while preserving
+          expertise-first routing and runtime-agnostic contracts. |
+          sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; expertise remains source-of-truth
+          for routing; bounded retrieval and prompt budgets; no mandatory vector
+          store or obsidian dependency; conservative rollout with explicit
+          fallback; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.8.0 | do=Context Memory
+          schema and validation for .md and .qmd sources; Canonical context
+          corpus, index, and retrieval contracts; Explainable retrieval output
+          by agent, capability, and task; Optional runtime bootstrap injection
+          with bounded context payloads; Proposal flow from sessions and
+          provenance into curated context memory; Operator-facing mah context
+          CLI surfaces; Integration, contract, and non-regression coverage |
+          avoid=context memory as routing authority; automatic memory promotion
+          from raw transcripts without review; mandatory vector database or
+          obsidian dependency; unrestricted vault scanning or prompt inflation;
+          runtime-locked memory behavior; v0.9.0+ scope | role=map real codebase
+          integration points for Context Memory; locate affected files and
+          dependency edges; surface regression and coupling risks; identify
+          runtime and plugin compatibility constraints
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -597,29 +607,32 @@ teams:
       - id: solution-architect
         role: worker
         sprint_responsibilities:
-          - define expertise object and storage contracts
-          - define routing score and fallback semantics
-          - define bounded export and import policy envelope
-        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-          evolution for Meta Agents Harness, transforming expertise from passive
-          memory into operational routing intelligence while preserving
-          policy-first constraints and runtime-agnostic contracts. |
-          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-          | directives=spec-bound execution; policy-first routing guardrails; no
-          ontology-wave expansion; conservative rollout with explicit fallback;
-          PR-sized slices; mandatory validation at each slice; explicit deferred
-          list for anything outside v0.7.0 | do=Structured expertise schema and
-          validation; Expertise catalog, evidence, and metrics persistence;
-          Expertise-aware delegation scoring and explain payload; Confidence,
-          validation status, and lifecycle transitions; Operator-facing
-          expertise CLI surfaces; Bounded expertise export and import contracts;
-          Integration, contract, and non-regression coverage | avoid=full
-          ontology engine; automatic trust promotion without evidence or policy;
-          unrestricted cross-organization federation; implicit permission grants
-          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
-          scope | role=define expertise object and storage contracts; define
-          routing score and fallback semantics; define bounded export and import
-          policy envelope
+          - define context memory document, index, and retrieval contracts
+          - define bootstrap injection and explain payload semantics
+          - define proposal governance and persistence envelope
+        instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+          evolution for Meta Agents Harness, adding operational context
+          retrieval and persistent memory primitives while preserving
+          expertise-first routing and runtime-agnostic contracts. |
+          sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; expertise remains source-of-truth
+          for routing; bounded retrieval and prompt budgets; no mandatory vector
+          store or obsidian dependency; conservative rollout with explicit
+          fallback; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.8.0 | do=Context Memory
+          schema and validation for .md and .qmd sources; Canonical context
+          corpus, index, and retrieval contracts; Explainable retrieval output
+          by agent, capability, and task; Optional runtime bootstrap injection
+          with bounded context payloads; Proposal flow from sessions and
+          provenance into curated context memory; Operator-facing mah context
+          CLI surfaces; Integration, contract, and non-regression coverage |
+          avoid=context memory as routing authority; automatic memory promotion
+          from raw transcripts without review; mandatory vector database or
+          obsidian dependency; unrestricted vault scanning or prompt inflation;
+          runtime-locked memory behavior; v0.9.0+ scope | role=define context
+          memory document, index, and retrieval contracts; define bootstrap
+          injection and explain payload semantics; define proposal governance
+          and persistence envelope
         model: zai/glm-5
         model_fallbacks:
           - minimax/minimax-m2.7
@@ -713,29 +726,32 @@ teams:
       id: engineering-lead
       role: lead
       sprint_responsibilities:
-        - coordinate model, routing, and CLI implementation streams
+        - coordinate schema, index, retrieval, and runtime integration streams
         - split work into reviewable changesets
         - preserve adapter boundaries and backward compatibility
-      instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-        evolution for Meta Agents Harness, transforming expertise from passive
-        memory into operational routing intelligence while preserving
-        policy-first constraints and runtime-agnostic contracts. |
-        sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-        | directives=spec-bound execution; policy-first routing guardrails; no
-        ontology-wave expansion; conservative rollout with explicit fallback;
+      instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+        evolution for Meta Agents Harness, adding operational context retrieval
+        and persistent memory primitives while preserving expertise-first
+        routing and runtime-agnostic contracts. |
+        sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+        | directives=spec-bound execution; expertise remains source-of-truth for
+        routing; bounded retrieval and prompt budgets; no mandatory vector store
+        or obsidian dependency; conservative rollout with explicit fallback;
         PR-sized slices; mandatory validation at each slice; explicit deferred
-        list for anything outside v0.7.0 | do=Structured expertise schema and
-        validation; Expertise catalog, evidence, and metrics persistence;
-        Expertise-aware delegation scoring and explain payload; Confidence,
-        validation status, and lifecycle transitions; Operator-facing expertise
-        CLI surfaces; Bounded expertise export and import contracts;
-        Integration, contract, and non-regression coverage | avoid=full ontology
-        engine; automatic trust promotion without evidence or policy;
-        unrestricted cross-organization federation; implicit permission grants
-        from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope
-        | role=coordinate model, routing, and CLI implementation streams; split
-        work into reviewable changesets; preserve adapter boundaries and
-        backward compatibility
+        list for anything outside v0.8.0 | do=Context Memory schema and
+        validation for .md and .qmd sources; Canonical context corpus, index,
+        and retrieval contracts; Explainable retrieval output by agent,
+        capability, and task; Optional runtime bootstrap injection with bounded
+        context payloads; Proposal flow from sessions and provenance into
+        curated context memory; Operator-facing mah context CLI surfaces;
+        Integration, contract, and non-regression coverage | avoid=context
+        memory as routing authority; automatic memory promotion from raw
+        transcripts without review; mandatory vector database or obsidian
+        dependency; unrestricted vault scanning or prompt inflation;
+        runtime-locked memory behavior; v0.9.0+ scope | role=coordinate schema,
+        index, retrieval, and runtime integration streams; split work into
+        reviewable changesets; preserve adapter boundaries and backward
+        compatibility
       model: zai/glm-5
       model_fallbacks:
         - minimax/minimax-m2.7
@@ -860,30 +876,33 @@ teams:
       - id: frontend-dev
         role: worker
         sprint_responsibilities:
-          - implement expertise CLI and help surfaces
-          - improve operator-facing explainability outputs
-          - keep UX legible for recommendation and delegation flows
-        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-          evolution for Meta Agents Harness, transforming expertise from passive
-          memory into operational routing intelligence while preserving
-          policy-first constraints and runtime-agnostic contracts. |
-          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-          | directives=spec-bound execution; policy-first routing guardrails; no
-          ontology-wave expansion; conservative rollout with explicit fallback;
-          PR-sized slices; mandatory validation at each slice; explicit deferred
-          list for anything outside v0.7.0 | do=Structured expertise schema and
-          validation; Expertise catalog, evidence, and metrics persistence;
-          Expertise-aware delegation scoring and explain payload; Confidence,
-          validation status, and lifecycle transitions; Operator-facing
-          expertise CLI surfaces; Bounded expertise export and import contracts;
-          Integration, contract, and non-regression coverage | avoid=full
-          ontology engine; automatic trust promotion without evidence or policy;
-          unrestricted cross-organization federation; implicit permission grants
-          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
-          scope | role=implement expertise CLI and help surfaces; improve
-          operator-facing explainability outputs; keep UX legible for
-          recommendation and delegation flows
-        model: openai-codex/gpt-5.3-codex
+          - implement context CLI and help surfaces
+          - improve operator-facing retrieval and proposal explainability outputs
+          - keep UX legible for bounded context and bootstrap flows
+        instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+          evolution for Meta Agents Harness, adding operational context
+          retrieval and persistent memory primitives while preserving
+          expertise-first routing and runtime-agnostic contracts. |
+          sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; expertise remains source-of-truth
+          for routing; bounded retrieval and prompt budgets; no mandatory vector
+          store or obsidian dependency; conservative rollout with explicit
+          fallback; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.8.0 | do=Context Memory
+          schema and validation for .md and .qmd sources; Canonical context
+          corpus, index, and retrieval contracts; Explainable retrieval output
+          by agent, capability, and task; Optional runtime bootstrap injection
+          with bounded context payloads; Proposal flow from sessions and
+          provenance into curated context memory; Operator-facing mah context
+          CLI surfaces; Integration, contract, and non-regression coverage |
+          avoid=context memory as routing authority; automatic memory promotion
+          from raw transcripts without review; mandatory vector database or
+          obsidian dependency; unrestricted vault scanning or prompt inflation;
+          runtime-locked memory behavior; v0.9.0+ scope | role=implement context
+          CLI and help surfaces; improve operator-facing retrieval and proposal
+          explainability outputs; keep UX legible for bounded context and
+          bootstrap flows
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -1041,30 +1060,33 @@ teams:
       - id: backend-dev
         role: worker
         sprint_responsibilities:
-          - implement expertise persistence and evidence pipeline
-          - integrate routing engine with dispatcher and MCP delegation surfaces
-          - own core expertise routing and interoperability tests
-        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-          evolution for Meta Agents Harness, transforming expertise from passive
-          memory into operational routing intelligence while preserving
-          policy-first constraints and runtime-agnostic contracts. |
-          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-          | directives=spec-bound execution; policy-first routing guardrails; no
-          ontology-wave expansion; conservative rollout with explicit fallback;
-          PR-sized slices; mandatory validation at each slice; explicit deferred
-          list for anything outside v0.7.0 | do=Structured expertise schema and
-          validation; Expertise catalog, evidence, and metrics persistence;
-          Expertise-aware delegation scoring and explain payload; Confidence,
-          validation status, and lifecycle transitions; Operator-facing
-          expertise CLI surfaces; Bounded expertise export and import contracts;
-          Integration, contract, and non-regression coverage | avoid=full
-          ontology engine; automatic trust promotion without evidence or policy;
-          unrestricted cross-organization federation; implicit permission grants
-          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
-          scope | role=implement expertise persistence and evidence pipeline;
-          integrate routing engine with dispatcher and MCP delegation surfaces;
-          own core expertise routing and interoperability tests
-        model: openai-codex/gpt-5.3-codex
+          - implement context corpus, index, and retrieval pipeline
+          - integrate bootstrap injection and proposal flow with runtime surfaces
+          - own core context interoperability and persistence tests
+        instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+          evolution for Meta Agents Harness, adding operational context
+          retrieval and persistent memory primitives while preserving
+          expertise-first routing and runtime-agnostic contracts. |
+          sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; expertise remains source-of-truth
+          for routing; bounded retrieval and prompt budgets; no mandatory vector
+          store or obsidian dependency; conservative rollout with explicit
+          fallback; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.8.0 | do=Context Memory
+          schema and validation for .md and .qmd sources; Canonical context
+          corpus, index, and retrieval contracts; Explainable retrieval output
+          by agent, capability, and task; Optional runtime bootstrap injection
+          with bounded context payloads; Proposal flow from sessions and
+          provenance into curated context memory; Operator-facing mah context
+          CLI surfaces; Integration, contract, and non-regression coverage |
+          avoid=context memory as routing authority; automatic memory promotion
+          from raw transcripts without review; mandatory vector database or
+          obsidian dependency; unrestricted vault scanning or prompt inflation;
+          runtime-locked memory behavior; v0.9.0+ scope | role=implement context
+          corpus, index, and retrieval pipeline; integrate bootstrap injection
+          and proposal flow with runtime surfaces; own core context
+          interoperability and persistence tests
+        model: zai/glm-5
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -1224,30 +1246,34 @@ teams:
       id: validation-lead
       role: lead
       sprint_responsibilities:
-        - define quality gates for schema, routing, and evidence
-        - validate spec adherence and release boundary
-        - enforce explainability and JSON contract stability
-        - block policy/topology bypass risk
-      instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-        evolution for Meta Agents Harness, transforming expertise from passive
-        memory into operational routing intelligence while preserving
-        policy-first constraints and runtime-agnostic contracts. |
-        sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-        | directives=spec-bound execution; policy-first routing guardrails; no
-        ontology-wave expansion; conservative rollout with explicit fallback;
+        - define quality gates for schema, retrieval, and bootstrap injection
+        - validate explainability, boundedness, and release boundary
+        - enforce JSON contract stability for context surfaces
+        - block policy, path, and memory-persistence bypass risk
+      instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+        evolution for Meta Agents Harness, adding operational context retrieval
+        and persistent memory primitives while preserving expertise-first
+        routing and runtime-agnostic contracts. |
+        sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+        | directives=spec-bound execution; expertise remains source-of-truth for
+        routing; bounded retrieval and prompt budgets; no mandatory vector store
+        or obsidian dependency; conservative rollout with explicit fallback;
         PR-sized slices; mandatory validation at each slice; explicit deferred
-        list for anything outside v0.7.0 | do=Structured expertise schema and
-        validation; Expertise catalog, evidence, and metrics persistence;
-        Expertise-aware delegation scoring and explain payload; Confidence,
-        validation status, and lifecycle transitions; Operator-facing expertise
-        CLI surfaces; Bounded expertise export and import contracts;
-        Integration, contract, and non-regression coverage | avoid=full ontology
-        engine; automatic trust promotion without evidence or policy;
-        unrestricted cross-organization federation; implicit permission grants
-        from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+ scope
-        | role=define quality gates for schema, routing, and evidence; validate
-        spec adherence and release boundary; enforce explainability and JSON
-        contract stability; block policy/topology bypass risk
+        list for anything outside v0.8.0 | do=Context Memory schema and
+        validation for .md and .qmd sources; Canonical context corpus, index,
+        and retrieval contracts; Explainable retrieval output by agent,
+        capability, and task; Optional runtime bootstrap injection with bounded
+        context payloads; Proposal flow from sessions and provenance into
+        curated context memory; Operator-facing mah context CLI surfaces;
+        Integration, contract, and non-regression coverage | avoid=context
+        memory as routing authority; automatic memory promotion from raw
+        transcripts without review; mandatory vector database or obsidian
+        dependency; unrestricted vault scanning or prompt inflation;
+        runtime-locked memory behavior; v0.9.0+ scope | role=define quality
+        gates for schema, retrieval, and bootstrap injection; validate
+        explainability, boundedness, and release boundary; enforce JSON contract
+        stability for context surfaces; block policy, path, and
+        memory-persistence bypass risk
       model: zai/glm-5
       model_fallbacks:
         - minimax/minimax-m2.7
@@ -1361,31 +1387,34 @@ teams:
       - id: qa-reviewer
         role: worker
         sprint_responsibilities:
-          - run expertise unit, integration, and contract tests
+          - run context unit, integration, and contract tests
           - run diagnostics and regression suites
           - verify sync consistency and output contracts
-          - validate recommendation and delegation explain flows
-        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-          evolution for Meta Agents Harness, transforming expertise from passive
-          memory into operational routing intelligence while preserving
-          policy-first constraints and runtime-agnostic contracts. |
-          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-          | directives=spec-bound execution; policy-first routing guardrails; no
-          ontology-wave expansion; conservative rollout with explicit fallback;
-          PR-sized slices; mandatory validation at each slice; explicit deferred
-          list for anything outside v0.7.0 | do=Structured expertise schema and
-          validation; Expertise catalog, evidence, and metrics persistence;
-          Expertise-aware delegation scoring and explain payload; Confidence,
-          validation status, and lifecycle transitions; Operator-facing
-          expertise CLI surfaces; Bounded expertise export and import contracts;
-          Integration, contract, and non-regression coverage | avoid=full
-          ontology engine; automatic trust promotion without evidence or policy;
-          unrestricted cross-organization federation; implicit permission grants
-          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
-          scope | role=run expertise unit, integration, and contract tests; run
-          diagnostics and regression suites; verify sync consistency and output
-          contracts; validate recommendation and delegation explain flows
-        model: openai-codex/gpt-5.4-mini
+          - validate retrieval, bootstrap, and proposal explain flows
+        instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+          evolution for Meta Agents Harness, adding operational context
+          retrieval and persistent memory primitives while preserving
+          expertise-first routing and runtime-agnostic contracts. |
+          sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; expertise remains source-of-truth
+          for routing; bounded retrieval and prompt budgets; no mandatory vector
+          store or obsidian dependency; conservative rollout with explicit
+          fallback; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.8.0 | do=Context Memory
+          schema and validation for .md and .qmd sources; Canonical context
+          corpus, index, and retrieval contracts; Explainable retrieval output
+          by agent, capability, and task; Optional runtime bootstrap injection
+          with bounded context payloads; Proposal flow from sessions and
+          provenance into curated context memory; Operator-facing mah context
+          CLI surfaces; Integration, contract, and non-regression coverage |
+          avoid=context memory as routing authority; automatic memory promotion
+          from raw transcripts without review; mandatory vector database or
+          obsidian dependency; unrestricted vault scanning or prompt inflation;
+          runtime-locked memory behavior; v0.9.0+ scope | role=run context unit,
+          integration, and contract tests; run diagnostics and regression
+          suites; verify sync consistency and output contracts; validate
+          retrieval, bootstrap, and proposal explain flows
+        model: zai/glm-5
         model_fallbacks: []
         agent_file: .opencode/crew/dev/agents/qa-reviewer.md
         expertise:
@@ -1491,30 +1520,33 @@ teams:
       - id: security-reviewer
         role: worker
         sprint_responsibilities:
-          - review policy gating and unsafe coupling risks
-          - flag privilege escalation via expertise metadata
-          - validate bounded export and confidential constraints
-        instruction_block: crew=dev | mission=Deliver bounded v0.7.0 Expertise Engine
-          evolution for Meta Agents Harness, transforming expertise from passive
-          memory into operational routing intelligence while preserving
-          policy-first constraints and runtime-agnostic contracts. |
-          sprint=v0.7.0-expertise-engine,release=v0.7.0,mode=spec-bound-milestone-driven,active=true
-          | directives=spec-bound execution; policy-first routing guardrails; no
-          ontology-wave expansion; conservative rollout with explicit fallback;
-          PR-sized slices; mandatory validation at each slice; explicit deferred
-          list for anything outside v0.7.0 | do=Structured expertise schema and
-          validation; Expertise catalog, evidence, and metrics persistence;
-          Expertise-aware delegation scoring and explain payload; Confidence,
-          validation status, and lifecycle transitions; Operator-facing
-          expertise CLI surfaces; Bounded expertise export and import contracts;
-          Integration, contract, and non-regression coverage | avoid=full
-          ontology engine; automatic trust promotion without evidence or policy;
-          unrestricted cross-organization federation; implicit permission grants
-          from expertise metadata; mandatory dedicated UI dashboard; v0.8.0+
-          scope | role=review policy gating and unsafe coupling risks; flag
-          privilege escalation via expertise metadata; validate bounded export
-          and confidential constraints
-        model: openai-codex/gpt-5.4-mini
+          - review path traversal, prompt inflation, and memory poisoning risks
+          - flag policy bypass via context injection and persistence
+          - validate bounded storage and confidential memory constraints
+        instruction_block: crew=dev | mission=Deliver bounded v0.8.0 Context Memory
+          evolution for Meta Agents Harness, adding operational context
+          retrieval and persistent memory primitives while preserving
+          expertise-first routing and runtime-agnostic contracts. |
+          sprint=v0.8.0-context-memory,release=v0.8.0,mode=spec-bound-milestone-driven,active=true
+          | directives=spec-bound execution; expertise remains source-of-truth
+          for routing; bounded retrieval and prompt budgets; no mandatory vector
+          store or obsidian dependency; conservative rollout with explicit
+          fallback; PR-sized slices; mandatory validation at each slice;
+          explicit deferred list for anything outside v0.8.0 | do=Context Memory
+          schema and validation for .md and .qmd sources; Canonical context
+          corpus, index, and retrieval contracts; Explainable retrieval output
+          by agent, capability, and task; Optional runtime bootstrap injection
+          with bounded context payloads; Proposal flow from sessions and
+          provenance into curated context memory; Operator-facing mah context
+          CLI surfaces; Integration, contract, and non-regression coverage |
+          avoid=context memory as routing authority; automatic memory promotion
+          from raw transcripts without review; mandatory vector database or
+          obsidian dependency; unrestricted vault scanning or prompt inflation;
+          runtime-locked memory behavior; v0.9.0+ scope | role=review path
+          traversal, prompt inflation, and memory poisoning risks; flag policy
+          bypass via context injection and persistence; validate bounded storage
+          and confidential memory constraints
+        model: zai/glm-5
         model_fallbacks: []
         agent_file: .opencode/crew/dev/agents/security-reviewer.md
         expertise:

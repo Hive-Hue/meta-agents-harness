@@ -1,15 +1,18 @@
 /**
  * runtime-kilo — Kilo Code runtime plugin.
  *
+ * Integrates the Kilo Code CLI (@kilocode/cli) with the MAH core.
+ * Kilo is a fork of OpenCode; MAH manages crew state and generated tree lookup,
+ * and this plugin translates that context into a direct `kilo` invocation.
+ *
+ * Plugin source: plugins/runtime-kilo/
+ * Install target: mah-plugins/kilo/  (via mah plugins install)
+ *
  * Core-managed commands:
  *   list:crews, use, clear, run
  *
  * Plugin-declared commands:
  *   doctor, check:runtime, validate, validate:runtime
- *
- * Core-integrated runtime plugin for Kilo Code (@kilocode/cli).
- * Crew discovery/state is managed by MAH core; the plugin only adapts
- * crew context into the direct `kilo` CLI invocation.
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
@@ -105,9 +108,25 @@ function buildKiloConfigEnv(config) {
   return JSON.stringify(mergeKiloConfig(parseExistingKiloConfig(), config))
 }
 
-function writeJson(targetPath, payload) {
-  mkdirSync(path.dirname(targetPath), { recursive: true })
-  writeFileSync(targetPath, JSON.stringify(payload, null, 2), "utf-8")
+function normalizeKiloModelId(model = "") {
+  const value = `${model || ""}`.trim()
+  if (!value) return value
+  const aliases = {
+    "minimax-coding-plan/MiniMax-M2.7": "minimax/minimax-m2.7",
+    "zai-coding-plan/glm-5": "zai/glm-5",
+    "zai-coding-plan/glm-5.1": "zai/glm-5.1"
+  }
+  return aliases[value] || value
+}
+
+function readAgentFlagFromArgs(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if (token === "--agent" && args[i + 1]) return `${args[i + 1]}`.trim()
+    if (token.startsWith("--agent=")) return token.slice("--agent=".length).trim()
+  }
+  return ""
 }
 
 function collectCrewAgentBlocks(crewConfig) {
@@ -193,6 +212,7 @@ function buildKiloRunConfig({ repoRoot, crew, configPath }) {
   }
 
   const orchestratorName = crewConfig?.orchestrator?.name || "orchestrator"
+  const orchestratorModel = `${crewConfig?.orchestrator?.model || ""}`.trim()
   const crewName = `${crewConfig?.name || ""}`.trim()
   const agents = collectCrewAgentBlocks(crewConfig)
   const agentConfig = {}
@@ -216,9 +236,12 @@ function buildKiloRunConfig({ repoRoot, crew, configPath }) {
     })
 
     const isOrchestrator = agent.name === orchestratorName || agent.role === "orchestrator"
+    const runtimeModel = isOrchestrator
+      ? `${agent.source.model || orchestratorModel || ""}`.trim()
+      : `${agent.source.model || orchestratorModel || ""}`.trim()
     agentConfig[agent.name] = {
       description: agent.source.description || `${agent.name} agent`,
-      model: agent.source.model,
+      model: normalizeKiloModelId(runtimeModel),
       prompt,
       mode: isOrchestrator ? "primary" : "subagent",
       hidden: !isOrchestrator
@@ -238,6 +261,11 @@ function buildKiloRunConfig({ repoRoot, crew, configPath }) {
       agent: agentConfig
     }
   }
+}
+
+function writeJson(targetPath, payload) {
+  mkdirSync(path.dirname(targetPath), { recursive: true })
+  writeFileSync(targetPath, JSON.stringify(payload, null, 2), "utf-8")
 }
 
 function materializeKiloAgents(repoRoot, crewId) {
@@ -291,27 +319,45 @@ function clearKiloCrewState({ repoRoot }) {
 }
 
 export const runtimePlugin = {
+  // --- Identification ---
   name: "kilo",
   version: "1.0.0",
   mahVersion: "^0.5.0",
 
+  // --- RuntimeAdapter ---
   adapter: {
     name: "kilo",
     markerDir: ".kilo",
     configPattern: ".kilo/crew/<crew>/multi-team.yaml",
+
+    // Kilo Code CLI — installed via: npm install -g @kilocode/cli
+    // Then accessible as `kilo` in PATH.
+    // Wrapper is optional in the core-integrated model.
     wrapper: null,
     directCli: "kilo",
+
+    // Session capabilities
     capabilities: {
-      sessionModeNew: true,
-      sessionModeContinue: true,
+      sessionModeNew: true,          // kilo supports /new session
+      sessionModeContinue: true,    // kilo supports /continue
       sessionModeNone: false,
       sessionIdFlag: "--session",
       sessionRootFlag: false,
       sessionMirrorFlag: false,
       sessionNewArgs: [],
-      sessionContinueArgs: []
+      sessionContinueArgs: [],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
+
     supportsSessions: true,
+
+    // kilo session subcommands (parsed from kilo session --help output)
     sessionListCommand: [
       ["kilo", ["session", "list", "--output-format", "json"]]
     ],
@@ -322,20 +368,29 @@ export const runtimePlugin = {
       ["kilo", ["session", "delete"]]
     ],
     supportsSessionNew: true,
+
+    // Commands handled directly by the runtime CLI.
+    // Crew-aware commands (list:crews, use, clear) are core-managed by MAH.
+    // `run` is prepared by `prepareRunContext()` below.
     commands: {
       doctor: [
         ["kilo", ["debug"]]
       ],
+
       "check:runtime": [
         ["kilo", ["debug"]]
       ],
+
       validate: [
         ["kilo", ["debug"]]
       ],
+
       "validate:runtime": [
         ["kilo", ["debug"]]
       ]
     },
+
+    // --- Required adapter methods ---
 
     detect(cwd, existsFn) {
       return existsFn(`${cwd}/${this.markerDir}`)
@@ -355,8 +410,8 @@ export const runtimePlugin = {
       return clearKiloCrewState({ repoRoot })
     },
 
-    prepareRunContext({ repoRoot, crew, configPath, argv }) {
-      const envOverrides = {}
+    prepareRunContext({ repoRoot, crew, configPath, argv, envOverrides: baseEnvOverrides = {} }) {
+      const envOverrides = { ...baseEnvOverrides }
       const warnings = []
       let orchestratorName = ""
 
@@ -371,10 +426,14 @@ export const runtimePlugin = {
         warnings.push(`kilo: crew config not found at ${configPath}, running without injected MAH context`)
       }
 
+      envOverrides.MAH_RUNTIME = "kilo"
+      if (crew) envOverrides.MAH_ACTIVE_CREW = crew
+      const requestedAgent = `${envOverrides.MAH_AGENT || readAgentFlagFromArgs(argv) || process.env.MAH_AGENT || orchestratorName}`.trim()
+
       const hasMessage = Array.isArray(argv) && argv.length > 0
       const args = []
       if (hasMessage) args.push("run")
-      if (orchestratorName) args.push("--agent", orchestratorName)
+      if (requestedAgent) args.push("--agent", requestedAgent)
 
       return {
         ok: true,
@@ -386,7 +445,33 @@ export const runtimePlugin = {
       }
     },
 
-    resolveCommandPlan(command, commandExistsFn) {
+    prepareHeadlessRunContext({ task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!Array.isArray(argv) || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "Kilo headless requires a task prompt"
+        }
+      }
+
+      return {
+        ok: true,
+        exec: this.directCli,
+        args: ["--no-interactive"],
+        passthrough: task ? [task] : argv,
+        envOverrides: {
+          ...envOverrides,
+          KILO_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "kilo"
+        }
+      }
+    },
+
+    resolveCommandPlan(command, commandExistsFn, passthroughArgs = []) {
       const variants = this.commands?.[command] || []
       if (variants.length === 0) {
         return { ok: false, error: `command not supported: ${command}`, variants: [] }
@@ -432,6 +517,7 @@ export const runtimePlugin = {
     }
   },
 
+  // --- Lifecycle hooks ---
   init(ctx) {
     if (process.env.MAH_DEBUG_PLUGINS === "1") {
       console.log(`[kilo] plugin loaded (MAH ${ctx.mahVersion})`)

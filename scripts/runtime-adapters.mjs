@@ -146,7 +146,7 @@ export const RUNTIME_ADAPTERS = {
     markerDir: ".claude",
     configPattern: ".claude/crew/<crew>/multi-team.yaml",
     wrapper: null,
-    directCli: "claude",
+    directCli: "ccr",
     capabilities: {
       sessionModeNew: false,
       sessionModeContinue: true,
@@ -170,10 +170,10 @@ export const RUNTIME_ADAPTERS = {
     sessionDeleteCommand: null,
     supportsSessionNew: false,
     commands: {
-      doctor: [["claude", ["--help"]]],
-      "check:runtime": [["claude", ["--help"]]],
-      validate: [["claude", ["--help"]]],
-      "validate:runtime": [["claude", ["--help"]]]
+      doctor: [["ccr", ["--help"]]],
+      "check:runtime": [["ccr", ["--help"]]],
+      validate: [["ccr", ["--help"]]],
+      "validate:runtime": [["ccr", ["--help"]]]
     },
     activateCrew(context) {
       return activateClaudeCrewState(context)

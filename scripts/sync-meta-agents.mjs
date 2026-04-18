@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { determineAction } from "./sync-utils.mjs"
+import { normalizeModelId } from "../mah-plugins/shared-model-normalize.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -738,8 +739,9 @@ function runtimeTools(agent, runtime) {
   const safeTools = ["read", "grep", "find", "ls"]
   if (agent.role === "orchestrator" || agent.role === "lead") {
     const delegationTool = runtime === "hermes" ? null : "delegate_agent"
-    const tools = [...safeTools, delegationTool, "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"].filter(Boolean)
-    return runtime === "kilo" ? Object.fromEntries(tools.map((tool) => [tool, true])) : tools
+    const tools = [...safeTools, delegationTool, "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
+    if (agent.role === "lead") tools.push("bash")
+    return runtime === "kilo" ? Object.fromEntries(tools.filter(Boolean).map((tool) => [tool, true])) : tools.filter(Boolean)
   }
   const base = ["read", "grep", "find", "ls", "update_expertise_model", "mcp_servers", "mcp_tools", "mcp_call"]
   const domain = domainFromProfile(metaDoc, agent.domain_profile, runtime)
@@ -771,8 +773,8 @@ function runtimeMcpAccess() {
 
 function resolveModel(meta, runtime, modelRef) {
   const override = meta.runtimes?.[runtime]?.model_overrides?.[modelRef]
-  if (override) return override
-  return meta.catalog?.models?.[modelRef] || "inherit"
+  if (override) return normalizeModelId(override)
+  return normalizeModelId(meta.catalog?.models?.[modelRef] || "inherit")
 }
 
 function resolveModelToken(meta, runtime, token) {
@@ -780,9 +782,9 @@ function resolveModelToken(meta, runtime, token) {
   if (!key) return ""
   if (meta.catalog?.models?.[key] || meta.runtimes?.[runtime]?.model_overrides?.[key]) {
     const resolved = resolveModel(meta, runtime, key)
-    return resolved || key
+    return normalizeModelId(resolved || key)
   }
-  return key
+  return normalizeModelId(key)
 }
 
 function resolveAgentModel(meta, runtime, agent) {
@@ -798,8 +800,8 @@ function resolveModelFallbacks(meta, runtime, modelRef) {
     .map((item) => {
       const key = `${item || ""}`.trim()
       if (!key) return ""
-      if (meta.catalog?.models?.[key]) return resolveModel(meta, runtime, key)
-      return key
+      if (meta.catalog?.models?.[key]) return normalizeModelId(resolveModel(meta, runtime, key))
+      return normalizeModelId(key)
     })
     .filter(Boolean)
 }

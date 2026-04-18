@@ -4,6 +4,7 @@ import path from "node:path"
 import { spawnSync } from "node:child_process"
 import YAML from "yaml"
 import { readActiveCrew } from "./runtime-core-ops.mjs"
+import { mapModelToCcrRef } from "./ccr-model-helper.mjs"
 
 function toPosix(targetPath) {
   return `${targetPath || ""}`.replaceAll(path.sep, "/")
@@ -287,7 +288,7 @@ function loadPromptBody(repoRoot, configPath, promptPath) {
   return { body: "", resolvedPath: candidates[0] || "" }
 }
 
-function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestratorPromptBody) {
+function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestratorPromptBody, rootModel = "") {
   const teamLines = []
   for (const team of config.teams || []) {
     const lead = team?.lead?.name || "(missing-lead)"
@@ -299,7 +300,9 @@ function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestrato
     }
   }
 
+  const rcm=mapModelToCcrRef(rootModel)
   return [
+    rcm?"<CCR-ROOT-MODEL>"+rcm+"</CCR-ROOT-MODEL>":"",
     `Current role: orchestrator`,
     `Current agent: ${config?.orchestrator?.name || "orchestrator"}`,
     `System: ${config?.name || "MultiTeam"}`,
@@ -329,9 +332,11 @@ function buildClaudeAgents(repoRoot, configPath, config, fullPrompts, strictHier
     const lead = team?.lead
     if (lead?.name && lead?.prompt) {
       const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, lead.prompt).body : ""
+      const leadCcrModel = mapModelToCcrRef(lead.model)
       agents[lead.name] = {
         description: lead.description || `Lead agent for team ${teamName}`,
         prompt: [
+          leadCcrModel?"<CCR-SUBAGENT-MODEL>"+leadCcrModel+"</CCR-SUBAGENT-MODEL>":"",
           `Current role: lead`,
           `Current team: ${teamName}`,
           `Current agent: ${lead.name}`,
@@ -349,9 +354,11 @@ function buildClaudeAgents(repoRoot, configPath, config, fullPrompts, strictHier
       for (const member of team.members || []) {
         if (!member?.name || !member?.prompt) continue
         const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
+        const memberCcrModel = mapModelToCcrRef(member.model)
         agents[member.name] = {
           description: member.description || `Worker agent for team ${teamName}`,
           prompt: [
+            memberCcrModel?"<CCR-SUBAGENT-MODEL>"+memberCcrModel+"</CCR-SUBAGENT-MODEL>":"",
             `Current role: worker`,
             `Current team: ${teamName}`,
             `Current agent: ${member.name}`,
@@ -422,6 +429,74 @@ function parseOpencodeRunArgs(argv = []) {
       : null
   const passthrough = stripFlags(argv, ["--hierarchy", "--no-hierarchy"])
   return { hierarchy, passthrough }
+}
+
+function readAgentFlagFromArgs(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if (token === "--agent" && args[i + 1]) return `${args[i + 1]}`.trim()
+    if (token.startsWith("--agent=")) return token.slice("--agent=".length).trim()
+  }
+  return ""
+}
+
+function hasOpencodeModelFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "-m" || token === "--model" || token.startsWith("--model=")) return true
+  }
+  return false
+}
+
+function readOpencodeAgentModel(repoRoot, crew, agentName = "") {
+  const requested = `${agentName || ""}`.trim().toLowerCase()
+  if (!requested) return ""
+  const configPath = path.join(repoRoot, ".opencode", "crew", crew, "multi-team.yaml")
+  if (!existsSync(configPath)) return ""
+  try {
+    const config = readYaml(configPath)
+    const orchestrator = config?.orchestrator
+    if (
+      `${orchestrator?.name || ""}`.trim().toLowerCase() === requested ||
+      `${orchestrator?.id || ""}`.trim().toLowerCase() === requested
+    ) {
+      return `${orchestrator?.model || ""}`.trim()
+    }
+    for (const team of Array.isArray(config?.teams) ? config.teams : []) {
+      if (
+        `${team?.lead?.name || ""}`.trim().toLowerCase() === requested ||
+        `${team?.lead?.id || ""}`.trim().toLowerCase() === requested
+      ) {
+        return `${team?.lead?.model || ""}`.trim()
+      }
+      for (const member of Array.isArray(team?.members) ? team.members : []) {
+        if (
+          `${member?.name || ""}`.trim().toLowerCase() === requested ||
+          `${member?.id || ""}`.trim().toLowerCase() === requested
+        ) {
+          return `${member?.model || ""}`.trim()
+        }
+      }
+    }
+  } catch {
+    return ""
+  }
+  return ""
+}
+
+function getOpencodeModelArgs(agentModel = "", passthroughArgs = []) {
+  if (!agentModel || hasOpencodeModelFlag(passthroughArgs)) return []
+  return ["-m", agentModel]
+}
+
+function shouldUseOpencodeRunSubcommand(argv = []) {
+  if (!Array.isArray(argv) || argv.length === 0) return false
+  return argv.some((token) => {
+    const value = `${token || ""}`.trim()
+    if (!value) return false
+    return !value.startsWith("-")
+  })
 }
 
 function getAllowDelegateForCrew(repoRoot, crew) {
@@ -518,6 +593,73 @@ function hasHermesModelFlag(args = []) {
     if (token === "-m" || token === "--model" || token.startsWith("--model=")) return true
   }
   return false
+}
+
+function hasHermesProviderFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "--provider" || token.startsWith("--provider=")) return true
+  }
+  return false
+}
+
+function splitProviderModel(model = "") {
+  const value = `${model || ""}`.trim()
+  if (!value || !value.includes("/")) return { provider: "", model: value }
+  const slashIndex = value.indexOf("/")
+  if (slashIndex <= 0 || slashIndex >= value.length - 1) return { provider: "", model: value }
+  const providerRaw = value.slice(0, slashIndex).trim()
+  const providerAliases = {
+    "zai-coding-plan": "zai",
+    "minimax-coding-plan": "minimax"
+  }
+  const provider = providerAliases[providerRaw] || providerRaw
+  return {
+    provider,
+    model: value.slice(slashIndex + 1).trim()
+  }
+}
+
+function getHermesModelArgs(agentModel = "", passthroughArgs = []) {
+  if (!agentModel || hasHermesModelFlag(passthroughArgs)) return []
+  const { provider, model } = splitProviderModel(agentModel)
+  if (!model) return []
+  if (hasHermesProviderFlag(passthroughArgs)) return ["-m", model]
+  if (provider) return ["--provider", provider, "-m", model]
+  return ["-m", model]
+}
+
+function hasHermesQueryFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "-q" || token === "--query" || token.startsWith("--query=")) return true
+  }
+  return false
+}
+
+function normalizeHermesPassthroughArgs(args = []) {
+  if (!Array.isArray(args) || args.length === 0 || hasHermesQueryFlag(args)) return args
+
+  const flagsWithValue = new Set(["-r", "--resume", "-c", "--continue", "-s", "--skills", "-m", "--model"])
+  const passthrough = []
+  const promptTokens = []
+
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (!token) continue
+    if (token.startsWith("-")) {
+      passthrough.push(token)
+      if (flagsWithValue.has(token) && args[i + 1] && !`${args[i + 1] || ""}`.startsWith("-")) {
+        passthrough.push(`${args[i + 1] || ""}`)
+        i += 1
+      }
+      continue
+    }
+    promptTokens.push(token)
+  }
+
+  if (promptTokens.length === 0) return args
+  return [...passthrough, "-q", promptTokens.join(" ")]
 }
 
 function readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides = {}) {
@@ -656,6 +798,8 @@ export function preparePiRunContext({ repoRoot, crew, configPath, argv = [], env
     envOverrides: {
       ...loadedEnv,
       ...envOverrides,
+      MAH_RUNTIME: "pi",
+      MAH_ACTIVE_CREW: crew,
       PI_MULTI_CONFIG: configPath,
       PI_MULTI_SESSION_ROOT: session.sessionRoot,
       PI_MULTI_SESSION_ID: session.sessionId
@@ -711,21 +855,27 @@ export function prepareClaudeRunContext({ repoRoot, crew, configPath, argv = [],
     config,
     parsed.strictHierarchy,
     parsed.fullPrompts,
-    orchestratorPrompt.body
+    orchestratorPrompt.body,
+    config?.orchestrator?.model || parsed.rootModel || "" 
   )
   const agents = buildClaudeAgents(repoRoot, configPath, config, parsed.fullPrompts, parsed.strictHierarchy)
 
   return {
     ok: true,
-    exec: "claude",
+    exec: "ccr",
     args: [
+      "code",
       "--append-system-prompt",
       rootPrompt,
       "--agents",
       JSON.stringify(agents)
     ],
     passthrough: parsed.passthrough,
-    envOverrides,
+    envOverrides: {
+      ...envOverrides,
+      MAH_RUNTIME: "claude",
+      MAH_ACTIVE_CREW: crew
+    },
     warnings: parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the core-integrated path"] : [],
     internal: {
       crew,
@@ -746,7 +896,7 @@ export function prepareClaudeRunContext({ repoRoot, crew, configPath, argv = [],
 export function executeClaudePreparedRun({ repoRoot, plan, runCommand }) {
   const internal = plan.internal || {}
   if (internal.showLaunchInfo || internal.dryRun) {
-    console.log("Running Claude Code via MAH core-integrated runtime config")
+    console.log("Running Claude Code via CCR (core-integrated runtime)")
     console.log(`- config=${rel(repoRoot, internal.configPath)}`)
     console.log(`- system=${internal.systemName || "MultiTeam"}`)
     console.log(`- hierarchy=${internal.strictHierarchy ? "strict" : "relaxed"}`)
@@ -805,17 +955,27 @@ export function prepareOpencodeRunContext({ repoRoot, crew, configPath, argv = [
     return { ok: false, error: "no OpenCode crew selected. Run 'mah use <crew>' or pass '--crew <crew>'." }
   }
   const parsed = parseOpencodeRunArgs(argv)
+  const requestedAgent = `${envOverrides.MAH_AGENT || readAgentFlagFromArgs(parsed.passthrough) || process.env.MAH_AGENT || "orchestrator"}`.trim()
+  const agentModel = readOpencodeAgentModel(repoRoot, crew, requestedAgent)
+  const modelArgs = getOpencodeModelArgs(agentModel, parsed.passthrough)
+  const commandArgs = shouldUseOpencodeRunSubcommand(parsed.passthrough) ? ["run"] : []
   return {
     ok: true,
     exec: "opencode",
-    args: [],
+    args: [...commandArgs, ...modelArgs],
     passthrough: parsed.passthrough,
-    envOverrides,
+    envOverrides: {
+      ...envOverrides,
+      MAH_RUNTIME: "opencode",
+      MAH_ACTIVE_CREW: crew,
+      ...(agentModel ? { MAH_AGENT_MODEL_CANONICAL: agentModel } : {})
+    },
     warnings: [],
     internal: {
       crew,
       configPath,
-      hierarchy: parsed.hierarchy
+      hierarchy: parsed.hierarchy,
+      agentModel
     }
   }
 }
@@ -869,15 +1029,15 @@ export function prepareHermesRunContext({ repoRoot, crew, configPath, argv = [],
   const sessionRoot = resolveFromRepo(repoRoot, configuredSessionRoot)
   const multiTeamPath = resolveFromRepo(repoRoot, config?.multi_team || `.hermes/crew/${crew}/multi-team.yaml`)
   const agentCtx = readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides)
-  const modelArgs = agentCtx.agentModel && !hasHermesModelFlag(remaining)
-    ? ["-m", agentCtx.agentModel]
-    : []
+  const modelArgs = getHermesModelArgs(agentCtx.agentModel, remaining)
+
+  const normalizedPassthrough = normalizeHermesPassthroughArgs(remaining)
 
   return {
     ok: true,
     exec: "hermes",
     args: ["chat", ...modelArgs],
-    passthrough: remaining,
+    passthrough: normalizedPassthrough,
     envOverrides: {
       ...envOverrides,
       MAH_RUNTIME: "hermes",
@@ -926,7 +1086,7 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
   if (shouldBootstrapHermes(args, envOverrides)) {
     const agentCtx = internal.agentCtx || readHermesAgentContext(repoRoot, internal.configPath, internal.multiTeamPath, envOverrides)
     const bootstrapQuery = buildHermesBootstrapQuery(agentCtx)
-    const bootstrapModelArgs = agentCtx.agentModel && !hasHermesModelFlag(args) ? ["-m", agentCtx.agentModel] : []
+    const bootstrapModelArgs = getHermesModelArgs(agentCtx.agentModel, args)
     const bootstrap = spawnSync("hermes", ["chat", ...bootstrapModelArgs, "-Q", "-q", bootstrapQuery, ...args], {
       cwd: repoRoot,
       env: { ...process.env, ...envOverrides },
@@ -1043,8 +1203,9 @@ export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = []
   // Claude in headless mode uses --print to avoid interactive TUI
   return {
     ok: true,
-    exec: "claude",
+    exec: "ccr",
     args: [
+      "code",
       "--print",
       "--no-session-persistence"
     ],
@@ -1087,7 +1248,7 @@ export function prepareOpencodeHeadlessRunContext({ repoRoot, task = "", argv = 
   return {
     ok: true,
     exec: "opencode",
-    args: [],
+    args: ["run"],
     passthrough: taskArgs,
     envOverrides: {
       ...envOverrides,
@@ -1133,13 +1294,14 @@ export function prepareHermesHeadlessRunContext({ repoRoot, task = "", crew, con
   } else if (argv.length > 0) {
     taskArgs.push(...argv)
   }
+  const normalizedTaskArgs = normalizeHermesPassthroughArgs(taskArgs)
 
   // Hermes headless uses chat mode with -c for continue
   return {
     ok: true,
     exec: "hermes",
     args: ["chat"],
-    passthrough: sessionId ? ["-c", ...taskArgs] : taskArgs,
+    passthrough: sessionId ? ["-c", ...normalizedTaskArgs] : normalizedTaskArgs,
     envOverrides: {
       ...envOverrides,
       HERMES_HEADLESS: "1",
@@ -1157,3 +1319,4 @@ export function prepareHermesHeadlessRunContext({ repoRoot, task = "", crew, con
     }
   }
 }
+

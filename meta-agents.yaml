@@ -16,12 +16,12 @@ runtime_detection:
       - MAH_RUNTIME
   marker:
     pi: .pi
-    claude: .claude
     hermes: .hermes
-    kilo: .kilo
     opencode: .opencode
     codex: .codex
     corefake: .corefake
+    kilo: .kilo
+    claude: .claude
 runtimes:
   pi: {}
   claude: {}
@@ -29,9 +29,10 @@ runtimes:
   hermes: {}
   kilo:
     model_overrides:
-      orchestrator_default: minimax-coding-plan/MiniMax-M2.7
-      lead_default: minimax-coding-plan/MiniMax-M2.7
-      worker_default: minimax-coding-plan/MiniMax-M2.7
+      orchestrator_default: minimax/minimax-m2.7
+      lead_default: zai/glm-5.1
+      worker_default: zai/glm-5.1
+      qa_default: zai/glm-5.1
   codex:
     model_overrides:
       orchestrator_default: gpt-5.4-mini
@@ -40,16 +41,16 @@ runtimes:
   corefake: {}
 catalog:
   models:
-    orchestrator_default: minimax/minimax-m2.7
-    lead_default: zai/glm-5
-    worker_default: openai-codex/gpt-5.3-codex
-    qa_default: openai-codex/gpt-5.4-mini
+    orchestrator_default: minimax-coding-plan/MiniMax-M2.7
+    lead_default: zai-coding-plan/glm-5
+    worker_default: zai-coding-plan/glm-5
+    qa_default: zai-coding-plan/glm-5
   model_fallbacks:
     orchestrator_default:
       - nvidia/nemotron-3-super-120b-a12b:free
       - zai/glm-5
       - minimax/minimax-m2.7
-      - openai-codex/gpt-5.4-mini
+      - openai/gpt-5.4-mini
     lead_default:
       - minimax/minimax-m2.7
       - nvidia/nemotron-3-super-120b-a12b:free
@@ -407,36 +408,37 @@ domain_profiles:
 crews:
   - id: dev
     display_name: Development Crew
-    mission: Deliver bounded v0.7.0 Expertise Engine evolution for Meta Agents Harness, transforming expertise from passive memory into operational routing intelligence while preserving policy-first constraints and runtime-agnostic contracts.
+    mission: Deliver bounded v0.8.0 Context Memory evolution for Meta Agents Harness, adding operational context retrieval and persistent memory primitives while preserving expertise-first routing and runtime-agnostic contracts.
     sprint_mode:
-      name: v0.7.0-expertise-engine
+      name: v0.8.0-context-memory
       active: true
-      target_release: v0.7.0
-      objective: "Define and implement bounded v0.7.0 Expertise Engine foundations: structured expertise model, expertise-aware delegation, trust/evidence signals, and operator-facing registry workflows."
+      target_release: v0.8.0
+      objective: "Define and implement bounded v0.8.0 Context Memory foundations: operational context schema, corpus/index lifecycle, bounded retrieval, runtime injection, and proposal flow for persistent operational memory."
       execution_mode: spec-bound-milestone-driven
       directives:
         - spec-bound execution
-        - policy-first routing guardrails
-        - no ontology-wave expansion
+        - expertise remains source-of-truth for routing
+        - bounded retrieval and prompt budgets
+        - no mandatory vector store or obsidian dependency
         - conservative rollout with explicit fallback
         - PR-sized slices
         - mandatory validation at each slice
-        - explicit deferred list for anything outside v0.7.0
+        - explicit deferred list for anything outside v0.8.0
       must_deliver:
-        - Structured expertise schema and validation
-        - Expertise catalog, evidence, and metrics persistence
-        - Expertise-aware delegation scoring and explain payload
-        - Confidence, validation status, and lifecycle transitions
-        - Operator-facing expertise CLI surfaces
-        - Bounded expertise export and import contracts
+        - Context Memory schema and validation for .md and .qmd sources
+        - Canonical context corpus, index, and retrieval contracts
+        - Explainable retrieval output by agent, capability, and task
+        - Optional runtime bootstrap injection with bounded context payloads
+        - Proposal flow from sessions and provenance into curated context memory
+        - Operator-facing mah context CLI surfaces
         - Integration, contract, and non-regression coverage
       must_not_deliver:
-        - full ontology engine
-        - automatic trust promotion without evidence or policy
-        - unrestricted cross-organization federation
-        - implicit permission grants from expertise metadata
-        - mandatory dedicated UI dashboard
-        - v0.8.0+ scope
+        - context memory as routing authority
+        - automatic memory promotion from raw transcripts without review
+        - mandatory vector database or obsidian dependency
+        - unrestricted vault scanning or prompt inflation
+        - runtime-locked memory behavior
+        - v0.9.0+ scope
     source_configs:
       pi: .pi/crew/dev/multi-team.yaml
       claude: .claude/crew/dev/multi-team.yaml
@@ -477,11 +479,11 @@ crews:
           - expertise_model
         domain_profile: read_only_repo
         sprint_responsibilities:
-          - control v0.7.0 scope
-          - sequence milestones and distribute slices
-          - enforce policy-first and fallback-safe decisions
+          - control v0.8.0 scope
+          - sequence foundation, retrieval, and runtime slices
+          - enforce expertise/context boundary and fallback-safe decisions
           - preserve runtime-agnostic MAH architecture
-          - defer anything outside v0.7.0
+          - defer broader assistant-layer ambitions outside v0.8.0
       - id: planning-lead
         role: lead
         team: planning
@@ -493,10 +495,10 @@ crews:
           - expertise_model
         domain_profile: planning_delivery
         sprint_responsibilities:
-          - translate Expertise Engine spec into executable backlog
+          - translate Context Memory plan into executable backlog
           - maintain milestone ordering and acceptance criteria
-          - prevent ontology and governance over-expansion
-          - keep M1-M5 boundaries explicit
+          - keep routing, memory, session, and provenance boundaries explicit
+          - prevent scope creep into autonomous knowledge systems
       - id: engineering-lead
         role: lead
         team: engineering
@@ -508,7 +510,7 @@ crews:
           - expertise_model
         domain_profile: runtime_impl
         sprint_responsibilities:
-          - coordinate model, routing, and CLI implementation streams
+          - coordinate schema, index, retrieval, and runtime integration streams
           - split work into reviewable changesets
           - preserve adapter boundaries and backward compatibility
       - id: validation-lead
@@ -522,10 +524,10 @@ crews:
           - expertise_model
         domain_profile: validation_runtime
         sprint_responsibilities:
-          - define quality gates for schema, routing, and evidence
-          - validate spec adherence and release boundary
-          - enforce explainability and JSON contract stability
-          - block policy/topology bypass risk
+          - define quality gates for schema, retrieval, and bootstrap injection
+          - validate explainability, boundedness, and release boundary
+          - enforce JSON contract stability for context surfaces
+          - block policy, path, and memory-persistence bypass risk
       - id: repo-analyst
         role: worker
         team: planning
@@ -535,7 +537,7 @@ crews:
           - expertise_model
         domain_profile: read_only_repo
         sprint_responsibilities:
-          - map real codebase integration points for Expertise Engine
+          - map real codebase integration points for Context Memory
           - locate affected files and dependency edges
           - surface regression and coupling risks
           - identify runtime and plugin compatibility constraints
@@ -548,9 +550,9 @@ crews:
           - expertise_model
         domain_profile: planning_delivery
         sprint_responsibilities:
-          - define expertise object and storage contracts
-          - define routing score and fallback semantics
-          - define bounded export and import policy envelope
+          - define context memory document, index, and retrieval contracts
+          - define bootstrap injection and explain payload semantics
+          - define proposal governance and persistence envelope
       - id: frontend-dev
         role: worker
         team: engineering
@@ -562,9 +564,9 @@ crews:
           - cli_operator_surface
           - runtime_impl
         sprint_responsibilities:
-          - implement expertise CLI and help surfaces
-          - improve operator-facing explainability outputs
-          - keep UX legible for recommendation and delegation flows
+          - implement context CLI and help surfaces
+          - improve operator-facing retrieval and proposal explainability outputs
+          - keep UX legible for bounded context and bootstrap flows
       - id: backend-dev
         role: worker
         team: engineering
@@ -576,9 +578,9 @@ crews:
           - cli_operator_surface
           - runtime_impl
         sprint_responsibilities:
-          - implement expertise persistence and evidence pipeline
-          - integrate routing engine with dispatcher and MCP delegation surfaces
-          - own core expertise routing and interoperability tests
+          - implement context corpus, index, and retrieval pipeline
+          - integrate bootstrap injection and proposal flow with runtime surfaces
+          - own core context interoperability and persistence tests
       - id: qa-reviewer
         role: worker
         team: validation
@@ -588,10 +590,10 @@ crews:
           - expertise_model
         domain_profile: validation_runtime
         sprint_responsibilities:
-          - run expertise unit, integration, and contract tests
+          - run context unit, integration, and contract tests
           - run diagnostics and regression suites
           - verify sync consistency and output contracts
-          - validate recommendation and delegation explain flows
+          - validate retrieval, bootstrap, and proposal explain flows
       - id: security-reviewer
         role: worker
         team: validation
@@ -601,9 +603,9 @@ crews:
           - expertise_model
         domain_profile: validation_runtime
         sprint_responsibilities:
-          - review policy gating and unsafe coupling risks
-          - flag privilege escalation via expertise metadata
-          - validate bounded export and confidential constraints
+          - review path traversal, prompt inflation, and memory poisoning risks
+          - flag policy bypass via context injection and persistence
+          - validate bounded storage and confidential memory constraints
     runtime_overrides:
       opencode:
         permission:
