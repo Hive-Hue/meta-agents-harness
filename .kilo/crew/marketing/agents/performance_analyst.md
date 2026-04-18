@@ -1,6 +1,6 @@
 ---
 name: performance-analyst
-model: minimax-coding-plan/MiniMax-M2.7
+model: zai/glm-5.1
 role: worker
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch

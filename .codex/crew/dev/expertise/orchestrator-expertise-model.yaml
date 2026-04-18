@@ -1,12 +1,27 @@
 agent:
-  name: orchestrator
-  role: orchestrator
-  team: Orchestration
+  name: "orchestrator"
+  role: "orchestrator"
+  team: "Orchestration"
 meta:
   version: "1"
   max_lines: "120"
-patterns: []
-risks: []
+  last_updated: "2026-04-18T18:09:41.435Z"
+patterns:
+  - date: "2026-04-18"
+    note: "Model normalization gap: sync-meta-agents.mjs writes raw catalog model IDs (zai-coding-plan/glm-5, minimax-coding-plan/MiniMax-M2.7, openai-codex/gpt-5.3-codex) to runtime-specific multi-team.yaml files. The shared normalizeModelId() function exists in mah-plugins/shared-model-normalize.mjs and is imported by pi plugin but never applied in the sync pipeline. resolveModelToken() in sync-meta-agents.mjs is the single point where model IDs are resolved before being written to runtime configs. Fix: import and apply normalizeModelId at the resolveModelToken level. The pi runtime has empty model_overrides (runtimes.pi: {}), while kilo and codex have explicit overrides that already use the correct provider prefixes."
+  - date: "2026-04-18"
+    note: "Model normalization fix applied: sync-meta-agents.mjs now imports and applies normalizeModelId() from shared-model-normalize.mjs in resolveModel(), resolveModelToken(), and resolveModelFallbacks(). All runtime multi-team.yaml files regenerated via mah sync. The zai-coding-plan/ and minimax-coding-plan/ prefixes are normalized to zai/ and minimax/ respectively. Note: the orchestrator model in catalog was manually patched to minimax/MiniMax-M2.7 (mixed case) — not fully lowered minimax/minimax-m2.7. This is a catalog source-of-truth concern, not a sync pipeline issue."
+  - date: "2026-04-18"
+    note: "Kilo runtime model resolution bug: mah-plugins/kilo/index.mjs line 241 had orchestratorModel || agent.source.model (wrong order) causing all subagents to get the orchestrator's model. Fixed to agent.source.model || orchestratorModel. Also added missing qa_default override for kilo in meta-agents.yaml. Worker edit tool sometimes fails silently for template literals — use python via bash as workaround."
+  - date: "2026-04-18"
+    note: "Claude runtime plugin (mah-plugins/claude/index.mjs) now uses `ccr code` instead of `claude` directly. This routes through the Claude Code Router (CCR) for proper model routing via custom-router.cjs + route-map, auth via `ccr activate` (ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL), and proxy startup. Changed directCli from \\\\\\\"claude\\\\\\\" to \\\\\\\"ccr\\\\\\\", prepended \\\\\\\"code\\\\\\\" to args, and updated command table entries. Worker edit tool fails silently for complex edits — heredoc-based Python via bash (using `<< 'PYEOF'`) is the reliable workaround."
+  - date: "2026-04-18"
+    note: "Claude runtime uses CCR (Claude Code Router): Three layers needed the same fix — (1) plugins/runtime-claude/index.mjs (source-of-truth plugin), (2) mah-plugins/claude/index.mjs (installed plugin copy), (3) scripts/runtime-adapters.mjs + scripts/runtime-core-integrations.mjs (built-in adapter that takes priority over plugins). The plugin-loader.mjs has BUILT_IN_RUNTIMES = [\\\"pi\\\",\\\"claude\\\",\\\"opencode\\\",\\\"hermes\\\"] that shadow installed plugins — must fix the built-in too. Both interactive and headless claude paths needed \\\"code\\\" prepended to args. Worker edit tool consistently fails for complex edits — only reliable approach is writing a Python script file to /tmp then executing it via bash."
+  - date: "2026-04-18"
+    note: "CCR model tag injection: scripts/ccr-model-helper.mjs provides mapModelToCcrRef() that maps MAH model IDs (zai/glm-5) to CCR format (Zai Coding Plan,glm-5). scripts/runtime-core-integrations.mjs injects <CCR-SUBAGENT-MODEL> tags into lead/worker prompts and <CCR-ROOT-MODEL> tag into orchestrator prompt. The CCR custom-router at ~/.claude-code-router/custom-router/multi-router.cjs checks these tags as highest priority routing. Workers have ~280 char bash command limit — use separate file approach for complex edits."
+risks:
+  - date: "2026-04-18"
+    note: "Model resolution failure: agents configured with 'zai-coding-plan/glm-5' and 'openai-codex/gpt-5.3-codex' fail because these models are not available in the runtime. Fallback chains in multi-team.yaml did not activate — agent exited with code 1 immediately. Planning, Engineering, and Validation leads plus solution-architect all use zai-coding-plan/glm-5. Worker agents use openai-codex/gpt-5.3-codex. Fix requires updating model fields to available providers before any delegation can proceed."
 tools: []
 workflows: []
 decisions: []

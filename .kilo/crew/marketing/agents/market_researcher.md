@@ -1,6 +1,6 @@
 ---
 name: market-researcher
-model: minimax-coding-plan/MiniMax-M2.7
+model: zai/glm-5.1
 role: worker
 team: Planning
 mission: Plan, produce, refine, and validate communication assets, launch

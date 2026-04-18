@@ -63,6 +63,15 @@ function parseOpencodeRunArgs(argv = []) {
   return { hierarchy, passthrough }
 }
 
+function shouldUseOpencodeRunSubcommand(argv = []) {
+  if (!Array.isArray(argv) || argv.length === 0) return false
+  return argv.some((token) => {
+    const value = `${token || ""}`.trim()
+    if (!value) return false
+    return !value.startsWith("-")
+  })
+}
+
 function getAllowDelegateForCrew(repoRoot, crew) {
   const metaPath = path.join(repoRoot, "meta-agents.yaml")
   if (!existsSync(metaPath)) return null
@@ -181,12 +190,17 @@ export const runtimePlugin = {
         return { ok: false, error: "no OpenCode crew selected. Run 'mah use <crew>' or pass '--crew <crew>'." }
       }
       const parsed = parseOpencodeRunArgs(argv)
+      const commandArgs = shouldUseOpencodeRunSubcommand(parsed.passthrough) ? ["run"] : []
       return {
         ok: true,
         exec: this.directCli,
-        args: [],
+        args: commandArgs,
         passthrough: parsed.passthrough,
-        envOverrides,
+        envOverrides: {
+          ...envOverrides,
+          MAH_RUNTIME: "opencode",
+          MAH_ACTIVE_CREW: crew
+        },
         warnings: [],
         internal: { crew, configPath, hierarchy: parsed.hierarchy }
       }
@@ -202,7 +216,7 @@ export const runtimePlugin = {
       return {
         ok: true,
         exec: "opencode",
-        args: ["--no-interactive"],
+        args: ["run"],
         passthrough: task ? [task] : argv,
         envOverrides: {
           ...envOverrides,

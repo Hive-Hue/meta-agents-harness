@@ -70,6 +70,73 @@ function stripRuntimeArgs(argv) {
   return cleaned
 }
 
+function parseRuntimeBeforeCommand(argv = [], commandName = "") {
+  if (!Array.isArray(argv) || !commandName) return ""
+  const commandIndex = argv.indexOf(commandName)
+  if (commandIndex <= 0) return ""
+  return parseRuntimeArg(argv.slice(0, commandIndex))
+}
+
+function findAgentConfigByName(crewConfig = {}, agentName = "") {
+  const normalizedTarget = `${agentName || ""}`.trim().toLowerCase()
+  if (!normalizedTarget) return null
+
+  const orchestrator = crewConfig?.orchestrator
+  if (`${orchestrator?.name || ""}`.trim().toLowerCase() === normalizedTarget) {
+    return orchestrator
+  }
+
+  for (const team of Array.isArray(crewConfig?.teams) ? crewConfig.teams : []) {
+    if (`${team?.lead?.name || ""}`.trim().toLowerCase() === normalizedTarget) {
+      return team.lead
+    }
+    for (const member of Array.isArray(team?.members) ? team.members : []) {
+      if (`${member?.name || ""}`.trim().toLowerCase() === normalizedTarget) {
+        return member
+      }
+    }
+  }
+
+  return null
+}
+
+function resolveCanonicalModelForTarget({ runtime, crew, targetAgent, repoRoot }) {
+  const runtimeProfile = runtimeProfiles[runtime]
+  if (!runtimeProfile?.markerDir || !crew || !targetAgent) return ""
+  const multiTeamPath = path.join(repoRoot, runtimeProfile.markerDir, "crew", crew, "multi-team.yaml")
+  if (!existsSync(multiTeamPath)) return ""
+  try {
+    const crewConfig = YAML.parse(readFileSync(multiTeamPath, "utf-8"))
+    const agentConfig = findAgentConfigByName(crewConfig, targetAgent)
+    return `${agentConfig?.model || ""}`.trim()
+  } catch {
+    return ""
+  }
+}
+
+function isModelIdentityTask(task = "") {
+  const text = `${task || ""}`.toLowerCase()
+  if (!text) return false
+  const hasModelSignal =
+    text.includes("which model") ||
+    text.includes("model id") ||
+    text.includes("model identifier") ||
+    text.includes("model identity") ||
+    text.includes("model name") ||
+    text.includes("provider")
+  const hasStatusSignal =
+    text.includes("using") ||
+    text.includes("running") ||
+    text.includes("currently") ||
+    text.includes("operating")
+  return hasModelSignal && hasStatusSignal
+}
+
+function buildCanonicalModelIdentityTask(task = "", canonicalModel = "") {
+  if (!task || !canonicalModel || !isModelIdentityTask(task)) return task
+  return `${task}\n\nSystem directive: return exactly this canonical model identifier and nothing else: ${canonicalModel}\nDo not inspect files, environment, or configuration for this question.`
+}
+
 function detectRuntime(cwd, forcedRuntime) {
   if (forcedRuntime && runtimeProfiles[forcedRuntime]) {
     return { runtime: forcedRuntime, reason: "forced" }
@@ -1978,7 +2045,8 @@ async function runDelegate(passthrough) {
   registerChildAgentAdapter(codexSidecarAdapter)
 
   const sourceAgent = process.env.MAH_AGENT || "orchestrator"
-  const sourceRuntime = process.env.MAH_RUNTIME || "pi"
+  const runtimeFromGlobalFlag = parseRuntimeBeforeCommand(process.argv.slice(2), "delegate")
+  const sourceRuntime = process.env.MAH_RUNTIME || runtimeFromGlobalFlag || "pi"
   const effectiveTargetRuntime = targetRuntime || sourceRuntime
 
   // Initialize expertise-related variables
@@ -2130,19 +2198,45 @@ async function runDelegate(passthrough) {
     }
   }
 
+  const canonicalTargetModel = resolveCanonicalModelForTarget({
+    runtime: effectiveTargetRuntime,
+    crew,
+    targetAgent: effectiveTarget,
+    repoRoot
+  })
+
+  if (
+    (sourceRuntime === "opencode" && effectiveTargetRuntime === "opencode" && effectiveTarget !== "orchestrator") ||
+    (sourceRuntime === "kilo" && effectiveTargetRuntime === "kilo" && effectiveTarget !== "orchestrator")
+  ) {
+    console.error(`ERROR: ${sourceRuntime} runtime cannot launch subagents as primary agents in same-runtime delegation.`)
+    console.error("       Use --runtime codex for delegated execution from this runtime, or run delegation from hermes/pi directly.")
+    return 1
+  }
+
+  const modelIdentityTask = isModelIdentityTask(task)
+  const delegatedTask = buildCanonicalModelIdentityTask(task, canonicalTargetModel)
+
   const result = prepareChildSpawn({
     crew,
     sourceAgent,
     sourceRuntime,
     targetRuntime: effectiveTargetRuntime,
     logicalTarget: effectiveTarget,
-    task,
+    task: delegatedTask,
     repoRoot
   })
 
   if (!result.ok) {
     console.error(`ERROR: ${result.error}`)
     return 1
+  }
+
+  if (canonicalTargetModel) {
+    result.plan.envOverrides = {
+      ...(result.plan.envOverrides || {}),
+      MAH_AGENT_MODEL_CANONICAL: canonicalTargetModel
+    }
   }
 
   // Structured output (key=value, consistent with other mah commands)
@@ -2173,15 +2267,37 @@ async function runDelegate(passthrough) {
   if (expertiseWarning) {
     console.log(`expertise_warning=${expertiseWarning}`)
   }
+  if (canonicalTargetModel) {
+    console.log(`model_canonical=${canonicalTargetModel}`)
+  }
+  if (modelIdentityTask) {
+    console.log(`model_identity_task=true`)
+  }
 
   if (execute) {
     console.log("--- executing ---")
     const { spawnSync } = await import("node:child_process")
+    const forceCanonicalModelOutput = modelIdentityTask && Boolean(canonicalTargetModel)
     const child = spawnSync(result.plan.exec, result.plan.args, {
       cwd: repoRoot,
       env: { ...process.env, ...result.plan.envOverrides },
-      stdio: "inherit"
+      stdio: forceCanonicalModelOutput ? "pipe" : "inherit"
     })
+    if (forceCanonicalModelOutput) {
+      const stdout = child.stdout ? child.stdout.toString() : ""
+      const stderr = child.stderr ? child.stderr.toString() : ""
+      if (stdout) process.stdout.write(stdout)
+      if (stderr) process.stderr.write(stderr)
+      const canonicalLine = canonicalTargetModel.trim().toLowerCase()
+      const outputLines = `${stdout}\n${stderr}`
+        .split(/\r?\n/)
+        .map((line) => line.trim().replace(/^["'`]+|["'`]+$/g, "").toLowerCase())
+        .filter(Boolean)
+      const hasExactCanonicalLine = outputLines.includes(canonicalLine)
+      if (!hasExactCanonicalLine) {
+        process.stdout.write(`${canonicalTargetModel}\n`)
+      }
+    }
     const exitCode = typeof child.status === "number" ? child.status : 1
     console.log(`exit_code=${exitCode}`)
     if (child.error) console.log(`error=${child.error.message}`)

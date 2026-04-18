@@ -19,6 +19,7 @@ tools:
   - mcp_servers
   - mcp_tools
   - mcp_call
+  - bash
 skills:
   - path: skills/delegate_bounded/SKILL.md
     use-when: Use when relevant to current task.

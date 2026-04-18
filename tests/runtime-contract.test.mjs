@@ -140,6 +140,45 @@ test("hermes adapter validateRuntime checks all fields", () => {
   assert.ok(result.checks.some((c) => c.name === "commands_declared" && c.ok === true))
 })
 
+test("opencode run preparation preserves interactive tui when no task is provided", () => {
+  const adapter = RUNTIME_ADAPTERS.opencode
+  const configPath = path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml")
+  const result = adapter.prepareRunContext({
+    repoRoot,
+    runtime: "opencode",
+    adapter,
+    crew: "dev",
+    requestedCrew: "dev",
+    activeCrew: null,
+    configPath,
+    argv: [],
+    envOverrides: {}
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.exec, "opencode")
+  assert.deepEqual(result.args, [])
+})
+
+test("opencode run preparation uses run subcommand when task is provided", () => {
+  const adapter = RUNTIME_ADAPTERS.opencode
+  const configPath = path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml")
+  const result = adapter.prepareRunContext({
+    repoRoot,
+    runtime: "opencode",
+    adapter,
+    crew: "dev",
+    requestedCrew: "dev",
+    activeCrew: null,
+    configPath,
+    argv: ["test task", "--agent", "planning-lead"],
+    envOverrides: {}
+  })
+  assert.equal(result.ok, true)
+  assert.equal(result.exec, "opencode")
+  assert.deepEqual(result.args, ["run"])
+  assert.deepEqual(result.passthrough, ["test task", "--agent", "planning-lead"])
+})
+
 test("adapter command resolution skips node variants whose script path is missing", () => {
   const adapter = createAdapter({
     name: "synthetic",

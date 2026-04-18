@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-model: minimax-coding-plan/MiniMax-M2.7
+model: minimax/minimax-m2.7
 role: orchestrator
 team: Orchestration
 mission: Plan, produce, refine, and validate communication assets, launch

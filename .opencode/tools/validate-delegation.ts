@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs"
 import path from "node:path"
-import YAML from "yaml"
+import * as YAML from "yaml"
 import { tool, type ToolContext } from "@opencode-ai/plugin"
 
 interface ValidationResult {
@@ -31,6 +31,19 @@ interface MetaAgentsConfig {
   crews?: CrewConfig[]
 }
 
+function parseYaml<T = unknown>(raw: string): T {
+  const anyYaml = YAML as unknown as {
+    parse?: (text: string) => T
+    default?: { parse?: (text: string) => T } | ((text: string) => T)
+  }
+  if (typeof anyYaml.parse === "function") return anyYaml.parse(raw)
+  if (typeof anyYaml.default === "function") return anyYaml.default(raw)
+  if (anyYaml.default && typeof (anyYaml.default as { parse?: (text: string) => T }).parse === "function") {
+    return (anyYaml.default as { parse: (text: string) => T }).parse(raw)
+  }
+  throw new Error("YAML parser unavailable in current runtime")
+}
+
 export default tool({
   description: "Validates whether a delegation target is allowed under the current crew hierarchy. Must be called before any Task call.",
   args: {
@@ -58,7 +71,7 @@ export default tool({
       // Read meta-agents.yaml to get delegation rules
       const metaAgentsPath = path.join(process.cwd(), "meta-agents.yaml")
       const metaAgentsRaw = readFileSync(metaAgentsPath, "utf-8")
-      const metaAgentsConfig: MetaAgentsConfig = YAML.parse(metaAgentsRaw)
+      const metaAgentsConfig: MetaAgentsConfig = parseYaml<MetaAgentsConfig>(metaAgentsRaw)
 
       // Find the crew config for the active crew
       const crewConfig = metaAgentsConfig.crews?.find((c) => c.id === activeCrewName)

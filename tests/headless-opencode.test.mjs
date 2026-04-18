@@ -16,6 +16,8 @@ test("OpenCode prepareHeadlessRunContext returns valid envelope", () => {
   const result = adapter.prepareHeadlessRunContext({ repoRoot: "/tmp", task: "test" })
   assert.strictEqual(result.ok, true)
   assert.strictEqual(result.exec, "opencode")
+  assert.deepStrictEqual(result.args, ["run"])
+  assert.deepStrictEqual(result.passthrough, ["test"])
 })
 
 test("OpenCode headless errors without task", () => {

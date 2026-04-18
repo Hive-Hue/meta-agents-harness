@@ -8,14 +8,14 @@ permission:
   bash: ask
   task:
     "*": deny
-model: openai-codex/gpt-5.4-mini
+model: zai/glm-5
 ---
 
 # Security Reviewer
 
 Role: `worker`
 Team: `Validation`
-Model: `openai-codex/gpt-5.4-mini`
+Model: `zai/glm-5`
 
 ## Mission
 Validation worker focused on validation findings with evidence and risk rating.

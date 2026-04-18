@@ -121,6 +121,40 @@ function hasHermesModelFlag(args = []) {
   return false
 }
 
+function hasHermesProviderFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "--provider" || token.startsWith("--provider=")) return true
+  }
+  return false
+}
+
+function splitProviderModel(model = "") {
+  const value = `${model || ""}`.trim()
+  if (!value || !value.includes("/")) return { provider: "", model: value }
+  const slashIndex = value.indexOf("/")
+  if (slashIndex <= 0 || slashIndex >= value.length - 1) return { provider: "", model: value }
+  const providerRaw = value.slice(0, slashIndex).trim()
+  const providerAliases = {
+    "zai-coding-plan": "zai",
+    "minimax-coding-plan": "minimax"
+  }
+  const provider = providerAliases[providerRaw] || providerRaw
+  return {
+    provider,
+    model: value.slice(slashIndex + 1).trim()
+  }
+}
+
+function getHermesModelArgs(agentModel = "", passthroughArgs = []) {
+  if (!agentModel || hasHermesModelFlag(passthroughArgs)) return []
+  const { provider, model } = splitProviderModel(agentModel)
+  if (!model) return []
+  if (hasHermesProviderFlag(passthroughArgs)) return ["-m", model]
+  if (provider) return ["--provider", provider, "-m", model]
+  return ["-m", model]
+}
+
 function readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides = {}) {
   const config = readYaml(configPath)
   const multiTeam = readYaml(multiTeamPath)
@@ -293,9 +327,7 @@ export const runtimePlugin = {
       const sessionRoot = resolveFromRepo(repoRoot, configuredSessionRoot)
       const multiTeamPath = resolveFromRepo(repoRoot, config?.multi_team || `.hermes/crew/${crew}/multi-team.yaml`)
       const agentCtx = readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides)
-      const modelArgs = agentCtx.agentModel && !hasHermesModelFlag(remaining)
-        ? ["-m", agentCtx.agentModel]
-        : []
+      const modelArgs = getHermesModelArgs(agentCtx.agentModel, remaining)
 
       return {
         ok: true,
@@ -393,7 +425,7 @@ export const runtimePlugin = {
       if (shouldBootstrapHermes(args, envOverrides)) {
         const agentCtx = internal.agentCtx || readHermesAgentContext(repoRoot, internal.configPath, internal.multiTeamPath, envOverrides)
         const bootstrapQuery = buildHermesBootstrapQuery(agentCtx)
-        const bootstrapModelArgs = agentCtx.agentModel && !hasHermesModelFlag(args) ? ["-m", agentCtx.agentModel] : []
+        const bootstrapModelArgs = getHermesModelArgs(agentCtx.agentModel, args)
         const bootstrap = spawnSync("hermes", ["chat", ...bootstrapModelArgs, "-Q", "-q", bootstrapQuery, ...args], {
           cwd: repoRoot,
           env: { ...process.env, ...envOverrides },

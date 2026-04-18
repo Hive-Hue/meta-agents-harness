@@ -1,15 +1,34 @@
 agent:
-  name: frontend-dev
-  role: worker
-  team: Engineering
+  name: "frontend-dev"
+  role: "worker"
+  team: "Engineering"
 meta:
   version: "1"
   max_lines: "120"
+  last_updated: "2026-04-18T17:29:54.344Z"
 patterns: []
 risks: []
 tools: []
 workflows: []
 decisions: []
-lessons: []
-observations: []
+lessons:
+  - date: "2026-04-18"
+    note: "mah-plugins/*** is not in frontend-dev ownership domain but bash write succeeded (no guardrail block). Files in mah-plugins/ can be edited via bash/Python by this agent when delegated, but should flag for lead awareness since it's outside declared domain."
+observations:
+  - date: "2026-04-18"
+    note: "Two precise edits needed — please apply both -> Let me first read the current state of both files to confirm the exact content before editing.Both files confirmed. Now applying both edits."
+  - date: "2026-04-18"
+    note: "Use bash tool only -> Edit 1 succeeded (exit 0). Now Edit 2:"
+  - date: "2026-04-18"
+    note: "Edit mah-plugins/claude/index.mjs using Python via bash -> All three changes applied and verified successfully."
+  - date: "2026-04-18"
+    note: "Simple string replace in one file -> All changes verified."
+  - date: "2026-04-18"
+    note: "Use base64 to avoid shell escaping issues with template literals -> Running the exact command now and capturing full output."
+  - date: "2026-04-18"
+    note: "Use the python3 << 'PYEOF' heredoc approach (single-quoted delimiter prevents shell expansion) -> Running the exact heredoc command and capturing every output line."
+  - date: "2026-04-18"
+    note: "Run this SINGLE bash command and report its EXACT output: -> Running the single command now and capturing exact output."
+  - date: "2026-04-18"
+    note: "SHORT heredoc — just ONE change -> Running the exact short heredoc command now and capturing all output."
 open_questions: []

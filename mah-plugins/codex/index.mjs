@@ -10,6 +10,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync, cpSync } from "node:fs"
 import path from "node:path"
 import YAML from "yaml"
+import { normalizeModelId } from "../shared-model-normalize.mjs"
 
 function variantPathExists(candidatePath) {
   if (!candidatePath || typeof candidatePath !== "string") return false
@@ -328,7 +329,7 @@ function buildCodexRunContext({ repoRoot, crew, configPath, argv = [], envOverri
     userPrompt: ""
   })
 
-  const model = `${selectedAgent.model || ""}`.trim()
+  const model = normalizeModelId(`${selectedAgent.model || ""}`.trim())
   const args = [...buildCodexMahMcpConfigArg(repoRoot), buildCodexInitialMessagesPrompt(systemPrompt)]
   if (model) args.push("--model", model)
   if (autonomous && taskPrompt) {

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs"
 import path from "node:path"
-import YAML from "yaml"
+import * as YAML from "yaml"
 import { tool } from "@opencode-ai/plugin"
 
 type ExpertiseEntry = { date: string; note: string }
@@ -16,6 +16,32 @@ const DEFAULT_MAX_LINES = 120
 const NOTE_MAX_CHARS = 2000
 const DECAY_AFTER_DAYS = 14
 const SIMILARITY_THRESHOLD = 0.55
+
+function parseYaml<T = unknown>(raw: string): T {
+  const anyYaml = YAML as unknown as {
+    parse?: (text: string) => T
+    default?: { parse?: (text: string) => T } | ((text: string) => T)
+  }
+  if (typeof anyYaml.parse === "function") return anyYaml.parse(raw)
+  if (typeof anyYaml.default === "function") return anyYaml.default(raw)
+  if (anyYaml.default && typeof (anyYaml.default as { parse?: (text: string) => T }).parse === "function") {
+    return (anyYaml.default as { parse: (text: string) => T }).parse(raw)
+  }
+  throw new Error("YAML parser unavailable in current runtime")
+}
+
+function stringifyYaml(value: unknown): string {
+  const anyYaml = YAML as unknown as {
+    stringify?: (v: unknown) => string
+    default?: { stringify?: (v: unknown) => string } | ((v: unknown) => string)
+  }
+  if (typeof anyYaml.stringify === "function") return anyYaml.stringify(value)
+  if (typeof anyYaml.default === "function") return anyYaml.default(value)
+  if (anyYaml.default && typeof (anyYaml.default as { stringify?: (v: unknown) => string }).stringify === "function") {
+    return (anyYaml.default as { stringify: (v: unknown) => string }).stringify(value)
+  }
+  throw new Error("YAML stringifier unavailable in current runtime")
+}
 
 function today(): string {
   return new Date().toISOString().slice(0, 10)
@@ -109,13 +135,13 @@ function trimAndClean(doc: ExpertiseDoc): ExpertiseDoc {
   // Phase 3: line + byte limit enforcement
   const maxLines = Math.min(clone.meta.max_lines || DEFAULT_MAX_LINES, 500)
   const maxBytes = 32_000
-  let rendered = YAML.stringify(clone)
+  let rendered = stringifyYaml(clone)
   const trimOrder = [...allSections]
   while ((lineCount(rendered) > maxLines || byteCount(rendered) > maxBytes) && trimOrder.length > 0) {
     const section = trimOrder.find((key) => Array.isArray(clone[key]) && (clone[key] as ExpertiseEntry[]).length > 0)
     if (!section) break
     ;(clone[section] as ExpertiseEntry[]).shift()
-    rendered = YAML.stringify(clone)
+    rendered = stringifyYaml(clone)
   }
 
   return clone
@@ -178,7 +204,7 @@ export default tool({
     let doc = base
     if (existsSync(filePath)) {
       try {
-        const parsed = YAML.parse(readFileSync(filePath, "utf-8")) as ExpertiseDoc
+        const parsed = parseYaml<ExpertiseDoc>(readFileSync(filePath, "utf-8"))
         if (parsed && parsed.meta && parsed.agent) doc = parsed
       } catch {
         doc = base
@@ -193,7 +219,7 @@ export default tool({
     })
     doc.meta.last_updated = new Date().toISOString()
     doc = trimAndClean(doc)
-    writeFileSync(filePath, YAML.stringify(doc), "utf-8")
+    writeFileSync(filePath, stringifyYaml(doc), "utf-8")
 
     return `ok agent=${agent} category=${key} path=${filePath}`
   }

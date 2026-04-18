@@ -737,26 +737,29 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 	};
 }
 
-function resolveConfigPath(cwd: string): string {
-	const envPath = process.env.PI_MULTI_CONFIG?.trim();
-	if (envPath) {
-		const absolute = resolve(cwd, envPath);
-		if (!existsSync(absolute)) {
-			throw new Error(`PI_MULTI_CONFIG points to a missing file: ${absolute}`);
+	function resolveConfigPath(cwd: string): string {
+		const envPath = process.env.MAH_MULTI_CONFIG?.trim() || process.env.PI_MULTI_CONFIG?.trim();
+		if (envPath) {
+			const absolute = resolve(cwd, envPath);
+			if (!existsSync(absolute)) {
+				throw new Error(`MAH_MULTI_CONFIG points to a missing file: ${absolute}`);
+			}
+			return absolute;
 		}
-		return absolute;
-	}
 
-	const envCrew = process.env.PI_MULTI_CREW?.trim();
-	if (envCrew) {
-		const byCrew = resolve(cwd, ".pi", "crew", envCrew, "multi-team.yaml");
-		if (!existsSync(byCrew)) {
-			throw new Error(`PI_MULTI_CREW="${envCrew}" was set but config was not found at ${byCrew}`);
+		const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+		const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+
+		const envCrew = process.env.MAH_ACTIVE_CREW?.trim() || process.env.PI_MULTI_CREW?.trim();
+		if (envCrew) {
+			const byCrew = resolve(cwd, runtimeMarker, "crew", envCrew, "multi-team.yaml");
+			if (!existsSync(byCrew)) {
+				throw new Error(`Active crew "${envCrew}" was set but config was not found at ${byCrew}`);
+			}
+			return byCrew;
 		}
-		return byCrew;
-	}
 
-	const activeCrewPath = resolve(cwd, ".pi", ".active-crew.json");
+		const activeCrewPath = resolve(cwd, runtimeMarker, ".active-crew.json");
 	if (existsSync(activeCrewPath)) {
 		try {
 			const active = JSON.parse(readFileSync(activeCrewPath, "utf-8")) as { source_config?: string };
@@ -770,15 +773,15 @@ function resolveConfigPath(cwd: string): string {
 		}
 	}
 
-	const legacyCandidates = [
-		resolve(cwd, "multi-team.yaml"),
-		resolve(cwd, ".pi", "multi-team.yaml"),
-	];
+		const legacyCandidates = [
+			resolve(cwd, "multi-team.yaml"),
+			resolve(cwd, runtimeMarker, "multi-team.yaml"),
+		];
 	for (const candidate of legacyCandidates) {
 		if (existsSync(candidate)) return candidate;
 	}
 
-	const crewRoot = resolve(cwd, ".pi", "crew");
+		const crewRoot = resolve(cwd, runtimeMarker, "crew");
 	const crewCandidates: string[] = [];
 	if (existsSync(crewRoot)) {
 		for (const entry of readdirSync(crewRoot)) {
@@ -799,15 +802,15 @@ function resolveConfigPath(cwd: string): string {
 	if (crewCandidates.length === 1) {
 		return crewCandidates[0];
 	}
-	if (crewCandidates.length > 1) {
-		const options = crewCandidates.map((candidate) => `- ${candidate}`).join("\n");
-		throw new Error(
-			`Multiple crew configs found. Select a crew first with "pimh use <crew>" or set PI_MULTI_CONFIG.\n${options}`
-		);
-	}
+		if (crewCandidates.length > 1) {
+			const options = crewCandidates.map((candidate) => `- ${candidate}`).join("\n");
+			throw new Error(
+				`Multiple crew configs found. Select a crew first or set MAH_MULTI_CONFIG.\n${options}`
+			);
+		}
 
-	throw new Error("Could not find a multi-team config. Set PI_MULTI_CONFIG or create .pi/crew/<crew>/multi-team.yaml.");
-}
+		throw new Error("Could not find a multi-team config. Set MAH_MULTI_CONFIG or create .kilo/.pi crew config.");
+	}
 
 function loadConfig(cwd: string): ResolvedConfig {
 	const configPath = resolveConfigPath(cwd);
@@ -822,11 +825,13 @@ function loadConfig(cwd: string): ResolvedConfig {
 		throw new Error("multi-team.yaml must define at least one team.");
 	}
 
-	const crewRoot = resolve(cwd, ".pi", "crew");
-	const relativeToCrewRoot = relative(crewRoot, baseDir);
-	const isCrewScoped = relativeToCrewRoot !== "" && !relativeToCrewRoot.startsWith("..");
-	const defaultSessionDir = isCrewScoped ? "sessions" : ".pi/multi-team/sessions";
-	const defaultExpertiseDir = isCrewScoped ? "expertise" : ".pi/expertise";
+		const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+		const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+		const crewRoot = resolve(cwd, runtimeMarker, "crew");
+		const relativeToCrewRoot = relative(crewRoot, baseDir);
+		const isCrewScoped = relativeToCrewRoot !== "" && !relativeToCrewRoot.startsWith("..");
+		const defaultSessionDir = isCrewScoped ? "sessions" : `${runtimeMarker}/multi-team/sessions`;
+		const defaultExpertiseDir = isCrewScoped ? "expertise" : `${runtimeMarker}/expertise`;
 
 	return {
 		...raw,
@@ -907,10 +912,10 @@ function matchesName(left: string, right: string): boolean {
 	return left.trim().toLowerCase() === right.trim().toLowerCase() || slugify(left) === slugify(right);
 }
 
-function resolveRuntime(config: ResolvedConfig): RuntimeState {
-	const role = (process.env.PI_MULTI_ROLE as RuntimeRole | undefined) || "orchestrator";
-	const agentName = process.env.PI_MULTI_AGENT?.trim();
-	const teamName = process.env.PI_MULTI_TEAM?.trim();
+	function resolveRuntime(config: ResolvedConfig): RuntimeState {
+		const role = (process.env.MAH_MULTI_ROLE as RuntimeRole | undefined) || (process.env.PI_MULTI_ROLE as RuntimeRole | undefined) || "orchestrator";
+		const agentName = process.env.MAH_MULTI_AGENT?.trim() || process.env.PI_MULTI_AGENT?.trim();
+		const teamName = process.env.MAH_MULTI_TEAM?.trim() || process.env.PI_MULTI_TEAM?.trim();
 
 	if (role === "orchestrator") {
 		return {
@@ -2421,7 +2426,20 @@ export default function (pi: ExtensionAPI) {
 			|| text.includes("404 no endpoints available");
 	}
 
+	function isKiloRuntimeConfig(configRef: ResolvedConfig | null | undefined): boolean {
+		const configPath = `${configRef?.configPath || ""}`;
+		return configPath.includes("/.kilo/") || configPath.includes("\\.kilo\\");
+	}
+
+	function delegationRuntimeCli(configRef: ResolvedConfig | null | undefined): string {
+		const runtimeFromEnv = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+		if (runtimeFromEnv === "kilo") return "kilo";
+		if (runtimeFromEnv === "pi") return "pi";
+		return isKiloRuntimeConfig(configRef) ? "kilo" : "pi";
+	}
+
 	function modelCandidates(ctx: any, child: DispatchTarget): string[] {
+		if (isKiloRuntimeConfig(config)) return [];
 		const primary = currentModel(ctx, effectiveModel(config!, child.agent) || child.agent.model);
 		const fallbacks = Array.isArray(child.agent.model_fallbacks) ? child.agent.model_fallbacks : [];
 		return Array.from(new Set([primary, ...fallbacks].map((item) => `${item || ""}`.trim()).filter(Boolean)));
@@ -2571,8 +2589,8 @@ export default function (pi: ExtensionAPI) {
 		}
 		if (existsSync(mcpBridgePath)) args.splice(args.indexOf("-e"), 0, "-e", mcpBridgePath);
 		if (resumeSession) args.push("-c");
-		if (model) args.push("--model", model);
-		args.push(prompt);
+			if (model && !isKiloRuntimeConfig(config)) args.push("--model", model);
+			args.push(prompt);
 
 		appendEvent("delegate_start", {
 			target: child.agent.name,
@@ -2610,20 +2628,29 @@ export default function (pi: ExtensionAPI) {
 		activeDelegations.set(activeKey, resultPromise);
 		resultPromise.then(() => activeDelegations.delete(activeKey)).catch(() => activeDelegations.delete(activeKey));
 
-		const proc = spawn("pi", args, {
-			stdio: ["ignore", "pipe", "pipe"],
-			env: {
-				...process.env,
-				PI_MULTI_CONFIG: config!.configPath,
-				PI_MULTI_ROLE: child.role,
-				PI_MULTI_AGENT: child.agent.name,
-				PI_MULTI_TEAM: child.team?.name || "",
-				PI_MULTI_SESSION_ID: currentSessionId(),
-				PI_MULTI_SESSION_ROOT: currentSessionRoot(),
-				PI_MULTI_PARENT: runtime!.agent.name,
-				PI_MULTI_DEPTH: String(currentDepth() + 1),
-			},
-		});
+			const delegationCli = delegationRuntimeCli(config);
+			const proc = spawn(delegationCli, args, {
+				stdio: ["ignore", "pipe", "pipe"],
+				env: {
+					...process.env,
+					MAH_MULTI_CONFIG: config!.configPath,
+					MAH_MULTI_ROLE: child.role,
+					MAH_MULTI_AGENT: child.agent.name,
+					MAH_MULTI_TEAM: child.team?.name || "",
+					MAH_MULTI_SESSION_ID: currentSessionId(),
+					MAH_MULTI_SESSION_ROOT: currentSessionRoot(),
+					MAH_MULTI_PARENT: runtime!.agent.name,
+					MAH_MULTI_DEPTH: String(currentDepth() + 1),
+					PI_MULTI_CONFIG: config!.configPath,
+					PI_MULTI_ROLE: child.role,
+					PI_MULTI_AGENT: child.agent.name,
+					PI_MULTI_TEAM: child.team?.name || "",
+					PI_MULTI_SESSION_ID: currentSessionId(),
+					PI_MULTI_SESSION_ROOT: currentSessionRoot(),
+					PI_MULTI_PARENT: runtime!.agent.name,
+					PI_MULTI_DEPTH: String(currentDepth() + 1),
+				},
+			});
 		childProcesses.set(child.agent.name, proc);
 
 		let buffer = "";

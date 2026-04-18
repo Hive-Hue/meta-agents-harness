@@ -1,6 +1,6 @@
 ---
 name: validation-lead
-model: minimax-coding-plan/MiniMax-M2.7
+model: zai/glm-5.1
 role: lead
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch
@@ -20,6 +20,7 @@ tools:
   mcp_servers: true
   mcp_tools: true
   mcp_call: true
+  bash: true
 skills:
   - path: skills/delegate_bounded/SKILL.md
     use-when: Use when relevant to current task.

@@ -13,6 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
+import { normalizeModelId } from "../shared-model-normalize.mjs"
 
 function variantPathExists(candidatePath) {
   if (!candidatePath || typeof candidatePath !== "string") return false

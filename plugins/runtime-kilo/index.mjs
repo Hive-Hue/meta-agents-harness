@@ -108,6 +108,27 @@ function buildKiloConfigEnv(config) {
   return JSON.stringify(mergeKiloConfig(parseExistingKiloConfig(), config))
 }
 
+function normalizeKiloModelId(model = "") {
+  const value = `${model || ""}`.trim()
+  if (!value) return value
+  const aliases = {
+    "minimax-coding-plan/MiniMax-M2.7": "minimax/minimax-m2.7",
+    "zai-coding-plan/glm-5": "zai/glm-5",
+    "zai-coding-plan/glm-5.1": "zai/glm-5.1"
+  }
+  return aliases[value] || value
+}
+
+function readAgentFlagFromArgs(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if (token === "--agent" && args[i + 1]) return `${args[i + 1]}`.trim()
+    if (token.startsWith("--agent=")) return token.slice("--agent=".length).trim()
+  }
+  return ""
+}
+
 function collectCrewAgentBlocks(crewConfig) {
   const agents = []
 
@@ -191,6 +212,7 @@ function buildKiloRunConfig({ repoRoot, crew, configPath }) {
   }
 
   const orchestratorName = crewConfig?.orchestrator?.name || "orchestrator"
+  const orchestratorModel = `${crewConfig?.orchestrator?.model || ""}`.trim()
   const crewName = `${crewConfig?.name || ""}`.trim()
   const agents = collectCrewAgentBlocks(crewConfig)
   const agentConfig = {}
@@ -214,9 +236,12 @@ function buildKiloRunConfig({ repoRoot, crew, configPath }) {
     })
 
     const isOrchestrator = agent.name === orchestratorName || agent.role === "orchestrator"
+    const runtimeModel = isOrchestrator
+      ? `${agent.source.model || orchestratorModel || ""}`.trim()
+      : `${orchestratorModel || agent.source.model || ""}`.trim()
     agentConfig[agent.name] = {
       description: agent.source.description || `${agent.name} agent`,
-      model: agent.source.model,
+      model: normalizeKiloModelId(runtimeModel),
       prompt,
       mode: isOrchestrator ? "primary" : "subagent",
       hidden: !isOrchestrator
@@ -385,8 +410,8 @@ export const runtimePlugin = {
       return clearKiloCrewState({ repoRoot })
     },
 
-    prepareRunContext({ repoRoot, crew, configPath, argv }) {
-      const envOverrides = {}
+    prepareRunContext({ repoRoot, crew, configPath, argv, envOverrides: baseEnvOverrides = {} }) {
+      const envOverrides = { ...baseEnvOverrides }
       const warnings = []
       let orchestratorName = ""
 
@@ -401,10 +426,14 @@ export const runtimePlugin = {
         warnings.push(`kilo: crew config not found at ${configPath}, running without injected MAH context`)
       }
 
+      envOverrides.MAH_RUNTIME = "kilo"
+      if (crew) envOverrides.MAH_ACTIVE_CREW = crew
+      const requestedAgent = `${envOverrides.MAH_AGENT || readAgentFlagFromArgs(argv) || process.env.MAH_AGENT || orchestratorName}`.trim()
+
       const hasMessage = Array.isArray(argv) && argv.length > 0
       const args = []
       if (hasMessage) args.push("run")
-      if (orchestratorName) args.push("--agent", orchestratorName)
+      if (requestedAgent) args.push("--agent", requestedAgent)
 
       return {
         ok: true,

@@ -453,6 +453,24 @@ test.describe('mah delegate integration', () => {
     // Should not crash the CLI (may have runtime errors but CLI exits cleanly)
     assert.ok(typeof result === 'string', 'should return string output')
   })
+
+  // 15b. Delegate should honor global runtime flag as source runtime
+  test('delegate uses forced runtime as source runtime when -r is set before command', () => {
+    const result = mahRaw(
+      '-r',
+      'opencode',
+      'delegate',
+      '--target',
+      'planning-lead',
+      '--task',
+      'Check runtime identity',
+      '--crew',
+      'dev'
+    )
+    assert.ok(result.includes('ok=true'), 'should have ok=true')
+    assert.ok(result.includes('source_runtime=opencode'), 'should detect forced source runtime')
+    assert.ok(result.includes('target_runtime=opencode'), 'should keep same target runtime by default')
+  })
 })
 
 // ------------------------------------------------------------------

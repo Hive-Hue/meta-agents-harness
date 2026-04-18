@@ -1,6 +1,6 @@
 ---
 name: brand-safety-reviewer
-model: openai-codex/gpt-5.3-codex
+model: zai/glm-5
 role: worker
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch
