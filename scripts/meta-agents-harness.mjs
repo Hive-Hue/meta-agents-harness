@@ -227,7 +227,7 @@ function printHelp() {
   console.log("  detect")
   console.log("  doctor")
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate] [args]")
-  console.log("  init [--yes] [--force] [--crew <name>] [--runtime <name>]")
+  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
@@ -365,20 +365,22 @@ function runCliPathSecuritySelfTest() {
 }
 
 function runLocalScript(scriptPath, scriptArgs = []) {
-  const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
+  const resolvedScriptPath = path.isAbsolute(scriptPath) ? scriptPath : path.join(packageRoot, scriptPath)
+  const child = spawnSync(process.execPath, [resolvedScriptPath, ...scriptArgs], {
     cwd: repoRoot,
     env: process.env,
     stdio: "inherit"
   })
   if (typeof child.status === "number") return child.status
   if (child.error) {
-    console.error(`ERROR: failed to run ${scriptPath}: ${child.error.message}`)
+    console.error(`ERROR: failed to run ${resolvedScriptPath}: ${child.error.message}`)
   }
   return 1
 }
 
 function runLocalScriptCapture(scriptPath, scriptArgs = []) {
-  const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
+  const resolvedScriptPath = path.isAbsolute(scriptPath) ? scriptPath : path.join(packageRoot, scriptPath)
+  const child = spawnSync(process.execPath, [resolvedScriptPath, ...scriptArgs], {
     cwd: repoRoot,
     env: process.env,
     encoding: "utf-8"
@@ -939,6 +941,10 @@ function printExplain(traceMode, payload) {
 function runInit(argv) {
   const runtime = parseValueArg(argv, "--runtime")
   const crew = parseValueArg(argv, "--crew")
+  const aiFlag = argv.includes("--ai") || argv.includes("--ai-assisted")
+  const projectName = parseValueArg(argv, "--name")
+  const projectDescription = parseValueArg(argv, "--description")
+  const projectBrief = parseValueArg(argv, "--brief")
   const yesFlag = argv.includes("--yes")
   const forceFlag = argv.includes("--force")
   const created = []
@@ -954,6 +960,18 @@ function runInit(argv) {
   if (crew) {
     bootstrapArgs.push("--crew", crew)
   }
+  if (aiFlag) {
+    bootstrapArgs.push("--ai")
+  }
+  if (projectName) {
+    bootstrapArgs.push("--name", projectName)
+  }
+  if (projectDescription) {
+    bootstrapArgs.push("--description", projectDescription)
+  }
+  if (projectBrief) {
+    bootstrapArgs.push("--brief", projectBrief)
+  }
 
   const bootstrapResult = spawnSync("node", bootstrapArgs, {
     cwd: process.cwd(),
@@ -968,7 +986,8 @@ function runInit(argv) {
     skipped.push("meta-agents.yaml")
   }
 
-  const mcpTarget = path.join(repoRoot, ".mcp.json")
+  const cwd = process.cwd()
+  const mcpTarget = path.join(cwd, ".mcp.json")
   const mcpExample = path.join(packageRoot, ".mcp.example.json")
   if (!existsSync(mcpTarget) && existsSync(mcpExample)) {
     copyFileSync(mcpExample, mcpTarget)
@@ -977,7 +996,7 @@ function runInit(argv) {
     skipped.push(".mcp.json")
   }
   if (runtime && runtimeProfiles[runtime]) {
-    const markerPath = path.join(repoRoot, runtimeProfiles[runtime].markerDir)
+    const markerPath = path.join(cwd, runtimeProfiles[runtime].markerDir)
     if (!existsSync(markerPath)) {
       mkdirSync(markerPath, { recursive: true })
       created.push(runtimeProfiles[runtime].markerDir)
@@ -1552,7 +1571,7 @@ function printSyncHelp() {
   console.log("mah sync / mah generate — materialize tree artifacts from meta-agents.yaml")
   console.log("")
   console.log("Usage:")
-  console.log("  mah sync              sync all meta-agent files (prompts for confirmation)")
+  console.log("  mah sync              sync files for the runtime markers present in the repo")
   console.log("  mah generate          generate runtime tree artifacts from meta-agents.yaml")
   console.log("  mah generate:tree     alias for `mah generate`")
   console.log("  mah sync --check      check for drift without modifying files")
@@ -3594,7 +3613,7 @@ function main() {
   }
 
   if (first === "init") {
-    process.exitCode = runInit(normalizedArgv.slice(1))
+    process.exitCode = runInit(argv.slice(1))
     return
   }
 

@@ -156,7 +156,7 @@ AI-assisted mode generates enhanced configurations based on your project context
 
 - **Runtime CLI**: `pi` or `opencode` installed and available in PATH
 - **API Key**: Configured in the runtime CLI (not passed to MAH directly)
-- **Skill File**: `bootstrap-config-architect` skill available
+- **Skill File**: `bootstrap` skill available
 
 ### Usage
 
@@ -187,7 +187,7 @@ mah init --yes --ai \
 If AI-assisted mode fails (no runtime, missing skill, API error), MAH automatically falls back to logical mode:
 
 ```
-bootstrap: bootstrap-config-architect skill not found, falling back to logical mode
+bootstrap: bootstrap skill not found, falling back to logical mode
 bootstrap: created meta-agents.yaml
 ```
 
@@ -425,7 +425,7 @@ mah init --yes --force
 
 **Possible causes:**
 1. No `pi` or `opencode` CLI installed
-2. Skill file `bootstrap-config-architect/SKILL.md` missing
+2. Skill file `bootstrap/SKILL.md` missing
 3. API key not configured in runtime CLI
 
 **Solution:** Check runtime availability:
@@ -436,7 +436,7 @@ which pi
 which opencode
 
 # Check skill file exists
-ls .opencode/skills/bootstrap-config-architect/SKILL.md
+ls .opencode/skills/bootstrap/SKILL.md
 ```
 
 ### Invalid Configuration After Bootstrap

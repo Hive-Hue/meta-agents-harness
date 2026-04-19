@@ -278,3 +278,78 @@ test("mah init passes --crew to bootstrap", () => {
     rmSync(tempDir, { recursive: true, force: true })
   }
 })
+
+test("mah init forwards --ai to bootstrap", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-init-ai-"))
+  try {
+    const mahPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
+    const result = spawnSync(process.execPath, [mahPath, "init", "--yes", "--ai", "--name", "ai-test"], {
+      cwd: tempDir,
+      env: { ...process.env, PATH: "/usr/bin:/bin" },
+      encoding: "utf-8"
+    })
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout + result.stderr, /--ai flag specified|AI-assisted generation/i)
+    assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created")
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("mah sync --check works from a repo using the global binary", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-sync-"))
+  try {
+    const initResult = spawnSync("mah", ["init", "--yes", "--runtime", "pi"], {
+      cwd: tempDir,
+      env: process.env,
+      encoding: "utf-8"
+    })
+    assert.equal(initResult.status, 0, initResult.stderr)
+
+    const syncResult = spawnSync("mah", ["sync"], {
+      cwd: tempDir,
+      env: process.env,
+      encoding: "utf-8"
+    })
+    assert.equal(syncResult.status, 0, syncResult.stderr)
+
+    const checkResult = spawnSync("mah", ["sync", "--check"], {
+      cwd: tempDir,
+      env: process.env,
+      encoding: "utf-8"
+    })
+    assert.equal(checkResult.status, 0, checkResult.stderr)
+    assert.match(checkResult.stdout, /sync/i)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("mah sync only materializes runtime markers that exist in the repo", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-sync-markers-"))
+  try {
+    const initResult = spawnSync("mah", ["init", "--yes", "--runtime", "pi"], {
+      cwd: tempDir,
+      env: process.env,
+      encoding: "utf-8"
+    })
+    assert.equal(initResult.status, 0, initResult.stderr)
+    const meta = YAML.parse(readFileSync(path.join(tempDir, "meta-agents.yaml"), "utf-8"))
+    const crewId = meta.crews?.[0]?.id || "dev"
+
+    const syncResult = spawnSync("mah", ["sync"], {
+      cwd: tempDir,
+      env: process.env,
+      encoding: "utf-8"
+    })
+    assert.equal(syncResult.status, 0, syncResult.stderr)
+
+    assert.equal(existsSync(path.join(tempDir, ".pi")), true)
+    for (const marker of [".claude", ".codex", ".kilo", ".opencode", ".hermes"]) {
+      assert.equal(existsSync(path.join(tempDir, marker)), false, `${marker} should not be created`)
+    }
+    assert.equal(existsSync(path.join(tempDir, ".pi", "crew", crewId, "multi-team.yaml")), true)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})

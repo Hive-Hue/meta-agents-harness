@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ## [Unreleased]
 
+### Fixed
+- AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first.
+- Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail.
+
 ### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
 - Workspace-aware root resolution so a global `mah` command operates on the current repo instead of the package install directory
@@ -21,6 +25,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
 - `mah detect` now reports a stable unknown state in repositories without runtime markers
 - Plugin loader warning noise for bundled runtime names was removed
+- Global `mah sync` and related script dispatch now resolve package-owned script paths instead of expecting a local `scripts/` directory in the target repo
+- `mah init` now writes `.mcp.json` and runtime markers into the caller repo instead of the MAH package directory
+- `mah sync` now materializes only the runtime markers present in the current repo
+- `mah init --ai` now forwards AI bootstrap flags to the bootstrap script and uses the bundled `bootstrap` skill instead of the retired `bootstrap-config-architect` name
 
 ## [0.8.0] - 2026-04-18
 

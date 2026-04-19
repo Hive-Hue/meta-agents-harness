@@ -7,8 +7,10 @@ import { normalizeModelId } from "../mah-plugins/shared-model-normalize.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const repoRoot = path.resolve(__dirname, "..")
-const metaConfigPath = path.join(repoRoot, "meta-agents.yaml")
+const packageRoot = path.resolve(__dirname, "..")
+const workspaceRoot = process.cwd()
+const metaConfigPath = path.join(workspaceRoot, "meta-agents.yaml")
+const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "hermes"]
 
 function fail(message) {
   console.error(`ERROR: ${message}`)
@@ -16,7 +18,20 @@ function fail(message) {
 }
 
 function rel(filePath) {
-  return path.relative(repoRoot, filePath) || "."
+  return path.relative(workspaceRoot, filePath) || "."
+}
+
+function runtimeMarkerDir(meta, runtime) {
+  const marker = meta?.runtime_detection?.marker?.[runtime]
+  if (typeof marker === "string" && marker.trim()) return marker.trim()
+  return `.${runtime}`
+}
+
+function detectActiveRuntimes(meta) {
+  return managedRuntimes.filter((runtime) => {
+    const markerPath = path.join(workspaceRoot, runtimeMarkerDir(meta, runtime))
+    return existsSync(markerPath)
+  })
 }
 
 function titleCase(value) {
@@ -34,14 +49,14 @@ function normalizePromptName(agentId) {
 }
 
 function resolvePromptPath(runtime, crewId, agentId) {
-  const baseDir = path.join(repoRoot, `.${runtime}`, "crew", crewId, "agents")
+  const baseDir = path.join(workspaceRoot, `.${runtime}`, "crew", crewId, "agents")
   const variants = normalizePromptName(agentId)
   for (const name of variants) {
     const candidate = path.join(baseDir, `${name}.md`)
-    if (existsSync(candidate)) return `.${path.sep}${path.relative(repoRoot, candidate)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
+    if (existsSync(candidate)) return `.${path.sep}${path.relative(workspaceRoot, candidate)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
   }
   const fallback = path.join(baseDir, `${variants[0]}.md`)
-  return `.${path.sep}${path.relative(repoRoot, fallback)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
+  return `.${path.sep}${path.relative(workspaceRoot, fallback)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
 }
 
 function listSubdirs(rootPath) {
@@ -252,7 +267,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
   let ok = true
   for (const agent of crew.agents || []) {
     const relativePromptPath = resolvePromptPath(runtime, crew.id, agent.id)
-    const promptPath = path.resolve(repoRoot, relativePromptPath)
+    const promptPath = path.resolve(workspaceRoot, relativePromptPath)
     if (checkOnly && !existsSync(promptPath)) {
       pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
       if (!jsonOutput) {
@@ -264,7 +279,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
     }
 
     const currentRaw = existsSync(promptPath) ? readFileSync(promptPath, "utf-8") : ""
-    const sourcePromptPath = runtime === "hermes" ? path.resolve(repoRoot, resolvePromptPath("pi", crew.id, agent.id)) : ""
+    const sourcePromptPath = runtime === "hermes" ? path.resolve(workspaceRoot, resolvePromptPath("pi", crew.id, agent.id)) : ""
     const sourceRaw = !currentRaw && sourcePromptPath && existsSync(sourcePromptPath)
       ? readFileSync(sourcePromptPath, "utf-8")
       : currentRaw
@@ -299,7 +314,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
     }
   }
   if (runtime !== "hermes") {
-    const expertiseDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id, "expertise")
+    const expertiseDir = path.join(workspaceRoot, `.${runtime}`, "crew", crew.id, "expertise")
     mkdirSync(expertiseDir, { recursive: true })
     for (const agent of crew.agents || []) {
       const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
@@ -351,7 +366,7 @@ function buildHermesRuntimeConfig(meta, crew) {
 }
 
 function ensureHermesArtifacts(crew) {
-  const crewRoot = path.join(repoRoot, ".hermes", "crew", crew.id)
+  const crewRoot = path.join(workspaceRoot, ".hermes", "crew", crew.id)
   const agentsDir = path.join(crewRoot, "agents")
   const expertiseDir = path.join(crewRoot, "expertise")
   const sessionsDir = path.join(crewRoot, "sessions")
@@ -371,11 +386,11 @@ function ensureHermesArtifacts(crew) {
 let globalOpencodeNeedsValidateDelegationPermission = false
 
 function ensureValidateDelegationTool() {
-  const toolsDir = path.join(repoRoot, ".opencode", "tools")
+  const toolsDir = path.join(workspaceRoot, ".opencode", "tools")
   const toolFile = path.join(toolsDir, "validate-delegation.ts")
   mkdirSync(toolsDir, { recursive: true })
   if (!existsSync(toolFile)) {
-    const templatePath = path.join(repoRoot, ".opencode", "tools", "validate-delegation.ts")
+    const templatePath = path.join(packageRoot, ".opencode", "tools", "validate-delegation.ts")
     if (existsSync(templatePath)) {
       const content = readFileSync(templatePath, "utf-8")
       writeFileSync(toolFile, content, "utf-8")
@@ -386,7 +401,7 @@ function ensureValidateDelegationTool() {
 
 function ensureValidateDelegationPermission() {
   if (!globalOpencodeNeedsValidateDelegationPermission) return
-  const opencodeJsonPath = path.join(repoRoot, ".opencode", "opencode.json")
+  const opencodeJsonPath = path.join(workspaceRoot, ".opencode", "opencode.json")
   if (!existsSync(opencodeJsonPath)) return
   const current = readFileSync(opencodeJsonPath, "utf-8")
   let doc
@@ -401,10 +416,10 @@ function ensureValidateDelegationPermission() {
 
 function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const agentsDir = path.join(repoRoot, ".opencode", "crew", crew.id, "agents")
-  const expertiseDir = path.join(repoRoot, ".opencode", "crew", crew.id, "expertise")
-  const legacyAgentsDir = path.join(repoRoot, ".opencode", "agents")
-  const referenceRoot = path.resolve(repoRoot, "..", "opencode-multi-harness", ".opencode", "crew", crew.id)
+  const agentsDir = path.join(workspaceRoot, ".opencode", "crew", crew.id, "agents")
+  const expertiseDir = path.join(workspaceRoot, ".opencode", "crew", crew.id, "expertise")
+  const legacyAgentsDir = path.join(workspaceRoot, ".opencode", "agents")
+  const referenceRoot = path.resolve(packageRoot, "..", "opencode-multi-harness", ".opencode", "crew", crew.id)
   const referenceAgentsDir = path.join(referenceRoot, "agents")
   mkdirSync(agentsDir, { recursive: true })
   mkdirSync(expertiseDir, { recursive: true })
@@ -482,8 +497,8 @@ function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
 
 function ensurePiThemes(mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const sourceDir = path.join(repoRoot, "extensions", "themes")
-  const targetDir = path.join(repoRoot, ".pi", "themes")
+  const sourceDir = path.join(packageRoot, "extensions", "themes")
+  const targetDir = path.join(workspaceRoot, ".pi", "themes")
 
   // Read source theme files
   if (!existsSync(sourceDir)) {
@@ -545,8 +560,8 @@ function ensurePiThemes(mode, records, jsonOutput) {
 
 function ensureRuntimeSkills(runtime, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const sourceDir = path.join(repoRoot, "skills")
-  const targetDir = path.join(repoRoot, `.${runtime}`, "skills")
+  const sourceDir = path.join(packageRoot, "skills")
+  const targetDir = path.join(workspaceRoot, `.${runtime}`, "skills")
 
   if (!existsSync(sourceDir)) {
     if (!jsonOutput) console.log(`drift: source skills dir missing ${rel(sourceDir)}`)
@@ -950,11 +965,11 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
     throw new Error(`crew ${crew.id} missing orchestrator agent definition`)
   }
 
-  const configDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id)
+  const configDir = path.join(workspaceRoot, `.${runtime}`, "crew", crew.id)
   const sessionDirRoot = runtimeSessionDirRoot(runtime, crew)
 
-  const sessionDir = path.relative(configDir, path.resolve(repoRoot, sessionDirRoot))
-  const expertiseDir = path.relative(configDir, path.resolve(repoRoot, `.${runtime}/crew/${crew.id}/expertise`))
+  const sessionDir = path.relative(configDir, path.resolve(workspaceRoot, sessionDirRoot))
+  const expertiseDir = path.relative(configDir, path.resolve(workspaceRoot, `.${runtime}/crew/${crew.id}/expertise`))
   const doc = {
     name: `${titleCase(crew.id)}MultiTeam`,
     ...crewRuntimeMetadata(crew),
@@ -1033,6 +1048,7 @@ const jsonOutput = argv.includes("--json")
 const raw = readFileSync(metaConfigPath, "utf-8")
 const metaDoc = YAML.parse(raw)
 const records = []
+const activeRuntimes = detectActiveRuntimes(metaDoc)
 
 if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   fail("meta-agents.yaml has no crews")
@@ -1040,40 +1056,51 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   let allGood = true
 
   for (const crew of metaDoc.crews) {
-    const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
-    const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
-    const codexYaml = buildRuntimeCrewDoc(metaDoc, crew, "codex")
-    const kiloYaml = buildRuntimeCrewDoc(metaDoc, crew, "kilo")
-    const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
-    const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
-    const hermesConfig = buildHermesRuntimeConfig(metaDoc, crew)
-
-    const piPath = path.join(repoRoot, ".pi", "crew", crew.id, "multi-team.yaml")
-    const claudePath = path.join(repoRoot, ".claude", "crew", crew.id, "multi-team.yaml")
-    const codexPath = path.join(repoRoot, ".codex", "crew", crew.id, "multi-team.yaml")
-    const kiloPath = path.join(repoRoot, ".kilo", "crew", crew.id, "multi-team.yaml")
-    const opencodeCrewPath = path.join(repoRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
-    const hermesCrewPath = path.join(repoRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
-    const hermesConfigPath = path.join(repoRoot, ".hermes", "crew", crew.id, "config.yaml")
-
-    allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(codexPath, codexYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(kiloPath, kiloYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
-    allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "codex", mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
-    allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
-    for (const rt of ["pi", "claude", "codex", "kilo", "opencode", "hermes"]) {
+    if (activeRuntimes.includes("pi")) {
+      const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
+      const piPath = path.join(workspaceRoot, ".pi", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("claude")) {
+      const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
+      const claudePath = path.join(workspaceRoot, ".claude", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("codex")) {
+      const codexYaml = buildRuntimeCrewDoc(metaDoc, crew, "codex")
+      const codexPath = path.join(workspaceRoot, ".codex", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(codexPath, codexYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "codex", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("kilo")) {
+      const kiloYaml = buildRuntimeCrewDoc(metaDoc, crew, "kilo")
+      const kiloPath = path.join(workspaceRoot, ".kilo", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(kiloPath, kiloYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("opencode")) {
+      const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
+      const opencodeCrewPath = path.join(workspaceRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
+      allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("hermes")) {
+      const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
+      const hermesConfig = buildHermesRuntimeConfig(metaDoc, crew)
+      const hermesCrewPath = path.join(workspaceRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
+      const hermesConfigPath = path.join(workspaceRoot, ".hermes", "crew", crew.id, "config.yaml")
+      allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
+      allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("pi")) {
+      allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
+    }
+    for (const rt of activeRuntimes) {
       allGood = ensureRuntimeSkills(rt, mode, records, jsonOutput) && allGood
     }
-
-    if (!checkOnly) {
+    if (!checkOnly && activeRuntimes.includes("hermes")) {
       ensureHermesArtifacts(crew)
     }
   }

@@ -51,12 +51,13 @@ OPTIONS:
 
 MODES:
   1. Logical (default): Generates config using templates and defaults
-  2. AI-assisted: Invokes an AI model with bootstrap-config-architect skill
+  2. AI-assisted: Invokes an AI model with the bootstrap skill
      to generate a tailored configuration based on project context
 
 AI-ASSISTED MODE:
-  Requires opencode or pi CLI to be available.
-  Uses the bootstrap-config-architect skill to analyze repository context
+  Requires opencode, codex, kilo, or pi CLI to be available.
+  Tries available runtimes in priority order until one succeeds.
+  Uses the bootstrap skill to analyze repository context
   and generate a production-ready meta-agents.yaml.
 
 EXAMPLES:
@@ -278,18 +279,19 @@ function buildMinimalCrew(crewId, mission) {
   }
 }
 
-function detectAvailableRuntime() {
+function detectAvailableRuntimes() {
   const runtimes = [
-    { name: "pi", cli: "pi", skillFlag: "--skill", printFlag: "-p", usesSkillFlag: true },
+    { name: "opencode", cli: "opencode", fileFlag: "-f", runCommand: "run", usesSkillFlag: false },
     { name: "codex", cli: "codex", runCommand: "exec", usesSkillFlag: false },
     { name: "kilo", cli: "kilo", runCommand: "run", usesSkillFlag: false },
-    { name: "opencode", cli: "opencode", fileFlag: "-f", runCommand: "run", usesSkillFlag: false }
+    { name: "pi", cli: "pi", skillFlag: "--skill", printFlag: "-p", usesSkillFlag: true }
   ]
+  const available = []
   for (const runtime of runtimes) {
     const result = spawnSync("bash", ["-lc", `command -v ${runtime.cli} >/dev/null 2>&1`], { stdio: "pipe" })
-    if (result.status === 0) return runtime
+    if (result.status === 0) available.push(runtime)
   }
-  return null
+  return available
 }
 
 function getRepoContext() {
@@ -315,7 +317,7 @@ function getRepoContext() {
 }
 
 function buildAiPrompt(inputs, repoContext) {
-  const prompt = `Generate a meta-agents.yaml configuration file using the bootstrap-config-architect skill guidelines.
+  const prompt = `Generate a meta-agents.yaml configuration file using the bootstrap skill guidelines.
 
 OPERATOR INPUTS:
 - Project name: ${inputs.projectName}
@@ -350,33 +352,9 @@ Generate the complete meta-agents.yaml now:`
   return prompt
 }
 
-async function runAiAssistedGeneration(inputs, repoContext, skillPath) {
-  const runtime = detectAvailableRuntime()
-  if (!runtime) {
-    console.log("bootstrap: no AI runtime available (opencode, kilo or pi required for AI-assisted mode)")
-    return { success: false, reason: "no_runtime" }
-  }
-
-  let env = { ...process.env }
-  const envPath = path.join(cwd, ".env")
-  if (existsSync(envPath)) {
-    try {
-      const envContent = readFileSync(envPath, "utf-8")
-      envContent.split("\n").forEach(line => {
-        const match = line.match(/^([^=]+)=(.*)$/)
-        if (match) {
-          const key = match[1].trim()
-          const value = match[2].trim()
-          if (key && value && !key.startsWith("#")) {
-            env[key] = value
-          }
-        }
-      })
-    } catch {}
-  }
-
+async function invokeAiRuntime(runtime, inputs, repoContext, skillPath, env) {
   const prompt = buildAiPrompt(inputs, repoContext)
-  console.log(`bootstrap: invoking ${runtime.name} with bootstrap-config-architect skill...`)
+  console.log(`bootstrap: invoking ${runtime.name} with bootstrap skill...`)
   let args, command
   if (runtime.usesSkillFlag) {
     args = [runtime.skillFlag, skillPath, runtime.printFlag, prompt]
@@ -388,7 +366,7 @@ async function runAiAssistedGeneration(inputs, repoContext, skillPath) {
 ---
 
 ${prompt}`
-    args = [runtime.runCommand || "run", prompt]
+    args = [runtime.runCommand || "run", fullPrompt]
     command = runtime.cli
   }
   const result = spawnSync(command, args, {
@@ -441,6 +419,43 @@ ${prompt}`
   mkdirSync(path.dirname(targetPath), { recursive: true })
   writeFileSync(targetPath, yamlContent)
   return { success: true, runtime: runtime.name }
+}
+
+async function runAiAssistedGeneration(inputs, repoContext, skillPath) {
+  const runtimes = detectAvailableRuntimes()
+  if (runtimes.length === 0) {
+    console.log("bootstrap: no AI runtime available (opencode, codex, kilo or pi required for AI-assisted mode)")
+    return { success: false, reason: "no_runtime" }
+  }
+
+  let env = { ...process.env }
+  const envPath = path.join(cwd, ".env")
+  if (existsSync(envPath)) {
+    try {
+      const envContent = readFileSync(envPath, "utf-8")
+      envContent.split("\n").forEach(line => {
+        const match = line.match(/^([^=]+)=(.*)$/)
+        if (match) {
+          const key = match[1].trim()
+          const value = match[2].trim()
+          if (key && value && !key.startsWith("#")) {
+            env[key] = value
+          }
+        }
+      })
+    } catch {}
+  }
+
+  let lastFailure = null
+  for (const runtime of runtimes) {
+    const result = await invokeAiRuntime(runtime, inputs, repoContext, skillPath, env)
+    if (result.success) return result
+    lastFailure = result
+    if (result.reason === "spawn_error" || result.reason === "exit_code" || result.reason === "empty_output" || result.reason === "invalid_yaml") {
+      continue
+    }
+  }
+  return lastFailure || { success: false, reason: "unknown_failure" }
 }
 
 async function collectInteractiveInputs(defaultName, defaultDescription) {
@@ -521,6 +536,10 @@ async function main() {
 
   if (inputs.mode === "2") {
     const skillCandidates = [
+      path.join(repoRoot, ".opencode", "skills", "bootstrap", "SKILL.md"),
+      path.join(repoRoot, ".claude", "skills", "bootstrap", "SKILL.md"),
+      path.join(repoRoot, ".kilo", "skills", "bootstrap", "SKILL.md"),
+      path.join(repoRoot, ".pi", "skills", "bootstrap", "SKILL.md"),
       path.join(repoRoot, ".opencode", "skills", "bootstrap-config-architect", "SKILL.md"),
       path.join(repoRoot, ".claude", "skills", "bootstrap-config-architect", "SKILL.md"),
       path.join(repoRoot, ".kilo", "skills", "bootstrap-config-architect", "SKILL.md"),
@@ -534,7 +553,7 @@ async function main() {
       }
     }
     if (!skillPath) {
-      console.log("bootstrap: bootstrap-config-architect skill not found, falling back to logical mode")
+      console.log("bootstrap: bootstrap skill not found, falling back to logical mode")
       inputs.mode = "1"
     } else {
       const repoContext = getRepoContext()
