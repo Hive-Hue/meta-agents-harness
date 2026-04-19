@@ -61,6 +61,8 @@ runtime:
   validation_command: npm --prefix .opencode run validate:multi-team
 shared:
   skills:
+    - path: skills/context-memory/SKILL.md
+      use-when: Use when relevant to current task.
     - path: skills/delegate_bounded/SKILL.md
       use-when: Use when relevant to current task.
     - path: skills/zero_micromanagement/SKILL.md
@@ -397,6 +399,8 @@ orchestrator:
     path: .opencode/crew/dev/expertise/orchestrator-expertise-model.yaml
     use-when: Track durable learnings for orchestrator.
   skills:
+    - path: skills/context-memory/SKILL.md
+      use-when: Use when relevant to current task.
     - path: skills/delegate_bounded/SKILL.md
       use-when: Use when relevant to current task.
     - path: skills/zero_micromanagement/SKILL.md
@@ -462,6 +466,8 @@ teams:
         path: .opencode/crew/dev/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
       skills:
+        - path: skills/context-memory/SKILL.md
+          use-when: Use when relevant to current task.
         - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: skills/zero_micromanagement/SKILL.md
@@ -587,6 +593,8 @@ teams:
           path: .opencode/crew/dev/expertise/repo-analyst-expertise-model.yaml
           use-when: Track durable learnings for repo-analyst.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -642,6 +650,8 @@ teams:
           path: .opencode/crew/dev/expertise/solution-architect-expertise-model.yaml
           use-when: Track durable learnings for solution-architect.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -761,6 +771,8 @@ teams:
         path: .opencode/crew/dev/expertise/engineering-lead-expertise-model.yaml
         use-when: Track durable learnings for engineering-lead.
       skills:
+        - path: skills/context-memory/SKILL.md
+          use-when: Use when relevant to current task.
         - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: skills/zero_micromanagement/SKILL.md
@@ -913,6 +925,8 @@ teams:
           path: .opencode/crew/dev/expertise/frontend-dev-expertise-model.yaml
           use-when: Track durable learnings for frontend-dev.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -1097,6 +1111,8 @@ teams:
           path: .opencode/crew/dev/expertise/backend-dev-expertise-model.yaml
           use-when: Track durable learnings for backend-dev.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -1283,6 +1299,8 @@ teams:
         path: .opencode/crew/dev/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
       skills:
+        - path: skills/context-memory/SKILL.md
+          use-when: Use when relevant to current task.
         - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: skills/zero_micromanagement/SKILL.md
@@ -1421,6 +1439,8 @@ teams:
           path: .opencode/crew/dev/expertise/qa-reviewer-expertise-model.yaml
           use-when: Track durable learnings for qa-reviewer.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -1553,6 +1573,8 @@ teams:
           path: .opencode/crew/dev/expertise/security-reviewer-expertise-model.yaml
           use-when: Track durable learnings for security-reviewer.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:

@@ -22,6 +22,8 @@ tools:
   mcp_tools: true
   mcp_call: true
 skills:
+  - path: skills/context-memory/SKILL.md
+    use-when: Use when relevant to current task.
   - path: skills/expertise_model/SKILL.md
     use-when: Use when relevant to current task.
 domain:

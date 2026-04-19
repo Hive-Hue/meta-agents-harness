@@ -79,6 +79,8 @@ tools:
   - mcp_call
   - bash
 skills:
+  - path: skills/context-memory/SKILL.md
+    use-when: Use when relevant to current task.
   - path: skills/expertise_model/SKILL.md
     use-when: Use when relevant to current task.
 domain:

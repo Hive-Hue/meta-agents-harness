@@ -12,6 +12,8 @@ runtime:
   validation_command: npm --prefix .opencode run validate:multi-team
 shared:
   skills:
+    - path: skills/context-memory/SKILL.md
+      use-when: Use when relevant to current task.
     - path: skills/delegate_bounded/SKILL.md
       use-when: Use when relevant to current task.
     - path: skills/zero_micromanagement/SKILL.md
@@ -323,6 +325,8 @@ orchestrator:
     path: .opencode/crew/marketing/expertise/orchestrator-expertise-model.yaml
     use-when: Track durable learnings for orchestrator.
   skills:
+    - path: skills/context-memory/SKILL.md
+      use-when: Use when relevant to current task.
     - path: skills/delegate_bounded/SKILL.md
       use-when: Use when relevant to current task.
     - path: skills/zero_micromanagement/SKILL.md
@@ -362,6 +366,8 @@ teams:
         path: .opencode/crew/marketing/expertise/planning-lead-expertise-model.yaml
         use-when: Track durable learnings for planning-lead.
       skills:
+        - path: skills/context-memory/SKILL.md
+          use-when: Use when relevant to current task.
         - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: skills/zero_micromanagement/SKILL.md
@@ -423,6 +429,8 @@ teams:
           path: .opencode/crew/marketing/expertise/market-researcher-expertise-model.yaml
           use-when: Track durable learnings for market-researcher.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -479,6 +487,8 @@ teams:
           path: .opencode/crew/marketing/expertise/campaign-strategist-expertise-model.yaml
           use-when: Track durable learnings for campaign-strategist.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -535,6 +545,8 @@ teams:
         path: .opencode/crew/marketing/expertise/creative-lead-expertise-model.yaml
         use-when: Track durable learnings for creative-lead.
       skills:
+        - path: skills/context-memory/SKILL.md
+          use-when: Use when relevant to current task.
         - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: skills/zero_micromanagement/SKILL.md
@@ -597,6 +609,8 @@ teams:
           path: .opencode/crew/marketing/expertise/copywriter-expertise-model.yaml
           use-when: Track durable learnings for copywriter.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -653,6 +667,8 @@ teams:
           path: .opencode/crew/marketing/expertise/creative-strategist-expertise-model.yaml
           use-when: Track durable learnings for creative-strategist.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -709,6 +725,8 @@ teams:
           path: .opencode/crew/marketing/expertise/media-operator-expertise-model.yaml
           use-when: Track durable learnings for media-operator.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -765,6 +783,8 @@ teams:
         path: .opencode/crew/marketing/expertise/validation-lead-expertise-model.yaml
         use-when: Track durable learnings for validation-lead.
       skills:
+        - path: skills/context-memory/SKILL.md
+          use-when: Use when relevant to current task.
         - path: skills/delegate_bounded/SKILL.md
           use-when: Use when relevant to current task.
         - path: skills/zero_micromanagement/SKILL.md
@@ -826,6 +846,8 @@ teams:
           path: .opencode/crew/marketing/expertise/performance-analyst-expertise-model.yaml
           use-when: Track durable learnings for performance-analyst.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:
@@ -882,6 +904,8 @@ teams:
           path: .opencode/crew/marketing/expertise/brand-safety-reviewer-expertise-model.yaml
           use-when: Track durable learnings for brand-safety-reviewer.
         skills:
+          - path: skills/context-memory/SKILL.md
+            use-when: Use when relevant to current task.
           - path: skills/expertise_model/SKILL.md
             use-when: Use when relevant to current task.
         tools:

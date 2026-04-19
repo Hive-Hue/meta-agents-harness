@@ -753,7 +753,8 @@ function runtimeTools(agent, runtime) {
 
 function runtimeSkillPaths(meta, skillRefs, runtime) {
   const result = []
-  for (const ref of skillRefs || []) {
+  const refs = [...(meta.catalog?.shared_skills || []), ...(skillRefs || [])]
+  for (const ref of new Set(refs)) {
     const mapped = meta.catalog?.skills?.[ref]?.[runtime]
     if (mapped) result.push(mapped)
   }

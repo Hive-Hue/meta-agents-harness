@@ -42,6 +42,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - No regressions in existing `mah expertise`, `mah sessions`, `mah run` commands
 - Verified with: `node scripts/meta-agents-harness.mjs context --help`
 
+### Fixed
+- `context_memory` is now projected as a shared skill across runtime markers and resolves to the physical `skills/context-memory/SKILL.md` path
+
 ### Documentation
 - `docs/context-memory.md` — Complete operator reference for Context Memory v0.8.0
 - `docs/README.md` — Updated with Context Memory in Core Concepts

@@ -317,6 +317,7 @@ orchestrator:
     - mcp_tools
     - mcp_call
   skills:
+    - skills/context-memory/SKILL.md
     - skills/delegate_bounded/SKILL.md
     - skills/zero_micromanagement/SKILL.md
     - skills/expertise_model/SKILL.md
@@ -359,6 +360,7 @@ teams:
         - mcp_call
         - bash
       skills:
+        - skills/context-memory/SKILL.md
         - skills/delegate_bounded/SKILL.md
         - skills/zero_micromanagement/SKILL.md
         - skills/expertise_model/SKILL.md
@@ -423,6 +425,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .
@@ -481,6 +484,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .
@@ -539,6 +543,7 @@ teams:
         - mcp_call
         - bash
       skills:
+        - skills/context-memory/SKILL.md
         - skills/delegate_bounded/SKILL.md
         - skills/zero_micromanagement/SKILL.md
         - skills/expertise_model/SKILL.md
@@ -604,6 +609,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .
@@ -662,6 +668,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .
@@ -720,6 +727,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .
@@ -778,6 +786,7 @@ teams:
         - mcp_call
         - bash
       skills:
+        - skills/context-memory/SKILL.md
         - skills/delegate_bounded/SKILL.md
         - skills/zero_micromanagement/SKILL.md
         - skills/expertise_model/SKILL.md
@@ -842,6 +851,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .
@@ -900,6 +910,7 @@ teams:
           - mcp_tools
           - mcp_call
         skills:
+          - skills/context-memory/SKILL.md
           - skills/expertise_model/SKILL.md
         domain:
           - path: .

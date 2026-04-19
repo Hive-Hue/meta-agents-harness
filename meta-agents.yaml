@@ -60,6 +60,13 @@ catalog:
       - minimax/minimax-m2.7
       - nvidia/nemotron-3-super-120b-a12b:free
   skills:
+    context_memory:
+      opencode: skills/context-memory/SKILL.md
+      claude: skills/context-memory/SKILL.md
+      kilo: skills/context-memory/SKILL.md
+      pi: skills/context-memory/SKILL.md
+      hermes: skills/context-memory/SKILL.md
+      codex: skills/context-memory/SKILL.md
     delegate_bounded:
       opencode: skills/delegate_bounded/SKILL.md
       claude: skills/delegate_bounded/SKILL.md
@@ -123,6 +130,8 @@ catalog:
       pi: skills/zeplin_mcp_ops/SKILL.md
       hermes: skills/zeplin_mcp_ops/SKILL.md
       codex: skills/zeplin_mcp_ops/SKILL.md
+  shared_skills:
+    - context_memory
 domain_profiles:
   read_only_repo:
     - path: .

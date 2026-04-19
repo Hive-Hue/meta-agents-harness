@@ -77,6 +77,8 @@ tools:
   mcp_call: true
   bash: true
 skills:
+  - path: skills/context-memory/SKILL.md
+    use-when: Use when relevant to current task.
   - path: skills/delegate_bounded/SKILL.md
     use-when: Use when relevant to current task.
   - path: skills/zero_micromanagement/SKILL.md
