@@ -30,7 +30,12 @@ __pycache__/
 .hermes/crew/*/sessions/
 .kilo/crew/*/sessions/
 .codex/crew/*/sessions/
-
+.codex/skills/
+.claude/skills/
+.hermes/skills/
+.kilo/skills/
+.opencode/skills/
+.pi/skills/
 tmp/
 .playwright-cli/
 .mah/

@@ -543,10 +543,10 @@ function ensurePiThemes(mode, records, jsonOutput) {
   return allGood
 }
 
-function ensureCodexSkills(mode, records, jsonOutput) {
+function ensureRuntimeSkills(runtime, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
   const sourceDir = path.join(repoRoot, "skills")
-  const targetDir = path.join(repoRoot, ".codex", "skills")
+  const targetDir = path.join(repoRoot, `.${runtime}`, "skills")
 
   if (!existsSync(sourceDir)) {
     if (!jsonOutput) console.log(`drift: source skills dir missing ${rel(sourceDir)}`)
@@ -1069,7 +1069,9 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
     allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
     allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
     allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
-    allGood = ensureCodexSkills(mode, records, jsonOutput) && allGood
+    for (const rt of ["pi", "claude", "codex", "kilo", "opencode", "hermes"]) {
+      allGood = ensureRuntimeSkills(rt, mode, records, jsonOutput) && allGood
+    }
 
     if (!checkOnly) {
       ensureHermesArtifacts(crew)

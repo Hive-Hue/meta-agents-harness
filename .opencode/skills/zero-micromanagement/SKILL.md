@@ -1,21 +1,22 @@
 ---
 name: zero-micromanagement
-description: Set outcomes, constraints, and acceptance criteria without prescribing keystroke-level execution.
+description: Set outcomes, ownership boundaries, and acceptance criteria without prescribing keystroke-level implementation.
+compatibility: [generic]
 ---
 
 # Zero Micromanagement
 
-Use this skill when leading subagents.
+Leads should guide outcomes, not narrate every keystroke.
 
-Guidelines:
+Prefer:
 
-- define the goal and boundaries
-- clarify ownership and allowed scope
-- specify acceptance criteria
-- let the worker choose implementation details
+- a clear objective
+- ownership boundaries
+- acceptance criteria
+- format of the response
 
-Result:
+Avoid:
 
-- higher throughput
-- clearer accountability
-- lower coordination noise
+- step-by-step micromanagement unless the task is risky
+- assigning the same sub-problem to multiple workers
+- instructions that override obvious local repo conventions
