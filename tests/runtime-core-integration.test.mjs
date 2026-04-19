@@ -5,6 +5,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
+import { preparePiRunContext } from "../scripts/runtime-core-integrations.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -296,6 +297,50 @@ test("pi explain run resolves to direct cli with MAH session env", () => {
   assert.ok(payload.env?.PI_MULTI_CONFIG)
   assert.ok(payload.env?.PI_MULTI_SESSION_ROOT)
   assert.ok(payload.env?.PI_MULTI_SESSION_ID)
+})
+
+test("pi prepareRunContext falls back to MAH package extensions when repo extensions are missing", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-pi-fallback-repo-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-pi-fallback-mah-"))
+  const tempExtensions = path.join(tempMahRoot, "extensions")
+  mkdirSync(path.join(tempRepo, ".pi", "crew", "dev"), { recursive: true })
+  mkdirSync(tempExtensions, { recursive: true })
+
+  const sourceExtensions = [
+    "multi-team.ts",
+    "agent-session-navigator.ts",
+    "mcp-bridge.ts",
+    "theme-cycler.ts"
+  ]
+
+  const previousMahPackageRoot = process.env.MAH_PACKAGE_ROOT
+  try {
+    for (const fileName of sourceExtensions) {
+      cpSync(path.join(repoRoot, "extensions", fileName), path.join(tempExtensions, fileName))
+    }
+    process.env.MAH_PACKAGE_ROOT = tempMahRoot
+
+    const configPath = path.join(tempRepo, ".pi", "crew", "dev", "multi-team.yaml")
+    writeFileSync(configPath, "crew: dev\n", "utf-8")
+
+    const result = preparePiRunContext({
+      repoRoot: tempRepo,
+      crew: "dev",
+      configPath,
+      argv: []
+    })
+
+    assert.equal(result.ok, true, result.error)
+    assert.equal(result.exec, "pi")
+    assert.equal(result.args.length, sourceExtensions.length * 2)
+    const resolvedExtensions = result.args.filter((item) => item !== "-e")
+    assert.ok(resolvedExtensions.every((item) => item.startsWith(tempMahRoot)), "extensions should resolve from MAH package root")
+  } finally {
+    if (previousMahPackageRoot === undefined) delete process.env.MAH_PACKAGE_ROOT
+    else process.env.MAH_PACKAGE_ROOT = previousMahPackageRoot
+    rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
 })
 
 test("claude explain run resolves to direct cli with generated agent context", () => {

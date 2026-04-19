@@ -9,6 +9,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Fixed
 - AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first.
 - Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail.
+- `mah run` for PI now falls back to the MAH package's bundled `extensions/` assets when the current repo does not have local extension files.
 
 ### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
@@ -30,7 +31,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah sync` now materializes only the runtime markers present in the current repo
 - `mah init --ai` now forwards AI bootstrap flags to the bootstrap script and uses the bundled `bootstrap` skill instead of the retired `bootstrap-config-architect` name
 
-## [0.8.0] - 2026-04-18
+## [0.8.0] - 2026-04-19
 
 ### Added
 - **Context Memory Engine (M4 — PR1+PR2+PR3+PR4)** — new canonical layer for operational context retrieval, separate from Expertise routing

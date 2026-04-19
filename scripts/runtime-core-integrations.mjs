@@ -2,10 +2,15 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, st
 import { randomUUID } from "node:crypto"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
+import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { readActiveCrew } from "./runtime-core-ops.mjs"
 import { mapModelToCcrRef } from "./ccr-model-helper.mjs"
 import { createRequire } from "node:module"
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const packageRoot = path.resolve(__dirname, "..")
 
 function toPosix(targetPath) {
   return `${targetPath || ""}`.replaceAll(path.sep, "/")
@@ -53,6 +58,25 @@ function listSubdirs(rootPath) {
 function resolveFromRepo(repoRoot, targetPath) {
   if (!targetPath) return ""
   return path.isAbsolute(targetPath) ? targetPath : path.resolve(repoRoot, targetPath)
+}
+
+function resolveMahPackageRoot() {
+  const override = `${process.env.MAH_PACKAGE_ROOT || ""}`.trim()
+  if (override) return path.isAbsolute(override) ? override : path.resolve(override)
+  return packageRoot
+}
+
+function resolvePiAssetPath(repoRoot, targetPath) {
+  if (!targetPath) return ""
+  if (path.isAbsolute(targetPath)) return targetPath
+
+  const localPath = path.resolve(repoRoot, targetPath)
+  if (existsSync(localPath)) return localPath
+
+  const packagePath = path.resolve(resolveMahPackageRoot(), targetPath)
+  if (existsSync(packagePath)) return packagePath
+
+  return localPath
 }
 
 function removeIfExists(targetPath) {
@@ -215,7 +239,7 @@ function parsePiExtensionArgs(repoRoot, argv = []) {
     .flatMap((item) => `${item || ""}`.split(","))
     .map((item) => item.trim())
     .filter(Boolean)
-    .map((item) => resolveFromRepo(repoRoot, item))
+    .map((item) => resolvePiAssetPath(repoRoot, item))
   return { extensionPaths: Array.from(new Set(values)), remaining }
 }
 
@@ -832,10 +856,10 @@ export function preparePiRunContext({ repoRoot, crew, configPath, argv = [], env
   const session = resolvePiSessionLayout(repoRoot, crew, extensionParse.remaining, envOverrides)
   const extensionPaths = extensionParse.extensionPaths.length > 0
     ? extensionParse.extensionPaths
-    : loadPiDefaultExtensions(repoRoot).map((item) => resolveFromRepo(repoRoot, item))
+    : loadPiDefaultExtensions(repoRoot).map((item) => resolvePiAssetPath(repoRoot, item))
   const missingExtension = extensionPaths.find((item) => !existsSync(item))
   if (missingExtension) {
-    return { ok: false, error: `PI extension not found: ${rel(repoRoot, missingExtension)}` }
+    return { ok: false, error: `PI extension not found locally or in MAH package root: ${rel(repoRoot, missingExtension)}` }
   }
 
   const loadedEnv = loadPiRuntimeEnv(repoRoot, envOverrides)
@@ -1204,7 +1228,7 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
   const extensionParse = parsePiExtensionArgs(repoRoot, argv)
   const extensionPaths = extensionParse.extensionPaths.length > 0
     ? extensionParse.extensionPaths
-    : loadPiDefaultExtensions(repoRoot).map((item) => resolveFromRepo(repoRoot, item))
+    : loadPiDefaultExtensions(repoRoot).map((item) => resolvePiAssetPath(repoRoot, item))
 
   const loadedEnv = loadPiRuntimeEnv(repoRoot, envOverrides)
 
@@ -1230,7 +1254,7 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
       PI_MULTI_HEADLESS: "1"
     },
     warnings: extensionPaths.some((item) => !existsSync(item))
-      ? [...warnings, "some PI extensions not found, headless run may lack full functionality"]
+      ? [...warnings, "some PI extensions not found locally or in MAH package root, headless run may lack full functionality"]
       : warnings,
     internal: {
       mode: "headless",

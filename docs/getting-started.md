@@ -24,6 +24,7 @@ npm run install:global
 ```
 
 That exposes both `mah` and `meta-agents-harness` on your PATH.
+It also lets `mah run` fall back to the bundled MAH runtime assets when a new repo does not have its own local `extensions/` tree yet.
 
 ### 2. Verify Installation
 
