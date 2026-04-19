@@ -414,16 +414,17 @@ function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: num
 					items.push(child.value);
 					index = child.index;
 				} else {
-					items.push("");
-					index++;
-				}
-				continue;
+				items.push("");
+				index++;
 			}
+			continue;
+		}
 
 			const colonIndex = rest.indexOf(":");
 			if (colonIndex === -1) {
-				items.push(parseScalarToken(rest));
-				index++;
+				const wrapped = consumeWrappedScalar(lines, index + 1, indent);
+				items.push([parseScalarToken(rest), wrapped.value].filter(Boolean).join(" ").trim());
+				index = wrapped.index;
 				continue;
 			}
 

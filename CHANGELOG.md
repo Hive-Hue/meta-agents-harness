@@ -10,6 +10,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first.
 - Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail.
 - `mah run` for PI now falls back to the MAH package's bundled `extensions/` assets when the current repo does not have local extension files.
+- The custom `multi-team.yaml` parser now keeps all teams when list items wrap across multiple lines, so PI multi-team runs surface every lead instead of truncating after the first team.
 
 ### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint

@@ -4,13 +4,17 @@ import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import vm from "node:vm"
+import { createRequire } from "node:module"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
+const landingRepoRoot = path.resolve(repoRoot, "..", "mah-lp")
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
+const require = createRequire(import.meta.url)
 
 function run(args) {
   return spawnSync(process.execPath, [cliPath, ...args], {
@@ -107,6 +111,30 @@ test("generate:tree alias materializes artifacts from meta-agents.yaml", () => {
   const result = run(["generate:tree"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /meta sync completed/)
+})
+
+test("multi-team parser keeps all teams when list items wrap across lines", () => {
+  const source = readFileSync(path.join(repoRoot, "extensions", "multi-team.ts"), "utf-8")
+  const start = source.indexOf("function stripYamlComments")
+  const end = source.indexOf("function findRepoRoot")
+  const slice = source.slice(start, end)
+  const ts = require("typescript")
+  const js = ts.transpileModule(slice, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText
+  const context = {
+    module: { exports: {} },
+    exports: {},
+    require,
+    readFileSync,
+  }
+  vm.createContext(context)
+  vm.runInContext(js + "\nmodule.exports = { parseYamlSubset };", context)
+  const { parseYamlSubset } = context.module.exports
+  const raw = readFileSync(path.join(landingRepoRoot, ".pi", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const parsed = parseYamlSubset(raw)
+  assert.equal(parsed.teams?.length, 3)
+  assert.equal(parsed.teams.map((team) => team.name).join(","), "Planning,Engineering,Validation")
 })
 
 test("multi-team extension registers the thinking slash command", () => {
