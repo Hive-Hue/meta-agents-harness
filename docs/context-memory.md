@@ -57,6 +57,8 @@ refs:
   - docs/expertise-catalog-governance.md
 \`\`\`
 
+For `planning-lead` backlog-planning specifically, the operational memory should name the ClickUp MCP path directly and keep the playbook scoped to backlog grooming, milestones, and task creation. The canonical smoke doc in this repo is `.mah/context/operational/dev/planning-lead/backlog-planning/clickup-backlog-triage.md`.
+
 ---
 
 ## Stability Levels
@@ -166,6 +168,8 @@ mah run --crew dev --with-context-memory
 Options:
 --context-limit <n>  Number of documents to retrieve (default 5, max 10)
 --context-mode summary|snippets  Output format
+
+`--with-context-memory`, `--context-limit`, and `--context-mode` are MAH-managed flags. They are consumed by the MAH bootstrap layer and stripped before the Hermes CLI is launched.
 
 The context block is appended to the bootstrap query before "CONTEXT LOADED". If no corpus or no matches, injection is silently skipped.
 

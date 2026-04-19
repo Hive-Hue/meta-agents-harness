@@ -642,12 +642,22 @@ function normalizeHermesPassthroughArgs(args = []) {
   if (!Array.isArray(args) || args.length === 0 || hasHermesQueryFlag(args)) return args
 
   const flagsWithValue = new Set(["-r", "--resume", "-c", "--continue", "-s", "--skills", "-m", "--model"])
+  const mahOnlyFlags = new Set(["--with-context-memory", "--context-limit", "--context-mode"])
   const passthrough = []
   const promptTokens = []
 
   for (let i = 0; i < args.length; i += 1) {
     const token = `${args[i] || ""}`
     if (!token) continue
+    if (token === "--context-limit" || token === "--context-mode") {
+      if (args[i + 1] && !`${args[i + 1] || ""}`.startsWith("-")) {
+        i += 1
+      }
+      continue
+    }
+    if (mahOnlyFlags.has(token) || token.startsWith("--context-limit=") || token.startsWith("--context-mode=")) {
+      continue
+    }
     if (token.startsWith("-")) {
       passthrough.push(token)
       if (flagsWithValue.has(token) && args[i + 1] && !`${args[i + 1] || ""}`.startsWith("-")) {
@@ -661,6 +671,35 @@ function normalizeHermesPassthroughArgs(args = []) {
 
   if (promptTokens.length === 0) return args
   return [...passthrough, "-q", promptTokens.join(" ")]
+}
+
+function stripHermesManagedArgs(args = []) {
+  if (!Array.isArray(args) || args.length === 0) return []
+
+  const managed = []
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (!token) continue
+
+    if (token === "--with-context-memory") {
+      continue
+    }
+
+    if (token === "--context-limit" || token === "--context-mode") {
+      if (args[i + 1] && !`${args[i + 1] || ""}`.startsWith("-")) {
+        i += 1
+      }
+      continue
+    }
+
+    if (token.startsWith("--context-limit=") || token.startsWith("--context-mode=")) {
+      continue
+    }
+
+    managed.push(token)
+  }
+
+  return managed
 }
 
 function readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides = {}) {
@@ -1041,7 +1080,7 @@ export function prepareHermesRunContext({ repoRoot, crew, configPath, argv = [],
   const agentCtx = readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverrides)
   const modelArgs = getHermesModelArgs(agentCtx.agentModel, remaining)
 
-  const normalizedPassthrough = normalizeHermesPassthroughArgs(remaining)
+  const normalizedPassthrough = stripHermesManagedArgs(normalizeHermesPassthroughArgs(remaining))
 
   return {
     ok: true,
@@ -1063,7 +1102,8 @@ export function prepareHermesRunContext({ repoRoot, crew, configPath, argv = [],
       multiTeamPath,
       sessionRoot,
       newSessionRequested,
-      agentCtx
+      agentCtx,
+      contextArgs: [...remaining]
     }
   }
 }
@@ -1102,7 +1142,7 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
       // Use createRequire for synchronous ESM require
       const req = createRequire(import.meta.url)
       const { buildContextMemoryBlock } = req("./context-memory-integration.mjs")
-      contextBlock = buildContextMemoryBlock(agentCtx, args, envOverrides)
+      contextBlock = buildContextMemoryBlock(agentCtx, internal.contextArgs || args, envOverrides)
     } catch (e) {
       // Context memory injection is optional — fail silently
     }
@@ -1316,7 +1356,7 @@ export function prepareHermesHeadlessRunContext({ repoRoot, task = "", crew, con
   } else if (argv.length > 0) {
     taskArgs.push(...argv)
   }
-  const normalizedTaskArgs = normalizeHermesPassthroughArgs(taskArgs)
+  const normalizedTaskArgs = stripHermesManagedArgs(normalizeHermesPassthroughArgs(taskArgs))
 
   // Hermes headless uses chat mode with -c for continue
   return {
@@ -1341,4 +1381,3 @@ export function prepareHermesHeadlessRunContext({ repoRoot, task = "", crew, con
     }
   }
 }
-

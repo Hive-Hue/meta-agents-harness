@@ -32,9 +32,14 @@ test("context memory keeps fixtures out of production indexing and uses task pat
 
   try {
     const operationalResult = buildOperationalIndex(contextRoot, { rebuild: true })
-    assert.equal(operationalResult.total_documents, 0)
+    assert.equal(operationalResult.total_documents, 1)
+    assert.equal(operationalResult.entries[0].id, "dev/planning-lead/backlog-planning/clickup-backlog-triage")
     assert.equal(
       operationalResult.entries.some((entry) => `${entry.file_path || ""}`.includes("tests/fixtures/context-memory")),
+      false
+    )
+    assert.equal(
+      operationalResult.entries.some((entry) => `${entry.file_path || ""}`.includes(".mah/context/README.md")),
       false
     )
 

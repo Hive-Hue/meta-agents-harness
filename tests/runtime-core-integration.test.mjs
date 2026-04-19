@@ -338,3 +338,30 @@ test("hermes explain run resolves to hermes chat with MAH bootstrap env", () => 
   assert.ok(payload.env?.MAH_HERMES_CONFIG)
   assert.ok(payload.env?.MAH_HERMES_MULTI_TEAM)
 })
+
+test("hermes explain run strips MAH context-memory flags before spawning hermes", () => {
+  const result = run([
+    "--runtime",
+    "hermes",
+    "explain",
+    "run",
+    "--trace",
+    "--crew",
+    "dev",
+    "--with-context-memory",
+    "--context-limit",
+    "2",
+    "--context-mode",
+    "snippets",
+    "smoke test"
+  ])
+  assert.equal(result.status, 0, result.stderr)
+  const payload = JSON.parse(result.stdout)
+  assert.equal(payload.runtime, "hermes")
+  assert.equal(payload.exec, "hermes")
+  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "minimax-m2.7"])
+  assert.match(payload.passthrough.join(" "), /smoke test/)
+  assert.equal(payload.passthrough.some((arg) => arg === "--with-context-memory"), false)
+  assert.equal(payload.passthrough.some((arg) => arg === "--context-limit"), false)
+  assert.equal(payload.passthrough.some((arg) => arg === "--context-mode"), false)
+})

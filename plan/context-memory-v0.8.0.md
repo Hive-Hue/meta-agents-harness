@@ -29,7 +29,7 @@ Exemplo:
 
 - `planning-lead` pode ser roteado para `backlog-planning`
 - mas o conhecimento operacional relevante para esta tarefa pode variar:
-  - uso de ClickUp via MCP
+  - uso de ClickUp via MCP diretamente
   - critérios de decomposição de backlog
   - fluxo de milestones
   - uso de skills de gestão/PERT
@@ -57,6 +57,7 @@ Criar uma nova camada canônica chamada **Context Memory** ou **Operational Cont
 2. enriquecer bootstrap e execução do agente selecionado
 3. persistir memória operacional curada entre sessões
 4. permitir evolução futura do MAH como **assistant substrate** acima dos runtimes
+5. manter o playbook de backlog-planning explícito para ClickUp MCP, sem exigir uma skill intermediária dedicada
 
 Princípio central:
 
@@ -178,6 +179,7 @@ Seu papel é exclusivamente **enriquecer execução pós-roteamento**.
 - arquivos canônicos `.md`/`.qmd`
 - versionados no repositório
 - escritos para reuso operacional
+- o smoke doc canônico de backlog-planning neste release é `.mah/context/operational/dev/planning-lead/backlog-planning/clickup-backlog-triage.md`
 
 2. `Context Index`
 - índice derivado com metadata, snippets e chaves de busca
@@ -213,7 +215,7 @@ Seu papel é exclusivamente **enriquecer execução pós-roteamento**.
   dev/
     planning-lead/
       backlog-planning/
-        clickup-backlog-triage.qmd
+        clickup-backlog-triage.md
         milestone-splitting.qmd
         acceptance-criteria-checklist.qmd
       scope-triage/
@@ -265,6 +267,7 @@ Exemplo:
   - `capability=backlog-planning`
   - `systems=clickup`
   - `task_patterns` compatíveis com a tarefa
+- o playbook recuperado explicita o caminho operacional via ClickUp MCP
 
 Ou seja:
 
@@ -361,6 +364,7 @@ Entrega:
 - regras de validação
 - storage layout canônico
 - docs de boundary e naming
+- playbooks de backlog-planning referenciam ClickUp MCP diretamente no corpus operacional
 
 Critérios de aceite:
 
@@ -377,6 +381,7 @@ Entrega:
 - retrieval por `agent`, `capability`, `task`, `systems`, `tools`
 - explainability do retrieval
 - limites de tamanho, profundidade e file-count
+- hints de backlog-planning devem apontar para ClickUp MCP quando o doc operacional mencionar backlog grooming ou task creation
 
 Critérios de aceite:
 
@@ -567,7 +572,7 @@ mah context propose --from-session hermes:dev:abc123
     }
   ],
   "summary_blocks": [
-    "Use ClickUp MCP when the task explicitly mentions backlog grooming or milestone/task creation.",
+    "Use ClickUp MCP directly when the task explicitly mentions backlog grooming or milestone/task creation.",
     "Prefer milestone-first decomposition before creating individual tasks."
   ],
   "tool_hints": ["mcp_call"],
@@ -721,8 +726,8 @@ Ponto de integração:
 1. `mah expertise` permanece semanticamente intacto no roteamento.
 2. `mah context` existe como namespace separado e operável.
 3. O sistema suporta `.md` e `.qmd` como corpus operacional.
-4. O retrieval é bounded, explainable e respeita ferramentas disponíveis.
-5. O bootstrap do runtime pode consumir contexto operacional sem depender de prompt fixo.
-6. Existe proposal flow para persistência de memória derivada.
-7. O design fortalece o MAH como camada de assistência de alto nível sem capturar a identidade do produto por um runtime específico.
-
+4. O smoke doc de backlog-planning usa ClickUp MCP diretamente e existe hoje como `.md`.
+5. O retrieval é bounded, explainable e respeita ferramentas disponíveis.
+6. O bootstrap do runtime pode consumir contexto operacional sem depender de prompt fixo.
+7. Existe proposal flow para persistência de memória derivada.
+8. O design fortalece o MAH como camada de assistência de alto nível sem capturar a identidade do produto por um runtime específico.

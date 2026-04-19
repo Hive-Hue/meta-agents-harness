@@ -2464,7 +2464,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const pathIdx = subArgv.indexOf("--path")
     const targetPath = pathIdx >= 0 && subArgv[pathIdx + 1]
       ? path.resolve(repoRoot, subArgv[pathIdx + 1])
-      : contextRoot
+      : path.join(contextRoot, "operational")
 
     const { parseContextFile } = await import("./context-memory-schema.mjs")
     const { validateContextMemoryDocument } = await import("./context-memory-validate.mjs")
