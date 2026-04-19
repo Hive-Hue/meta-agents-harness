@@ -65,7 +65,8 @@ function defaultExpertiseContent(agent) {
     },
     meta: {
       version: "1",
-      max_lines: "120"
+      max_lines: "120",
+      last_updated: new Date().toISOString().replace(/\.\d{3}Z$/, ".000Z")
     },
     patterns: [],
     risks: [],
@@ -299,41 +300,24 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
   }
   if (runtime !== "hermes") {
     const expertiseDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id, "expertise")
-    const piExpertiseDir = path.join(repoRoot, ".pi", "crew", crew.id, "expertise")
     mkdirSync(expertiseDir, { recursive: true })
     for (const agent of crew.agents || []) {
       const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
       const hadExpertiseFile = existsSync(expertiseFile)
-      const expertiseContent =
-        runtime === "kilo"
-          ? defaultExpertiseContent(agent)
-          : (() => {
-              const piExpertiseFile = path.join(piExpertiseDir, `${agent.expertise}.yaml`)
-              if (existsSync(piExpertiseFile)) return readFileSync(piExpertiseFile, "utf-8")
-              return defaultExpertiseContent(agent)
-            })()
-      const currentExpertise = hadExpertiseFile ? readFileSync(expertiseFile, "utf-8") : ""
-      if (checkOnly) {
-        if (!hadExpertiseFile) {
+      if (hadExpertiseFile) {
+        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+      } else {
+        const expertiseContent = defaultExpertiseContent(agent)
+        if (checkOnly) {
           pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
           if (!jsonOutput) console.log(`drift: missing ${rel(expertiseFile)}`)
           ok = false
-        } else if (currentExpertise !== expertiseContent) {
-          const preview = mode === "diff" ? diffPreview(currentExpertise, expertiseContent) : []
-          pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id, preview })
-          if (!jsonOutput) {
-            if (mode === "plan") console.log(`plan: update ${rel(expertiseFile)}`)
-            else { console.log(`drift: out-of-sync ${rel(expertiseFile)}`); for (const l of preview) console.log(l) }
-          }
-          ok = false
         } else {
-          pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
-          if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+          writeFileSync(expertiseFile, expertiseContent, "utf-8")
+          console.log(`generated: ${rel(expertiseFile)}`)
+          pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "generated", action: determineAction("generated"), crew: crew.id, agent: agent.id })
         }
-      } else if (currentExpertise !== expertiseContent) {
-        writeFileSync(expertiseFile, expertiseContent, "utf-8")
-        console.log(`synced: ${rel(expertiseFile)}`)
-        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: hadExpertiseFile ? "synced" : "generated", action: determineAction(hadExpertiseFile ? "synced" : "generated"), crew: crew.id, agent: agent.id })
       }
     }
   }
@@ -371,22 +355,15 @@ function ensureHermesArtifacts(crew) {
   const agentsDir = path.join(crewRoot, "agents")
   const expertiseDir = path.join(crewRoot, "expertise")
   const sessionsDir = path.join(crewRoot, "sessions")
-  const piExpertiseDir = path.join(repoRoot, ".pi", "crew", crew.id, "expertise")
   mkdirSync(agentsDir, { recursive: true })
   mkdirSync(expertiseDir, { recursive: true })
   mkdirSync(sessionsDir, { recursive: true })
 
   for (const agent of crew.agents || []) {
     const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
-    const piExpertiseFile = path.join(piExpertiseDir, `${agent.expertise}.yaml`)
-    const hadExpertiseFile = existsSync(expertiseFile)
-    const expertiseContent = existsSync(piExpertiseFile)
-      ? readFileSync(piExpertiseFile, "utf-8")
-      : `agent: ${agent.id}\nsummary: []\n`
-    const currentExpertise = hadExpertiseFile ? readFileSync(expertiseFile, "utf-8") : ""
-    if (currentExpertise !== expertiseContent) {
-      writeFileSync(expertiseFile, expertiseContent, "utf-8")
-      console.log(`${hadExpertiseFile ? "synced" : "generated"}: ${rel(expertiseFile)}`)
+    if (!existsSync(expertiseFile)) {
+      writeFileSync(expertiseFile, defaultExpertiseContent(agent), "utf-8")
+      console.log(`generated: ${rel(expertiseFile)}`)
     }
   }
 }
@@ -427,10 +404,8 @@ function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
   const agentsDir = path.join(repoRoot, ".opencode", "crew", crew.id, "agents")
   const expertiseDir = path.join(repoRoot, ".opencode", "crew", crew.id, "expertise")
   const legacyAgentsDir = path.join(repoRoot, ".opencode", "agents")
-  const legacyExpertiseDir = path.join(repoRoot, ".opencode", "expertise")
   const referenceRoot = path.resolve(repoRoot, "..", "opencode-multi-harness", ".opencode", "crew", crew.id)
   const referenceAgentsDir = path.join(referenceRoot, "agents")
-  const referenceExpertiseDir = path.join(referenceRoot, "expertise")
   mkdirSync(agentsDir, { recursive: true })
   mkdirSync(expertiseDir, { recursive: true })
 
@@ -484,37 +459,22 @@ function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
     }
 
     const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
-    const referenceExpertiseFile = path.join(referenceExpertiseDir, `${agent.expertise}.yaml`)
-    const legacyExpertiseFile = path.join(legacyExpertiseDir, `${agent.expertise}.yaml`)
     const hadExpertiseFile = existsSync(expertiseFile)
-    const expertiseContent = existsSync(referenceExpertiseFile)
-      ? readFileSync(referenceExpertiseFile, "utf-8")
-      : existsSync(legacyExpertiseFile)
-        ? readFileSync(legacyExpertiseFile, "utf-8")
-        : `agent: ${agent.id}\nsummary: []\n`
-    const currentExpertise = hadExpertiseFile ? readFileSync(expertiseFile, "utf-8") : ""
 
-    if (checkOnly) {
-      if (!hadExpertiseFile) {
+    if (hadExpertiseFile) {
+      pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+      if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+    } else {
+      const expertiseContent = defaultExpertiseContent(agent)
+      if (checkOnly) {
         pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
         if (!jsonOutput) console.log(`drift: missing ${rel(expertiseFile)}`)
         ok = false
-      } else if (currentExpertise !== expertiseContent) {
-        const preview = mode === "diff" ? diffPreview(currentExpertise, expertiseContent) : []
-        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id, preview })
-        if (!jsonOutput) {
-          if (mode === "plan") console.log(`plan: update ${rel(expertiseFile)}`)
-          else { console.log(`drift: out-of-sync ${rel(expertiseFile)}`); for (const l of preview) console.log(l) }
-        }
-        ok = false
       } else {
-        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
-        if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+        writeFileSync(expertiseFile, expertiseContent, "utf-8")
+        if (!jsonOutput) console.log(`generated: ${rel(expertiseFile)}`)
+        pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "generated", action: determineAction("generated"), crew: crew.id, agent: agent.id })
       }
-    } else if (currentExpertise !== expertiseContent) {
-      writeFileSync(expertiseFile, expertiseContent, "utf-8")
-      if (!jsonOutput) console.log(`${hadExpertiseFile ? "synced" : "generated"}: ${rel(expertiseFile)}`)
-      pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: hadExpertiseFile ? "synced" : "generated", action: determineAction(hadExpertiseFile ? "synced" : "generated"), crew: crew.id, agent: agent.id })
     }
   }
   return ok

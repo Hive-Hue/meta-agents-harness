@@ -26,6 +26,7 @@ __pycache__/
 .pi/crew/*/sessions/
 .claude/crew/*/sessions/
 .opencode/crew/*/sessions/
+.opencode/crew/*
 .hermes/crew/*/sessions/
 .kilo/crew/*/sessions/
 .codex/crew/*/sessions/
