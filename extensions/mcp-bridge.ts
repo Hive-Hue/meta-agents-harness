@@ -504,7 +504,7 @@ class StdioMcpClient implements McpClientLike {
 	private async request(method: string, params?: any): Promise<any> {
 		this.startProcess();
 		const id = this.idCounter++;
-		return new Promise((resolvePromise, rejectPromise) => {
+		const promise = new Promise((resolvePromise, rejectPromise) => {
 			const timer = setTimeout(() => {
 				this.pending.delete(id);
 				rejectPromise(new Error(`Timed out waiting for MCP response from "${this.name}" for ${method}`));
@@ -519,6 +519,8 @@ class StdioMcpClient implements McpClientLike {
 				params,
 			});
 		});
+		void promise.catch(() => undefined);
+		return promise;
 	}
 
 	private notify(method: string, params?: any) {
@@ -742,6 +744,7 @@ class HttpMcpClient implements McpClientLike {
 
 			this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise, timer });
 		});
+		void promise.catch(() => undefined);
 
 		const response = await fetch(this.config.url, {
 			method: "POST",
