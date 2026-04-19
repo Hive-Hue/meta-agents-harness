@@ -13,6 +13,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - The custom `multi-team.yaml` parser now keeps all teams when list items wrap across multiple lines, so PI multi-team runs surface every lead instead of truncating after the first team.
 - MCP bridge tool calls now return controlled timeout errors instead of throwing out of the runtime, and Stitch gets a longer per-request timeout in PI MCP config.
 - Increased the PI Stitch MCP timeout again for long-running `generate_screen_from_text` calls.
+- Added `npm run stitch:secrets` to populate `GOOGLE_CLOUD_PROJECT` and `STITCH_ACCESS_TOKEN` directly in the target repo `.env` without overwriting the rest of the file.
 
 ### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint

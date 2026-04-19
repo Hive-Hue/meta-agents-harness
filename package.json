@@ -9,6 +9,7 @@
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "stitch:secrets": "node scripts/generate-stitch-secrets.mjs",
     "install:global": "npm install -g .",
     "link:global": "npm link",
     "bootstrap:meta": "node scripts/bootstrap-meta-agents.mjs",
