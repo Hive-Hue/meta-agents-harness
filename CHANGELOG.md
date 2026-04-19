@@ -12,6 +12,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah run` for PI now falls back to the MAH package's bundled `extensions/` assets when the current repo does not have local extension files.
 - The custom `multi-team.yaml` parser now keeps all teams when list items wrap across multiple lines, so PI multi-team runs surface every lead instead of truncating after the first team.
 - MCP bridge tool calls now return controlled timeout errors instead of throwing out of the runtime, and Stitch gets a longer per-request timeout in PI MCP config.
+- Increased the PI Stitch MCP timeout again for long-running `generate_screen_from_text` calls.
 
 ### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
