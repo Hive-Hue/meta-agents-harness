@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Meta Agents Harness installed (`npm install -g .` or local `node bin/mah`)
+- Meta Agents Harness installed (`npm run install:global` or local `node bin/mah`)
 - Repo-local `.hermes/` runtime assets generated from `meta-agents.yaml`
 - Hermes CLI available (`hermes` command in PATH) for `doctor` and interactive `run`
 - A repository initialized with `meta-agents.yaml`

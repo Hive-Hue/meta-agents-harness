@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, cpSync,
 import path from "node:path"
 import { resolve, dirname } from "node:path"
 import { spawnSync } from "node:child_process"
+import os from "node:os"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { RUNTIME_ORDER } from "./runtime-adapters.mjs"
@@ -12,7 +13,59 @@ import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, reso
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const repoRoot = path.resolve(__dirname, "..")
+const packageRoot = path.resolve(__dirname, "..")
+
+function isPathWithin(parentDir, childDir) {
+  const relative = path.relative(parentDir, childDir)
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
+}
+
+function resolveSearchBoundary(startDir) {
+  const cwd = path.resolve(startDir)
+  const gitProbe = spawnSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd,
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "ignore"]
+  })
+  if (gitProbe.status === 0) {
+    const gitRoot = `${gitProbe.stdout || ""}`.trim()
+    if (gitRoot) {
+      return { dir: path.resolve(gitRoot), include: true }
+    }
+  }
+
+  const homeDir = process.env.HOME?.trim() || os.homedir()
+  if (homeDir) {
+    const resolvedHome = path.resolve(homeDir)
+    if (isPathWithin(resolvedHome, cwd)) {
+      return { dir: resolvedHome, include: false }
+    }
+  }
+
+  return { dir: path.parse(cwd).root, include: false }
+}
+
+function resolveWorkspaceRoot(startDir = process.cwd()) {
+  const markerNames = ["meta-agents.yaml", ".pi", ".claude", ".opencode", ".hermes", ".codex", ".kilo"]
+  const initial = path.resolve(startDir)
+  const { dir: ceiling, include: includeCeiling } = resolveSearchBoundary(initial)
+  let current = initial
+
+  while (true) {
+    for (const marker of markerNames) {
+      if (existsSync(path.join(current, marker))) {
+        if (current !== ceiling || includeCeiling) return current
+        break
+      }
+    }
+    if (current === ceiling) return initial
+    const parent = path.dirname(current)
+    if (parent === current || !isPathWithin(ceiling, parent)) return initial
+    current = parent
+  }
+}
+
+const repoRoot = resolveWorkspaceRoot(process.cwd())
 
 // Bootstrap plugin discovery at module load time (top-level await).
 // This ensures plugin runtimes are available for all commands including detect.
@@ -159,16 +212,6 @@ function detectRuntime(cwd, forcedRuntime) {
     if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
     const pluginPreferred = [...byMarker].sort((left, right) => left.localeCompare(right))[0]
     if (pluginPreferred) return { runtime: pluginPreferred, reason: `markers:${byMarker.join(",")}` }
-  }
-
-  const byCli = orderedRuntimeNames(runtimeProfiles)
-    .map((name) => ({ name, profile: runtimeProfiles[name], status: runtimeExecutableStatus(name) }))
-    .filter(({ status }) => status.directCliAvailable || status.wrapperAvailable)
-
-  if (byCli.length > 0) {
-    const selected = byCli[0]
-    const source = selected.status.directCliAvailable ? selected.profile.directCli : selected.profile.wrapper
-    return { runtime: selected.name, reason: `cli:${source}` }
   }
 
   return { runtime: null, reason: "none" }
@@ -684,7 +727,7 @@ function buildCoreManagedCommandPayload(runtime, command, passthrough = []) {
   const payload = {
     runtime,
     command,
-    mode: "core-managed",
+    mode: "mah-managed",
     crew_root: path.join(adapter.markerDir || `.${runtime}`, "crew"),
     active_crew: activeCrew?.crew || "",
     crews
@@ -901,7 +944,7 @@ function runInit(argv) {
   const created = []
   const skipped = []
 
-  const bootstrapArgs = [path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")]
+  const bootstrapArgs = [path.join(packageRoot, "scripts", "bootstrap-meta-agents.mjs")]
   if (!process.stdin.isTTY || yesFlag) {
     bootstrapArgs.push("--non-interactive")
   }
@@ -926,7 +969,7 @@ function runInit(argv) {
   }
 
   const mcpTarget = path.join(repoRoot, ".mcp.json")
-  const mcpExample = path.join(repoRoot, ".mcp.example.json")
+  const mcpExample = path.join(packageRoot, ".mcp.example.json")
   if (!existsSync(mcpTarget) && existsSync(mcpExample)) {
     copyFileSync(mcpExample, mcpTarget)
     created.push(".mcp.json")
@@ -996,7 +1039,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const effectiveRuntime = filters.runtime || detectedRuntime || ""
   if (jsonMode) filters.json = true
 
-  // Get all runtimes (built-ins + loaded plugins)
+  // Get all runtimes (bundled plugins + loaded plugins)
   const allRuntimes = await getAllRuntimes()
 
   // Handle subcommands
@@ -3526,6 +3569,7 @@ function main() {
         }))
       } else {
         console.log("runtime=unknown")
+        console.log("reason=none")
       }
       process.exitCode = 1
       return

@@ -149,7 +149,7 @@ function ensureDefaults(doc) {
     opencode: ".opencode",
     hermes: ".hermes",
     codex: ".codex",
-    // Plugin entries override nothing (built-ins above take priority by name),
+    // Plugin entries override nothing (bundled plugins above take priority by name),
     // but we include them so the YAML documents all available markers
     ...Object.fromEntries(
       [...installedPlugins.entries()]
@@ -157,16 +157,16 @@ function ensureDefaults(doc) {
         .map(([name, p]) => [name, p.markerDir])
     )
   }
-  // cli: NOT generated — derived entirely from RUNTIME_ADAPTERS (built-ins) and
+  // cli: NOT generated — derived entirely from bundled runtime plugins and
   // plugin.json (plugins) at runtime. The YAML does not store this.
   // Note: existing cli: entries in the YAML are NOT auto-removed here; they are
   // simply ignored at runtime.
 
   // runtimes: NOT generated from code. The YAML stores ONLY user-specific overrides
   // (e.g. model_overrides for opencode). All runtime properties come from
-  // RUNTIME_ADAPTERS (built-ins) and plugin.json (plugins) — those are code, not config.
+  // bundled runtime plugins and plugin.json (plugins) — those are code, not config.
   // Preserve existing YAML runtimes entries only if they contain user-specific config.
-  // Built-in/plugin entries should not be duplicated in YAML.
+  // Bundled/installed plugin entries should not be duplicated in YAML.
   next.runtimes = next.runtimes || {}
 
   next.catalog = next.catalog || {}

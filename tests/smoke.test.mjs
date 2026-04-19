@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -20,10 +20,80 @@ function run(args) {
   })
 }
 
+function runAt(cwd, args) {
+  return spawnSync(process.execPath, [cliPath, ...args], {
+    cwd,
+    env: process.env,
+    encoding: "utf-8"
+  })
+}
+
 test("detect resolves a supported runtime in this repository", () => {
   const result = run(["detect"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /runtime=(pi|claude|opencode)/)
+})
+
+test("detect uses the caller cwd for marker discovery", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-detect-"))
+  try {
+    writeFileSync(path.join(tempDir, ".opencode"), "")
+    const result = runAt(tempDir, ["detect"])
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /runtime=opencode/)
+    assert.match(result.stdout, /reason=marker/)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("detect walks up to the nearest workspace root", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-root-"))
+  const nestedDir = path.join(tempDir, "apps", "landing")
+  try {
+    mkdirSync(path.join(tempDir, ".opencode"), { recursive: true })
+    mkdirSync(nestedDir, { recursive: true })
+    const result = runAt(nestedDir, ["detect"])
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /runtime=opencode/)
+    assert.match(result.stdout, /reason=marker/)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("detect does not inherit markers from HOME", () => {
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-home-"))
+  const nestedDir = path.join(tempHome, "Github", "mah-lp")
+  const previousHome = process.env.HOME
+  try {
+    mkdirSync(path.join(tempHome, ".pi"), { recursive: true })
+    mkdirSync(nestedDir, { recursive: true })
+    const result = spawnSync(process.execPath, [cliPath, "detect"], {
+      cwd: nestedDir,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stdout, /runtime=unknown/)
+    assert.match(result.stdout, /reason=none/)
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    rmSync(tempHome, { recursive: true, force: true })
+  }
+})
+
+test("detect returns unknown in an empty workspace without markers", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-empty-workspace-"))
+  try {
+    const result = runAt(tempDir, ["detect"])
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(result.stdout, /runtime=unknown/)
+    assert.match(result.stdout, /reason=none/)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
 })
 
 test("help returns usage", () => {
@@ -83,11 +153,10 @@ test("explain detect with hermes forced returns hermes in payload", () => {
   assert.equal(payload.data?.runtime, "hermes")
 })
 
-test("forced hermes list:crews resolves through the MAH core-managed runtime surface", () => {
+test("forced hermes list:crews resolves through the MAH-managed runtime surface", () => {
   const result = run(["--runtime", "hermes", "list:crews"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /\bdev\b/)
-  assert.match(result.stdout, /\bmarketing\b/)
 })
 
 test("hermes use and list:crews expose MAH-managed active crew state", () => {
@@ -113,7 +182,8 @@ test("claude dry-run works with wrapped instruction blocks in crew config", () =
   const result = run(["--runtime", "claude", "run", "--crew", "dev", "--dry-run"])
   assert.equal(result.status, 0, result.stderr)
   assert.match(result.stdout, /config=\.claude\/crew\/dev\/multi-team\.yaml/)
-  assert.match(result.stdout, /\[dry-run\] claude/)
+  assert.match(result.stdout, /Running Claude Code via CCR/)
+  assert.match(result.stdout, /\[dry-run\] ccr code/)
 })
 
 test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode", () => {

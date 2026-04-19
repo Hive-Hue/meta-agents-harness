@@ -925,7 +925,7 @@ export function prepareClaudeRunContext({ repoRoot, crew, configPath, argv = [],
       MAH_RUNTIME: "claude",
       MAH_ACTIVE_CREW: crew
     },
-    warnings: parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the core-integrated path"] : [],
+    warnings: parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the MAH-managed path"] : [],
     internal: {
       crew,
       configPath,
@@ -945,7 +945,7 @@ export function prepareClaudeRunContext({ repoRoot, crew, configPath, argv = [],
 export function executeClaudePreparedRun({ repoRoot, plan, runCommand }) {
   const internal = plan.internal || {}
   if (internal.showLaunchInfo || internal.dryRun) {
-    console.log("Running Claude Code via CCR (core-integrated runtime)")
+    console.log("Running Claude Code via CCR (MAH-managed runtime)")
     console.log(`- config=${rel(repoRoot, internal.configPath)}`)
     console.log(`- system=${internal.systemName || "MultiTeam"}`)
     console.log(`- hierarchy=${internal.strictHierarchy ? "strict" : "relaxed"}`)

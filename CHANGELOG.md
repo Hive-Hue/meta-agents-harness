@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
+## [Unreleased]
+
+### Added
+- Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
+- Workspace-aware root resolution so a global `mah` command operates on the current repo instead of the package install directory
+- `meta-agents-harness` packaging alias and install scripts for local/global usage
+
+### Changed
+- Runtime detection now follows a stricter plugin-first model: forced runtime flags and repository markers only
+- Detection no longer infers a runtime from an executable on `PATH` when the workspace has no runtime markers
+- Runtime terminology across docs and loader output now uses plugin-based language instead of built-in/core runtime wording
+- Bundled runtime plugins remain prioritized over installed plugins with the same name
+
+### Fixed
+- Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
+- `mah detect` now reports a stable unknown state in repositories without runtime markers
+- Plugin loader warning noise for bundled runtime names was removed
+
 ## [0.8.0] - 2026-04-18
 
 ### Added

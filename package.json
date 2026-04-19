@@ -4,10 +4,13 @@
   "description": "Unified multi-agent harness that detects OpenCode, Claude, or PI runtime and adapts commands dynamically.",
   "type": "module",
   "bin": {
-    "mah": "bin/mah"
+    "mah": "bin/mah",
+    "meta-agents-harness": "bin/mah"
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
+    "install:global": "npm install -g .",
+    "link:global": "npm link",
     "bootstrap:meta": "node scripts/bootstrap-meta-agents.mjs",
     "generate:meta": "node scripts/meta-agents-harness.mjs generate",
     "sync:meta": "node scripts/sync-meta-agents.mjs",

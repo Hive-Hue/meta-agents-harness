@@ -17,6 +17,14 @@ cd meta-agents-harness
 npm run setup
 ```
 
+If you want a global install from the repository checkout, use:
+
+```bash
+npm run install:global
+```
+
+That exposes both `mah` and `meta-agents-harness` on your PATH.
+
 ### 2. Verify Installation
 
 ```bash

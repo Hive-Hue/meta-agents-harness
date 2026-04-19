@@ -105,9 +105,8 @@ Detection currently follows this priority:
 
 1. forced runtime via `--runtime`, `-r`, `-f`, or `MAH_RUNTIME`
 2. runtime marker directory in the repository (`.pi`, `.claude`, `.opencode`, `.hermes`)
-3. installed runtime executable or compatibility shim available in the environment
 
-This allows the same repository to remain runtime-aware while preserving explicit overrides for CI, local debugging, or controlled execution.
+If no runtime marker is present, detection returns `unknown` unless you force a runtime explicitly.
 
 ---
 
@@ -137,7 +136,7 @@ mah plugins uninstall <name>         # remove an installed plugin
 
 Installed plugins persist across MAH updates. See [`docs/plugin-api.md`](./docs/plugin-api.md) for the full plugin contract, manifest format, discovery mechanism, and CLI API.
 
-Plugins can be wrapper-based or core-integrated. In the core-integrated model, MAH owns crew state and generated artifacts, and the plugin only maps that context into the runtime's direct CLI.
+Plugins can be wrapper-based or MAH-managed. In the MAH-managed model, MAH owns crew state and generated artifacts, and the plugin only maps that context into the runtime's direct CLI.
 
 ---
 
@@ -372,13 +371,19 @@ node bin/mah --help
 Or install it globally:
 
 ```bash
-npm install -g .
+npm run install:global
 ```
 
 Then:
 
 ```bash
 mah --help
+```
+
+You can also invoke the package name directly after a global install:
+
+```bash
+meta-agents-harness --help
 ```
 
 ---
@@ -582,7 +587,7 @@ Boundary details are documented in `docs/runtime-boundary.md`.
 
 A runtime should be represented as an explicit contract rather than implicit command branching scattered through the dispatcher. MAH now supports two integration styles:
 
-- core-integrated runtimes, where MAH manages crew state, generated tree lookup, and run preparation before calling the runtime CLI directly
+- MAH-managed runtimes, where MAH manages crew state, generated tree lookup, and run preparation before calling the runtime CLI directly
 - compatibility-shim runtimes, where a repo-local wrapper still bridges missing runtime primitives
 
 Illustrative direction:
@@ -599,7 +604,7 @@ interface RuntimeAdapter {
 }
 ```
 
-`plugins/runtime-kilo` is the reference plugin for the core-integrated model in this branch. The built-in runtimes (`pi`, `claude`, `opencode`, `hermes`) now follow the same MAH-owned orchestration path, with wrappers kept only as an optional compatibility escape hatch for future runtimes that may need them.
+`plugins/runtime-kilo` is the reference plugin for the MAH-managed model in this branch. The bundled runtime plugins (`pi`, `claude`, `opencode`, `hermes`) follow the same orchestration path, with wrappers kept only as an optional compatibility escape hatch for future plugins that may need them.
 
 ---
 
@@ -623,7 +628,7 @@ It is the best branch to inspect for **roadmap**, **direction**, and **product a
 Possible causes:
 
 - the repository has no `.pi`, `.claude`, `.opencode`, or `.hermes` marker
-- no relevant runtime executable is available
+- no relevant runtime plugin is present
 - no explicit `--runtime` was passed
 
 Try:
@@ -638,7 +643,7 @@ mah --runtime opencode detect
 Try:
 
 - running `npm run setup`
-- verifying runtime executable or optional wrapper availability
+- verifying runtime plugin presence and optional wrapper availability
 - forcing a known runtime explicitly
 
 ### MCP configuration missing
@@ -681,7 +686,7 @@ node bin/mah --help
 Or install globally:
 
 ```bash
-npm install -g .
+npm run install:global
 ```
 
 ---

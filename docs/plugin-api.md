@@ -4,7 +4,7 @@ A formal plugin system for adding new runtimes to MAH without modifying core fil
 
 Plugins can integrate in two ways:
 - wrapper-based, where the plugin dispatches through a runtime-specific shim
-- core-integrated, where MAH manages crew state and generated artifacts, and the plugin translates that context into the runtime's direct CLI
+- MAH-managed, where MAH manages crew state and generated artifacts, and the plugin translates that context into the runtime's direct CLI
 
 ---
 
@@ -31,14 +31,14 @@ Plugins are discovered from two locations on startup:
 | `mah-plugins/<name>/` | `plugin.json` + `index.mjs` | Local, operator-controlled |
 | `node_modules/@mah/runtime-<name>/` | `package.json` + `index.mjs` | npm-installed, team-shared |
 
-### Built-ins vs plugins
+### Bundled plugins vs installed plugins
 
-The four built-in runtimes (`pi`, `claude`, `opencode`, `hermes`) are always loaded from `RUNTIME_ADAPTERS`. They **always win** over any plugin that claims the same name — this is enforced at the registry level.
+The four bundled runtime plugins (`pi`, `claude`, `opencode`, `hermes`) are always loaded from `RUNTIME_ADAPTERS`. They **always win** over any installed plugin that claims the same name — this is enforced at the registry level.
 
 ### Plugin registry merge order
 
 ```
-RUNTIME_ADAPTERS (built-ins, loaded first)
+RUNTIME_ADAPTERS (bundled plugins, loaded first)
     + discovered plugins
     = runtimeProfiles (used by all commands)
 ```
@@ -136,7 +136,7 @@ Compose the `prompt` as plain text and strip YAML frontmatter before injecting i
 
 ### Required adapter fields
 
-The adapter must pass the same `validateRuntimeAdapterContract` check that built-in runtimes use. Required fields:
+The adapter must pass the same `validateRuntimeAdapterContract` check that bundled plugins use. Required fields:
 
 | Field | Description |
 |---|---|
@@ -148,7 +148,7 @@ The adapter must pass the same `validateRuntimeAdapterContract` check that built
 | `supportsSessions` | Boolean |
 | `supportsSessionNew` | Boolean |
 
-`wrapper` is supported but optional. Use it only when the runtime still needs a compatibility shim outside the MAH core.
+`wrapper` is supported but optional. Use it only when the runtime still needs a compatibility shim outside the MAH bundle.
 
 ### Required commands
 
@@ -165,9 +165,9 @@ Every adapter must support these MAH commands:
 
 Support can come from either:
 - adapter `commands` entries with `[executable, args]` variants tried in order
-- MAH core-managed behavior
+- MAH-managed behavior
 
-Core-managed support currently covers:
+MAH-managed support currently covers:
 - `list:crews`, `use`, and `clear` when the runtime follows the generated tree under `markerDir/crew/<crew>/...`
 - `run` when the adapter exposes `prepareRunContext()`
 
@@ -279,8 +279,8 @@ Validation checks:
 2. `runtimePlugin` is exported from the entry module
 3. `name`, `version`, `mahVersion`, `adapter` are present
 4. `mahVersion` is compatible with running MAH version
-5. Adapter passes `validateRuntimeAdapterContract` (same check as built-ins)
-6. Adapter declares or core-manages all required commands
+5. Adapter passes `validateRuntimeAdapterContract` (same check as bundled plugins)
+6. Adapter declares or MAH-manages all required commands
 
 ### `mah plugins install <path>`
 
@@ -330,13 +330,12 @@ MAH_PLUGINS_ENABLED=0 mah detect
 
 ## Runtime detection with plugins
 
-`mah detect` iterates all registered runtimes (built-ins + plugins) and checks:
+`mah detect` iterates all registered runtime plugins and checks:
 
 1. **Marker directory** — does `<cwd>/.<name>` exist?
-2. **CLI availability** — is `directCli` or optional `wrapper` executable?
-3. **Priority** — when multiple markers exist, `RUNTIME_ORDER` tiebreaks; plugin runtimes are sorted alphabetically after built-ins
+2. **Priority** — when multiple markers exist, `RUNTIME_ORDER` tiebreaks; installed plugins are sorted alphabetically after bundled plugins
 
-A plugin runtime is selected by `mah detect` if its marker directory is present and no higher-priority runtime's marker exists.
+A plugin runtime is selected by `mah detect` if its marker directory is present and no higher-priority runtime's marker exists. If no marker is present, detection returns `unknown`.
 
 ---
 
@@ -377,16 +376,16 @@ const result = await validatePlugin('./mah-plugins/runtime-kilo')
 Removes a plugin from the in-memory registry and calls `teardown()`:
 
 ```js
-unloadPlugin('kilo')  // true if unloaded, false if not found or built-in
+unloadPlugin('kilo')  // true if unloaded, false if not found or bundled plugin
 ```
 
-Built-in runtimes (`pi`, `claude`, `opencode`, `hermes`) cannot be unloaded.
+Bundled runtime plugins (`pi`, `claude`, `opencode`, `hermes`) cannot be unloaded.
 
 ---
 
 ## Validation contract
 
-Plugins must satisfy the same `validateRuntimeAdapterContract` that built-in runtimes use. This is enforced at registration time — a plugin with a malformed adapter is rejected with a clear error message listing the missing fields or commands.
+Plugins must satisfy the same `validateRuntimeAdapterContract` that bundled plugins use. This is enforced at registration time — a plugin with a malformed adapter is rejected with a clear error message listing the missing fields or commands.
 
 To validate manually:
 ```bash
@@ -420,8 +419,8 @@ mah plugins validate ./path/to/plugin
 | File | Role |
 |---|---|
 | `scripts/plugin-loader.mjs` | Core plugin system — discovery, validation, registry |
-| `scripts/runtime-adapter-contract.mjs` | Adapter shape validation (shared with built-ins) |
-| `scripts/runtime-adapters.mjs` | Built-in runtime definitions |
+| `scripts/runtime-adapter-contract.mjs` | Adapter shape validation (shared with bundled plugins) |
+| `scripts/runtime-adapters.mjs` | Bundled runtime plugin definitions |
 | `scripts/meta-agents-harness.mjs` | CLI entry — imports `getAllRuntimes()` at startup |
 | `mah-plugins/` | Operator plugin directory (created on first use) |
 | `tests/plugin-loader.test.mjs` | Unit tests for plugin-loader |

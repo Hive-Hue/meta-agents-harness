@@ -42,7 +42,7 @@ test("hermes adapter has correct structural fields", () => {
   assert.equal(typeof adapter.executePreparedRun, "function")
 })
 
-test("hermes adapter supports all required commands through the core-managed contract", () => {
+test("hermes adapter supports all required commands through the MAH-managed contract", () => {
   const adapter = RUNTIME_ADAPTERS.hermes
   for (const cmd of REQUIRED_RUNTIME_COMMANDS) {
     assert.equal(adapter.supports(cmd), true, `hermes should support command: ${cmd}`)
