@@ -343,7 +343,7 @@ teams:
         use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -405,7 +405,7 @@ teams:
           use-when: Track durable learnings for market-researcher.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -463,7 +463,7 @@ teams:
           use-when: Track durable learnings for campaign-strategist.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -523,7 +523,7 @@ teams:
         use-when: Track durable learnings for creative-lead.
         updatable: true
         max-lines: 10000
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -586,7 +586,7 @@ teams:
           use-when: Track durable learnings for copywriter.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -644,7 +644,7 @@ teams:
           use-when: Track durable learnings for creative-strategist.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -702,7 +702,7 @@ teams:
           use-when: Track durable learnings for media-operator.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -762,7 +762,7 @@ teams:
         use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -824,7 +824,7 @@ teams:
           use-when: Track durable learnings for performance-analyst.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -882,7 +882,7 @@ teams:
           use-when: Track durable learnings for brand-safety-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7

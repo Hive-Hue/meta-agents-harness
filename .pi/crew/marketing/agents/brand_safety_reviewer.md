@@ -1,6 +1,6 @@
 ---
 name: brand-safety-reviewer
-model: zai/glm-5
+model: minimax/minimax-m2.7
 role: worker
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch

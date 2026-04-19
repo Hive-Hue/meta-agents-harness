@@ -8,14 +8,14 @@ permission:
   bash: deny
   task:
     "*": deny
-model: zai/glm-5
+model: minimax/minimax-m2.7
 ---
 
 # Brand Safety Reviewer
 
 Role: `worker`
 Team: `Validation`
-Model: `zai/glm-5`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Validation worker focused on validation findings with evidence and risk rating.

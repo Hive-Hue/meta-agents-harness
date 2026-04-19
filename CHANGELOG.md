@@ -4,6 +4,50 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
+## [0.8.0] - 2026-04-18
+
+### Added
+- **Context Memory Engine (M4 — PR1+PR2+PR3+PR4)** — new canonical layer for operational context retrieval, separate from Expertise routing
+- `types/context-memory-types.mjs` — type definitions and constants for ContextMemoryDocument, ContextMemoryIndexEntry, ContextMemoryRetrievalRequest, ContextMemoryRetrievalResult, ContextMemoryProposal
+- `scripts/context-memory-validate.mjs` — pure validation functions returning `{ valid, errors, warnings }`
+- `scripts/context-memory-schema.mjs` — frontmatter parsing, ID derivation, file hashing, corpus walking, index building, and retrieval scoring utilities
+- `mah context` CLI namespace with `validate`, `list`, `show`, `index`, `find`, and `explain` subcommands
+- Canonical storage layout at `.mah/context/` with `operational/`, `index/`, `proposals/`, `cache/` subdirectories
+- 5 test fixtures in `tests/fixtures/context-memory/` covering valid, minimal, and invalid documents
+- `mah context index [--rebuild]` — deterministic index builder for the committed operational corpus only
+- `mah context find --agent <name> --task "<desc>"` — lexical + metadata retrieval with scoring algorithm (agent filter, capability boost, tool/system matching, task-pattern/tag/heading lexical match, stability adjustment)
+- `mah context explain --agent <name> --task "<desc>"` — explainable retrieval with step-by-step scoring breakdown and per-document reasoning
+- `mah context propose --from-session <ref>` — create draft memory proposal from session
+- `scripts/context-memory-integration.mjs` — runtime injection utilities (`isContextMemoryEnabled`, `parseContextMemoryOptions`, `buildContextMemoryBlock`)
+- Hermes bootstrap injection via `MAH_CONTEXT_MEMORY=1` or `--with-context-memory` flag
+- Supports `--context-limit <n>` (default 5, max 10) and `--context-mode=summary|snippets`
+- Graceful fallback when corpus is empty or Hermes is unavailable
+- `skills/context-memory/SKILL.md` and `.codex/skills/context-memory/SKILL.md` — specialized operator skill for retrieving and curating operational context
+- `scripts/context-memory-proposal.mjs` — proposal generator (`proposeFromSession`, `writeProposal`, `listProposals`, `findSession`)
+- `mah context propose --from-session <ref>` — create memory proposal from session (status: draft, requires review)
+
+### Constraints
+- No vector DB dependency — lexical + metadata retrieval only
+- No Obsidian dependency — `.md` and `.qmd` files only; Obsidian is optional as an editor, not a runtime dependency
+- Context Memory has zero role in expertise-based routing decisions
+- Fixtures in `tests/fixtures/context-memory/` are validation-only and are not part of the operational corpus
+
+### Validation
+- PR1+PR2+PR3+PR4 acceptance criteria met
+- All CLI commands functional: validate, list, show, index, find, explain, propose
+- Schema stable, validators return `{ valid, errors, warnings }`
+- Retrieval scoring: agent filter + capability/tool/system/tag/heading lexical + stability adjustment
+- Hermes bootstrap injection with graceful fallback
+- Proposal flow writes drafts to `.mah/context/proposals/` with status: draft
+- No regressions in existing `mah expertise`, `mah sessions`, `mah run` commands
+- Verified with: `node scripts/meta-agents-harness.mjs context --help`
+
+### Documentation
+- `docs/context-memory.md` — Complete operator reference for Context Memory v0.8.0
+- `docs/README.md` — Updated with Context Memory in Core Concepts
+- `plan/slices/context-memory-pr1-schema.md` — PR1 technical specification
+- `plan/context-memory-v0.8.0.md` — Full feature plan and rationale
+
 ## [0.7.0] - 2026-04-16
 
 ### Added

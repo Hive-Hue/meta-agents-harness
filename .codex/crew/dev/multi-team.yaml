@@ -1422,7 +1422,7 @@ teams:
           use-when: Track durable learnings for qa-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks: []
         tools:
           - write
@@ -1557,7 +1557,7 @@ teams:
           use-when: Track durable learnings for security-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks: []
         tools:
           - write

@@ -1,6 +1,6 @@
 ---
 name: planning-lead
-model: zai/glm-5
+model: minimax/minimax-m2.7
 role: lead
 team: Planning
 mission: Plan, produce, refine, and validate communication assets, launch

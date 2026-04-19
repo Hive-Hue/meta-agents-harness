@@ -11,14 +11,14 @@ permission:
     "*": deny
     repo-analyst: allow
     solution-architect: allow
-model: zai/glm-5
+model: minimax/minimax-m2.7
 ---
 
 # Planning Lead
 
 Role: `lead`
 Team: `Planning`
-Model: `zai/glm-5`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Planning lead responsible for delegation, synthesis, and team-level coordination.

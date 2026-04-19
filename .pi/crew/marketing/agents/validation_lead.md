@@ -1,6 +1,6 @@
 ---
 name: validation-lead
-model: zai/glm-5
+model: minimax/minimax-m2.7
 role: lead
 team: Validation
 mission: Plan, produce, refine, and validate communication assets, launch

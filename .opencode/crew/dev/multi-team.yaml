@@ -453,7 +453,7 @@ teams:
         acceptance criteria; keep routing, memory, session, and provenance
         boundaries explicit; prevent scope creep into autonomous knowledge
         systems
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -576,7 +576,7 @@ teams:
           integration points for Context Memory; locate affected files and
           dependency edges; surface regression and coupling risks; identify
           runtime and plugin compatibility constraints
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -633,7 +633,7 @@ teams:
           memory document, index, and retrieval contracts; define bootstrap
           injection and explain payload semantics; define proposal governance
           and persistence envelope
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - minimax/minimax-m2.7
           - nvidia/nemotron-3-super-120b-a12b:free
@@ -752,7 +752,7 @@ teams:
         index, retrieval, and runtime integration streams; split work into
         reviewable changesets; preserve adapter boundaries and backward
         compatibility
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -902,7 +902,7 @@ teams:
           CLI and help surfaces; improve operator-facing retrieval and proposal
           explainability outputs; keep UX legible for bounded context and
           bootstrap flows
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -1086,7 +1086,7 @@ teams:
           corpus, index, and retrieval pipeline; integrate bootstrap injection
           and proposal flow with runtime surfaces; own core context
           interoperability and persistence tests
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -1274,7 +1274,7 @@ teams:
         explainability, boundedness, and release boundary; enforce JSON contract
         stability for context surfaces; block policy, path, and
         memory-persistence bypass risk
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -1414,7 +1414,7 @@ teams:
           integration, and contract tests; run diagnostics and regression
           suites; verify sync consistency and output contracts; validate
           retrieval, bootstrap, and proposal explain flows
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks: []
         agent_file: .opencode/crew/dev/agents/qa-reviewer.md
         expertise:
@@ -1546,7 +1546,7 @@ teams:
           traversal, prompt inflation, and memory poisoning risks; flag policy
           bypass via context injection and persistence; validate bounded storage
           and confidential memory constraints
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks: []
         agent_file: .opencode/crew/dev/agents/security-reviewer.md
         expertise:

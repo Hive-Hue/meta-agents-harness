@@ -5,8 +5,10 @@ agent:
 meta:
   version: "1"
   max_lines: "120"
-  last_updated: "2026-04-18T15:22:51.698Z"
-patterns: []
+  last_updated: "2026-04-18T18:23:51.103Z"
+patterns:
+  - date: "2026-04-18"
+    note: "CCR model tag injection chain validated end-to-end: (1) mapModelToCcrRef in scripts/ccr-model-helper.mjs maps provider/model strings to CCR format, (2) buildClaudeRootPrompt wraps root model in CCR-ROOT-MODEL tags, (3) buildClaudeAgents wraps lead/member models in CCR-SUBAGENT-MODEL tags, (4) custom router at ~/.claude-code-router/custom-router/multi-router.cjs extracts tags via extractTag() and normalizes with normalizeModelRef(), (5) CCR config has Zai Coding Plan (glm-5) and Minimax (minimax-m2.7) providers correctly configured."
 risks: []
 tools: []
 workflows: []
@@ -61,4 +63,6 @@ observations:
     note: "Ping: acknowledge you are online and confirm readiness for v0.8.0 sprint work -> Validation Lead is online and confirms readiness for v0.8.0 sprint work."
   - date: "2026-04-18"
     note: "Validation Lead acknowledged second ping for v0.8.0 sprint readiness. Workers (qa-reviewer, security-reviewer) returned empty on cold-start pings — liveness to be confirmed on first real task delegation."
+  - date: "2026-04-18"
+    note: "Verify the CCR model tag injection is actually working end-to-end -> Let me first inspect the key files to understand the codebase structure before delegating.Good, I have a solid understanding of the codebase. Let me now run the test suite and check CCR logs in parallel.The workers reported back but the outputs are truncated. Let me run the critical checks directly to get definitive results.Now let me check CCR logs and custom router for tag handling:Now let me verify the prepareClaudeRunContext is exported and see if there's a direct way to call it:Now let me read the prepareClaudeRunContext function to see how it ties everything together:Excellent. I now have complete end-to-end verification. Let me compile the final report.Here is the complete validation report:"
 open_questions: []

@@ -1,6 +1,6 @@
 ---
 name: solution-architect
-model: zai/glm-5
+model: minimax/minimax-m2.7
 role: worker
 team: Planning
 mission: Deliver bounded v0.8.0 Context Memory evolution for Meta Agents

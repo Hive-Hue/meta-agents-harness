@@ -303,8 +303,8 @@ test("claude explain run resolves to direct cli with generated agent context", (
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "claude")
-  assert.equal(payload.exec, "claude")
-  assert.equal(payload.execArgs[0], "--append-system-prompt")
+  assert.equal(payload.exec, "ccr")
+  assert.equal(payload.execArgs[0], "code")
   assert.ok(payload.execArgs.includes("--agents"))
 })
 
@@ -314,7 +314,7 @@ test("opencode explain run resolves to direct cli without wrapper plan", () => {
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "opencode")
   assert.equal(payload.exec, "opencode")
-  assert.deepEqual(payload.execArgs, ["-m", "minimax-coding-plan/MiniMax-M2.7"])
+  assert.deepEqual(payload.execArgs, ["-m", "minimax/minimax-m2.7"])
 })
 
 test("opencode explain run uses run subcommand when task prompt is provided", () => {
@@ -323,7 +323,7 @@ test("opencode explain run uses run subcommand when task prompt is provided", ()
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "opencode")
   assert.equal(payload.exec, "opencode")
-  assert.deepEqual(payload.execArgs, ["run", "-m", "zai-coding-plan/glm-5"])
+  assert.deepEqual(payload.execArgs, ["run", "-m", "minimax/minimax-m2.7"])
   assert.deepEqual(payload.passthrough, ["test task", "--agent", "planning-lead"])
 })
 
@@ -333,7 +333,7 @@ test("hermes explain run resolves to hermes chat with MAH bootstrap env", () => 
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "hermes")
   assert.equal(payload.exec, "hermes")
-  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "MiniMax-M2.7"])
+  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "minimax-m2.7"])
   assert.equal(payload.env?.MAH_ACTIVE_CREW, "dev")
   assert.ok(payload.env?.MAH_HERMES_CONFIG)
   assert.ok(payload.env?.MAH_HERMES_MULTI_TEAM)

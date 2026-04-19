@@ -9,14 +9,14 @@ permission:
   bash: ask
   task:
     "*": deny
-model: zai/glm-5
+model: minimax/minimax-m2.7
 ---
 
 # Backend Dev
 
 Role: `worker`
 Team: `Engineering`
-Model: `zai/glm-5`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Engineering worker focused on scoped execution within assigned ownership boundaries.

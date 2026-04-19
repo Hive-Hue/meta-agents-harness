@@ -1,0 +1,38 @@
+---
+id: dev/planning-lead/scope-triage/scope-cut-heuristics
+kind: gotcha
+crew: dev
+agent: planning-lead
+capabilities:
+  - scope-triage
+  - backlog-planning
+domains:
+  - planning
+task_patterns:
+  - "reduce scope for v0.x release"
+  - "triage features by priority"
+  - "cut features from milestone"
+priority: medium
+stability: draft
+source_type: human-authored
+---
+
+# Scope Cut Heuristics
+
+## When to Cut
+
+- Features without acceptance criteria → cut first
+- Features depending on unimplemented infrastructure → defer
+- Features with high uncertainty → move to exploration milestone
+
+## How to Cut
+
+1. Tag the feature as `[deferred]` in the backlog
+2. Document the deferral rationale in the plan file
+3. Create a follow-up task in the next milestone
+4. Update CHANGELOG with "Removed" or "Deferred" section
+
+## Gotchas
+
+- Don't cut features that are already referenced by other features' acceptance criteria
+- Don't confuse "deferred" with "rejected" — deferred features have a planned revisit milestone

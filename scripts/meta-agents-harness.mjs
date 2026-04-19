@@ -2429,6 +2429,439 @@ function formatValidation(status) {
  * @param {boolean} jsonMode
  * @returns {Promise<number>} exit code
  */
+async function runContext(argv, jsonMode = false) {
+  const sub = argv[0]
+  const subArgv = argv.slice(1)
+  const contextRoot = path.resolve(repoRoot, ".mah", "context")
+
+  if (!sub || sub === "--help" || sub === "-h") {
+    console.log(`Usage: mah context <subcommand> [options]
+
+Context Memory — operational context retrieval for MAH agents
+
+Subcommands:
+  validate [--strict] [--path <dir>]   Validate context memory documents
+  index [--rebuild]                    Build or update the context index
+  list [--agent <name>] [--capability] List context memory documents
+  show <id>                            Show a specific context document
+  find --agent <name> --task "<desc>"  Find relevant context for a task
+  explain --agent <name> --task "<desc>" Explain retrieval reasoning
+  propose --from-session <ref>         Create memory proposal from session
+
+Options:
+  --json        JSON output mode
+  --strict      Strict validation (unknown fields = errors)
+  --help, -h    Show this help message
+
+Context Memory is separate from Expertise routing. It provides operational
+detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
+    return 0
+  }
+
+  // --- mah context validate [--strict] [--path <dir>] ---
+  if (sub === "validate") {
+    const strict = subArgv.includes("--strict")
+    const pathIdx = subArgv.indexOf("--path")
+    const targetPath = pathIdx >= 0 && subArgv[pathIdx + 1]
+      ? path.resolve(repoRoot, subArgv[pathIdx + 1])
+      : contextRoot
+
+    const { parseContextFile } = await import("./context-memory-schema.mjs")
+    const { validateContextMemoryDocument } = await import("./context-memory-validate.mjs")
+    const { readdirSync } = await import("node:fs")
+
+    const files = []
+    function walk(dir) {
+      try {
+        for (const entry of readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name)
+          if (entry.isDirectory()) { walk(full); continue }
+          if (entry.name.endsWith(".md") || entry.name.endsWith(".qmd")) files.push(full)
+        }
+      } catch {}
+    }
+    walk(targetPath)
+
+    const results = []
+    for (const file of files) {
+      const parsed = parseContextFile(file)
+      if (parsed.error) {
+        results.push({ file: path.relative(repoRoot, file), valid: false, errors: [parsed.error], warnings: [] })
+        continue
+      }
+      const vr = validateContextMemoryDocument(parsed.frontmatter, strict)
+      if (!parsed.body || !parsed.body.trim()) {
+        vr.warnings.push("body: empty or whitespace-only body")
+      }
+      if (parsed.body && !parsed.body.match(/^#{1,6}\s+/m)) {
+        vr.warnings.push("body: no headings found (consider adding structure)")
+      }
+      results.push({ file: path.relative(repoRoot, file), ...vr })
+    }
+
+    if (jsonMode) {
+      const valid = results.filter(r => r.valid).length
+      console.log(JSON.stringify({ files_checked: results.length, valid, invalid: results.length - valid, results }, null, 2))
+    } else {
+      for (const r of results) {
+        const icon = r.valid ? "✓" : "✗"
+        console.log(icon + " " + r.file)
+        for (const e of r.errors) console.log("  ERROR: " + e)
+        for (const w of r.warnings) console.log("  WARN:  " + w)
+      }
+      const valid = results.filter(r => r.valid).length
+      console.log("\n" + results.length + " file(s) checked: " + valid + " valid, " + (results.length - valid) + " invalid")
+    }
+    return results.every(r => r.valid) ? 0 : 1
+  }
+
+  // --- mah context list [--agent <name>] [--capability <cap>] [--json] ---
+  if (sub === "list") {
+    const agentIdx = subArgv.indexOf("--agent")
+    const agentFilter = agentIdx >= 0 ? subArgv[agentIdx + 1] : null
+    const capIdx = subArgv.indexOf("--capability")
+    const capFilter = capIdx >= 0 ? subArgv[capIdx + 1] : null
+
+    const { parseContextFile } = await import("./context-memory-schema.mjs")
+    const { readdirSync } = await import("node:fs")
+
+    const searchDirs = [path.join(contextRoot, "operational")]
+    const files = []
+    for (const dir of searchDirs) {
+      try {
+        function walk(d) {
+          for (const entry of readdirSync(d, { withFileTypes: true })) {
+            const full = path.join(d, entry.name)
+            if (entry.isDirectory()) { walk(full); continue }
+            if (entry.name.endsWith(".md") || entry.name.endsWith(".qmd")) files.push(full)
+          }
+        }
+        walk(dir)
+      } catch {}
+    }
+
+    const docs = []
+    for (const file of files) {
+      const parsed = parseContextFile(file)
+      if (parsed.error) continue
+      const fm = parsed.frontmatter
+      if (agentFilter && fm.agent !== agentFilter) continue
+      if (capFilter && !(fm.capabilities || []).includes(capFilter)) continue
+      docs.push({ id: fm.id || "(no id)", kind: fm.kind || "(no kind)", stability: fm.stability || "(no stability)", priority: fm.priority || "—", last_reviewed_at: fm.last_reviewed_at || "—" })
+    }
+
+    if (jsonMode) {
+      console.log(JSON.stringify({ documents: docs }, null, 2))
+    } else {
+      if (docs.length === 0) { console.log("No context memory documents found."); return 0 }
+      console.log("=== Context Memory Documents ===\n")
+      console.log("ID".padEnd(60) + " Kind".padEnd(22) + " Stability".padEnd(12) + " Priority".padEnd(10))
+      console.log("─".repeat(60) + " " + "─".repeat(22) + " " + "─".repeat(12) + " " + "─".repeat(10))
+      for (const d of docs) console.log(d.id.padEnd(60) + " " + d.kind.padEnd(22) + " " + d.stability.padEnd(12) + " " + d.priority.padEnd(10))
+      console.log("\n" + docs.length + " document(s).")
+    }
+    return 0
+  }
+
+  // --- mah context show <id> [--json] ---
+  if (sub === "show") {
+    const docId = subArgv.find(a => !a.startsWith("--"))
+    if (!docId) { console.error("ERROR: usage: mah context show <id>"); return 1 }
+
+    const { parseContextFile, deriveDocId } = await import("./context-memory-schema.mjs")
+    const { readdirSync } = await import("node:fs")
+
+    const searchDirs = [path.join(contextRoot, "operational")]
+    const files = []
+    for (const dir of searchDirs) {
+      try {
+        function walk(d) {
+          for (const entry of readdirSync(d, { withFileTypes: true })) {
+            const full = path.join(d, entry.name)
+            if (entry.isDirectory()) { walk(full); continue }
+            if (entry.name.endsWith(".md") || entry.name.endsWith(".qmd")) files.push(full)
+          }
+        }
+        walk(dir)
+      } catch {}
+    }
+
+    for (const file of files) {
+      const rel = path.relative(repoRoot, file)
+      const derived = deriveDocId(rel)
+      const parsed = parseContextFile(file)
+      if (parsed.error) continue
+      if (parsed.frontmatter.id === docId || derived === docId) {
+        if (jsonMode) {
+          console.log(JSON.stringify({ document: { frontmatter: parsed.frontmatter, body: parsed.body, file_path: rel } }, null, 2))
+        } else {
+          console.log("=== Context: " + parsed.frontmatter.id + " ===\n")
+          console.log("Kind:      " + parsed.frontmatter.kind)
+          console.log("Agent:     " + parsed.frontmatter.agent)
+          console.log("Crew:      " + parsed.frontmatter.crew)
+          console.log("Stability: " + parsed.frontmatter.stability)
+          if (parsed.frontmatter.priority) console.log("Priority:  " + parsed.frontmatter.priority)
+          if (parsed.frontmatter.capabilities) console.log("Capabilities: " + parsed.frontmatter.capabilities.join(", "))
+          console.log("\n--- Content ---\n" + parsed.body)
+        }
+        return 0
+      }
+    }
+
+    console.error("ERROR: context document \x27" + docId + "\x27 not found.")
+    return 1
+  }
+
+  // --- mah context index [--rebuild] ---
+  if (sub === "index") {
+    const rebuild = subArgv.includes("--rebuild")
+
+    const { buildOperationalIndex, loadIndex } = await import("./context-memory-schema.mjs")
+    const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
+
+    const result = buildOperationalIndex(contextRoot, { rebuild })
+
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        total_documents: result.total_documents,
+        new: result.new,
+        updated: result.updated,
+        removed: result.removed,
+        errors: result.errors,
+      }, null, 2))
+    } else {
+      console.log("=== Context Memory Index ===")
+      console.log("Total documents: " + result.total_documents)
+      console.log("New: " + result.new)
+      console.log("Updated: " + result.updated)
+      console.log("Removed: " + result.removed)
+      if (result.errors.length > 0) {
+        console.log("\nErrors:")
+        for (const e of result.errors) console.log("  " + e)
+      }
+      console.log("\nIndex saved to: " + indexPath)
+    }
+    return result.errors.length > 0 ? 1 : 0
+  }
+
+  // --- mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
+  if (sub === "find") {
+    const agentIdx = subArgv.indexOf("--agent")
+    const taskIdx = subArgv.indexOf("--task")
+    const capIdx = subArgv.indexOf("--capability")
+    const toolIdx = subArgv.indexOf("--tools")
+
+    const agent = agentIdx >= 0 ? subArgv[agentIdx + 1] : null
+    const task = taskIdx >= 0 ? subArgv[taskIdx + 1] : null
+    const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
+
+    if (!agent || !task) {
+      console.error("ERROR: usage: mah context find --agent <name> --task "<desc>" [--capability <cap>]")
+      return 1
+    }
+
+    const { loadIndex, buildOperationalIndex, retrieveDocuments } = await import("./context-memory-schema.mjs")
+
+    // Try to load existing index first, build if needed
+    const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
+    let index = loadIndex(indexPath)
+
+    // If index is empty or doesn't exist, build from operational corpus only
+    if (!index || !index.entries || index.entries.length === 0) {
+      buildOperationalIndex(contextRoot, { rebuild: false })
+      index = loadIndex(indexPath)
+    }
+    if (!index || !index.entries) {
+      index = { entries: [] }
+    }
+
+    const request = {
+      agent,
+      task,
+      capability_hint,
+      available_tools: null,
+      available_mcp: null,
+    }
+
+
+    const result = retrieveDocuments(request, index)
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result, null, 2))
+    } else {
+      if (result.matched_docs.length === 0) {
+        console.log("No matching documents found.")
+        return 0
+      }
+      console.log("=== Context Memory Retrieval ===")
+      console.log("Task: " + task)
+      console.log("Agent: " + agent)
+      if (capability_hint) console.log("Capability hint: " + capability_hint)
+      console.log("Total candidates: " + result.total_candidates)
+      console.log("Confidence: " + result.confidence)
+      console.log("\nTop matches:")
+      console.log("ID".padEnd(60) + " Score   Reasons")
+      console.log("─".repeat(90))
+      for (const m of result.matched_docs) {
+        const scoreStr = (m.score * 100).toFixed(0) + "%"
+        const reasonsStr = m.reasons.join("; ")
+        console.log(m.id.padEnd(60) + scoreStr.padStart(8) + " " + reasonsStr)
+      }
+      if (result.tool_hints.length > 0) {
+        console.log("\nTool hints: " + result.tool_hints.join(", "))
+      }
+    }
+    return 0
+  }
+
+  // --- mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
+  if (sub === "explain") {
+    const agentIdx = subArgv.indexOf("--agent")
+    const taskIdx = subArgv.indexOf("--task")
+    const capIdx = subArgv.indexOf("--capability")
+
+    const agent = agentIdx >= 0 ? subArgv[agentIdx + 1] : null
+    const task = taskIdx >= 0 ? subArgv[taskIdx + 1] : null
+    const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
+
+    if (!agent || !task) {
+      console.error("ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>]")
+      return 1
+    }
+
+    const { loadIndex, buildOperationalIndex, retrieveDocuments, scoreDocument } = await import("./context-memory-schema.mjs")
+
+    // Try to load existing index first, build if needed
+    const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
+    let index = loadIndex(indexPath)
+
+    // If index is empty or doesn't exist, build from operational corpus only
+    if (!index || !index.entries || index.entries.length === 0) {
+      buildOperationalIndex(contextRoot, { rebuild: false })
+      index = loadIndex(indexPath)
+    }
+    if (!index || !index.entries) {
+      index = { entries: [] }
+    }
+
+    const request = { agent, task, capability_hint, available_tools: null, available_mcp: null }
+
+    // Score all docs for explanation
+    const allScored = []
+    for (const entry of index.entries || []) {
+      const r = scoreDocument(entry, request)
+      allScored.push({ entry, ...r })
+    }
+    allScored.sort((a, b) => b.score - a.score)
+
+    const result = retrieveDocuments(request, index)
+
+    if (jsonMode) {
+      console.log(JSON.stringify({
+        retrieval_result: result,
+        explanation: {
+          steps: [
+            "1. Filtered by agent: " + agent,
+            "2. Scored by capability_hint match (+0.3 if matched)",
+            "3. Boosted by tool matches (+0.1 each, max +0.3)",
+            "4. Boosted by system/MCP matches (+0.1 each, max +0.3)",
+            "5. Lexical match on task_patterns (+0.1 each, max +0.3)",
+            "6. Lexical fallback on tags (+0.05 each, max +0.2)",
+            "7. Lexical match on headings (+0.05 each, max +0.2)",
+            "8. Stability adjustment (stable +0.05, draft -0.1)",
+            "9. Clamped to [0, 1]",
+          ],
+          total_candidates: index.entries?.length || 0,
+          filtered_count: allScored.filter(s => s.score > 0).length,
+          top_scores: allScored.slice(0, 5).map(s => ({ id: s.id, score: s.score, reasons: s.reasons })),
+        },
+      }, null, 2))
+    } else {
+      console.log("=== Context Memory Retrieval Explanation ===")
+      console.log("Task: " + task)
+      console.log("Agent: " + agent)
+      if (capability_hint) console.log("Capability hint: " + capability_hint)
+      console.log("")
+      console.log("Retrieval Process:")
+      console.log("1. Filtered by agent: " + agent)
+      console.log("2. Scored by capability_hint match (+0.3 if matched)")
+      console.log("3. Boosted by tool matches (+0.1 each, max +0.3)")
+      console.log("4. Boosted by system/MCP matches (+0.1 each, max +0.3)")
+      console.log("5. Lexical match on task_patterns (+0.1 each, max +0.3)")
+      console.log("6. Lexical fallback on tags (+0.05 each, max +0.2)")
+      console.log("7. Lexical match on headings (+0.05 each, max +0.2)")
+      console.log("8. Stability adjustment (stable +0.05, draft -0.1)")
+      console.log("9. Clamped to [0, 1]")
+      console.log("")
+      console.log("Statistics:")
+      console.log("Total candidates considered: " + (index.entries?.length || 0))
+      console.log("Passed filter: " + allScored.filter(s => s.score > 0).length)
+      console.log("Confidence: " + result.confidence)
+      console.log("")
+      console.log("Top-scored documents:")
+      console.log("ID".padEnd(55) + " Score   Stability   Reasons")
+      console.log("─".repeat(100))
+      for (const s of allScored.slice(0, 5)) {
+        const stability = s.entry?.metadata_summary?.stability || "?"
+        const scoreStr = (s.score * 100).toFixed(0) + "%"
+        console.log((s.id || "").padEnd(55) + scoreStr.padStart(8) + " " + stability.padEnd(11) + " " + s.reasons.join("; "))
+      }
+    }
+    return 0
+  }
+
+  // --- mah context propose --from-session <session-ref> ---
+  if (sub === "propose") {
+    const sessionIdx = subArgv.indexOf("--from-session")
+    const sessionRef = sessionIdx >= 0 ? subArgv[sessionIdx + 1] : null
+
+    if (!sessionRef) {
+      console.error("ERROR: usage: mah context propose --from-session <session-ref>")
+      console.error("  session-ref format: runtime:crew:sessionId")
+      console.error("  Example: mah context propose --from-session hermes:dev:abc123")
+      return 1
+    }
+
+    const { proposeFromSession, writeProposal } = await import("./context-memory-proposal.mjs")
+    const result = proposeFromSession(repoRoot, sessionRef)
+
+    if (!result.ok) {
+      console.error("ERROR: " + result.error)
+      return 1
+    }
+
+    const writeResult = writeProposal(repoRoot, result.proposal)
+    if (!writeResult.ok) {
+      console.error("ERROR: " + writeResult.error)
+      return 1
+    }
+
+    const prop = result.proposal
+    console.log("=== Context Memory Proposal Created ===")
+    console.log("File:    " + writeResult.file_path)
+    console.log("Status:  draft (requires review)")
+    console.log("Source:  " + prop.source_type + " — " + prop.source_ref)
+    console.log("Proposed ID: " + prop.proposed_document_id)
+    console.log("")
+    console.log("Summary:")
+    console.log("  " + prop.summary)
+    console.log("")
+    console.log("Rationale:")
+    for (const line of (prop.rationale || "").split("\n").slice(0, 5)) {
+      console.log("  " + line)
+    }
+    console.log("")
+    console.log("Next steps:")
+    console.log("  1. Review the proposal at: " + writeResult.file_path)
+    console.log("  2. If approved, move to .mah/context/operational/")
+    console.log("  3. Set stability: draft → curated → stable")
+    return 0
+  }
+
+  console.error("ERROR: unknown context subcommand \x27" + sub + "\x27. Run \x27mah context --help\x27 for usage.")
+  return 1
+}
+
 async function runExpertise(argv, jsonMode = false) {
   const sub = argv[0]
   const subArgv = argv.slice(1)
@@ -3156,12 +3589,20 @@ function main() {
     return
   }
 
+  if (first === "context") {
+    ;(async () => {
+      process.exitCode = await runContext(argv.slice(1), jsonMode)
+    })()
+    return
+  }
+
   if (first === "expertise") {
     ;(async () => {
       process.exitCode = await runExpertise(argv.slice(1), jsonMode)
     })()
     return
   }
+
 
   if (first === "demo") {
     process.exitCode = runDemo(normalizedArgv.slice(1))

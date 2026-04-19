@@ -442,7 +442,7 @@ teams:
         use-when: Track durable learnings for planning-lead.
         updatable: true
         max-lines: 10000
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -567,7 +567,7 @@ teams:
           use-when: Track durable learnings for repo-analyst.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -624,7 +624,7 @@ teams:
           use-when: Track durable learnings for solution-architect.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - minimax/minimax-m2.7
           - nvidia/nemotron-3-super-120b-a12b:free
@@ -746,7 +746,7 @@ teams:
         use-when: Track durable learnings for engineering-lead.
         updatable: true
         max-lines: 10000
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -898,7 +898,7 @@ teams:
           use-when: Track durable learnings for frontend-dev.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -1085,7 +1085,7 @@ teams:
           use-when: Track durable learnings for backend-dev.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -1276,7 +1276,7 @@ teams:
         use-when: Track durable learnings for validation-lead.
         updatable: true
         max-lines: 10000
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -1418,7 +1418,7 @@ teams:
           use-when: Track durable learnings for qa-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks: []
         tools:
           - write
@@ -1553,7 +1553,7 @@ teams:
           use-when: Track durable learnings for security-reviewer.
           updatable: true
           max-lines: 10000
-        model: zai/glm-5
+        model: openai-codex/gpt-5.3-codex
         model_fallbacks: []
         tools:
           - write

@@ -1,6 +1,6 @@
 ---
 name: qa-reviewer
-model: zai/glm-5
+model: openai-codex/gpt-5.3-codex
 role: worker
 team: Validation
 mission: Deliver bounded v0.8.0 Context Memory evolution for Meta Agents

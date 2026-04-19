@@ -11,14 +11,14 @@ permission:
     "*": deny
     performance-analyst: allow
     brand-safety-reviewer: allow
-model: zai/glm-5
+model: minimax/minimax-m2.7
 ---
 
 # Validation Lead
 
 Role: `lead`
 Team: `Validation`
-Model: `zai/glm-5`
+Model: `minimax/minimax-m2.7`
 
 ## Mission
 Validation lead responsible for delegation, synthesis, and team-level coordination.

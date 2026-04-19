@@ -353,7 +353,7 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -412,7 +412,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -468,7 +468,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -526,7 +526,7 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -586,7 +586,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -642,7 +642,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -698,7 +698,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -756,7 +756,7 @@ teams:
       instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
         communication assets, launch narratives, campaign collateral, and
         supporting media for Meta Agents Harness.
-      model: zai/glm-5
+      model: minimax/minimax-m2.7
       model_fallbacks:
         - minimax/minimax-m2.7
         - nvidia/nemotron-3-super-120b-a12b:free
@@ -815,7 +815,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7
@@ -871,7 +871,7 @@ teams:
         instruction_block: crew=marketing | mission=Plan, produce, refine, and validate
           communication assets, launch narratives, campaign collateral, and
           supporting media for Meta Agents Harness.
-        model: zai/glm-5
+        model: minimax/minimax-m2.7
         model_fallbacks:
           - zai/glm-5
           - zai/glm-4.7

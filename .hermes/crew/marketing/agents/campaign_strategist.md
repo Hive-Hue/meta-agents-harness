@@ -1,6 +1,6 @@
 ---
 name: campaign-strategist
-model: zai/glm-5
+model: minimax/minimax-m2.7
 role: worker
 team: Planning
 mission: Plan, produce, refine, and validate communication assets, launch

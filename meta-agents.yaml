@@ -42,9 +42,9 @@ runtimes:
 catalog:
   models:
     orchestrator_default: minimax-coding-plan/MiniMax-M2.7
-    lead_default: zai-coding-plan/glm-5
-    worker_default: zai-coding-plan/glm-5
-    qa_default: zai-coding-plan/glm-5
+    lead_default: minimax-coding-plan/MiniMax-M2.7
+    worker_default: minimax-coding-plan/MiniMax-M2.7
+    qa_default: openai-codex/gpt-5.3-codex
   model_fallbacks:
     orchestrator_default:
       - nvidia/nemotron-3-super-120b-a12b:free

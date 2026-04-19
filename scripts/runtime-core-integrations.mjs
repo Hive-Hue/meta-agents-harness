@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process"
 import YAML from "yaml"
 import { readActiveCrew } from "./runtime-core-ops.mjs"
 import { mapModelToCcrRef } from "./ccr-model-helper.mjs"
+import { createRequire } from "node:module"
 
 function toPosix(targetPath) {
   return `${targetPath || ""}`.replaceAll(path.sep, "/")
@@ -706,7 +707,7 @@ function readHermesAgentContext(repoRoot, configPath, multiTeamPath, envOverride
   }
 }
 
-function buildHermesBootstrapQuery(agentCtx) {
+function buildHermesBootstrapQuery(agentCtx, contextBlock = null) {
   const mission = `${agentCtx?.config?.mission || ""}`.trim()
   const sprintName = `${agentCtx?.config?.sprint_mode?.name || ""}`.trim() || "n/a"
   const targetRelease = `${agentCtx?.config?.sprint_mode?.target_release || ""}`.trim() || "n/a"
@@ -719,7 +720,7 @@ function buildHermesBootstrapQuery(agentCtx) {
     ? agentCtx.skills.map((item) => `- ${item}`).join("\n")
     : "- n/a"
 
-  return [
+  const parts = [
     "Load the following runtime context for this session and keep it active unless the user explicitly overrides it.",
     "",
     "You are not a generic assistant in this session.",
@@ -748,9 +749,18 @@ function buildHermesBootstrapQuery(agentCtx) {
     "",
     "Prompt body:",
     agentCtx?.promptBody || "n/a",
-    "",
-    "Acknowledge with exactly: CONTEXT LOADED"
-  ].join("\n")
+  ]
+
+  // Append context memory block if provided
+  if (contextBlock) {
+    parts.push("")
+    parts.push(contextBlock)
+  }
+
+  parts.push("")
+  parts.push("Acknowledge with exactly: CONTEXT LOADED")
+
+  return parts.join("\n")
 }
 
 export function activatePiCrewState({ repoRoot, crewId }) {
@@ -1085,7 +1095,19 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
 
   if (shouldBootstrapHermes(args, envOverrides)) {
     const agentCtx = internal.agentCtx || readHermesAgentContext(repoRoot, internal.configPath, internal.multiTeamPath, envOverrides)
-    const bootstrapQuery = buildHermesBootstrapQuery(agentCtx)
+
+    // Inject context memory if enabled
+    let contextBlock = null
+    try {
+      // Use createRequire for synchronous ESM require
+      const req = createRequire(import.meta.url)
+      const { buildContextMemoryBlock } = req("./context-memory-integration.mjs")
+      contextBlock = buildContextMemoryBlock(agentCtx, args, envOverrides)
+    } catch (e) {
+      // Context memory injection is optional — fail silently
+    }
+
+    const bootstrapQuery = buildHermesBootstrapQuery(agentCtx, contextBlock)
     const bootstrapModelArgs = getHermesModelArgs(agentCtx.agentModel, args)
     const bootstrap = spawnSync("hermes", ["chat", ...bootstrapModelArgs, "-Q", "-q", bootstrapQuery, ...args], {
       cwd: repoRoot,

@@ -13,6 +13,7 @@ Meta Agents Harness (MAH) is a runtime-agnostic orchestration layer for multi-ag
 
 - [Expertise Model Foundation](./expertise-model-foundation.md) — Operational expertise foundation for routing, confidence, and governance
 - [Expertise Catalog Governance](./expertise-catalog-governance.md) — How the seed catalog is proposed, reviewed, and refreshed
+- [Context Memory](./context-memory.md) — Operational context retrieval for agents after routing (v0.8.0)
 - [Platform Capabilities](./platform-capabilities.md) — Feature overview across runtimes
 - [Runtime Boundary](./runtime-boundary.md) — What MAH owns vs. what runtime handles
 - [Headless Runtime](./headless-runtime.md) — Non-interactive execution model and support matrix
