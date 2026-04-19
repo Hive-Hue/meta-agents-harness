@@ -94,6 +94,19 @@ function jsonText(value: any): string {
 	return JSON.stringify(value, null, 2);
 }
 
+function errorMessage(error: unknown): string {
+	if (error instanceof Error) return error.message;
+	return `${error}`;
+}
+
+function mcpToolFailure(server: string, operation: string, error: unknown) {
+	const message = errorMessage(error);
+	return {
+		content: [{ type: "text", text: `MCP ${operation} failed for "${server}": ${message}` }],
+		details: { server, operation, error: message },
+	};
+}
+
 function parseArgumentsJson(raw?: string): Record<string, any> {
 	if (!raw || !raw.trim()) return {};
 	const parsed = JSON.parse(raw);
@@ -722,8 +735,9 @@ class HttpMcpClient implements McpClientLike {
 
 		const promise = new Promise<any>((resolvePromise, rejectPromise) => {
 			const timer = setTimeout(() => {
+				this.lastError = `Timed out waiting for MCP response from "${this.name}" for ${method}`;
 				this.pending.delete(id);
-				rejectPromise(new Error(`Timed out waiting for MCP response from "${this.name}" for ${method}`));
+				rejectPromise(new Error(this.lastError));
 			}, this.timeoutMs());
 
 			this.pending.set(id, { resolve: resolvePromise, reject: rejectPromise, timer });
@@ -983,11 +997,15 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const { server } = params as { server: string };
-			const result = await getClient(server).listTools();
-			return {
-				content: [{ type: "text", text: jsonText(result) }],
-				details: { server, result },
-			};
+			try {
+				const result = await getClient(server).listTools();
+				return {
+					content: [{ type: "text", text: jsonText(result) }],
+					details: { server, result },
+				};
+			} catch (error) {
+				return mcpToolFailure(server, "tools/list", error);
+			}
 		},
 		renderCall(args, theme) {
 			return new Text(`${theme.bold("mcp_tools")} ${(args as any).server || ""}`, 0, 0);
@@ -1010,11 +1028,15 @@ export default function (pi: ExtensionAPI) {
 		async execute(_toolCallId, params) {
 			const { server, tool, arguments_json } = params as { server: string; tool: string; arguments_json?: string };
 			const args = parseArgumentsJson(arguments_json);
-			const result = await getClient(server).callTool(tool, args);
-			return {
-				content: [{ type: "text", text: jsonText(result) }],
-				details: { server, tool, args, result },
-			};
+			try {
+				const result = await getClient(server).callTool(tool, args);
+				return {
+					content: [{ type: "text", text: jsonText(result) }],
+					details: { server, tool, args, result },
+				};
+			} catch (error) {
+				return mcpToolFailure(server, `tools/call:${tool}`, error);
+			}
 		},
 		renderCall(args, theme) {
 			return new Text(`${theme.bold("mcp_call")} ${(args as any).server || ""}:${(args as any).tool || ""}`, 0, 0);
@@ -1034,11 +1056,15 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const { server } = params as { server: string };
-			const result = await getClient(server).listResources();
-			return {
-				content: [{ type: "text", text: jsonText(result) }],
-				details: { server, result },
-			};
+			try {
+				const result = await getClient(server).listResources();
+				return {
+					content: [{ type: "text", text: jsonText(result) }],
+					details: { server, result },
+				};
+			} catch (error) {
+				return mcpToolFailure(server, "resources/list", error);
+			}
 		},
 		renderCall(args, theme) {
 			return new Text(`${theme.bold("mcp_resources")} ${(args as any).server || ""}`, 0, 0);
@@ -1059,11 +1085,15 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const { server, uri } = params as { server: string; uri: string };
-			const result = await getClient(server).readResource(uri);
-			return {
-				content: [{ type: "text", text: jsonText(result) }],
-				details: { server, uri, result },
-			};
+			try {
+				const result = await getClient(server).readResource(uri);
+				return {
+					content: [{ type: "text", text: jsonText(result) }],
+					details: { server, uri, result },
+				};
+			} catch (error) {
+				return mcpToolFailure(server, "resources/read", error);
+			}
 		},
 		renderCall(args, theme) {
 			return new Text(`${theme.bold("mcp_read_resource")} ${(args as any).server || ""}`, 0, 0);
@@ -1083,11 +1113,15 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_toolCallId, params) {
 			const { server } = params as { server: string };
-			const result = await getClient(server).listPrompts();
-			return {
-				content: [{ type: "text", text: jsonText(result) }],
-				details: { server, result },
-			};
+			try {
+				const result = await getClient(server).listPrompts();
+				return {
+					content: [{ type: "text", text: jsonText(result) }],
+					details: { server, result },
+				};
+			} catch (error) {
+				return mcpToolFailure(server, "prompts/list", error);
+			}
 		},
 		renderCall(args, theme) {
 			return new Text(`${theme.bold("mcp_prompts")} ${(args as any).server || ""}`, 0, 0);
@@ -1110,11 +1144,15 @@ export default function (pi: ExtensionAPI) {
 		async execute(_toolCallId, params) {
 			const { server, name, arguments_json } = params as { server: string; name: string; arguments_json?: string };
 			const args = parseArgumentsJson(arguments_json);
-			const result = await getClient(server).getPrompt(name, args);
-			return {
-				content: [{ type: "text", text: jsonText(result) }],
-				details: { server, name, args, result },
-			};
+			try {
+				const result = await getClient(server).getPrompt(name, args);
+				return {
+					content: [{ type: "text", text: jsonText(result) }],
+					details: { server, name, args, result },
+				};
+			} catch (error) {
+				return mcpToolFailure(server, `prompts/get:${name}`, error);
+			}
 		},
 		renderCall(args, theme) {
 			return new Text(`${theme.bold("mcp_get_prompt")} ${(args as any).server || ""}:${(args as any).name || ""}`, 0, 0);
