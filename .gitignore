@@ -10,16 +10,25 @@ __pycache__/
 .mcp.json
 
 # Runtime/session artifacts
-.opencode/.active-crew.json
-.opencode/agents
-.opencode/multi-team.yaml
-.claude/.active-crew.json
 .pi/.active-crew.json
+.claude/.active-crew.json
+.opencode/.active-crew.json
+.opencode/multi-team.yaml
 .hermes/.active-crew.json
+.kilo/.active-crew.json
+.codex/.active-crew.json
+.pi/agents/
+.claude/agents/
+.opencode/agents/
+.hermes/agents/
+.kilo/agents/
+.codex/agents/
 .pi/crew/*/sessions/
 .claude/crew/*/sessions/
 .opencode/crew/*/sessions/
 .hermes/crew/*/sessions/
+.kilo/crew/*/sessions/
+.codex/crew/*/sessions/
 
 tmp/
 .playwright-cli/
