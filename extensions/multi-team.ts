@@ -306,15 +306,21 @@ function parseInlineArray(token: string): string[] {
 		.split(",")
 		.map((part) => part.trim())
 		.filter(Boolean)
-		.map((part) => part.replace(/^['"]|['"]$/g, ""));
+		.map((part) => {
+			const stripped = part.replace(/^['"]|['"]$/g, "");
+			return stripped.replace(/\\(.)/g, "$1").replace(/''/g, "'");
+		});
 }
 
 function parseScalarToken(token: string): any {
 	if (token === "[]") return [];
 	if (token === "{}") return {};
 	if (token.startsWith("[") && token.endsWith("]")) return parseInlineArray(token);
-	if ((token.startsWith(`"`) && token.endsWith(`"`)) || (token.startsWith("'") && token.endsWith("'"))) {
-		return token.slice(1, -1);
+	if (token.startsWith(`"`) && token.endsWith(`"`)) {
+		return token.slice(1, -1).replace(/\\(.)/g, "$1");
+	}
+	if (token.startsWith(`'`) && token.endsWith(`'`)) {
+		return token.slice(1, -1).replace(/''/g, "'");
 	}
 	if (token === "true") return true;
 	if (token === "false") return false;
@@ -1349,9 +1355,9 @@ function artifactFileName(parts: string[], extension = "md"): string {
 
 function yamlScalar(value: any): string {
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
-	if (value === null || value === undefined) return '""';
+	if (value === null || value === undefined) return "''";
 	const text = String(value);
-	return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+	return `'${text.replace(/'/g, "''")}'`;
 }
 
 function stringifyYaml(value: any, indent = 0): string {

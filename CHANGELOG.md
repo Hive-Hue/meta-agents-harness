@@ -11,6 +11,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Workspace-aware root resolution so a global `mah` command operates on the current repo instead of the package install directory
 - `meta-agents-harness` packaging alias and install scripts for local/global usage
 - `npm run stitch:secrets` to populate `GOOGLE_CLOUD_PROJECT` and `STITCH_ACCESS_TOKEN` directly in the target repo `.env` without overwriting the rest of the file
+- Caveman skill suite (`caveman`, `caveman-commit`, `caveman-compress`, `caveman-help`, `caveman-review`) registered on all agents across all teams
+- `.env.stitch` added to `.gitignore` to prevent credential leaks
+- Regression test for YAML scalar round-trip backslash preservation
 
 ### Changed
 - Runtime detection now follows a stricter plugin-first model: forced runtime flags and repository markers only
@@ -19,21 +22,19 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Bundled runtime plugins remain prioritized over installed plugins with the same name
 - Skill path resolution now uses a convention-based default (`skills/<skill-slug>/SKILL.md`) instead of a per-runtime matrix in `meta-agents.yaml`
 - Expertise catalog resolution is now workspace-local only, and reports workspace paths instead of package-repo paths
-
-### Added
-- Caveman skill suite (`caveman`, `caveman-commit`, `caveman-compress`, `caveman-help`, `caveman-review`) registered on all agents across all teams
-- `.env.stitch` added to `.gitignore` to prevent credential leaks
-
-### Changed
 - Orchestrator model updated from `glm-5-turbo` to `glm-5`
 - Skill sync now copies entire skill directories (including scripts) instead of only `SKILL.md`
 - Agent skill injection preserves existing `use-when` metadata from frontmatter instead of overwriting
 - Model resolution for opencode and kilo runtimes returns raw catalog model IDs (no normalization)
+- `detectRuntime` now walks up the directory tree to find markers (stops at HOME boundary)
+- Smoke tests strip `MAH_RUNTIME` and related env vars so marker detection tests work in any environment
+- Skill list assertions in tests use subset checks instead of exact match
 
 ### Fixed
+- Expertise YAML scalar serialization used double-quote style with backslash escaping but the parser never unescaped, causing `\\` to double on every load→save cycle. Switched to single-quote style with proper unescaping in both `parseScalarToken` and `parseInlineArray`
+- `mah detect` now walks up from nested directories to find runtime markers
+- `mah detect` no longer leaks markers from HOME into subdirectory workspaces
 - Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
-- `mah detect` now reports a stable unknown state in repositories without runtime markers
-- Plugin loader warning noise for bundled runtime names was removed
 - Global `mah sync` and related script dispatch now resolve package-owned script paths instead of expecting a local `scripts/` directory in the target repo
 - `mah init` now writes `.mcp.json` and runtime markers into the caller repo instead of the MAH package directory
 - `mah sync` now materializes only the runtime markers present in the current repo

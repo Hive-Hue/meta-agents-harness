@@ -148,23 +148,33 @@ function detectRuntime(cwd, forcedRuntime) {
     return { runtime: forcedRuntime, reason: "forced" }
   }
 
-  const byMarker = Object.entries(runtimeProfiles)
-    .filter(([, profile]) => existsSync(path.join(cwd, profile.markerDir)))
-    .map(([name]) => name)
+  const homeDir = (process.env.HOME || "").trim()
+  let searchDir = cwd
+  while (true) {
+    if (homeDir && searchDir === homeDir) break
 
-  if (byMarker.length === 1) {
-    return { runtime: byMarker[0], reason: "marker" }
-  }
+    const byMarker = Object.entries(runtimeProfiles)
+      .filter(([, profile]) => existsSync(path.join(searchDir, profile.markerDir)))
+      .map(([name]) => name)
 
-  if (byMarker.length > 1) {
-    const strictMarkers = process.argv.includes("--strict-markers") || process.env.MAH_STRICT_MARKERS === "1"
-    if (strictMarkers) {
-      return { runtime: null, reason: `ambiguous-markers:${byMarker.join(",")}` }
+    if (byMarker.length === 1) {
+      return { runtime: byMarker[0], reason: "marker" }
     }
-    const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
-    if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
-    const pluginPreferred = [...byMarker].sort((left, right) => left.localeCompare(right))[0]
-    if (pluginPreferred) return { runtime: pluginPreferred, reason: `markers:${byMarker.join(",")}` }
+
+    if (byMarker.length > 1) {
+      const strictMarkers = process.argv.includes("--strict-markers") || process.env.MAH_STRICT_MARKERS === "1"
+      if (strictMarkers) {
+        return { runtime: null, reason: `ambiguous-markers:${byMarker.join(",")}` }
+      }
+      const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
+      if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
+      const pluginPreferred = [...byMarker].sort((left, right) => left.localeCompare(right))[0]
+      if (pluginPreferred) return { runtime: pluginPreferred, reason: `markers:${byMarker.join(",")}` }
+    }
+
+    const parent = path.dirname(searchDir)
+    if (parent === searchDir) break
+    searchDir = parent
   }
 
   return { runtime: null, reason: "none" }
