@@ -24,7 +24,7 @@ npm run install:global
 ```
 
 That exposes both `mah` and `meta-agents-harness` on your PATH.
-It also lets `mah run` fall back to the bundled MAH runtime assets when a new repo does not have its own local `extensions/` tree yet.
+It also prepares `~/.mah/` with the default MAH assets (`skills/`, `extensions/`, `mah-plugins/`, and `scripts/`). MAH prefers that global overlay first and then complements it with any local repo assets that exist.
 
 ### 2. Verify Installation
 
@@ -204,21 +204,13 @@ The bootstrap generates a valid `meta-agents.yaml` with:
 version: 1                          # Config schema version
 name: "my-project"                  # Project name
 description: "Project description"  # Project description
-runtime_detection:                  # How MAH detects runtimes
-  order: ["forced", "marker", "cli"]
-  marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-    hermes: ".hermes"
-runtimes:                           # Runtime configurations
+runtimes:                           # Runtime configurations (runtime detection is internal)
   pi: { ... }
   claude: { ... }
   opencode: { ... }
   hermes: { ... }
 catalog:                            # Shared resources
   models: { ... }
-  skills: { ... }
   domain_profiles: { ... }
 crews:                              # Team definitions
   - id: "dev"
@@ -475,7 +467,7 @@ After bootstrap:
 
 1. **Customize Configuration** - Edit `meta-agents.yaml` to match your project
 2. **Add Custom Crews** - Define teams for your specific workflows
-3. **Configure Skills** - Add or modify skills in the catalog
+3. **Configure Skills** - Add or modify skill files under `skills/` (skill refs are convention-based)
 4. **Set Up Domain Profiles** - Define access control for agents
 5. **Explore Commands** - See [README.md](../README.md) for full command reference
 

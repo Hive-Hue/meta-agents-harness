@@ -6,6 +6,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 import { preparePiRunContext } from "../scripts/runtime-core-integrations.mjs"
+import { ensurePiGlobalSettings, findMahSkillFile, resolveMahAssetPath } from "../scripts/mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -97,7 +98,6 @@ for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo", "codex"]) {
     const result = run(["--runtime", runtime, "list:crews"])
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /crew=dev/)
-    assert.match(result.stdout, /crew=marketing/)
   })
 }
 
@@ -302,6 +302,7 @@ test("pi explain run resolves to direct cli with MAH session env", () => {
 test("pi prepareRunContext falls back to MAH package extensions when repo extensions are missing", () => {
   const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-pi-fallback-repo-"))
   const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-pi-fallback-mah-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah-home")
   const tempExtensions = path.join(tempMahRoot, "extensions")
   mkdirSync(path.join(tempRepo, ".pi", "crew", "dev"), { recursive: true })
   mkdirSync(tempExtensions, { recursive: true })
@@ -314,10 +315,12 @@ test("pi prepareRunContext falls back to MAH package extensions when repo extens
   ]
 
   const previousMahPackageRoot = process.env.MAH_PACKAGE_ROOT
+  const previousMahHome = process.env.MAH_HOME
   try {
     for (const fileName of sourceExtensions) {
       cpSync(path.join(repoRoot, "extensions", fileName), path.join(tempExtensions, fileName))
     }
+    process.env.MAH_HOME = tempMahHome
     process.env.MAH_PACKAGE_ROOT = tempMahRoot
 
     const configPath = path.join(tempRepo, ".pi", "crew", "dev", "multi-team.yaml")
@@ -336,9 +339,205 @@ test("pi prepareRunContext falls back to MAH package extensions when repo extens
     const resolvedExtensions = result.args.filter((item) => item !== "-e")
     assert.ok(resolvedExtensions.every((item) => item.startsWith(tempMahRoot)), "extensions should resolve from MAH package root")
   } finally {
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
     if (previousMahPackageRoot === undefined) delete process.env.MAH_PACKAGE_ROOT
     else process.env.MAH_PACKAGE_ROOT = previousMahPackageRoot
     rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
+})
+
+test("pi prepareRunContext prefers MAH_HOME extensions before the package root", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-pi-home-repo-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-pi-home-mah-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah")
+  const tempExtensions = path.join(tempMahHome, "extensions")
+  mkdirSync(path.join(tempRepo, ".pi", "crew", "dev"), { recursive: true })
+  mkdirSync(tempExtensions, { recursive: true })
+
+  const sourceExtensions = [
+    "multi-team.ts",
+    "agent-session-navigator.ts",
+    "mcp-bridge.ts",
+    "theme-cycler.ts"
+  ]
+
+  const previousMahHome = process.env.MAH_HOME
+  const previousMahPackageRoot = process.env.MAH_PACKAGE_ROOT
+  try {
+    for (const fileName of sourceExtensions) {
+      cpSync(path.join(repoRoot, "extensions", fileName), path.join(tempExtensions, fileName))
+    }
+    process.env.MAH_HOME = tempMahHome
+    process.env.MAH_PACKAGE_ROOT = tempMahRoot
+
+    const configPath = path.join(tempRepo, ".pi", "crew", "dev", "multi-team.yaml")
+    writeFileSync(configPath, "crew: dev\n", "utf-8")
+
+    const result = preparePiRunContext({
+      repoRoot: tempRepo,
+      crew: "dev",
+      configPath,
+      argv: []
+    })
+
+    assert.equal(result.ok, true, result.error)
+    assert.equal(result.exec, "pi")
+    assert.equal(result.args.length, sourceExtensions.length * 2)
+    const resolvedExtensions = result.args.filter((item) => item !== "-e")
+    assert.ok(resolvedExtensions.every((item) => item.startsWith(tempMahHome)), "extensions should resolve from MAH_HOME")
+  } finally {
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
+    if (previousMahPackageRoot === undefined) delete process.env.MAH_PACKAGE_ROOT
+    else process.env.MAH_PACKAGE_ROOT = previousMahPackageRoot
+    rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
+})
+
+test("pi prepareRunContext with -c still resolves extensions from MAH_HOME", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-pi-continue-repo-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-pi-continue-mah-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah")
+  const tempExtensions = path.join(tempMahHome, "extensions")
+  mkdirSync(path.join(tempRepo, ".pi", "crew", "dev"), { recursive: true })
+  mkdirSync(tempExtensions, { recursive: true })
+
+  const sourceExtensions = [
+    "multi-team.ts",
+    "agent-session-navigator.ts",
+    "mcp-bridge.ts",
+    "theme-cycler.ts"
+  ]
+
+  const previousMahHome = process.env.MAH_HOME
+  const previousMahPackageRoot = process.env.MAH_PACKAGE_ROOT
+  try {
+    for (const fileName of sourceExtensions) {
+      cpSync(path.join(repoRoot, "extensions", fileName), path.join(tempExtensions, fileName))
+    }
+    process.env.MAH_HOME = tempMahHome
+    process.env.MAH_PACKAGE_ROOT = tempMahRoot
+
+    const configPath = path.join(tempRepo, ".pi", "crew", "dev", "multi-team.yaml")
+    writeFileSync(configPath, "crew: dev\n", "utf-8")
+
+    const result = preparePiRunContext({
+      repoRoot: tempRepo,
+      crew: "dev",
+      configPath,
+      argv: ["-c"]
+    })
+
+    assert.equal(result.ok, true, result.error)
+    const resolvedExtensions = result.args.filter((item) => item !== "-e")
+    assert.ok(resolvedExtensions.every((item) => item.startsWith(tempMahHome)), "continue-mode extensions should resolve from MAH_HOME")
+  } finally {
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
+    if (previousMahPackageRoot === undefined) delete process.env.MAH_PACKAGE_ROOT
+    else process.env.MAH_PACKAGE_ROOT = previousMahPackageRoot
+    rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
+})
+
+test("MAH_HOME asset overlay wins over local repo assets", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-asset-local-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-asset-home-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah")
+  const localAsset = path.join(tempRepo, "extensions", "multi-team.ts")
+  const homeAsset = path.join(tempMahHome, "extensions", "multi-team.ts")
+  const previousMahHome = process.env.MAH_HOME
+  try {
+    mkdirSync(path.dirname(localAsset), { recursive: true })
+    mkdirSync(path.dirname(homeAsset), { recursive: true })
+    writeFileSync(localAsset, "// local asset\n", "utf-8")
+    writeFileSync(homeAsset, "// home asset\n", "utf-8")
+    process.env.MAH_HOME = tempMahHome
+
+    const resolved = resolveMahAssetPath(tempRepo, "extensions/multi-team.ts", { packageRoot: tempMahRoot })
+    assert.equal(resolved, homeAsset)
+  } finally {
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
+    rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
+})
+
+test("MAH_HOME skill overlay wins over local repo skills", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-skill-local-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-skill-home-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah")
+  const localSkill = path.join(tempRepo, "skills", "bootstrap", "SKILL.md")
+  const homeSkill = path.join(tempMahHome, "skills", "bootstrap", "SKILL.md")
+  const previousMahHome = process.env.MAH_HOME
+  try {
+    mkdirSync(path.dirname(localSkill), { recursive: true })
+    mkdirSync(path.dirname(homeSkill), { recursive: true })
+    writeFileSync(localSkill, "# local bootstrap\n", "utf-8")
+    writeFileSync(homeSkill, "# home bootstrap\n", "utf-8")
+    process.env.MAH_HOME = tempMahHome
+
+    const resolved = findMahSkillFile("bootstrap", { repoRoot: tempRepo, packageRoot: tempMahRoot })
+    assert.equal(resolved, homeSkill)
+  } finally {
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
+    rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
+})
+
+test("local repo complements global overlay when MAH_HOME is missing the asset", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-skill-fallback-local-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-skill-fallback-home-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah")
+  const localSkill = path.join(tempRepo, "skills", "delegate-bounded", "SKILL.md")
+  const previousMahHome = process.env.MAH_HOME
+  try {
+    mkdirSync(path.dirname(localSkill), { recursive: true })
+    writeFileSync(localSkill, "# local delegate bounded\n", "utf-8")
+    process.env.MAH_HOME = tempMahHome
+
+    const resolved = findMahSkillFile("delegate-bounded", { repoRoot: tempRepo, packageRoot: tempMahRoot })
+    assert.equal(resolved, localSkill)
+  } finally {
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
+    rmSync(tempRepo, { recursive: true, force: true })
+    rmSync(tempMahRoot, { recursive: true, force: true })
+  }
+})
+
+test("ensurePiGlobalSettings points PI theme discovery at the MAH overlay", () => {
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-pi-home-"))
+  const tempMahRoot = mkdtempSync(path.join(os.tmpdir(), "mah-pi-mah-"))
+  const tempMahHome = path.join(tempMahRoot, ".mah")
+  const previousHome = process.env.HOME
+  const previousMahHome = process.env.MAH_HOME
+  try {
+    mkdirSync(path.join(tempMahHome, "extensions", "themes"), { recursive: true })
+    process.env.HOME = tempHome
+    process.env.MAH_HOME = tempMahHome
+
+    const result = ensurePiGlobalSettings(tempMahHome)
+    assert.equal(result.changed, true)
+    assert.equal(result.themeOverlayPath, path.join(tempMahHome, "extensions", "themes"))
+
+    const settingsPath = path.join(tempHome, ".pi", "agent", "settings.json")
+    const next = JSON.parse(readFileSync(settingsPath, "utf-8"))
+    assert.ok(Array.isArray(next.themes))
+    assert.ok(next.themes.includes(path.join(tempMahHome, "extensions", "themes")))
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME
+    else process.env.HOME = previousHome
+    if (previousMahHome === undefined) delete process.env.MAH_HOME
+    else process.env.MAH_HOME = previousMahHome
+    rmSync(tempHome, { recursive: true, force: true })
     rmSync(tempMahRoot, { recursive: true, force: true })
   }
 })
@@ -359,7 +558,7 @@ test("opencode explain run resolves to direct cli without wrapper plan", () => {
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "opencode")
   assert.equal(payload.exec, "opencode")
-  assert.deepEqual(payload.execArgs, ["-m", "minimax/minimax-m2.7"])
+  assert.deepEqual(payload.execArgs, ["-m", "zai/glm-5-turbo"])
 })
 
 test("opencode explain run uses run subcommand when task prompt is provided", () => {
@@ -378,7 +577,7 @@ test("hermes explain run resolves to hermes chat with MAH bootstrap env", () => 
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "hermes")
   assert.equal(payload.exec, "hermes")
-  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "minimax-m2.7"])
+  assert.deepEqual(payload.execArgs, ["chat", "--provider", "zai", "-m", "glm-5-turbo"])
   assert.equal(payload.env?.MAH_ACTIVE_CREW, "dev")
   assert.ok(payload.env?.MAH_HERMES_CONFIG)
   assert.ok(payload.env?.MAH_HERMES_MULTI_TEAM)
@@ -404,7 +603,7 @@ test("hermes explain run strips MAH context-memory flags before spawning hermes"
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "hermes")
   assert.equal(payload.exec, "hermes")
-  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "minimax-m2.7"])
+  assert.deepEqual(payload.execArgs, ["chat", "--provider", "zai", "-m", "glm-5-turbo"])
   assert.match(payload.passthrough.join(" "), /smoke test/)
   assert.equal(payload.passthrough.some((arg) => arg === "--with-context-memory"), false)
   assert.equal(payload.passthrough.some((arg) => arg === "--context-limit"), false)

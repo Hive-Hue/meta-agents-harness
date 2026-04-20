@@ -10,6 +10,7 @@ import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
 import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./m3-ops.mjs"
 import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./plugin-loader.mjs"
 import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
+import { resolveMahHome } from "./mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -66,6 +67,7 @@ function resolveWorkspaceRoot(startDir = process.cwd()) {
 }
 
 const repoRoot = resolveWorkspaceRoot(process.cwd())
+const mahHome = resolveMahHome()
 
 // Bootstrap plugin discovery at module load time (top-level await).
 // This ensures plugin runtimes are available for all commands including detect.
@@ -1584,42 +1586,34 @@ function printSyncHelp() {
 }
 
 /**
- * Sync plugin runtime entry into meta-agents.yaml.
- * action: "add" — adds the plugin's markerDir entry.
- * action: "remove" — removes the plugin's markerDir entry.
- *
- * This function only updates plugin-owned marker entries.
- * It does not remove user-authored runtime overrides from meta-agents.yaml.
+ * Runtime detection is internal to MAH now.
+ * Plugin install/uninstall still call this hook, but it intentionally does nothing
+ * so the repo-local meta-agents.yaml stays free of runtime_detection noise.
  */
 function syncPluginYaml(pluginName, pluginMeta, action) {
-  const yamlPath = path.join(repoRoot, "meta-agents.yaml")
-  if (!existsSync(yamlPath)) return
+  void pluginName
+  void pluginMeta
+  void action
+}
 
-  let doc = {}
-  try {
-    const raw = readFileSync(yamlPath, "utf-8")
-    doc = YAML.parse(raw) || {}
-  } catch {
-    return
-  }
+function hasMahWorkspaceMarkers(dir) {
+  return [
+    "meta-agents.yaml",
+    ".pi",
+    ".claude",
+    ".opencode",
+    ".hermes",
+    ".codex",
+    ".kilo"
+  ].some((marker) => existsSync(path.join(dir, marker)))
+}
 
-  doc.runtime_detection = doc.runtime_detection || {}
-  doc.runtime_detection.marker = doc.runtime_detection.marker || {}
+function resolvePluginStoreRoot(baseRoot) {
+  return hasMahWorkspaceMarkers(baseRoot) ? baseRoot : mahHome
+}
 
-  if (action === "add") {
-    // Add/update marker entry
-    if (pluginMeta.markerDir) {
-      doc.runtime_detection.marker[pluginName] = pluginMeta.markerDir
-    }
-  } else if (action === "remove") {
-    delete doc.runtime_detection.marker[pluginName]
-  }
-  try {
-    const updated = YAML.stringify(doc, { indent: 2, lineWidth: 0 })
-    writeFileSync(yamlPath, updated, "utf-8")
-  } catch {
-    // non-fatal
-  }
+function resolvePluginDir(baseRoot, pluginName) {
+  return path.join(resolvePluginStoreRoot(baseRoot), "mah-plugins", pluginName)
 }
 
 function printPluginsHelp() {
@@ -1650,7 +1644,7 @@ async function runPlugins(argv, jsonMode = false) {
   }
 
   const subcommand = argv[0] || "list"
-  const mahPluginsDir = path.join(repoRoot, "mah-plugins")
+  const mahPluginsDir = path.join(resolvePluginStoreRoot(repoRoot), "mah-plugins")
 
   if (subcommand === "list") {
     const entries = listLoadedPlugins()
@@ -1685,7 +1679,7 @@ async function runPlugins(argv, jsonMode = false) {
       console.error("ERROR: plugin name could not be determined")
       return 1
     }
-    const targetDir = path.join(mahPluginsDir, pluginName)
+    const targetDir = resolvePluginDir(repoRoot, pluginName)
     if (existsSync(targetDir)) {
       console.error(`ERROR: plugin '${pluginName}' is already installed at ${targetDir}`)
       return 1
@@ -1798,7 +1792,12 @@ async function runPlugins(argv, jsonMode = false) {
       return 1
     }
     // Read plugin metadata from plugin.json (sync, no module import needed)
-    const installedPluginJson = path.join(mahPluginsDir, pluginName, "plugin.json")
+    const pluginRoots = [
+      path.join(repoRoot, "mah-plugins"),
+      path.join(mahHome, "mah-plugins")
+    ]
+    const targetDir = pluginRoots.map((root) => path.join(root, pluginName)).find((candidate) => existsSync(candidate)) || path.join(mahPluginsDir, pluginName)
+    const installedPluginJson = path.join(targetDir, "plugin.json")
     let markerDir = null
     let directCli = null
     let wrapper = null
@@ -1828,7 +1827,6 @@ async function runPlugins(argv, jsonMode = false) {
     // Remove plugin entry from meta-agents.yaml before removing files
     syncPluginYaml(pluginName, { markerDir, directCli, wrapper, configRoot, configPattern }, "remove")
     // First remove from mah-plugins/ directory if present
-    const targetDir = path.join(mahPluginsDir, pluginName)
     if (existsSync(targetDir)) {
       try {
         rmSync(targetDir, { recursive: true })

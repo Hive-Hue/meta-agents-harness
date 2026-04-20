@@ -7,6 +7,7 @@ import YAML from "yaml"
 import { readActiveCrew } from "./runtime-core-ops.mjs"
 import { mapModelToCcrRef } from "./ccr-model-helper.mjs"
 import { createRequire } from "node:module"
+import { resolveMahAssetPath } from "./mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -67,16 +68,7 @@ function resolveMahPackageRoot() {
 }
 
 function resolvePiAssetPath(repoRoot, targetPath) {
-  if (!targetPath) return ""
-  if (path.isAbsolute(targetPath)) return targetPath
-
-  const localPath = path.resolve(repoRoot, targetPath)
-  if (existsSync(localPath)) return localPath
-
-  const packagePath = path.resolve(resolveMahPackageRoot(), targetPath)
-  if (existsSync(packagePath)) return packagePath
-
-  return localPath
+  return resolveMahAssetPath(repoRoot, targetPath, { packageRoot: resolveMahPackageRoot() })
 }
 
 function removeIfExists(targetPath) {
@@ -859,7 +851,7 @@ export function preparePiRunContext({ repoRoot, crew, configPath, argv = [], env
     : loadPiDefaultExtensions(repoRoot).map((item) => resolvePiAssetPath(repoRoot, item))
   const missingExtension = extensionPaths.find((item) => !existsSync(item))
   if (missingExtension) {
-    return { ok: false, error: `PI extension not found locally or in MAH package root: ${rel(repoRoot, missingExtension)}` }
+    return { ok: false, error: `PI extension not found locally, in ~/.mah, or in MAH package root: ${rel(repoRoot, missingExtension)}` }
   }
 
   const loadedEnv = loadPiRuntimeEnv(repoRoot, envOverrides)
@@ -1254,7 +1246,7 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
       PI_MULTI_HEADLESS: "1"
     },
     warnings: extensionPaths.some((item) => !existsSync(item))
-      ? [...warnings, "some PI extensions not found locally or in MAH package root, headless run may lack full functionality"]
+      ? [...warnings, "some PI extensions not found locally, in ~/.mah, or in MAH package root, headless run may lack full functionality"]
       : warnings,
     internal: {
       mode: "headless",

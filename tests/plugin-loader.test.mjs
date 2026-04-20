@@ -201,6 +201,76 @@ describe("plugin-loader", async () => {
       assert.ok(loaded.some(p => p.name === "codex"), "should discover runtime-codex plugin")
     })
 
+    it("discovers plugins from MAH_HOME/mah-plugins", async () => {
+      const tempHomeRoot = path.join(TEMP_DIR, "mah-home-discovery")
+      const tempMahHome = path.join(tempHomeRoot, ".mah")
+      const pluginRoot = path.join(tempMahHome, "mah-plugins", "homefake")
+      mkdirSync(pluginRoot, { recursive: true })
+      writeFileSync(path.join(pluginRoot, "plugin.json"), JSON.stringify({
+        name: "homefake",
+        version: "0.1.0",
+        mahVersion: "^0.5.0",
+        entry: "index.mjs"
+      }, null, 2))
+      writeFileSync(path.join(pluginRoot, "index.mjs"), `
+export const runtimePlugin = {
+  name: "homefake",
+  version: "0.1.0",
+  mahVersion: "^0.5.0",
+  adapter: {
+    name: "homefake",
+    markerDir: ".homefake",
+    wrapper: "homefake-mh",
+    directCli: "homefake",
+    capabilities: {
+      sessionModeNew: true,
+      sessionModeContinue: true,
+      sessionModeNone: true,
+      sessionIdViaEnv: "HOMEFAKE_SESSION_ID",
+      sessionRootFlag: "--session-root",
+      sessionMirrorFlag: false
+    },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: true,
+    commands: {
+      "list:crews": [["homefake", ["list:crews"]]],
+      use: [["homefake", ["use"]]],
+      clear: [["homefake", ["clear"]]],
+      run: [["homefake", ["run"]]],
+      doctor: [["homefake", ["doctor"]]],
+      "check:runtime": [["homefake", ["check:runtime"]]],
+      validate: [["homefake", ["validate"]]],
+      "validate:runtime": [["homefake", ["validate:runtime"]]]
+    },
+    detect(cwd, existsFn) { return existsFn(cwd + "/" + this.markerDir) },
+    supports(command) { return Array.isArray(this.commands?.[command]) && this.commands[command].length > 0 },
+    resolveCommandPlan(command, commandExistsFn) {
+      const variants = this.commands?.[command] || []
+      if (variants.length === 0) return { ok: false, error: "command not supported", variants: [] }
+      return { ok: true, exec: variants[0][0], args: variants[0][1], variants }
+    },
+    validateRuntime(commandExistsFn) {
+      return { ok: true, checks: [] }
+    }
+  }
+}
+`)
+
+      const previousMahHome = process.env.MAH_HOME
+      try {
+        process.env.MAH_HOME = tempMahHome
+        const loader = await import(`../scripts/plugin-loader.mjs?home=${Date.now()}`)
+        const runtimes = await loader.getAllRuntimes()
+        assert.ok(runtimes.homefake, "should discover plugins installed in MAH_HOME/mah-plugins")
+      } finally {
+        if (previousMahHome === undefined) delete process.env.MAH_HOME
+        else process.env.MAH_HOME = previousMahHome
+      }
+    })
+
     it("skips plugins with version incompatibility", async () => {
       const loader = await getPluginLoader()
 

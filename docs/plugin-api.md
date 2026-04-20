@@ -24,11 +24,12 @@ The Plugin API solves this by having MAH scan designated directories for plugins
 
 ### Discovery locations
 
-Plugins are discovered from two locations on startup:
+Plugins are discovered from two locations on startup, with `~/.mah/mah-plugins` preferred before the package-local fallback:
 
 | Location | Format | Use case |
 |---|---|---|
-| `mah-plugins/<name>/` | `plugin.json` + `index.mjs` | Local, operator-controlled |
+| `~/.mah/mah-plugins/<name>/` | `plugin.json` + `index.mjs` | Global, operator-controlled |
+| `mah-plugins/<name>/` | `plugin.json` + `index.mjs` | Package-local fallback |
 | `node_modules/@mah/runtime-<name>/` | `package.json` + `index.mjs` | npm-installed, team-shared |
 
 ### Bundled plugins vs installed plugins
@@ -320,6 +321,7 @@ On every MAH command invocation, `getAllRuntimes()` is called at module load tim
 5. Registers valid plugins in the in-memory registry
 
 Plugin discovery is resolved from the MAH package root, not the caller's current working directory. A plugin installed under `mah-plugins/` remains available when `mah` is executed from subdirectories inside the same repo.
+The global install also creates `~/.mah/mah-plugins/` and MAH discovers plugins there before falling back to the package root.
 
 To disable plugin discovery:
 ```bash
@@ -422,7 +424,7 @@ mah plugins validate ./path/to/plugin
 | `scripts/runtime-adapter-contract.mjs` | Adapter shape validation (shared with bundled plugins) |
 | `scripts/runtime-adapters.mjs` | Bundled runtime plugin definitions |
 | `scripts/meta-agents-harness.mjs` | CLI entry — imports `getAllRuntimes()` at startup |
-| `mah-plugins/` | Operator plugin directory (created on first use) |
+| `mah-plugins/` | Operator plugin directory (repo-local or `~/.mah/mah-plugins/`, depending on where the plugin is installed) |
 | `tests/plugin-loader.test.mjs` | Unit tests for plugin-loader |
 | `tests/plugins-e2e.test.mjs` | End-to-end tests for install/uninstall/detect |
 | `mah-plugins/runtime-fake/` | Test fixture plugin |

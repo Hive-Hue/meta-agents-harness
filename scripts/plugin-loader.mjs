@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { RUNTIME_ADAPTERS } from "./runtime-adapters.mjs"
 import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
+import { getMahPluginSearchPaths, resolveMahHome } from "./mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -329,9 +330,7 @@ async function runPluginDiscovery() {
   if (process.env.MAH_PLUGINS_ENABLED === "0") {
     return
   }
-  const searchPaths = [
-    path.join(packageRoot, "mah-plugins")
-  ]
+  const searchPaths = getMahPluginSearchPaths({ packageRoot, homeRoot: resolveMahHome() })
   await loadPlugins(searchPaths, MAH_VERSION)
 }
 

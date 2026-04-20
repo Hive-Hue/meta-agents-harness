@@ -108,6 +108,8 @@ Detection currently follows this priority:
 
 If no runtime marker is present, detection returns `unknown` unless you force a runtime explicitly.
 
+These defaults are internal to MAH. New `meta-agents.yaml` files no longer need a `runtime_detection` block unless you are overriding the standard behavior.
+
 ---
 
 ## Supported runtimes
@@ -190,13 +192,13 @@ The project uses `meta-agents.yaml` as the canonical multi-runtime configuration
 
 This config is used to define:
 
-- runtime detection metadata
+- runtime detection behavior (internal defaults)
 - runtime-specific config roots and optional runtime entrypoint overrides
 - model catalog and fallbacks
-- skill references
+- skill references resolved by convention
 - domain profiles
 - multi-team crew topology
-- runtime overrides and mapping rules
+- runtime overrides
 
 ### 3. Generated runtime artifacts
 
@@ -374,6 +376,13 @@ Or install it globally:
 npm run install:global
 ```
 
+This prepares `~/.mah/` with the default MAH assets. MAH prefers that global overlay first, then complements it with any local repo assets that exist:
+
+- `skills/`
+- `extensions/`
+- `mah-plugins/`
+- `scripts/`
+
 Then:
 
 ```bash
@@ -489,7 +498,9 @@ The repository includes:
 - [`examples/crew-dev.complete.example.yaml`](./examples/crew-dev.complete.example.yaml)
 - [`examples/crew-marketing.complete.example.yaml`](./examples/crew-marketing.complete.example.yaml)
 
-Use these files to understand and author crew topology, model mapping, skill references, and runtime-specific overrides.
+Use these files to understand and author crew topology, model mapping, agent skill refs, and runtime-specific overrides.
+
+Skill paths are resolved by convention: a skill ref like `context_memory` maps to `skills/context-memory/SKILL.md` internally, and `context_memory` is applied as a default MAH skill without needing any catalog skill map.
 
 ---
 
@@ -688,6 +699,8 @@ Or install globally:
 ```bash
 npm run install:global
 ```
+
+That prepares `~/.mah/` with the default MAH assets and makes the global `mah` entrypoint available. MAH prefers the global overlay first and uses local repo assets only as a complement when a global asset is absent.
 
 ---
 

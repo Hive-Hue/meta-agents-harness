@@ -1,7 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import vm from "node:vm"
@@ -97,6 +97,34 @@ test("detect returns unknown in an empty workspace without markers", () => {
     assert.match(result.stdout, /reason=none/)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("mah wrapper materializes ~/.mah layout for global assets", () => {
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-home-layout-"))
+  try {
+    const binPath = path.join(repoRoot, "bin", "mah")
+    const result = spawnSync(process.execPath, [binPath, "--help"], {
+      cwd: repoRoot,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(result.status, 0, result.stderr)
+
+    const mahHome = path.join(tempHome, ".mah")
+    assert.equal(existsSync(mahHome), true)
+    assert.equal(existsSync(path.join(mahHome, "mah-plugins")), true)
+    assert.equal(existsSync(path.join(mahHome, "skills")), true)
+    assert.equal(existsSync(path.join(mahHome, "extensions")), true)
+    assert.equal(existsSync(path.join(mahHome, "scripts")), true)
+    assert.equal(lstatSync(path.join(mahHome, "skills")).isSymbolicLink(), false)
+    assert.equal(lstatSync(path.join(mahHome, "extensions")).isSymbolicLink(), false)
+    assert.deepEqual(
+      readdirSync(path.join(mahHome, "skills")).sort(),
+      ["active-listener", "bootstrap", "context-memory", "delegate-bounded", "expertise-model"]
+    )
+  } finally {
+    rmSync(tempHome, { recursive: true, force: true })
   }
 })
 
@@ -229,7 +257,7 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
     const parsed = YAML.parse(readFileSync(configPath, "utf-8"))
     assert.equal(parsed.version, 1)
     assert.ok(Array.isArray(parsed.crews) && parsed.crews.length >= 1)
-    assert.equal(typeof parsed.runtime_detection?.marker?.hermes, "string")
+    assert.equal(parsed.runtime_detection, undefined)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
@@ -373,6 +401,7 @@ test("mah sync only materializes runtime markers that exist in the repo", () => 
     assert.equal(syncResult.status, 0, syncResult.stderr)
 
     assert.equal(existsSync(path.join(tempDir, ".pi")), true)
+    assert.equal(existsSync(path.join(tempDir, ".pi", "themes")), false, ".pi/themes should not be materialized")
     for (const marker of [".claude", ".codex", ".kilo", ".opencode", ".hermes"]) {
       assert.equal(existsSync(path.join(tempDir, marker)), false, `${marker} should not be created`)
     }

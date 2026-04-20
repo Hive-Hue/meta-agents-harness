@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { determineAction } from "./sync-utils.mjs"
+import { resolveMahHome } from "./mah-home.mjs"
 import { normalizeModelId } from "../mah-plugins/shared-model-normalize.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
@@ -11,6 +12,8 @@ const packageRoot = path.resolve(__dirname, "..")
 const workspaceRoot = process.cwd()
 const metaConfigPath = path.join(workspaceRoot, "meta-agents.yaml")
 const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "hermes"]
+const runtimeMarkerRoots = Object.fromEntries(managedRuntimes.map((runtime) => [runtime, `.${runtime}`]))
+const defaultSharedSkills = ["context_memory"]
 
 function fail(message) {
   console.error(`ERROR: ${message}`)
@@ -21,15 +24,13 @@ function rel(filePath) {
   return path.relative(workspaceRoot, filePath) || "."
 }
 
-function runtimeMarkerDir(meta, runtime) {
-  const marker = meta?.runtime_detection?.marker?.[runtime]
-  if (typeof marker === "string" && marker.trim()) return marker.trim()
-  return `.${runtime}`
+function runtimeMarkerDir(runtime) {
+  return runtimeMarkerRoots[runtime] || `.${runtime}`
 }
 
-function detectActiveRuntimes(meta) {
+function detectActiveRuntimes() {
   return managedRuntimes.filter((runtime) => {
-    const markerPath = path.join(workspaceRoot, runtimeMarkerDir(meta, runtime))
+    const markerPath = path.join(workspaceRoot, runtimeMarkerDir(runtime))
     return existsSync(markerPath)
   })
 }
@@ -497,65 +498,42 @@ function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
 
 function ensurePiThemes(mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const sourceDir = path.join(packageRoot, "extensions", "themes")
   const targetDir = path.join(workspaceRoot, ".pi", "themes")
+  const globalThemeDir = path.join(resolveMahHome(), "extensions", "themes")
+  const bundledThemeDir = path.join(packageRoot, "extensions", "themes")
+  const sourceAvailable = existsSync(globalThemeDir) || existsSync(bundledThemeDir)
 
-  // Read source theme files
-  if (!existsSync(sourceDir)) {
-    if (!jsonOutput) console.log(`drift: source themes dir missing ${rel(sourceDir)}`)
-    pushRecord(records, { kind: "theme", path: rel(sourceDir), status: "missing", action: "fail" })
+  if (!sourceAvailable) {
+    if (!jsonOutput) console.log(`drift: theme overlay missing in ~/.mah/extensions/themes and package extensions/themes`)
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "missing", action: "fail" })
     return false
   }
 
-  const sourceFiles = ["catppuccin-mocha.json", "cyberpunk.json", "dracula.json", "everforest.json", "gruvbox.json", "midnight-ocean.json", "nord.json", "ocean-breeze.json", "rose-pine.json", "synthwave.json", "tokyo-night.json"]
-  let allGood = true
-
-  for (const themeFile of sourceFiles) {
-    const sourcePath = path.join(sourceDir, themeFile)
-    const targetPath = path.join(targetDir, themeFile)
-
-    if (!existsSync(sourcePath)) continue // Skip if source doesn't exist
-
-    const sourceContent = readFileSync(sourcePath, "utf-8")
-
-    if (checkOnly) {
-      if (!existsSync(targetPath)) {
-        pushRecord(records, { kind: "theme", path: rel(targetPath), status: "missing", action: determineAction("missing") })
-        if (!jsonOutput) {
-          if (mode === "plan") console.log(`plan: create ${rel(targetPath)}`)
-          else console.log(`drift: missing ${rel(targetPath)}`)
-        }
-        allGood = false
-      } else {
-        const targetContent = readFileSync(targetPath, "utf-8")
-        if (sourceContent !== targetContent) {
-          const preview = mode === "diff" ? diffPreview(targetContent, sourceContent) : []
-          pushRecord(records, { kind: "theme", path: rel(targetPath), status: "out_of_sync", action: determineAction("out_of_sync"), preview })
-          if (!jsonOutput) {
-            if (mode === "plan") console.log(`plan: update ${rel(targetPath)}`)
-            else {
-              console.log(`drift: out-of-sync ${rel(targetPath)}`)
-              if (mode === "diff") for (const line of preview) console.log(line)
-            }
-          }
-          allGood = false
-        } else {
-          pushRecord(records, { kind: "theme", path: rel(targetPath), status: "ok", action: determineAction("ok") })
-          if (!jsonOutput) {
-            if (mode === "plan") console.log(`plan: no-change ${rel(targetPath)}`)
-            else console.log(`ok: ${rel(targetPath)}`)
-          }
-        }
+  if (checkOnly) {
+    if (existsSync(targetDir)) {
+      pushRecord(records, { kind: "theme", path: rel(targetDir), status: "out_of_sync", action: determineAction("out_of_sync") })
+      if (!jsonOutput) {
+        if (mode === "plan") console.log(`plan: remove stale ${rel(targetDir)}`)
+        else console.log(`drift: stale ${rel(targetDir)} (themes resolve from ~/.mah/extensions/themes)`)
       }
-    } else {
-      // Sync mode - copy file
-      mkdirSync(path.dirname(targetPath), { recursive: true })
-      cpSync(sourcePath, targetPath, { force: true })
-      console.log(`synced: ${rel(targetPath)}`)
-      pushRecord(records, { kind: "theme", path: rel(targetPath), status: "synced", action: determineAction("synced") })
+      return false
     }
+    if (!jsonOutput) {
+      if (mode === "plan") console.log("plan: themes resolved from ~/.mah/extensions/themes")
+      else console.log("ok: themes resolved from ~/.mah/extensions/themes")
+    }
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "ok", action: determineAction("ok") })
+    return true
   }
-  return allGood
+
+  if (existsSync(targetDir)) {
+    rmSync(targetDir, { recursive: true, force: true })
+    console.log(`removed: ${rel(targetDir)} (themes resolve from ~/.mah/extensions/themes)`)
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "synced", action: determineAction("synced") })
+  } else {
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "ok", action: determineAction("ok") })
+  }
+  return true
 }
 
 function ensureRuntimeSkills(runtime, mode, records, jsonOutput) {
@@ -728,10 +706,11 @@ function runtimeTools(agent, runtime) {
 
 function runtimeSkillPaths(meta, skillRefs, runtime) {
   const result = []
-  const refs = [...(meta.catalog?.shared_skills || []), ...(skillRefs || [])]
+  const refs = [...defaultSharedSkills, ...(skillRefs || [])]
   for (const ref of new Set(refs)) {
-    const mapped = meta.catalog?.skills?.[ref]?.[runtime]
-    if (mapped) result.push(mapped)
+    const slug = `${ref || ""}`.trim().replaceAll("_", "-")
+    if (!slug) continue
+    result.push(`.${runtime}/skills/${slug}/SKILL.md`)
   }
   return result
 }
@@ -1048,7 +1027,7 @@ const jsonOutput = argv.includes("--json")
 const raw = readFileSync(metaConfigPath, "utf-8")
 const metaDoc = YAML.parse(raw)
 const records = []
-const activeRuntimes = detectActiveRuntimes(metaDoc)
+const activeRuntimes = detectActiveRuntimes()
 
 if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   fail("meta-agents.yaml has no crews")

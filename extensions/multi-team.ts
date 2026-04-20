@@ -7,7 +7,7 @@
  * - Worker: executes code tasks directly within its ownership domain
  *
  * The runtime is driven by a selected crew config (typically .pi/crew/<crew>/multi-team.yaml)
- * plus shared skills under .pi/skills/.
+ * plus shared assets from the MAH overlay, which prefers ~/.mah/ and falls back to the local repo.
  *
  * Usage:
  *   pi -e extensions/multi-team.ts

@@ -4,27 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
-## [Unreleased]
-
-### Fixed
-- AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first.
-- Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail.
-- `mah run` for PI now falls back to the MAH package's bundled `extensions/` assets when the current repo does not have local extension files.
-- The custom `multi-team.yaml` parser now keeps all teams when list items wrap across multiple lines, so PI multi-team runs surface every lead instead of truncating after the first team.
-- MCP bridge tool calls now return controlled timeout errors instead of throwing out of the runtime, and Stitch gets a longer per-request timeout in PI MCP config.
-- Increased the PI Stitch MCP timeout again for long-running `generate_screen_from_text` calls.
-- Added `npm run stitch:secrets` to populate `GOOGLE_CLOUD_PROJECT` and `STITCH_ACCESS_TOKEN` directly in the target repo `.env` without overwriting the rest of the file.
+## [0.8.0]
 
 ### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
 - Workspace-aware root resolution so a global `mah` command operates on the current repo instead of the package install directory
 - `meta-agents-harness` packaging alias and install scripts for local/global usage
+- `npm run stitch:secrets` to populate `GOOGLE_CLOUD_PROJECT` and `STITCH_ACCESS_TOKEN` directly in the target repo `.env` without overwriting the rest of the file
 
 ### Changed
 - Runtime detection now follows a stricter plugin-first model: forced runtime flags and repository markers only
 - Detection no longer infers a runtime from an executable on `PATH` when the workspace has no runtime markers
 - Runtime terminology across docs and loader output now uses plugin-based language instead of built-in/core runtime wording
 - Bundled runtime plugins remain prioritized over installed plugins with the same name
+- Skill path resolution now uses a convention-based default (`skills/<skill-slug>/SKILL.md`) instead of a per-runtime matrix in `meta-agents.yaml`
 
 ### Fixed
 - Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
@@ -34,8 +27,14 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah init` now writes `.mcp.json` and runtime markers into the caller repo instead of the MAH package directory
 - `mah sync` now materializes only the runtime markers present in the current repo
 - `mah init --ai` now forwards AI bootstrap flags to the bootstrap script and uses the bundled `bootstrap` skill instead of the retired `bootstrap-config-architect` name
-
-## [0.8.0] - 2026-04-19
+- AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first
+- Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail
+- `mah run` for PI now falls back to the MAH package's bundled `extensions/` assets when the current repo does not have local extension files
+- The custom `multi-team.yaml` parser now keeps all teams when list items wrap across multiple lines, so PI multi-team runs surface every lead instead of truncating after the first team
+- MCP bridge tool calls now return controlled timeout errors instead of throwing out of the runtime, and Stitch gets a longer per-request timeout in PI MCP config
+- Increased the PI Stitch MCP timeout again for long-running `generate_screen_from_text` calls
+- Added regression coverage for the PI theme overlay registration so the global settings expose `~/.mah/extensions/themes`
+- Added regression coverage for `mah run -c` resolving PI extensions from `~/.mah`
 
 ### Added
 - **Context Memory Engine (M4 — PR1+PR2+PR3+PR4)** — new canonical layer for operational context retrieval, separate from Expertise routing

@@ -12,38 +12,6 @@ version: 1
 name: "my-project"
 description: "Example project using Hermes runtime via Meta Agents Harness"
 
-runtime_detection:
-  order:
-    - forced
-    - marker
-    - cli
-  forced:
-    args:
-      - "--runtime=<name>"
-      - "--runtime <name>"
-      - "-r <name>"
-      - "-f <name>"
-    env:
-      - MAH_RUNTIME
-  marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-    hermes: ".hermes"
-  cli:
-    pi:
-      direct_cli: "pi"
-      wrapper: "pimh"
-    claude:
-      direct_cli: "claude"
-      wrapper: "ccmh"
-    opencode:
-      direct_cli: "opencode"
-      wrapper: "ocmh"
-    hermes:
-      direct_cli: "hermes"
-      wrapper: "hermesh"
-
 runtimes:
   hermes:
     wrapper: "hermesh"

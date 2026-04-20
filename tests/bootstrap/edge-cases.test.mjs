@@ -146,7 +146,7 @@ test.describe("Partial Input Handling", () => {
       const parsed = YAML.parse(readFileSync(configPath, "utf-8"))
       assert.equal(parsed.name, "custom-name")
       assert.equal(parsed.crews[0].id, "dev", "Should use default crew id")
-      assert.ok(parsed.runtime_detection, "Should have runtime_detection defaults")
+      assert.equal(parsed.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -216,7 +216,7 @@ test.describe("Partial Input Handling", () => {
       assert.equal(parsed.name, path.basename(tempDir), "Should use cwd basename")
       assert.equal(parsed.crews[0].id, "dev", "Should use default crew id 'dev'")
       assert.ok(parsed.description, "Should have default description")
-      assert.ok(parsed.runtime_detection, "Should have runtime_detection")
+      assert.equal(parsed.runtime_detection, undefined, "Runtime detection should be internal and omitted")
       assert.ok(parsed.runtimes, "Should have runtimes")
       assert.ok(parsed.catalog, "Should have catalog")
     } finally {

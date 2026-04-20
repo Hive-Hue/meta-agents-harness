@@ -1,13 +1,15 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { z } from "zod"
+import { resolveMahHome } from "./mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 const configPath = path.join(repoRoot, "meta-agents.yaml")
+const defaultSharedSkills = ["context_memory"]
 
 const runtimeDetectionSchema = z.object({
   order: z.array(z.enum(["forced", "marker", "cli"])).min(1),
@@ -73,14 +75,13 @@ const schema = z.object({
   version: z.literal(1),
   name: z.string().min(1),
   description: z.string().optional(),
-  runtime_detection: runtimeDetectionSchema,
+  runtime_detection: runtimeDetectionSchema.optional(),
   runtimes: z.record(z.string(), z.object({
     wrapper: z.string().optional()
   }).passthrough()),
   catalog: z.object({
     models: z.record(z.string(), z.string()).default({}),
-    model_fallbacks: z.record(z.string(), z.array(z.string())).optional(),
-    skills: z.record(z.string(), z.record(z.string(), z.string())).default({})
+    model_fallbacks: z.record(z.string(), z.array(z.string())).optional()
   }).passthrough(),
   domain_profiles: z.record(z.string(), z.array(domainRuleSchema)).optional(),
   crews: z.array(crewSchema).min(1)
@@ -100,8 +101,21 @@ function validateCrossRefs(config) {
   }
 
   const modelRefs = new Set(Object.keys(config.catalog?.models || {}))
-  const skillRefs = new Set(Object.keys(config.catalog?.skills || {}))
   const domainRefs = new Set(Object.keys(config.domain_profiles || {}))
+  const canonicalSkillRefs = new Set([
+    ...defaultSharedSkills,
+    ...((config.crews || []).flatMap((crew) => (crew.agents || []).flatMap((agent) => agent.skills || [])))
+  ])
+
+  for (const skillRef of canonicalSkillRefs) {
+    const slug = `${skillRef || ""}`.trim().replaceAll("_", "-")
+    if (!slug) continue
+    const localSkillPath = path.join(repoRoot, "skills", slug, "SKILL.md")
+    const homeSkillPath = path.join(resolveMahHome(), "skills", slug, "SKILL.md")
+    if (!existsSync(localSkillPath) && !existsSync(homeSkillPath)) {
+      issues.push(`skill ref '${skillRef}' does not resolve to a skill at 'skills/${slug}/SKILL.md' or '~/.mah/skills/${slug}/SKILL.md'`)
+    }
+  }
 
   for (const crew of config.crews || []) {
     const agentMap = new Map()

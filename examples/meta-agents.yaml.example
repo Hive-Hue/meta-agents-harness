@@ -4,32 +4,7 @@
 version: 1
 name: "meta-agents-harness"
 description: "Unified configuration for OpenCode, Claude Code, and PI."
-
-runtime_detection:
-  order:
-    - forced
-    - marker
-    - cli
-  forced:
-    args:
-      - "--runtime=<name>"
-      - "--runtime <name>"
-    env:
-      - MAH_RUNTIME
-  marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-  cli:
-    pi:
-      direct_cli: "pi"
-      wrapper: "pimh"
-    claude:
-      direct_cli: "claude"
-      wrapper: "ccmh"
-    opencode:
-      direct_cli: "opencode"
-      wrapper: "ocmh"
+# Runtime detection defaults are internal to MAH and intentionally omitted here.
 
 runtimes:
   pi:
@@ -53,6 +28,7 @@ runtimes:
     task_policy: "permission.task"
 
 catalog:
+  # Skill refs resolve by convention: skills/<skill-slug>/SKILL.md
   models:
     orchestrator_default: "zai/glm-4.7"
     lead_default: "openrouter/nvidia/nemotron-3-super-120b-a12b:free"
@@ -199,15 +175,3 @@ crews:
         multi_team:
           session_root: ".pi/crew/marketing/sessions"
           extension_entry: "extensions/multi-team.ts"
-
-adapters:
-  mapping_rules:
-    roles_to_runtime:
-      opencode: "agents + permission.task"
-      claude: "agents + CCR route map"
-      pi: "multi-team.yaml + extension runtime"
-    permissions_to_runtime:
-      read_write_scopes:
-        opencode: "permission.read / permission.edit"
-        claude: "tool allowlist + route scope"
-        pi: "domain.read / domain.upsert / domain.delete"

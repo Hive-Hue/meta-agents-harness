@@ -12,13 +12,14 @@ Owns declarative and semantic config checks:
 
 - schema and required fields
 - config version compatibility
-- cross-reference integrity (`model_ref`, `skills`, `domain_profile`, topology references)
+- cross-reference integrity (`model_ref`, `agent.skills`, `domain_profile`, topology references)
 
 Primary failure examples:
 
 - unknown `model_ref`
 - missing orchestrator agent in crew topology
 - unsupported config version
+- unknown skill refs declared on an agent
 
 ### `validate:runtime`
 

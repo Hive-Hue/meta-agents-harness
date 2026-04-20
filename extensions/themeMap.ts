@@ -1,11 +1,11 @@
 /**
  * themeMap.ts — Per-extension default theme assignments
  *
- * Themes live in .pi/themes/ and are mapped by extension filename (no extension).
+ * Themes live under the extension overlay (`extensions/themes/`) and are mapped by extension filename (no extension).
  * Each extension calls applyExtensionTheme(import.meta.url, ctx) in its session_start
  * hook to automatically load its designated theme on boot.
  *
- * Available themes (.pi/themes/):
+ * Available themes (overlay path: `extensions/themes/`):
  *   catppuccin-mocha · cyberpunk · dracula · everforest · gruvbox
  *   midnight-ocean   · nord      · ocean-breeze · rose-pine
  *   synthwave        · tokyo-night
@@ -18,7 +18,7 @@ import { fileURLToPath } from "url";
 // ── Theme assignments ──────────────────────────────────────────────────────
 //
 // Key   = extension filename without extension (matches extensions/<key>.ts)
-// Value = theme name from .pi/themes/<value>.json
+// Value = theme name from the overlay theme directory
 //
 export const THEME_MAP: Record<string, string> = {
 	"agent-chain":        "midnight-ocean",   // deep sequential pipeline

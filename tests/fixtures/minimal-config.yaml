@@ -2,38 +2,6 @@ version: 1
 name: "test-project"
 description: "Test project description"
 
-runtime_detection:
-  order:
-    - forced
-    - marker
-    - cli
-  forced:
-    args:
-      - "--runtime=<name>"
-      - "--runtime <name>"
-      - "-r <name>"
-      - "-f <name>"
-    env:
-      - MAH_RUNTIME
-  marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-    hermes: ".hermes"
-  cli:
-    pi:
-      direct_cli: "pi"
-      wrapper: "pimh"
-    claude:
-      direct_cli: "claude"
-      wrapper: "ccmh"
-    opencode:
-      direct_cli: "opencode"
-      wrapper: "ocmh"
-    hermes:
-      direct_cli: "hermes"
-      wrapper: "hermesh"
-
 runtimes:
   pi:
     wrapper: "pimh"
@@ -57,22 +25,6 @@ catalog:
     orchestrator_default: "zai/glm-4.7"
     lead_default: "zai/glm-4.7"
     worker_default: "zai/glm-5-turbo"
-  skills:
-    delegate_bounded:
-      pi: ".pi/skills/delegate-bounded/SKILL.md"
-      claude: ".claude/skills/delegate-bounded/SKILL.md"
-      opencode: ".opencode/skills/delegate-bounded/SKILL.md"
-      hermes: ".hermes/skills/delegate-bounded/SKILL.md"
-    zero_micromanagement:
-      pi: ".pi/skills/zero-micromanagement/SKILL.md"
-      claude: ".claude/skills/zero-micromanagement/SKILL.md"
-      opencode: ".opencode/skills/zero-micromanagement/SKILL.md"
-      hermes: ".hermes/skills/zero-micromanagement/SKILL.md"
-    expertise_model:
-      pi: ".pi/skills/expertise-model/SKILL.md"
-      claude: ".claude/skills/expertise-model/SKILL.md"
-      opencode: ".opencode/skills/expertise-model/SKILL.md"
-      hermes: ".hermes/skills/expertise-model/SKILL.md"
   domain_profiles:
     read_only_repo:
       - path: "."

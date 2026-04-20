@@ -13,18 +13,6 @@ version: 1
 name: "hermes-simple-crew"
 description: "Minimal Hermes crew configuration"
 
-runtime_detection:
-  order: [forced, marker, cli]
-  forced:
-    args: ["--runtime=<name>", "--runtime <name>"]
-    env: ["MAH_RUNTIME"]
-  marker:
-    hermes: ".hermes"
-  cli:
-    hermes:
-      direct_cli: "hermes"
-      wrapper: "hermesh"
-
 runtimes:
   hermes:
     wrapper: "hermesh"

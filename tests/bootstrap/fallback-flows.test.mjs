@@ -45,6 +45,7 @@ test.describe("Fallback Flow - API Key Missing but AI Mode Requested", () => {
       assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created")
       const config = readConfig(tempDir)
       assert.equal(config.version, 1, "Should have valid version")
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -63,6 +64,8 @@ test.describe("Fallback Flow - API Key Missing but AI Mode Requested", () => {
       )
 
       assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created")
+      const config = readConfig(tempDir)
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -78,6 +81,7 @@ test.describe("Fallback Flow - API Key Missing but AI Mode Requested", () => {
       assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created in CI")
       const config = readConfig(tempDir)
       assert.equal(config.version, 1, "Should have valid config")
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -92,6 +96,7 @@ test.describe("Fallback Flow - API Key Missing but AI Mode Requested", () => {
       assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created on fallback")
       const config = readConfig(tempDir)
       assert.equal(config.version, 1, "Should have valid version after fallback")
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -172,7 +177,7 @@ test.describe("Fallback Flow - Unrecognized Runtime Type", () => {
       assert.equal(result.status, 0, result.stderr)
 
       const config = readConfig(tempDir)
-      assert.ok(config.runtime_detection, "Should have runtime_detection")
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -187,6 +192,7 @@ test.describe("Fallback Flow - Unrecognized Runtime Type", () => {
       const config = readConfig(tempDir)
       assert.equal(config.version, 1, "Should have valid version")
       assert.ok(config.runtimes, "Should have runtimes with defaults")
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -203,7 +209,7 @@ test.describe("Fallback Flow - Unrecognized Runtime Type", () => {
       assert.equal(result.status, 0, result.stderr)
 
       const config = readConfig(tempDir)
-      assert.ok(config.runtime_detection.marker, "Should have marker detection")
+      assert.equal(config.runtime_detection, undefined, "Runtime detection should be internal and omitted")
       assert.ok(config.runtimes, "Should have all runtime configs")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })

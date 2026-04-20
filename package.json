@@ -10,8 +10,8 @@
   "scripts": {
     "setup": "node scripts/setup.mjs",
     "stitch:secrets": "node scripts/generate-stitch-secrets.mjs",
-    "install:global": "npm install -g .",
-    "link:global": "npm link",
+    "install:global": "npm install -g . && node scripts/prepare-mah-home.mjs",
+    "link:global": "npm link && node scripts/prepare-mah-home.mjs",
     "bootstrap:meta": "node scripts/bootstrap-meta-agents.mjs",
     "generate:meta": "node scripts/meta-agents-harness.mjs generate",
     "sync:meta": "node scripts/sync-meta-agents.mjs",
