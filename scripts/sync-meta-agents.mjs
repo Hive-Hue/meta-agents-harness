@@ -638,13 +638,13 @@ function ensureRuntimeSkills(runtime, mode, records, jsonOutput) {
 
   rmSync(targetDir, { recursive: true, force: true })
   for (const skill of sourceSkills) {
-    const sourceSkillFile = path.join(sourceDir, skill, "SKILL.md")
-    if (!existsSync(sourceSkillFile)) continue
-    const targetSkillFile = path.join(targetDir, skill, "SKILL.md")
-    mkdirSync(path.dirname(targetSkillFile), { recursive: true })
-    cpSync(sourceSkillFile, targetSkillFile, { force: true })
-    console.log(`synced: ${rel(targetSkillFile)}`)
-    pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "synced", action: determineAction("synced") })
+    const sourceSkillDir = path.join(sourceDir, skill)
+    if (!existsSync(sourceSkillDir)) continue
+    const targetSkillDir = path.join(targetDir, skill)
+    mkdirSync(path.dirname(targetSkillDir), { recursive: true })
+    cpSync(sourceSkillDir, targetSkillDir, { recursive: true, force: true })
+    console.log(`synced: ${rel(targetSkillDir)}/`)
+    pushRecord(records, { kind: "skill", path: rel(targetSkillDir), status: "synced", action: determineAction("synced") })
   }
   return true
 }
@@ -663,13 +663,23 @@ function injectAgentPermissions(content, agent, allowDelegate, byId, meta, runti
     body = match[2]
   }
 
-  // Inject model from model_ref
   const resolvedModel = resolveAgentModel(meta, runtime, agent)
   if (resolvedModel && resolvedModel !== "inherit") {
     frontmatter.model = resolvedModel
-    // Also update Model: in body (markdown format) if present.
     body = body.replace(/^Model: `.*`$/m, `Model: \`${resolvedModel}\``)
   }
+
+  const skillsByPath = new Map(
+    Array.isArray(frontmatter.skills)
+      ? frontmatter.skills
+        .map((item) => [item?.path, item?.["use-when"] || item?.use_when || ""])
+        .filter((item) => typeof item[0] === "string" && item[0].trim())
+      : []
+  )
+  frontmatter.skills = runtimeSkillPaths(meta, agent.skills, runtime).map((item) => ({
+    path: item,
+    "use-when": skillsByPath.get(item) || "Use when relevant to current task."
+  }))
 
   const role = agent.role
   let taskPermissions = null
@@ -764,8 +774,10 @@ function runtimeMcpAccess() {
 
 function resolveModel(meta, runtime, modelRef) {
   const override = meta.runtimes?.[runtime]?.model_overrides?.[modelRef]
-  if (override) return normalizeModelId(override)
-  return normalizeModelId(meta.catalog?.models?.[modelRef] || "inherit")
+  if (override) return override
+  const catalogModel = meta.catalog?.models?.[modelRef] || "inherit"
+  if (runtime === "opencode" || runtime === "kilo") return catalogModel
+  return normalizeModelId(catalogModel)
 }
 
 function resolveModelToken(meta, runtime, token) {

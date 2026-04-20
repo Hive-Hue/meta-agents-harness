@@ -20,6 +20,16 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Skill path resolution now uses a convention-based default (`skills/<skill-slug>/SKILL.md`) instead of a per-runtime matrix in `meta-agents.yaml`
 - Expertise catalog resolution is now workspace-local only, and reports workspace paths instead of package-repo paths
 
+### Added
+- Caveman skill suite (`caveman`, `caveman-commit`, `caveman-compress`, `caveman-help`, `caveman-review`) registered on all agents across all teams
+- `.env.stitch` added to `.gitignore` to prevent credential leaks
+
+### Changed
+- Orchestrator model updated from `glm-5-turbo` to `glm-5`
+- Skill sync now copies entire skill directories (including scripts) instead of only `SKILL.md`
+- Agent skill injection preserves existing `use-when` metadata from frontmatter instead of overwriting
+- Model resolution for opencode and kilo runtimes returns raw catalog model IDs (no normalization)
+
 ### Fixed
 - Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
 - `mah detect` now reports a stable unknown state in repositories without runtime markers

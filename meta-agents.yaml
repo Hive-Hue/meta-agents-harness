@@ -20,7 +20,7 @@ runtimes:
   corefake: {}
 catalog:
   models:
-    orchestrator_default: zai-coding-plan/glm-5-turbo
+    orchestrator_default: zai-coding-plan/glm-5
     lead_default: minimax-coding-plan/MiniMax-M2.7
     worker_default: minimax-coding-plan/MiniMax-M2.7
     qa_default: openai-codex/gpt-5.3-codex
@@ -391,6 +391,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: read_only_repo
         sprint_responsibilities:
           - control v0.8.0 scope
@@ -407,6 +412,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: planning_delivery
         sprint_responsibilities:
           - translate Context Memory plan into executable backlog
@@ -422,6 +432,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: runtime_impl
         sprint_responsibilities:
           - coordinate schema, index, retrieval, and runtime integration streams
@@ -436,6 +451,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: validation_runtime
         sprint_responsibilities:
           - define quality gates for schema, retrieval, and bootstrap injection
@@ -449,6 +469,10 @@ crews:
         expertise: repo-analyst-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: read_only_repo
         sprint_responsibilities:
           - map real codebase integration points for Context Memory
@@ -462,6 +486,10 @@ crews:
         expertise: solution-architect-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: planning_delivery
         sprint_responsibilities:
           - define context memory document, index, and retrieval contracts
@@ -474,6 +502,11 @@ crews:
         expertise: frontend-dev-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile:
           - cli_operator_surface
           - runtime_impl
@@ -488,6 +521,11 @@ crews:
         expertise: backend-dev-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile:
           - cli_operator_surface
           - runtime_impl
@@ -502,6 +540,10 @@ crews:
         expertise: qa-reviewer-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: validation_runtime
         sprint_responsibilities:
           - run context unit, integration, and contract tests
@@ -515,6 +557,10 @@ crews:
         expertise: security-reviewer-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: validation_runtime
         sprint_responsibilities:
           - review path traversal, prompt inflation, and memory poisoning risks
