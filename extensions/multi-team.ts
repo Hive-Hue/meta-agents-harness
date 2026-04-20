@@ -2136,31 +2136,91 @@ export default function (pi: ExtensionAPI) {
 		const statusColor = state.status === "idle" ? "dim"
 			: state.status === "running" ? "accent"
 				: state.status === "done" ? "success" : "error";
+
+		// Status icons — animated spinner for running
+		const CARD_SPINNERS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+		const spinIdx = Math.floor(Date.now() / 80) % CARD_SPINNERS.length;
 		const statusIcon = state.status === "idle" ? "○"
-			: state.status === "running" ? "●"
+			: state.status === "running" ? CARD_SPINNERS[spinIdx]
 				: state.status === "done" ? "✓" : "✗";
+
+		// Role badge with icon
+		const roleIcon = state.role === "lead" ? "◆" : "◇";
 		const roleLabel = state.role === "lead" ? "Lead" : "Worker";
-		const titleText = shortText(displayName(state.agent.name), contentWidth);
-		const metaText = shortText(state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel, contentWidth);
-		const statusText = shortText(`${statusIcon} ${state.status}${state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : ""}`, contentWidth);
+
+		// Title row
+		const titleText = shortText(displayName(state.agent.name), contentWidth - 2);
+
+		// Meta row: role badge + team
+		const metaText = shortText(`${roleIcon} ${state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel}`, contentWidth);
+
+		// Status row: icon + status + elapsed + run count
+		const elapsedText = state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : "";
+		const runLabel = state.runCount > 0 ? ` #${state.runCount}` : "";
+		const statusText = shortText(`${statusIcon} ${state.status}${elapsedText}${runLabel}`, contentWidth);
+
+		// Task row
 		const taskText = shortText(state.task || state.agent.description || "idle", contentWidth);
+
+		// Last line preview (truncated)
+		const hasLastLine = state.status === "running" && !!state.lastLine.trim();
+		const lastLineText = hasLastLine
+			? shortText(`↳ ${state.lastLine.trim()}`, contentWidth)
+			: "";
+
+		// Card assembly
 		const title = theme.fg("accent", theme.bold(titleText));
 		const meta = theme.fg("dim", metaText);
 		const status = theme.fg(statusColor, statusText);
 		const task = theme.fg("muted", taskText);
-		const top = "┌" + "─".repeat(width) + "┐";
-		const bot = "└" + "─".repeat(width) + "┘";
+
+		// Top border with status-colored accent
+		const accentWidth = Math.min(width, 4);
+		const topAccent = theme.fg(statusColor, "━".repeat(accentWidth));
+		const topRest = theme.fg("dim", "─".repeat(Math.max(0, width - accentWidth)));
+		const top = theme.fg("dim", "┌") + topAccent + topRest + theme.fg("dim", "┐");
+		const bot = theme.fg("dim", "└") + theme.fg("dim", "─".repeat(width)) + theme.fg("dim", "┘");
+
 		const row = (content: string, visible: string) =>
 			theme.fg("dim", "│") + " " + content + " ".repeat(Math.max(0, contentWidth - visibleWidth(visible))) + theme.fg("dim", "│");
 
-		return [
-			theme.fg("dim", top),
+		// Progress bar for running agents
+		let progressRow = "";
+		if (state.status === "running") {
+			const barWidth = Math.max(4, contentWidth - 2);
+			const elapsed = Math.round(state.elapsed / 1000);
+			const cycle = elapsed % barWidth;
+			const barChars = Array(barWidth).fill("─");
+			// Animated sweep
+			for (let k = 0; k < 3 && cycle + k < barWidth; k++) {
+				barChars[cycle + k] = "━";
+			}
+			const barStr = barChars.join("");
+			const barVisible = ` ${barStr} `;
+			progressRow = theme.fg("dim", "│") + " " +
+				theme.fg("accent", barStr) +
+				" ".repeat(Math.max(0, contentWidth - visibleWidth(barStr))) +
+				theme.fg("dim", "│");
+		}
+
+		const rows = [
+			top,
 			row(title, titleText),
 			row(meta, metaText),
 			row(status, statusText),
 			row(task, taskText),
-			theme.fg("dim", bot),
 		];
+
+		if (hasLastLine) {
+			rows.push(row(theme.fg("dim", lastLineText), lastLineText));
+		}
+
+		if (progressRow) {
+			rows.push(progressRow);
+		}
+
+		rows.push(bot);
+		return rows;
 	}
 
 	function updateWidget() {
@@ -2176,34 +2236,67 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					const items = Array.from(cards.values());
+					const lines: string[] = [];
+
+					// ── Header summary bar (opencode-style) ──
+					const running = items.filter((c) => c.status === "running").length;
+					const done = items.filter((c) => c.status === "done").length;
+					const errored = items.filter((c) => c.status === "error").length;
+					const idle = items.filter((c) => c.status === "idle").length;
+
+					const WIDGET_SPINNERS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+					const wSpinIdx = Math.floor(Date.now() / 80) % WIDGET_SPINNERS.length;
+					const spinChar = running > 0 ? WIDGET_SPINNERS[wSpinIdx] : "●";
+
+					const headerParts: string[] = [];
+					headerParts.push(theme.fg("accent", theme.bold(` ${spinChar} Agents`)));
+					if (running > 0) headerParts.push(theme.fg("accent", ` ${running} running`));
+					if (done > 0) headerParts.push(theme.fg("success", ` ${done} done`));
+					if (errored > 0) headerParts.push(theme.fg("error", ` ${errored} error`));
+					if (idle > 0) headerParts.push(theme.fg("dim", ` ${idle} idle`));
+
+					const headerLeft = headerParts.join(theme.fg("dim", " ·"));
+					const roleName = runtime.role === "orchestrator" ? "Orchestrator" : "Lead";
+					const headerRight = theme.fg("dim", `${roleName} `);
+					const headerPad = Math.max(0, width - visibleWidth(headerLeft) - visibleWidth(headerRight));
+					lines.push(truncateToWidth(headerLeft + " ".repeat(headerPad) + headerRight, width));
+					lines.push(theme.fg("accent", "━".repeat(Math.min(4, width))) + theme.fg("dim", "─".repeat(Math.max(0, width - 4))));
+
+					// ── Cards grid ──
 					const cols = Math.min(runtime.role === "orchestrator" ? 3 : 2, items.length);
 					const gap = 1;
 					const colWidth = Math.floor((width - gap * (cols - 1)) / cols);
-					const lines: string[] = [];
 
 					for (let i = 0; i < items.length; i += cols) {
 						const rowItems = items.slice(i, i + cols);
 						const cardRows = rowItems.map((item) => renderCard(item, colWidth, theme));
-						const cardHeight = cardRows[0]?.length || 0;
-						while (cardRows.length < cols) cardRows.push(Array(cardHeight).fill(" ".repeat(colWidth)));
-						for (let row = 0; row < cardRows[0].length; row++) {
+
+						// Normalize card heights (cards now vary in height)
+						const maxHeight = Math.max(...cardRows.map((cr) => cr.length));
+						for (const cr of cardRows) {
+							while (cr.length < maxHeight) {
+								cr.push(" ".repeat(colWidth));
+							}
+						}
+
+						// Fill remaining columns with blanks
+						while (cardRows.length < cols) cardRows.push(Array(maxHeight).fill(" ".repeat(colWidth)));
+
+						for (let row = 0; row < maxHeight; row++) {
 							lines.push(cardRows.map((card) => card[row] || "").join(" ".repeat(gap)));
 						}
 					}
 
-					const runningWithLast = items.filter((item) =>
-						item.status === "running" && !!item.lastLine.trim()
-					);
-					if (runningWithLast.length > 0) {
-						lines.push(theme.fg("dim", "─".repeat(Math.max(1, width))));
-						for (const item of runningWithLast) {
-							const teamLabel = item.teamName || displayName(item.agent.name);
-							const prefix = `- ${teamLabel}: `;
-							const available = Math.max(8, width - visibleWidth(prefix));
-							const suffix = middleEllipsis(item.lastLine, available);
-							lines.push(truncateToWidth(theme.fg("dim", prefix + suffix), width));
-						}
-					}
+					// ── Footer status bar ──
+					const totalElapsed = items.reduce((sum, c) => sum + (c.status !== "idle" ? c.elapsed : 0), 0);
+					const totalRuns = items.reduce((sum, c) => sum + c.runCount, 0);
+					const footerLeft = theme.fg("dim", ` ${items.length} agents · ${totalRuns} total runs`);
+					const footerRight = totalElapsed > 0
+						? theme.fg("dim", `${Math.round(totalElapsed / 1000)}s elapsed `)
+						: "";
+					const footerPad = Math.max(0, width - visibleWidth(footerLeft) - visibleWidth(footerRight));
+					lines.push(theme.fg("dim", "─".repeat(width)));
+					lines.push(truncateToWidth(footerLeft + " ".repeat(footerPad) + footerRight, width));
 
 					text.setText(lines.join("\n"));
 					return text.render(width);
