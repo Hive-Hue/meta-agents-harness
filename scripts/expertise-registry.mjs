@@ -5,14 +5,16 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'node:fs'
-import { join, dirname, relative } from 'node:path'
+import { join, dirname, relative, resolve, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { loadExpertiseCatalog } from './expertise-loader.mjs'
+import { loadExpertiseCatalog, resolveCatalogRoots } from './expertise-loader.mjs'
+import { resolveMahHome, resolveMahHomePath } from './mah-home.mjs'
+import { resolveWorkspaceRoot } from './workspace-root.mjs'
 import { EXPERTISE_SCHEMA_VERSION } from '../types/expertise-types.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const repoRoot = join(__dirname, '..')
+const workspaceRoot = resolveWorkspaceRoot()
 
 // --------------------------------------------------------------------------
 // Types (mirrored from task spec)
@@ -63,18 +65,51 @@ function warn(...args) {
  * @returns {string}
  */
 function resolvePath(relPath) {
-  return join(repoRoot, relPath)
+  return join(workspaceRoot, relPath)
 }
 
 /**
- * Normalize a catalog path into a stable repo-relative string when possible.
+ * Normalize a catalog path into a stable workspace- or MAH-home-relative string.
  * @param {string} catalogPath
  * @returns {string}
  */
 function normalizeCatalogRoot(catalogPath) {
-  const relPath = relative(repoRoot, catalogPath).replace(/\\/g, '/')
-  if (relPath && !relPath.startsWith('..')) return relPath
+  const homeRoot = resolveMahHome()
+  const normalized = resolve(catalogPath)
+  if (normalized === homeRoot || normalized.startsWith(`${homeRoot}/`)) {
+    return `~/.mah/${relative(homeRoot, normalized).replace(/\\/g, '/')}`.replace(/\/$/, '')
+  }
+  const workspaceRel = relative(workspaceRoot, normalized).replace(/\\/g, '/')
+  if (workspaceRel && !workspaceRel.startsWith('..')) return workspaceRel
   return catalogPath.replace(/\\/g, '/')
+}
+
+/**
+ * Normalize one or more catalog roots.
+ * @param {string | string[]} catalogPath
+ * @returns {string[]}
+ */
+function normalizeCatalogRoots(catalogPath) {
+  const roots = Array.isArray(catalogPath) ? catalogPath : [catalogPath]
+  return [...new Set(roots.map(normalizeCatalogRoot).filter(Boolean))]
+}
+
+/**
+ * Convert an absolute expertise file path into a friendly display path.
+ * Prefer ~/.mah/ when the file is in the MAH home overlay, otherwise use the
+ * current workspace-relative path when possible.
+ * @param {string} filePath
+ * @returns {string}
+ */
+function displayExpertisePath(filePath) {
+  const homeRoot = resolveMahHome()
+  const normalized = resolve(filePath)
+  if (normalized === homeRoot || normalized.startsWith(`${homeRoot}/`)) {
+    return `~/.mah/${relative(homeRoot, normalized).replace(/\\/g, '/')}`.replace(/\/$/, '')
+  }
+  const workspaceRel = relative(workspaceRoot, normalized).replace(/\\/g, '/')
+  if (workspaceRel && !workspaceRel.startsWith('..')) return workspaceRel
+  return normalized.replace(/\\/g, '/')
 }
 
 /**
@@ -95,17 +130,16 @@ function ensureDir(dirPath) {
  */
 function deriveRegistryPath(expertise) {
   if (typeof expertise.__source_file === 'string') {
-    const relPath = relative(repoRoot, expertise.__source_file).replace(/\\/g, '/')
-    if (relPath && !relPath.startsWith('..')) return relPath
+    return displayExpertisePath(expertise.__source_file)
   }
 
   // The expertise ID format is "owner:name" — construct registry path
   // Default to catalog/{owner}/{name}.yaml
   const parts = expertise.id.split(':')
   if (parts.length >= 2) {
-    return `.mah/expertise/catalog/${parts[0]}/${parts[1]}.yaml`
+    return `~/.mah/expertise/catalog/${parts[0]}/${parts[1]}.yaml`
   }
-  return `.mah/expertise/catalog/${expertise.id}.yaml`
+  return `~/.mah/expertise/catalog/${expertise.id}.yaml`
 }
 
 /**
@@ -184,14 +218,20 @@ function toExpertiseRef(expertise) {
 
 /**
  * Compute the canonical registry path for an expertise id.
- * Canonical catalog layout is `.mah/expertise/catalog/{crew}/{name}.yaml`.
+ * Canonical catalog layout is `expertise/catalog/{crew}/{name}.yaml` under the active overlay.
  * @param {string} expertiseId
  * @returns {string}
  */
 function canonicalRegistryPathForId(expertiseId) {
   const [crew, name] = String(expertiseId || '').split(':')
-  if (crew && name) return `.mah/expertise/catalog/${crew}/${name}.yaml`
-  return `.mah/expertise/catalog/${expertiseId}.yaml`
+  if (crew && name) return `expertise/catalog/${crew}/${name}.yaml`
+  return `expertise/catalog/${expertiseId}.yaml`
+}
+
+function stripRegistryRootPrefix(registryPath) {
+  return String(registryPath || '')
+    .replace(/^~\/\.mah\//, '')
+    .replace(/^\.mah\//, '')
 }
 
 /**
@@ -202,9 +242,14 @@ function canonicalRegistryPathForId(expertiseId) {
  * @returns {ExpertiseRef}
  */
 function choosePreferredRef(current, candidate) {
-  const canonicalPath = canonicalRegistryPathForId(current.id)
-  const currentIsCanonical = current.registry_path === canonicalPath
-  const candidateIsCanonical = candidate.registry_path === canonicalPath
+  const currentIsGlobal = current.registry_path.startsWith('~/.mah/')
+  const candidateIsGlobal = candidate.registry_path.startsWith('~/.mah/')
+  if (currentIsGlobal && !candidateIsGlobal) return current
+  if (candidateIsGlobal && !currentIsGlobal) return candidate
+
+  const canonicalFileName = `${String(current.id || '').split(':')[1] || current.id}.yaml`
+  const currentIsCanonical = basename(current.registry_path) === canonicalFileName
+  const candidateIsCanonical = basename(candidate.registry_path) === canonicalFileName
 
   if (currentIsCanonical && !candidateIsCanonical) return current
   if (candidateIsCanonical && !currentIsCanonical) return candidate
@@ -279,11 +324,11 @@ function groupBy(entries, keyFn) {
  */
 export async function buildRegistry(options = {}) {
   const { catalogPath, outputPath } = options
-  const catalog = catalogPath || resolvePath('.mah/expertise/catalog')
+  const catalogRoots = resolveCatalogRoots(catalogPath)
   const output = outputPath || resolvePath('.mah/expertise/registry.json')
 
   // Load all expertise from catalog
-  const expertiseList = await loadExpertiseCatalog(catalog)
+  const expertiseList = await loadExpertiseCatalog(catalogRoots)
 
   // Convert to refs
   /** @type {ExpertiseRef[]} */
@@ -294,7 +339,8 @@ export async function buildRegistry(options = {}) {
   const registry = {
     schema_version: EXPERTISE_SCHEMA_VERSION,
     generated_at: new Date().toISOString(),
-    catalog_root: normalizeCatalogRoot(catalog),
+    catalog_root: normalizeCatalogRoots(catalogRoots)[0] || '',
+    catalog_roots: normalizeCatalogRoots(catalogRoots),
     total_count: entries.length,
     by_owner: groupBy(entries, (e) => extractOwnerLabel(e)),
     by_domain: groupBy(entries, (e) => e.domains.join(',') || 'unknown'),
@@ -331,7 +377,7 @@ export async function buildRegistry(options = {}) {
  */
 export async function readRegistry(registryPath, options = {}) {
   const resolved = registryPath || resolvePath('.mah/expertise/registry.json')
-  const expectedCatalogRoot = normalizeCatalogRoot(options.catalogPath || resolvePath('.mah/expertise/catalog'))
+  const expectedCatalogRoots = normalizeCatalogRoots(resolveCatalogRoots(options.catalogPath))
 
   if (!existsSync(resolved)) {
     warn(`registry not found at '${resolved}'`)
@@ -349,8 +395,13 @@ export async function readRegistry(registryPath, options = {}) {
       return null
     }
 
-    if (registry.catalog_root !== expectedCatalogRoot) {
-      warn(`registry catalog_root '${registry.catalog_root}' does not match expected '${expectedCatalogRoot}', treating as stale`)
+    const actualCatalogRoots = Array.isArray(registry.catalog_roots) && registry.catalog_roots.length > 0
+      ? registry.catalog_roots
+      : [registry.catalog_root]
+    const rootsMatch = actualCatalogRoots.length === expectedCatalogRoots.length
+      && actualCatalogRoots.every((value, index) => value === expectedCatalogRoots[index])
+    if (!rootsMatch) {
+      warn(`registry catalog_root '${actualCatalogRoots.join(', ')}' does not match expected '${expectedCatalogRoots.join(', ')}', treating as stale`)
       return null
     }
 

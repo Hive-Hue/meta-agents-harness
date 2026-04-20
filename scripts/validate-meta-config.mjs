@@ -128,7 +128,7 @@ function validateCrossRefs(config) {
         issues.push(`crew '${crew.id}' agent '${agent.id}' references unknown model_ref '${agent.model_ref}'`)
       }
       for (const skill of agent.skills || []) {
-        if (!skillRefs.has(skill)) {
+        if (!canonicalSkillRefs.has(skill)) {
           issues.push(`crew '${crew.id}' agent '${agent.id}' references unknown skill '${skill}'`)
         }
       }

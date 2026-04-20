@@ -95,6 +95,42 @@ function defaultExpertiseContent(agent) {
   }, { indent: 2 }).trimEnd()
 }
 
+function syncWorkspaceExpertiseCatalog(crew, mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
+  const expertiseDir = path.join(workspaceRoot, ".mah", "expertise", "catalog", crew.id)
+  mkdirSync(expertiseDir, { recursive: true })
+  let ok = true
+  for (const agent of crew.agents || []) {
+    const expertiseFile = path.join(expertiseDir, `${agent.id}.yaml`)
+    const currentRaw = existsSync(expertiseFile) ? readFileSync(expertiseFile, "utf-8") : ""
+    const nextRaw = defaultExpertiseContent(agent)
+    if (checkOnly) {
+      if (!currentRaw) {
+        pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`drift: missing ${rel(expertiseFile)}`)
+        ok = false
+        continue
+      }
+      if (currentRaw !== nextRaw) {
+        pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`drift: out-of-sync ${rel(expertiseFile)}`)
+        ok = false
+      } else {
+        pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+        if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+      }
+      continue
+    }
+
+    if (currentRaw !== nextRaw) {
+      writeFileSync(expertiseFile, nextRaw, "utf-8")
+      console.log(`synced: ${rel(expertiseFile)}`)
+      pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "synced", action: determineAction("synced"), crew: crew.id, agent: agent.id })
+    }
+  }
+  return ok
+}
+
 function runtimeSessionDirRoot(runtime, crew) {
   if (runtime === "pi") {
     return crew.session?.pi_root || `.${runtime}/crew/${crew.id}/sessions`
@@ -1035,6 +1071,7 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   let allGood = true
 
   for (const crew of metaDoc.crews) {
+    allGood = syncWorkspaceExpertiseCatalog(crew, mode, records, jsonOutput) && allGood
     if (activeRuntimes.includes("pi")) {
       const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
       const piPath = path.join(workspaceRoot, ".pi", "crew", crew.id, "multi-team.yaml")

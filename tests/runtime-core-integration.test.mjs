@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 import { preparePiRunContext } from "../scripts/runtime-core-integrations.mjs"
 import { ensurePiGlobalSettings, findMahSkillFile, resolveMahAssetPath } from "../scripts/mah-home.mjs"
+import { resolveWorkspaceRoot } from "../scripts/workspace-root.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -92,6 +93,131 @@ function run(args, options = {}) {
     stderr: existsSync(stderrPath) ? readFileSync(stderrPath, "utf-8") : ""
   }
 }
+
+test("global install does not seed expertise catalog under ~/.mah", () => {
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-home-layout-"))
+  try {
+    const binPath = path.join(repoRoot, "bin", "mah")
+    const result = spawnSync(process.execPath, [binPath, "--help"], {
+      cwd: repoRoot,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(result.status, 0, result.stderr)
+
+    const mahHome = path.join(tempHome, ".mah")
+    assert.equal(existsSync(path.join(mahHome, "expertise", "catalog")), false)
+  } finally {
+    rmSync(tempHome, { recursive: true, force: true })
+  }
+})
+
+test("mah sync materializes workspace-local expertise catalog", () => {
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-expertise-home-"))
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-expertise-workspace-"))
+  try {
+    const prepare = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "prepare-mah-home.mjs")], {
+      cwd: repoRoot,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(prepare.status, 0, prepare.stderr)
+
+    const initMeta = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs"), "--yes", "--force"], {
+      cwd: tempWorkspace,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(initMeta.status, 0, initMeta.stderr)
+
+    const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "meta-agents-harness.mjs"), "sync", "--json"], {
+      cwd: tempWorkspace,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(sync.status, 0, sync.stderr)
+    assert.ok(existsSync(path.join(tempWorkspace, ".mah", "expertise", "catalog", "dev", "orchestrator.yaml")))
+
+    const result = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "meta-agents-harness.mjs"), "expertise", "list", "--json"], {
+      cwd: tempWorkspace,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const payload = JSON.parse(result.stdout)
+    assert.equal(payload.count > 0, true)
+    assert.match(payload.expertise[0].registry_path, /^\.mah\/expertise\/catalog\//)
+  } finally {
+    rmSync(tempHome, { recursive: true, force: true })
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})
+
+test("expertise list from a nested workspace directory resolves the workspace root once", () => {
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-expertise-home-nested-"))
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-expertise-workspace-nested-"))
+  const nestedDir = path.join(tempWorkspace, ".mah", "expertise")
+  mkdirSync(nestedDir, { recursive: true })
+  writeFileSync(path.join(tempWorkspace, "meta-agents.yaml"), [
+    "version: 1",
+    "name: nested-workspace",
+    "description: nested workspace test",
+    "crews:",
+    "  - id: dev",
+    "    mission: nested workspace test",
+    "    topology:",
+    "      orchestrator: orchestrator",
+    "      leads:",
+    "        planning: planning-lead",
+    "      workers:",
+    "        planning:",
+    "          - repo-analyst",
+    "    agents:",
+    "      - id: orchestrator",
+    "        role: orchestrator",
+    "        team: orchestration",
+    "        expertise: orchestrator-expertise-model",
+    "      - id: planning-lead",
+    "        role: lead",
+    "        team: planning",
+    "        expertise: planning-lead-expertise-model",
+    "      - id: repo-analyst",
+    "        role: worker",
+    "        team: planning",
+    "        expertise: repo-analyst-expertise-model",
+    "",
+  ].join("\n"), "utf-8")
+  try {
+    const prepare = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "prepare-mah-home.mjs")], {
+      cwd: repoRoot,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(prepare.status, 0, prepare.stderr)
+
+    const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "meta-agents-harness.mjs"), "sync", "--json"], {
+      cwd: tempWorkspace,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(sync.status, 0, sync.stderr)
+
+    assert.equal(resolveWorkspaceRoot(nestedDir), tempWorkspace)
+
+    const result = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "meta-agents-harness.mjs"), "expertise", "list", "--json"], {
+      cwd: tempWorkspace,
+      env: { ...process.env, HOME: tempHome },
+      encoding: "utf-8"
+    })
+    assert.equal(result.status, 0, result.stderr)
+    const payload = JSON.parse(result.stdout)
+    assert.equal(payload.count > 0, true)
+    assert.match(payload.expertise[0].registry_path, /^\.mah\/expertise\/catalog\//)
+  } finally {
+    rmSync(tempHome, { recursive: true, force: true })
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})
 
 for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo", "codex"]) {
   test(`${runtime} list:crews is handled by MAH core without wrapper`, () => {

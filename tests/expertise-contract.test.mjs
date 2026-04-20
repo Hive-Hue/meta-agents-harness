@@ -9,12 +9,50 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
-import { parse as yamlParse } from 'yaml'
+import { parse as yamlParse, stringify as yamlStringify } from 'yaml'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const repoRoot = join(__dirname, '..')
 const fixturesDir = join(__dirname, 'fixtures', 'expertise')
+const localCatalogRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-local-catalog-'))
+const localRegistryPath = join(tmpdir(), `mah-expertise-local-registry-${Date.now()}.json`)
+
+function seedLocalCatalog() {
+  const devDir = join(localCatalogRoot, 'dev')
+  mkdirSync(devDir, { recursive: true })
+
+  const backendDev = {
+    id: 'dev:backend-dev',
+    owner: { agent: 'backend-dev', team: 'dev' },
+    schema_version: 'mah.expertise.v1',
+    capabilities: ['code-generation', 'routing'],
+    domains: ['software-engineering'],
+    allowed_environments: ['development'],
+    validation_status: 'validated',
+    confidence: { score: 0.92, band: 'high', evidence_count: 8 },
+    trust_tier: 'internal',
+    lifecycle: 'active'
+  }
+
+  const orchestrator = {
+    id: 'dev:orchestrator',
+    owner: { agent: 'orchestrator', team: 'dev' },
+    schema_version: 'mah.expertise.v1',
+    capabilities: ['task-planning', 'crew-coordination'],
+    domains: ['software-engineering', 'multi-agent-systems'],
+    allowed_environments: ['development'],
+    validation_status: 'validated',
+    confidence: { score: 0.87, band: 'high', evidence_count: 42 },
+    trust_tier: 'org',
+    lifecycle: 'active'
+  }
+
+  writeFileSync(join(devDir, 'backend-dev.yaml'), yamlStringify(backendDev), 'utf-8')
+  writeFileSync(join(devDir, 'orchestrator.yaml'), yamlStringify(orchestrator), 'utf-8')
+}
+
+seedLocalCatalog()
 
 // ---------------------------------------------------------------------------
 // Imports from modules under test
@@ -368,14 +406,8 @@ describe('expertise contract', () => {
   // 17. buildRegistry — creates registry.json
   // -------------------------------------------------------------------------
   it('buildRegistry creates registry.json', async () => {
-    const tmpCatalog = join(repoRoot, '.mah', 'expertise', 'catalog', 'dev')
-    mkdirSync(tmpCatalog, { recursive: true })
-    // Copy valid-minimal into the catalog path so buildRegistry finds something
-    const destPath = join(tmpCatalog, 'dev-orchestrator.yaml')
-    writeFileSync(destPath, readFileSync(join(fixturesDir, 'valid-minimal.yaml'), 'utf-8'), 'utf-8')
-
-    const registry = await buildRegistry({ catalogPath: tmpCatalog })
-    const registryPath = join(repoRoot, '.mah', 'expertise', 'registry.json')
+    const registry = await buildRegistry({ catalogPath: localCatalogRoot, outputPath: localRegistryPath })
+    const registryPath = localRegistryPath
     assert.ok(existsSync(registryPath), 'registry.json should exist')
     assert.equal(registry.schema_version, 'mah.expertise.v1')
     assert.equal(typeof registry.generated_at, 'string')
@@ -396,7 +428,7 @@ describe('expertise contract', () => {
     assert.equal(registry.total_count, 1)
     assert.equal(registry.entries.length, 1)
     assert.equal(registry.entries[0].id, 'dev:orchestrator')
-    assert.equal(registry.entries[0].registry_path, '.mah/expertise/catalog/dev/orchestrator.yaml')
+    assert.match(registry.entries[0].registry_path, /orchestrator\.yaml$/)
 
     rmSync(tmpCatalog, { recursive: true, force: true })
   })
@@ -405,8 +437,8 @@ describe('expertise contract', () => {
   // 18. readRegistry — returns cached registry
   // -------------------------------------------------------------------------
   it('readRegistry returns cached registry when fresh', async () => {
-    const registryPath = join(repoRoot, '.mah', 'expertise', 'registry.json')
-    const canonicalCatalog = join(repoRoot, '.mah', 'expertise', 'catalog')
+    const registryPath = localRegistryPath
+    const canonicalCatalog = localCatalogRoot
     await buildRegistry({ catalogPath: canonicalCatalog, outputPath: registryPath })
     assert.ok(existsSync(registryPath), 'registry.json must exist after rebuild')
     const cached = await readRegistry(registryPath, { catalogPath: canonicalCatalog })
@@ -420,7 +452,7 @@ describe('expertise contract', () => {
     writeFileSync(join(tmpCatalog, 'orchestrator.yaml'), readFileSync(join(fixturesDir, 'valid-minimal.yaml'), 'utf-8'), 'utf-8')
 
     await buildRegistry({ catalogPath: tmpCatalog, outputPath: tmpOutput })
-    const cached = await readRegistry(tmpOutput, { catalogPath: join(repoRoot, '.mah', 'expertise', 'catalog', 'dev') })
+    const cached = await readRegistry(tmpOutput, { catalogPath: localCatalogRoot })
 
     assert.equal(cached, null)
 
@@ -432,8 +464,8 @@ describe('expertise contract', () => {
   // 19. Registry has correct shape (by_owner, by_domain, by_status, by_lifecycle)
   // -------------------------------------------------------------------------
   it('Registry has correct shape with all required grouping keys', async () => {
-    const registryPath = join(repoRoot, '.mah', 'expertise', 'registry.json')
-    const canonicalCatalog = join(repoRoot, '.mah', 'expertise', 'catalog')
+    const registryPath = localRegistryPath
+    const canonicalCatalog = localCatalogRoot
     await buildRegistry({ catalogPath: canonicalCatalog, outputPath: registryPath })
     const cached = await readRegistry(registryPath, { catalogPath: canonicalCatalog })
     assert.ok(cached !== null)
@@ -448,7 +480,7 @@ describe('expertise contract', () => {
   })
 
   it('loadExpertiseById resolves canonical catalog entries', async () => {
-    const expertise = await loadExpertiseById('dev:backend-dev')
+    const expertise = await loadExpertiseById('dev:backend-dev', localCatalogRoot)
     assert.ok(expertise, 'should load canonical expertise')
     assert.equal(expertise.id, 'dev:backend-dev')
     assert.deepEqual(expertise.allowed_environments, ['development'])

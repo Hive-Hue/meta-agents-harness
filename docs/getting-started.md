@@ -24,7 +24,7 @@ npm run install:global
 ```
 
 That exposes both `mah` and `meta-agents-harness` on your PATH.
-It also prepares `~/.mah/` with the default MAH assets (`skills/`, `extensions/`, `mah-plugins/`, and `scripts/`). MAH prefers that global overlay first and then complements it with any local repo assets that exist.
+It also prepares `~/.mah/` with the default MAH assets (`skills/`, `extensions/`, `mah-plugins/`, and `scripts/`). Expertise is workspace-local and is materialized under `.mah/expertise/` by `mah sync` / `mah generate`.
 
 ### 2. Verify Installation
 
@@ -296,6 +296,8 @@ npm run sync:meta
 # Check for drift without writing
 npm run check:meta-sync
 ```
+
+`mah generate` and `mah sync` materialize the current workspace's `.mah/` artifacts. They do not depend on a cloned MAH repository; the package install supplies the default overlay, and the workspace owns its own generated expertise catalog, registry, and evidence tree.
 
 ### 3. Select a Crew
 

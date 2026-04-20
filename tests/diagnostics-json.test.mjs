@@ -40,6 +40,17 @@ test("validate:config --json follows diagnostics schema", () => {
   assert.equal(result.json.ok, true)
 })
 
+test("validate:config completes successfully without ReferenceError", () => {
+  const result = spawnSync(process.execPath, [cliPath, "validate:config"], {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: "utf-8"
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stderr.includes("ReferenceError"), false, result.stderr)
+  assert.match(result.stdout, /validate:config passed/)
+})
+
 test("validate:sync --json follows diagnostics schema", () => {
   const result = runJson(["validate:sync", "--json"])
   assert.equal(result.json.schema, "mah.diagnostics.v1")

@@ -7,10 +7,10 @@ It should be small, explicit, and governed. It is not the evidence store and it 
 
 ## Source Of Truth Layers
 
-- `catalog`: canonical seed data for each crew and agent
-- `registry`: derived index rebuilt from the catalog
-- `evidence`: runtime-only learning records
-- runtime expertise mirrors: generated from the catalog for each runtime
+- `catalog`: canonical seed data for each crew and agent, stored in the workspace-local `.mah/expertise/catalog`
+- `registry`: derived index rebuilt from the catalog into the workspace-local `.mah/expertise/registry.json`
+- `evidence`: runtime-only learning records stored in the workspace-local `.mah/expertise/evidence`
+- runtime expertise mirrors: generated from the catalog for each runtime, using the current workspace as the target tree
 
 ## Update Flow
 
@@ -18,7 +18,7 @@ It should be small, explicit, and governed. It is not the evidence store and it 
 2. `orchestrator` or a `*-lead` summarizes evidence into a proposal for catalog changes.
 3. A reviewer checks whether the change is durable, reusable, and safe.
 4. Approved changes are written into the catalog seed files.
-5. Registry is rebuilt from the catalog.
+5. Registry is rebuilt from the catalog into the current workspace's `.mah/`.
 6. Runtime mirrors are resynced from the catalog when needed.
 
 The primary generator is the CLI command:
@@ -58,3 +58,9 @@ That mode summarizes recent evidence, derives a conservative draft change set, a
 
 When the repo is reset, the catalog seed should be recreated from a checked-in bootstrap template, not from runtime data.
 That keeps the foundation fresh while still giving the project a known-good starting point.
+
+## Workspace And Global Overlay
+
+MAH does not load expertise from the global `~/.mah` overlay.
+The global install keeps shared runtime assets such as skills, extensions, plugins, and themes.
+Expertise is a workspace concern and is materialized into `.mah/expertise/catalog` by `mah sync` / `mah generate`.

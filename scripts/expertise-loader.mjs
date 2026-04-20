@@ -13,12 +13,12 @@ import {
   EXPERTISE_SCHEMA_VERSION,
 } from '../types/expertise-types.mjs'
 import { validateExpertise } from './expertise-schema.mjs'
+import { resolveMahHome, resolveMahHomePath } from './mah-home.mjs'
+import { resolveWorkspaceRoot } from './workspace-root.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const repoRoot = resolve(__dirname, '..')
-const DEFAULT_CATALOG_PATH = '.mah/expertise/catalog'
-
+const workspaceRoot = resolveWorkspaceRoot()
 // SECURITY: v0.7.0-patch — catalog traversal bounds
 const MAX_RECURSION_DEPTH = 5
 const MAX_CATALOG_FILES = 1000
@@ -109,8 +109,44 @@ function parseFile(filePath) {
  * @param {{ agent: string, team: string }} owner
  * @returns {'agent'|'team'|'both'}
  */
-function resolveCatalogPath(catalogPath) {
-  return resolve(repoRoot, catalogPath)
+function normalizeCatalogCandidate(candidate) {
+  if (!candidate || typeof candidate !== 'string') return ''
+  const trimmed = candidate.trim()
+  if (!trimmed) return ''
+  if (trimmed.startsWith('~/.mah/')) {
+    return resolveMahHomePath(trimmed.slice('~/.mah/'.length))
+  }
+  return resolve(trimmed)
+}
+
+export function resolveCatalogRoots(catalogPath) {
+  if (Array.isArray(catalogPath)) {
+    const normalized = catalogPath.map(normalizeCatalogCandidate).filter(Boolean)
+    return [...new Set(normalized)]
+  }
+
+  if (typeof catalogPath === 'string' && catalogPath.trim()) {
+    return [normalizeCatalogCandidate(catalogPath)]
+  }
+
+  const workspaceCatalog = resolve(workspaceRoot, '.mah', 'expertise', 'catalog')
+  const roots = []
+  if (existsSync(workspaceCatalog)) roots.push(workspaceCatalog)
+  return roots
+}
+
+function workspaceRelativeOrHome(filePath) {
+  const resolved = resolve(filePath)
+  const homeRoot = resolveMahHome()
+  if (resolved === homeRoot || resolved.startsWith(`${homeRoot}/`)) {
+    return `~/.mah/${relative(homeRoot, resolved).replace(/\\/g, '/')}`.replace(/\/$/, '')
+  }
+
+  if (resolved === workspaceRoot || resolved.startsWith(`${workspaceRoot}/`)) {
+    return relative(workspaceRoot, resolved).replace(/\\/g, '/')
+  }
+
+  return resolved.replace(/\\/g, '/')
 }
 
 /**
@@ -134,19 +170,21 @@ function attachSourceFile(expertise, filePath) {
 
 /**
  * Load all expertise entries from the catalog directory.
- * Reads .mah/expertise/catalog/{owner}/{expertise-id}.yaml (or .json)
- * @param {string} [catalogPath='.mah/expertise/catalog']
+ * Reads expertise/catalog/{owner}/{expertise-id}.yaml (or .json) from the active overlay.
+ * @param {string|string[]} [catalogPath]
  * @returns {Promise<object[]>}
  */
-export async function loadExpertiseCatalog(catalogPath = DEFAULT_CATALOG_PATH) {
+export async function loadExpertiseCatalog(catalogPath) {
   const extensions = ['.yaml', '.yml', '.json']
-  const files = collectFiles(resolveCatalogPath(catalogPath), extensions)
   /** @type {object[]} */
   const results = []
 
-  for (const file of files) {
-    const expertise = await loadExpertiseFile(file)
-    if (expertise) results.push(expertise)
+  for (const catalogRoot of resolveCatalogRoots(catalogPath)) {
+    const files = collectFiles(catalogRoot, extensions)
+    for (const file of files) {
+      const expertise = await loadExpertiseFile(file)
+      if (expertise) results.push(expertise)
+    }
   }
 
   return results
@@ -186,7 +224,7 @@ export async function loadExpertiseFile(filePath) {
   }
 
   // Legacy format — normalize using file path context
-  // Path pattern: .mah/expertise/catalog/{owner}/{expertise-id}.yaml
+  // Path pattern: expertise/catalog/{owner}/{expertise-id}.yaml under the active overlay
   // or legacy: .hermes/crew/{crew}/expertise/{expertise-id}.yaml
   let owner = 'agent'
   let crew = 'unknown'
@@ -199,13 +237,13 @@ export async function loadExpertiseFile(filePath) {
   const hermesIdx = parts.indexOf('.hermes')
 
   if (mahIdx !== -1) {
-    // .mah/expertise/catalog/{owner}/{expertise-id}.yaml
-    const ownerIdx = parts.indexOf('catalog') + 1
-    if (ownerIdx > 0 && parts[ownerIdx]) {
-      owner = parts[ownerIdx]
+    // .mah/expertise/catalog/{crew}/{expertise-id}.yaml under the active overlay
+    const crewIdx = parts.indexOf('catalog') + 1
+    if (crewIdx > 0 && parts[crewIdx]) {
+      crew = parts[crewIdx]
     }
   } else if (hermesIdx !== -1) {
-    // .hermes/crew/{crew}/expertise/{expertise-id}.yaml
+    // legacy .hermes/crew/{crew}/expertise/{expertise-id}.yaml
     const crewIdx = hermesIdx + 2
     if (parts[crewIdx]) {
       crew = parts[crewIdx]
@@ -229,14 +267,14 @@ export async function loadExpertiseFile(filePath) {
 /**
  * Resolve a canonical expertise file path by expertise id.
  * @param {string} expertiseId
- * @param {string} [catalogPath='.mah/expertise/catalog']
+ * @param {string|string[]} [catalogPath]
  * @returns {Promise<string|null>}
  */
-export async function findExpertiseFileById(expertiseId, catalogPath = DEFAULT_CATALOG_PATH) {
+export async function findExpertiseFileById(expertiseId, catalogPath) {
   const normalizedId = expertiseId.trim()
   const extensions = ['.yaml', '.yml', '.json']
-  const catalogRoot = resolveCatalogPath(catalogPath)
   const [crew, name] = normalizedId.split(':')
+  const catalogRoots = resolveCatalogRoots(catalogPath)
 
   // SECURITY: v0.7.0-patch — validate ID segments prevent path traversal
   if (crew && name) {
@@ -248,25 +286,29 @@ export async function findExpertiseFileById(expertiseId, catalogPath = DEFAULT_C
       return null
     }
 
-    for (const ext of extensions) {
-      const candidatePath = join(catalogRoot, crew, `${name}${ext}`)
-      // SECURITY: v0.7.0-patch — verify candidate path stays under catalogRoot
-      const resolvedCandidate = resolve(candidatePath)
-      const resolvedRoot = resolve(catalogRoot)
-      if (!resolvedCandidate.startsWith(resolvedRoot + '/') && resolvedCandidate !== resolvedRoot) {
-        warn(`candidate path '${candidatePath}' escapes catalog root`)
-        continue
+    for (const catalogRoot of catalogRoots) {
+      for (const ext of extensions) {
+        const candidatePath = join(catalogRoot, crew, `${name}${ext}`)
+        // SECURITY: v0.7.0-patch — verify candidate path stays under catalogRoot
+        const resolvedCandidate = resolve(candidatePath)
+        const resolvedRoot = resolve(catalogRoot)
+        if (!resolvedCandidate.startsWith(resolvedRoot + '/') && resolvedCandidate !== resolvedRoot) {
+          warn(`candidate path '${candidatePath}' escapes catalog root`)
+          continue
+        }
+        if (!existsSync(candidatePath)) continue
+        const expertise = await loadExpertiseFile(candidatePath)
+        if (expertise?.id === normalizedId) return candidatePath
       }
-      if (!existsSync(candidatePath)) continue
-      const expertise = await loadExpertiseFile(candidatePath)
-      if (expertise?.id === normalizedId) return candidatePath
     }
   }
 
-  const files = collectFiles(catalogRoot, extensions)
-  for (const file of files) {
-    const expertise = await loadExpertiseFile(file)
-    if (expertise?.id === normalizedId) return file
+  for (const catalogRoot of catalogRoots) {
+    const files = collectFiles(catalogRoot, extensions)
+    for (const file of files) {
+      const expertise = await loadExpertiseFile(file)
+      if (expertise?.id === normalizedId) return file
+    }
   }
 
   return null
@@ -275,10 +317,10 @@ export async function findExpertiseFileById(expertiseId, catalogPath = DEFAULT_C
 /**
  * Load a canonical expertise object by id from the catalog.
  * @param {string} expertiseId
- * @param {string} [catalogPath='.mah/expertise/catalog']
+ * @param {string|string[]} [catalogPath]
  * @returns {Promise<object|null>}
  */
-export async function loadExpertiseById(expertiseId, catalogPath = DEFAULT_CATALOG_PATH) {
+export async function loadExpertiseById(expertiseId, catalogPath) {
   const filePath = await findExpertiseFileById(expertiseId, catalogPath)
   if (!filePath) return null
   return loadExpertiseFile(filePath)

@@ -70,7 +70,7 @@ The current release supports:
 
 Behaviorally, MAH now:
 
-- loads canonical expertise from the catalog by id
+  - loads canonical expertise from the workspace catalog by id
 - scores candidate targets with explainable routing data
 - uses confidence and validation as routing signals
 - records and aggregates evidence for later decision support
@@ -103,13 +103,13 @@ In practice:
 ## Operational Notes
 
 - The registry is a summary index, not the source of truth.
-- The catalog remains canonical for expertise content.
-- `show`, `recommend`, `explain`, and `export` now resolve canonical catalog documents by expertise id.
+- The catalog remains canonical for expertise content and is loaded from the workspace-local `.mah/expertise/catalog`.
+- `show`, `recommend`, `explain`, and `export` resolve canonical catalog documents by expertise id and report paths relative to the current workspace, not the MAH package repository.
 - `export` redacts sensitive fields such as `owner_id` and evidence details.
 - `validate:expertise` understands the v0.7 owner object model.
 - Lifecycle promotion from `experimental` to `active` now requires review evidence.
-- Evidence is runtime-only and may be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`; tests should use a temp root instead of writing into `.mah/expertise/evidence`.
-- The repository's checked-in `.mah/expertise/evidence` directory is kept empty except for `.gitkeep`; real evidence should be produced by actual tasks.
+- Evidence is runtime-only and may be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`; tests should use a temp root instead of writing into workspace-local `.mah/expertise/evidence`.
+- The workspace-local `.mah/expertise/evidence` directory is kept empty except for `.gitkeep`; real evidence should be produced by actual tasks.
 
 ## Evidence Writing Policy
 

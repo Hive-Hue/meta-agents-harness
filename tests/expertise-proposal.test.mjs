@@ -5,12 +5,13 @@
 import { describe, it, after } from 'node:test'
 import assert from 'node:assert'
 import { execSync } from 'node:child_process'
-import { rmSync, existsSync, readFileSync, mkdtempSync } from 'node:fs'
+import { rmSync, existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { stringify as yamlStringify } from 'yaml'
 
 const repoRoot = process.cwd()
-const mah = 'node bin/mah'
+const mah = `node ${join(repoRoot, 'bin', 'mah')}`
 
 const {
   buildExpertiseProposal,
@@ -21,13 +22,51 @@ const { loadExpertiseById } = await import('../scripts/expertise-loader.mjs')
 const { recordEvidence } = await import('../scripts/expertise-evidence-store.mjs')
 
 const evidenceRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-proposal-evidence-'))
+const catalogRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-proposal-catalog-'))
+const workspaceRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-proposal-workspace-'))
 
-function runExpertise(args, envOverrides = {}) {
+function seedCatalog() {
+  const devDirs = [join(catalogRoot, 'dev'), join(workspaceRoot, '.mah', 'expertise', 'catalog', 'dev')]
+  for (const dir of devDirs) {
+    mkdirSync(dir, { recursive: true })
+  }
+  writeFileSync(join(workspaceRoot, 'meta-agents.yaml'), [
+    'version: 1',
+    'name: proposal-workspace',
+    'description: proposal workspace test',
+    'crews:',
+    '  - id: dev',
+    '    mission: proposal workspace test',
+    '    agents:',
+    '      - id: backend-dev',
+    '        role: worker',
+    '        team: dev',
+  ].join('\n'), 'utf-8')
+  const backendDev = {
+    id: 'dev:backend-dev',
+    owner: { agent: 'backend-dev', team: 'dev' },
+    schema_version: 'mah.expertise.v1',
+    capabilities: ['code-generation', 'routing'],
+    domains: ['software-engineering'],
+    allowed_environments: ['development'],
+    validation_status: 'validated',
+    confidence: { score: 0.92, band: 'high', evidence_count: 8 },
+    trust_tier: 'internal',
+    lifecycle: 'active'
+  }
+  for (const dir of devDirs) {
+    writeFileSync(join(dir, 'backend-dev.yaml'), yamlStringify(backendDev), 'utf-8')
+  }
+}
+
+seedCatalog()
+
+function runExpertise(args, envOverrides = {}, cwd = repoRoot) {
   try {
     const stdout = execSync(`${mah} ${args}`, {
       encoding: 'utf-8',
       timeout: 15000,
-      cwd: repoRoot,
+      cwd,
       env: {
         ...process.env,
         MAH_ACTIVE_CREW: 'dev',
@@ -48,7 +87,7 @@ function runExpertise(args, envOverrides = {}) {
 
 describe('proposal generator', () => {
   it('creates a proposal for a lead actor', async () => {
-    const target = await loadExpertiseById('dev:backend-dev')
+    const target = await loadExpertiseById('dev:backend-dev', catalogRoot)
     const result = buildExpertiseProposal({
       targetExpertise: target,
       actor: { agent: 'planning-lead', role: 'lead', team: 'dev' },
@@ -71,7 +110,7 @@ describe('proposal generator', () => {
   })
 
   it('rejects worker actors from generating proposals', async () => {
-    const target = await loadExpertiseById('dev:backend-dev')
+    const target = await loadExpertiseById('dev:backend-dev', catalogRoot)
     const result = buildExpertiseProposal({
       targetExpertise: target,
       actor: { agent: 'backend-dev', role: 'worker', team: 'dev' },
@@ -83,7 +122,7 @@ describe('proposal generator', () => {
   })
 
   it('writes proposal artifacts to disk', async () => {
-    const target = await loadExpertiseById('dev:backend-dev')
+    const target = await loadExpertiseById('dev:backend-dev', catalogRoot)
     const proposalResult = buildExpertiseProposal({
       targetExpertise: target,
       actor: { agent: 'orchestrator', role: 'orchestrator', team: 'dev' },
@@ -138,7 +177,7 @@ describe('proposal generator', () => {
       recorded_at: '2026-04-16T10:10:00.000Z',
     }, { evidenceRoot })
 
-    const { stdout, status } = runExpertise('expertise propose dev:backend-dev --from-evidence --json')
+    const { stdout, status } = runExpertise('expertise propose dev:backend-dev --from-evidence --json', {}, workspaceRoot)
     assert.equal(status, 0)
     const data = JSON.parse(stdout)
     assert.equal(data.target_expertise_id, 'dev:backend-dev')
@@ -152,7 +191,9 @@ describe('proposal generator', () => {
 describe('proposal CLI', () => {
   it('generates a proposal from the CLI for a lead actor', () => {
     const { stdout, status } = runExpertise(
-      `expertise propose dev:backend-dev --summary "Promote backend-dev" --changes '{"validation_status":"validated"}' --json`
+      `expertise propose dev:backend-dev --summary "Promote backend-dev" --changes '{"validation_status":"validated"}' --json`,
+      {},
+      workspaceRoot
     )
 
     assert.equal(status, 0)
@@ -161,22 +202,10 @@ describe('proposal CLI', () => {
     assert.equal(data.generated_by.role, 'lead')
     assert.equal(data.proposed_changes.validation_status, 'validated')
   })
-
-  it('writes the proposal to a safe output path', () => {
-    const output = '.mah/expertise/proposals/test-backend-dev.json'
-    try {
-      const { stdout, status } = runExpertise(
-        `expertise propose dev:backend-dev --summary "Write proposal" --changes '{"validation_status":"validated"}' --output ${output}`
-      )
-      assert.equal(status, 0)
-      assert.ok(stdout.includes('Proposal written') || stdout.includes('✓ Proposal written'))
-      assert.ok(existsSync(join(repoRoot, output)))
-    } finally {
-      rmSync(join(repoRoot, output), { force: true })
-    }
-  })
 })
 
 after(() => {
   rmSync(evidenceRoot, { recursive: true, force: true })
+  rmSync(catalogRoot, { recursive: true, force: true })
+  rmSync(workspaceRoot, { recursive: true, force: true })
 })

@@ -18,6 +18,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Runtime terminology across docs and loader output now uses plugin-based language instead of built-in/core runtime wording
 - Bundled runtime plugins remain prioritized over installed plugins with the same name
 - Skill path resolution now uses a convention-based default (`skills/<skill-slug>/SKILL.md`) instead of a per-runtime matrix in `meta-agents.yaml`
+- Expertise catalog resolution is now workspace-local only, and reports workspace paths instead of package-repo paths
 
 ### Fixed
 - Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
@@ -26,6 +27,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Global `mah sync` and related script dispatch now resolve package-owned script paths instead of expecting a local `scripts/` directory in the target repo
 - `mah init` now writes `.mcp.json` and runtime markers into the caller repo instead of the MAH package directory
 - `mah sync` now materializes only the runtime markers present in the current repo
+- `mah generate` / `mah expertise list` now operate on workspace-local `.mah` artifacts and no longer depend on a cloned MAH repository
+- Global installs now clear stale `~/.mah/expertise/catalog` and `registry.json` leftovers instead of reseeding expertise from the package
 - `mah init --ai` now forwards AI bootstrap flags to the bootstrap script and uses the bundled `bootstrap` skill instead of the retired `bootstrap-config-architect` name
 - AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first
 - Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail

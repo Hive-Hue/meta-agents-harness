@@ -251,12 +251,14 @@ See [`docs/hermes/`](./docs/hermes/) for the complete Hermes integration guide.
 
 In `v0.7.0`, the expertise model is treated as an operational foundation concept:
 
-- canonical catalog loading by expertise id
+- canonical catalog loading by expertise id from the workspace-local `.mah/expertise/catalog`
 - evidence-backed routing and explainability
 - validation, lifecycle, export/import, and governance boundaries
 - runtime evidence storage that can be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`
 
-The checked-in `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
+`mah generate`, `mah sync`, and `mah expertise list` do not depend on a cloned MAH repo. The global install prepares `~/.mah/` with the canonical skills, extensions, plugins, and themes, while each workspace gets its own generated `.mah/` expertise catalog, cache, and evidence tree as needed.
+
+The workspace-local `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
 
 See: `docs/expertise-model-foundation.md`
 

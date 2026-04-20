@@ -8,10 +8,11 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
+import { resolveWorkspaceRoot } from './workspace-root.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const repoRoot = join(__dirname, '..')
+const workspaceRoot = resolveWorkspaceRoot()
 
 // SECURITY: v0.7.0-patch — evidence loading bounds
 const MAX_EVIDENCE_FILES = 10000
@@ -27,7 +28,7 @@ const MAX_EVIDENCE_FILE_SIZE = 1 * 1024 * 1024 // 1MB
  * @returns {string}
  */
 function resolvePath(relPath) {
-  return join(repoRoot, relPath)
+  return join(workspaceRoot, relPath)
 }
 
 /**

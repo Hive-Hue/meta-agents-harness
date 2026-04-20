@@ -82,6 +82,10 @@ export function ensureMahHomeLayout({ packageRoot = defaultPackageRoot } = {}) {
   const homeRoot = resolveMahHome()
   mkdirSync(homeRoot, { recursive: true })
   mkdirSync(path.join(homeRoot, "mah-plugins"), { recursive: true })
+  const expertiseRoot = path.join(homeRoot, "expertise")
+  mkdirSync(expertiseRoot, { recursive: true })
+  rmSync(path.join(expertiseRoot, "catalog"), { recursive: true, force: true })
+  rmSync(path.join(expertiseRoot, "registry.json"), { force: true })
 
   const skillRoot = path.join(homeRoot, "skills")
   rmSync(skillRoot, { recursive: true, force: true })

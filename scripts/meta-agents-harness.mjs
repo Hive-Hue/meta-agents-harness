@@ -11,60 +11,11 @@ import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectS
 import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./plugin-loader.mjs"
 import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
 import { resolveMahHome } from "./mah-home.mjs"
+import { resolveWorkspaceRoot } from "./workspace-root.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const packageRoot = path.resolve(__dirname, "..")
-
-function isPathWithin(parentDir, childDir) {
-  const relative = path.relative(parentDir, childDir)
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
-}
-
-function resolveSearchBoundary(startDir) {
-  const cwd = path.resolve(startDir)
-  const gitProbe = spawnSync("git", ["rev-parse", "--show-toplevel"], {
-    cwd,
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "ignore"]
-  })
-  if (gitProbe.status === 0) {
-    const gitRoot = `${gitProbe.stdout || ""}`.trim()
-    if (gitRoot) {
-      return { dir: path.resolve(gitRoot), include: true }
-    }
-  }
-
-  const homeDir = process.env.HOME?.trim() || os.homedir()
-  if (homeDir) {
-    const resolvedHome = path.resolve(homeDir)
-    if (isPathWithin(resolvedHome, cwd)) {
-      return { dir: resolvedHome, include: false }
-    }
-  }
-
-  return { dir: path.parse(cwd).root, include: false }
-}
-
-function resolveWorkspaceRoot(startDir = process.cwd()) {
-  const markerNames = ["meta-agents.yaml", ".pi", ".claude", ".opencode", ".hermes", ".codex", ".kilo"]
-  const initial = path.resolve(startDir)
-  const { dir: ceiling, include: includeCeiling } = resolveSearchBoundary(initial)
-  let current = initial
-
-  while (true) {
-    for (const marker of markerNames) {
-      if (existsSync(path.join(current, marker))) {
-        if (current !== ceiling || includeCeiling) return current
-        break
-      }
-    }
-    if (current === ceiling) return initial
-    const parent = path.dirname(current)
-    if (parent === current || !isPathWithin(ceiling, parent)) return initial
-    current = parent
-  }
-}
 
 const repoRoot = resolveWorkspaceRoot(process.cwd())
 const mahHome = resolveMahHome()
