@@ -320,6 +320,8 @@ class AgentSessionNavigator {
 	private lastTranscriptViewport = 0;
 	/** Per-section collapse state. Keys: "msg:N" for messages, "tool:N:T" for tools */
 	private collapsed = new Set<string>();
+	private mouseEnabled = true;
+	private showSidebar = true;
 	private spinnerFrame = 0;
 	private spinnerInterval: any = null;
 	/**
@@ -335,7 +337,9 @@ class AgentSessionNavigator {
 		private requestRender: () => void,
 	) {
 		// Enable SGR Mouse Tracking (1000 = normal config, 1006 = SGR format)
-		process.stdout.write("\x1b[?1000h\x1b[?1006h");
+		if (this.mouseEnabled) {
+			process.stdout.write("\x1b[?1000h\x1b[?1006h");
+		}
 
 		this.refresh(true);
 		this.spinnerInterval = setInterval(() => {
@@ -705,37 +709,56 @@ class AgentSessionNavigator {
 
 	handleInput(data: string, tui: any): boolean {
 		// ── Mouse events ──
-		const mouse = this.parseMouseEvent(data);
-		if (mouse) {
-			// Scroll wheel
-			if (mouse.button === 64) { this.scrollTranscript(-3); tui.requestRender(); return true; }
-			if (mouse.button === 65) { this.scrollTranscript(3); tui.requestRender(); return true; }
+		if (this.mouseEnabled) {
+			const mouse = this.parseMouseEvent(data);
+			if (mouse) {
+				// Scroll wheel
+				if (mouse.button === 64) { this.scrollTranscript(-3); tui.requestRender(); return true; }
+				if (mouse.button === 65) { this.scrollTranscript(3); tui.requestRender(); return true; }
 
-			// Left click (press)
-			if (mouse.button === 0 && !mouse.release) {
-				const screenRow = mouse.row - 1; // 0-indexed
-				const toggleKey = this.clickableRows.get(screenRow);
-				if (toggleKey) {
-					if (this.collapsed.has(toggleKey)) {
-						this.collapsed.delete(toggleKey);
-					} else {
-						this.collapsed.add(toggleKey);
+				// Left click (press)
+				if (mouse.button === 0 && !mouse.release) {
+					const screenRow = mouse.row - 1; // 0-indexed
+					const toggleKey = this.clickableRows.get(screenRow);
+					if (toggleKey) {
+						if (this.collapsed.has(toggleKey)) {
+							this.collapsed.delete(toggleKey);
+						} else {
+							this.collapsed.add(toggleKey);
+						}
+						this.transcriptCache.clear();
+						tui.requestRender();
 					}
-					this.transcriptCache.clear();
-					tui.requestRender();
+					return true;
 				}
-				return true;
+
+				return true; // Consume all mouse events
 			}
 
-			return true; // Consume all mouse events
-		}
-
-		// Catch any other mouse escape sequences
-		if (data.startsWith("\x1b[<") || data.startsWith("\x1b[M")) {
-			return true;
+			// Catch any other mouse escape sequences
+			if (data.startsWith("\x1b[<") || data.startsWith("\x1b[M")) {
+				return true;
+			}
 		}
 
 		// ── Keyboard ──
+		if (matchesKey(data, "m")) {
+			this.mouseEnabled = !this.mouseEnabled;
+			if (this.mouseEnabled) {
+				process.stdout.write("\x1b[?1000h\x1b[?1006h");
+			} else {
+				process.stdout.write("\x1b[?1000l\x1b[?1006l");
+			}
+			tui.requestRender();
+			return true;
+		}
+
+		if (matchesKey(data, "z")) {
+			this.showSidebar = !this.showSidebar;
+			tui.requestRender();
+			return true;
+		}
+
 		if (matchesKey(data, Key.left) || matchesKey(data, "shift+tab")) {
 			if (this.summaries.length > 0) {
 				this.selected = (this.selected - 1 + this.summaries.length) % this.summaries.length;
@@ -865,7 +888,8 @@ class AgentSessionNavigator {
 			theme.fg("dim", titleRight)
 		);
 
-		const hints = "  ←/→ agent  ↑/↓ scroll  click toggle  Ctrl+O all  g/G jump  esc quit";
+		const mouseState = this.mouseEnabled ? "on" : "off";
+		const hints = `  ←/→ agent  ↑/↓ scroll  click toggle  Ctrl+O all  z zoom  g/G jump  m mouse:${mouseState}  esc quit`;
 		lines.push(truncateToWidth(theme.fg("dim", hints), width));
 
 		lines.push(theme.fg("dim", "─".repeat(width)));
@@ -999,16 +1023,19 @@ class AgentSessionNavigator {
 		const headerHeight = headerLines.length;
 
 		// ── Sidebar (fixed, no scroll) ──
-		const sidebarWidth = Math.min(28, Math.floor(width * 0.20));
-		const transcriptWidth = Math.max(20, width - sidebarWidth - 1);
+		const sidebarWidth = this.showSidebar ? Math.min(28, Math.floor(width * 0.20)) : 0;
+		const transcriptWidth = this.showSidebar ? Math.max(20, width - sidebarWidth - 1) : width;
 
-		const agentList = this.buildAgentList(sidebarWidth, theme);
-		const statsPanel = this.buildStatsPanel(selected, sidebarWidth, theme);
-		const sidebarContent = [
-			...agentList,
-			theme.fg("dim", "─".repeat(sidebarWidth)),
-			...statsPanel,
-		];
+		let sidebarContent: string[] = [];
+		if (this.showSidebar) {
+			const agentList = this.buildAgentList(sidebarWidth, theme);
+			const statsPanel = this.buildStatsPanel(selected, sidebarWidth, theme);
+			sidebarContent = [
+				...agentList,
+				theme.fg("dim", "─".repeat(sidebarWidth)),
+				...statsPanel,
+			];
+		}
 
 		// Viewport for transcript
 		const availableRows = Number.isFinite(this.terminalRows) ? this.terminalRows : 24;
@@ -1044,20 +1071,24 @@ class AgentSessionNavigator {
 		const visibleTranscript = allTranscriptLines.slice(tStart, tEnd);
 
 		// ── Merge sidebar + transcript side-by-side ──
-		const divider = theme.fg("dim", "│");
+		const divider = this.showSidebar ? theme.fg("dim", "│") : "";
 		const rowCount = Math.max(sidebarContent.length, visibleTranscript.length, bodyHeight);
 
 		for (let i = 0; i < rowCount; i++) {
-			const sidebarLine = i < sidebarContent.length
-				? sidebarContent[i]
-				: " ".repeat(sidebarWidth);
+			let sidebarPadded = "";
+
+			if (this.showSidebar) {
+				const sidebarLine = i < sidebarContent.length
+					? sidebarContent[i]
+					: " ".repeat(sidebarWidth);
+
+				const sidebarVisible = visibleWidth(sidebarLine);
+				sidebarPadded = sidebarLine + " ".repeat(Math.max(0, sidebarWidth - sidebarVisible));
+			}
 
 			const transcriptEntry = i < visibleTranscript.length
 				? visibleTranscript[i]
 				: { rendered: "" };
-
-			const sidebarVisible = visibleWidth(sidebarLine);
-			const sidebarPadded = sidebarLine + " ".repeat(Math.max(0, sidebarWidth - sidebarVisible));
 
 			const screenRow = output.length; // absolute screen row
 			output.push(truncateToWidth(sidebarPadded + divider + transcriptEntry.rendered, width));
