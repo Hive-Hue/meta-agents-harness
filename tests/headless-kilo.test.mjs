@@ -16,7 +16,7 @@ test("Kilo prepareHeadlessRunContext returns valid envelope", () => {
   const result = adapter.prepareHeadlessRunContext({ repoRoot: "/tmp", task: "test" })
   assert.strictEqual(result.ok, true)
   assert.strictEqual(result.exec, "kilo")
-  assert.deepEqual(result.args, ["--no-interactive"])
+  assert.deepEqual(result.args, ["run"])
   assert.deepEqual(result.passthrough, ["test"])
   assert.strictEqual(result.envOverrides.KILO_HEADLESS, "1")
 })

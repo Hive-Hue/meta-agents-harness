@@ -1,7 +1,7 @@
 {
   "name": "pi",
   "version": "1.0.0",
-  "mahVersion": "^0.5.0",
+  "mahVersion": "^0.8.0",
   "markerDir": ".pi",
   "directCli": "pi",
   "wrapper": null,

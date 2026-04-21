@@ -157,7 +157,7 @@ function resolvePiSessionLayout(repoRoot, crew, argv = [], baseEnvOverrides = {}
 export const runtimePlugin = {
   name: "pi",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   adapter: {
     name: "pi",

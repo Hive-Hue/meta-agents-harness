@@ -51,7 +51,7 @@ function createTestPlugin(targetDir) {
   const pluginJson = {
     name: "fake",
     version: "0.0.1",
-    mahVersion: "^0.5.0",
+    mahVersion: "^0.8.0",
     entry: "index.mjs"
   }
 
@@ -128,7 +128,7 @@ const adapter = createFakeAdapter({
 export const runtimePlugin = {
   name: "fake",
   version: "0.0.1",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
   adapter
 }
 `
@@ -142,7 +142,7 @@ function createCoreManagedTestPlugin(targetDir) {
   const pluginJson = {
     name: CORE_PLUGIN_NAME,
     version: "0.0.1",
-    mahVersion: "^0.5.0",
+    mahVersion: "^0.8.0",
     entry: "index.mjs"
   }
 
@@ -232,7 +232,7 @@ const adapter = createFakeAdapter({
 export const runtimePlugin = {
   name: "${CORE_PLUGIN_NAME}",
   version: "0.0.1",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
   adapter
 }
 `

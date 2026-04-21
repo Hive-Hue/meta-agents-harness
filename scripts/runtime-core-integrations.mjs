@@ -438,6 +438,59 @@ function parseClaudeInternalArgs(argv = []) {
   }
 }
 
+function parseOpenclaudeInternalArgs(argv = []) {
+  let remaining = [...argv]
+  const dryRun = remaining.includes("--dry-run")
+  remaining = stripFlags(remaining, ["--dry-run"])
+  const showLaunchInfo = remaining.includes("--show-launch-info")
+  remaining = stripFlags(remaining, ["--show-launch-info"])
+  const fullPrompts = remaining.includes("--full-prompts")
+  remaining = stripFlags(remaining, ["--full-prompts"])
+  const hierarchy = remaining.includes("--hierarchy")
+    ? true
+    : remaining.includes("--no-hierarchy")
+      ? false
+      : true
+  remaining = stripFlags(remaining, ["--hierarchy", "--no-hierarchy"])
+  const providerParse = parseInlineFlag(remaining, "--provider")
+  remaining = providerParse.remaining
+  return {
+    passthrough: remaining,
+    dryRun,
+    showLaunchInfo,
+    fullPrompts,
+    strictHierarchy: hierarchy,
+    provider: providerParse.values.at(-1) || ""
+  }
+}
+
+function resolveOpenclaudeProviderEnv(provider, envOverrides = {}) {
+  const providerEnv = {}
+  const providerLower = `${provider || ""}`.toLowerCase().trim()
+  if (providerLower === "openai") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+  } else if (providerLower === "gemini") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+    if (!envOverrides.OPENAI_BASE_URL) providerEnv.OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
+  } else if (providerLower === "deepseek") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+    if (!envOverrides.OPENAI_BASE_URL) providerEnv.OPENAI_BASE_URL = "https://api.deepseek.com/v1"
+  } else if (providerLower === "ollama") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+    if (!envOverrides.OPENAI_BASE_URL) providerEnv.OPENAI_BASE_URL = "http://localhost:11434/v1"
+  } else if (providerLower === "openrouter") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+    if (!envOverrides.OPENAI_BASE_URL) providerEnv.OPENAI_BASE_URL = "https://openrouter.ai/api/v1"
+  } else if (providerLower === "groq") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+    if (!envOverrides.OPENAI_BASE_URL) providerEnv.OPENAI_BASE_URL = "https://api.groq.com/openai/v1"
+  } else if (providerLower === "mistral") {
+    providerEnv.CLAUDE_CODE_USE_OPENAI = "1"
+    if (!envOverrides.OPENAI_BASE_URL) providerEnv.OPENAI_BASE_URL = "https://api.mistral.ai/v1"
+  }
+  return providerEnv
+}
+
 function parseOpencodeRunArgs(argv = []) {
   const hierarchy = argv.includes("--hierarchy")
     ? true
@@ -980,6 +1033,164 @@ export function executeClaudePreparedRun({ repoRoot, plan, runCommand }) {
   return runCommand(plan.exec, plan.args || [], plan.passthrough || [], plan.envOverrides || {})
 }
 
+export function activateOpenclaudeCrewState({ repoRoot, crewId }) {
+  const runtimeRoot = path.join(repoRoot, ".openclaude")
+  const configPath = path.join(runtimeRoot, "crew", crewId, "multi-team.yaml")
+  const sessionRoot = path.join(runtimeRoot, "crew", crewId, "sessions")
+  mkdirSync(sessionRoot, { recursive: true })
+  const payload = {
+    crew: crewId,
+    source_config: rel(repoRoot, configPath),
+    session_root: rel(repoRoot, sessionRoot),
+    activated_at: new Date().toISOString(),
+    runtime: "openclaude",
+    note: "Used by MAH core to bootstrap OpenClaude runtime with selected crew."
+  }
+  writeJson(path.join(runtimeRoot, ".active-crew.json"), payload)
+  return payload
+}
+
+export function clearOpenclaudeCrewState({ repoRoot }) {
+  removeIfExists(path.join(repoRoot, ".openclaude", ".active-crew.json"))
+  return true
+}
+
+export function prepareOpenclaudeRunContext({ repoRoot, crew, configPath, argv = [], envOverrides = {} }) {
+  if (!configPath) {
+    return { ok: false, error: "no OpenClaude crew selected. Run 'mah use <crew>' or pass '--crew <crew>'." }
+  }
+
+  const parsed = parseOpenclaudeInternalArgs(argv)
+  let config
+  try {
+    config = readYaml(configPath)
+  } catch (error) {
+    return { ok: false, error: `invalid OpenClaude config '${rel(repoRoot, configPath)}': ${error.message}` }
+  }
+
+  const orchestratorPrompt = loadPromptBody(repoRoot, configPath, config?.orchestrator?.prompt || "")
+  const teamLines = []
+  for (const team of config.teams || []) {
+    const lead = team?.lead?.name || "(missing-lead)"
+    const members = Array.isArray(team?.members) ? team.members.map((m) => m?.name).filter(Boolean) : []
+    if (parsed.strictHierarchy) {
+      teamLines.push(`- ${team?.name || "unknown"}: ${lead}`)
+    } else {
+      teamLines.push(`- ${team?.name || "unknown"}: ${lead}${members.length > 0 ? ` -> ${members.join(", ")}` : ""}`)
+    }
+  }
+  const rootPrompt = [
+    `Current role: orchestrator`,
+    `Current agent: ${config?.orchestrator?.name || "orchestrator"}`,
+    `System: ${config?.name || "MultiTeam"}`,
+    `Mission: ${config?.mission || ""}`.trim(),
+    `Hierarchy mode: ${parsed.strictHierarchy ? "strict" : "relaxed"}`,
+    "",
+    `Instruction block:`,
+    `${config?.instruction_block || ""}`.trim() || "n/a",
+    "",
+    `Topology:`,
+    ...teamLines,
+    "",
+    `Hard rules:`,
+    parsed.strictHierarchy
+      ? `- Delegate only to leads.`
+      : `- Delegate to leads and workers as needed, with explicit deliverables.`,
+    `- Keep responses concise and execution-oriented.`,
+    "",
+    parsed.fullPrompts && orchestratorPrompt.body ? `Agent operating prompt:\n${orchestratorPrompt.body}` : ""
+  ].filter(Boolean).join("\n")
+
+  const agents = {}
+  for (const team of config.teams || []) {
+    const teamName = team?.name || "unknown-team"
+    const lead = team?.lead
+    if (lead?.name && lead?.prompt) {
+      const promptBody = parsed.fullPrompts ? loadPromptBody(repoRoot, configPath, lead.prompt).body : ""
+      agents[lead.name] = {
+        description: lead.description || `Lead agent for team ${teamName}`,
+        prompt: [
+          `Current role: lead`,
+          `Current team: ${teamName}`,
+          `Current agent: ${lead.name}`,
+          `System: ${config?.name || "MultiTeam"}`,
+          `Prompt source: ${lead.prompt}`,
+          parsed.strictHierarchy
+            ? `- Delegate only to workers from your own team.`
+            : `- You may delegate within your team as needed.`,
+          parsed.fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
+        ].filter(Boolean).join("\n")
+      }
+    }
+    if (!parsed.strictHierarchy) {
+      for (const member of team.members || []) {
+        if (!member?.name || !member?.prompt) continue
+        const promptBody = parsed.fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
+        agents[member.name] = {
+          description: member.description || `Worker agent for team ${teamName}`,
+          prompt: [
+            `Current role: worker`,
+            `Current team: ${teamName}`,
+            `Current agent: ${member.name}`,
+            `System: ${config?.name || "MultiTeam"}`,
+            `Prompt source: ${member.prompt}`,
+            `- Do not delegate unless explicitly instructed.`,
+            parsed.fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
+          ].filter(Boolean).join("\n")
+        }
+      }
+    }
+  }
+
+  const providerEnv = resolveOpenclaudeProviderEnv(parsed.provider, envOverrides)
+
+  return {
+    ok: true,
+    exec: "openclaude",
+    args: ["code", "--append-system-prompt", rootPrompt, "--agents", JSON.stringify(agents)],
+    passthrough: parsed.passthrough,
+    envOverrides: {
+      ...envOverrides,
+      ...providerEnv,
+      MAH_RUNTIME: "openclaude",
+      MAH_ACTIVE_CREW: crew
+    },
+    warnings: [],
+    internal: {
+      crew,
+      configPath,
+      systemName: config?.name || "MultiTeam",
+      strictHierarchy: parsed.strictHierarchy,
+      dryRun: parsed.dryRun,
+      showLaunchInfo: parsed.showLaunchInfo,
+      provider: parsed.provider,
+      customAgents: Object.keys(agents).length
+    }
+  }
+}
+
+export function executeOpenclaudePreparedRun({ repoRoot, plan, runCommand }) {
+  const internal = plan.internal || {}
+  if (internal.showLaunchInfo || internal.dryRun) {
+    console.log("Running OpenClaude (MAH-managed runtime)")
+    console.log(`- config=${rel(repoRoot, internal.configPath)}`)
+    console.log(`- system=${internal.systemName || "MultiTeam"}`)
+    console.log(`- hierarchy=${internal.strictHierarchy ? "strict" : "relaxed"}`)
+    console.log(`- custom_agents=${internal.customAgents || 0}`)
+    if (internal.provider) console.log(`- provider=${internal.provider}`)
+    if (plan.passthrough?.length > 0) console.log(`- args=${plan.passthrough.join(" ")}`)
+    console.log("")
+  }
+  if (internal.dryRun) {
+    const rendered = [...(plan.args || []), ...(plan.passthrough || [])]
+      .map((arg) => (/\s/.test(arg) ? JSON.stringify(arg) : arg))
+      .join(" ")
+    console.log(`[dry-run] ${plan.exec} ${rendered}`)
+    return 0
+  }
+  return runCommand(plan.exec, plan.args || [], plan.passthrough || [], plan.envOverrides || {})
+}
+
 export function activateOpencodeCrewState({ repoRoot, crewId, argv = [] }) {
   const runtimeRoot = path.join(repoRoot, ".opencode")
   const parse = parseOpencodeRunArgs(argv)
@@ -1237,7 +1448,7 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
     exec: "pi",
     args: [
       ...extensionPaths.flatMap((item) => ["-e", item]),
-      "run"
+      "-p"
     ],
     passthrough: taskArgs,
     envOverrides: {
@@ -1258,7 +1469,7 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
 
 /**
  * Prepare headless execution context for Claude runtime.
- * Claude supports headless via --print flag for non-interactive output.
+ * Claude supports headless via -p flag for non-interactive output.
  */
 export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
   const warnings = []
@@ -1278,14 +1489,13 @@ export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = []
     taskArgs.push(...argv)
   }
 
-  // Claude in headless mode uses --print to avoid interactive TUI
+  // Claude in headless mode uses -p to run non-interactively
   return {
     ok: true,
     exec: "ccr",
     args: [
       "code",
-      "--print",
-      "--no-session-persistence"
+      "-p"
     ],
     passthrough: taskArgs,
     envOverrides: {
@@ -1297,6 +1507,43 @@ export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = []
       mode: "headless",
       promptMode: "argv",
       runtime: "claude"
+    }
+  }
+}
+
+/**
+ * Prepare headless execution context for OpenClaude runtime.
+ * OpenClaude supports headless via -p flag (same as Claude Code).
+ */
+export function prepareOpenclaudeHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+  if (!task && (!argv || argv.length === 0)) {
+    return {
+      ok: false,
+      error: "OpenClaude headless requires a task prompt. Pass task as argument or via -- task."
+    }
+  }
+
+  const taskArgs = []
+  if (task) {
+    taskArgs.push(task)
+  } else if (argv.length > 0) {
+    taskArgs.push(...argv)
+  }
+
+  return {
+    ok: true,
+    exec: "openclaude",
+    args: ["-p"],
+    passthrough: taskArgs,
+    envOverrides: {
+      ...envOverrides,
+      MAH_HEADLESS: "1"
+    },
+    warnings: [],
+    internal: {
+      mode: "headless",
+      promptMode: "argv",
+      runtime: "openclaude"
     }
   }
 }

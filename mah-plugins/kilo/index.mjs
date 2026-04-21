@@ -238,7 +238,7 @@ function buildKiloRunConfig({ repoRoot, crew, configPath }) {
     const isOrchestrator = agent.name === orchestratorName || agent.role === "orchestrator"
     const runtimeModel = isOrchestrator
       ? `${agent.source.model || orchestratorModel || ""}`.trim()
-      : `${agent.source.model || orchestratorModel || ""}`.trim()
+      : `${orchestratorModel || agent.source.model || ""}`.trim()
     agentConfig[agent.name] = {
       description: agent.source.description || `${agent.name} agent`,
       model: normalizeKiloModelId(runtimeModel),
@@ -322,7 +322,7 @@ export const runtimePlugin = {
   // --- Identification ---
   name: "kilo",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   // --- RuntimeAdapter ---
   adapter: {
@@ -456,7 +456,7 @@ export const runtimePlugin = {
       return {
         ok: true,
         exec: this.directCli,
-        args: ["--no-interactive"],
+        args: ["run"],
         passthrough: task ? [task] : argv,
         envOverrides: {
           ...envOverrides,

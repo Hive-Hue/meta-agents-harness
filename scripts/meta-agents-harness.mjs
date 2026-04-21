@@ -265,7 +265,7 @@ function parseOutputMode(argv) {
 }
 
 function stripHeadlessArgs(argv) {
-  return argv.filter((item) => item !== "--headless" && !item.startsWith("--output=") && !item.startsWith("-o="))
+  return argv.filter((item) => item !== "--headless" && item !== "--" && !item.startsWith("--output=") && !item.startsWith("-o="))
 }
 
 function parseFilterArgs(argv) {
@@ -798,7 +798,7 @@ function normalizeRunArgs(runtime, passthrough) {
 
 function runCommand(command, args, passthrough = [], envOverrides = {}, options = {}) {
   const headless = options.headless === true
-  const stdio = headless ? "pipe" : "inherit"
+  const stdio = headless ? ["ignore", "pipe", "pipe"] : "inherit"
   const child = spawnSync(command, [...args, ...passthrough], {
     cwd: repoRoot,
     env: { ...process.env, ...envOverrides },
@@ -1582,13 +1582,13 @@ function printPluginsHelp() {
   console.log("")
   console.log("Usage:")
   console.log("  mah plugins [list]")
-  console.log("  mah plugins install <path>")
+  console.log("  mah plugins install <path> [--force]")
   console.log("  mah plugins uninstall <name>")
   console.log("  mah plugins validate <path>")
   console.log("")
   console.log("Commands:")
   console.log("  list                      list installed plugins")
-  console.log("  install <path>            validate and install a plugin from <path>")
+  console.log("  install <path> [--force]  validate and install a plugin from <path>")
   console.log("  uninstall <name>          remove an installed plugin")
   console.log("  validate <path>           validate a plugin without installing it")
   console.log("")
@@ -1622,7 +1622,9 @@ async function runPlugins(argv, jsonMode = false) {
   }
 
   if (subcommand === "install") {
-    const pluginPath = argv[1]
+    const installArgs = argv.slice(1)
+    const force = installArgs.includes("--force")
+    const pluginPath = installArgs.find((a) => a !== "--force")
     if (!pluginPath) {
       console.error("ERROR: 'mah plugins install <path>' requires a plugin path")
       return 1
@@ -1642,8 +1644,12 @@ async function runPlugins(argv, jsonMode = false) {
     }
     const targetDir = resolvePluginDir(repoRoot, pluginName)
     if (existsSync(targetDir)) {
-      console.error(`ERROR: plugin '${pluginName}' is already installed at ${targetDir}`)
-      return 1
+      if (!force) {
+        console.error(`ERROR: plugin '${pluginName}' is already installed at ${targetDir}. Use --force to reinstall.`)
+        return 1
+      }
+      rmSync(targetDir, { recursive: true, force: true })
+      console.log(`removed existing=${targetDir}`)
     }
 
     let markerPath = ""
@@ -1942,6 +1948,52 @@ function dispatchCapture(runtime, command, passthrough) {
   }
 }
 
+function stripHermesSplash(text) {
+  if (!text) return ""
+  const clean = text
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\x1b\][^\x07]*\x07/g, "")
+    .replace(/\x1b\[\?[0-9]+[hl]/g, "")
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "")
+
+  const responseMatch = clean.match(/─+\s*(?:⚕\s*)?\w+\s*─+(.*?)(?:╰─+╯|Resume this session)/s)
+  if (responseMatch) {
+    return responseMatch[1]
+      .replace(/^[╭╰─│├┤┬┴┼┏┓┗┛┃━]+$|^[╮╭╯╰]+$/gm, "")
+      .replace(/^\s*\n/gm, "")
+      .trim()
+  }
+
+  const lines = clean.split("\n")
+  const contentLines = []
+  let inBanner = false
+  let pastBanner = false
+
+  for (const line of lines) {
+    const stripped = line.trim()
+    if (!pastBanner && !stripped) continue
+    if (/^[╭╰─│├┤┬┴┼┏┓┗┛┃━╮╯]+$/.test(stripped) || /^─{20,}$/.test(stripped)) {
+      if (!pastBanner) { inBanner = !inBanner; continue }
+    }
+    if (!pastBanner && (stripped.startsWith("Available Tools") || stripped.startsWith("Available Skills") || /^(browser|clarify|code_execution|cronjob|delegation|file|homeassistant|image_gen|cronjob|media|mcp|mlops|note|productivity|red.teaming|research|smart.home|social|software|general|devops|email|gaming|leisure|github)/.test(stripped))) {
+      continue
+    }
+    if (stripped.startsWith("Query:")) { pastBanner = true; continue }
+    if (stripped === "Initializing agent..." || stripped === "") {
+      if (pastBanner) contentLines.push("")
+      continue
+    }
+    if (pastBanner) {
+      if (stripped.startsWith("Resume this session") || stripped.startsWith("Session:") || stripped.startsWith("Duration:") || stripped.startsWith("Messages:")) break
+      contentLines.push(line)
+    }
+  }
+
+  const result = contentLines.join("\n").trim()
+  return result || clean.trim()
+}
+
 function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
   const adapter = runtimeProfiles[runtime]
   if (!adapter) {
@@ -1972,6 +2024,7 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     runtime,
     adapter,
     crew: normalizedPassthrough,
+    task: normalized.args.join(" "),
     argv: normalized.args,
     envOverrides
   })
@@ -2012,6 +2065,11 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
   // Text mode output
   if (result.status !== 0) {
     process.stderr.write(result.stderr || "")
+  }
+  const isHermesHeadless = headlessPlan.internal?.runtime === "hermes"
+  if (isHermesHeadless) {
+    result.stdout = stripHermesSplash(result.stdout)
+    result.stderr = stripHermesSplash(result.stderr)
   }
   process.stdout.write(result.stdout || "")
   return result
@@ -4472,8 +4530,8 @@ function main() {
     if (outputMode === "json") {
       console.log(JSON.stringify(result, null, 2))
     }
-    process.exitCode = typeof result.status === "number" ? result.status : 1
-    return
+    const exitCode = typeof result.status === "number" ? result.status : 1
+    process.exit(exitCode)
   }
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)

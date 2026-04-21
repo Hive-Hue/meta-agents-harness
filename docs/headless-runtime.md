@@ -1,14 +1,6 @@
-# Headless Runtime Operations (v0.6.0)
+# Headless Runtime Operations
 
-This guide documents bounded headless execution in Meta Agents Harness (MAH) for v0.6.0.
-
-## Purpose
-
-Headless mode enables non-interactive runtime execution with explicit behavior:
-
-- No TTY-dependent interaction loops
-- Deterministic command plan construction
-- Machine-consumable output when requested
+Non-interactive runtime execution with deterministic output capture.
 
 ## CLI Usage
 
@@ -16,7 +8,7 @@ Headless mode enables non-interactive runtime execution with explicit behavior:
 mah run --headless -- "your task prompt"
 ```
 
-Optional output mode:
+Structured output:
 
 ```bash
 mah run --headless --output=json -- "your task prompt"
@@ -26,15 +18,34 @@ mah run --headless -o=json -- "your task prompt"
 
 ## Explainability
 
-Use explain with trace to inspect the operational plan:
-
 ```bash
 mah explain run --headless --trace -- "your task prompt"
 ```
 
-## Runtime Capability Contract
+## How It Works
 
-Each runtime adapter must declare:
+1. MAH detects the active runtime (pi, claude, opencode, etc.)
+2. The runtime adapter's `prepareHeadlessRunContext` builds a non-interactive execution plan
+3. MAH executes the plan via `spawnSync` with `stdio: ["ignore", "pipe", "pipe"]`
+4. Output is captured and returned to the caller
+5. `process.exit()` terminates immediately (avoids plugin event loop hang)
+
+## Runtime Notes
+
+- **PI**: uses native `-p` flag for non-interactive mode. Process-and-exit, no TUI.
+  Example: `pi -e <ext1> -e <ext2> -p "task"`
+- **Claude**: uses native `-p` flag for non-interactive mode.
+  Example: `claude -p "task"`
+- **OpenCode**: uses `run` subcommand for non-interactive mode.
+  Example: `opencode run "task"`
+- **Kilo**: uses native `run` subcommand for non-interactive mode.
+  Example: `kilo run "task"`
+- **Hermes**: session-gated — requires an active session for headless execution. Splash output is automatically stripped in headless mode.
+- **Codex**: currently declares headless unsupported.
+
+## Adapter Contract
+
+Each runtime adapter declares headless capability:
 
 ```js
 capabilities: {
@@ -48,58 +59,44 @@ capabilities: {
 }
 ```
 
-## Adapter Hook
-
-Adapters that support headless execution must implement:
+Adapters must implement:
 
 ```js
 prepareHeadlessRunContext({ repoRoot, task, argv, envOverrides })
 ```
 
-Expected return envelope:
+Returns:
 
 ```js
 {
   ok: true,
   exec: "<binary>",
-  args: [/* base args */],
-  passthrough: [/* task/prompt args */],
+  args: [/* base args including headless flag */],
+  passthrough: [/* task/prompt */],
   envOverrides: { /* merged env */ },
   warnings: [],
   internal: { mode: "headless", runtime: "<name>" }
 }
 ```
 
-Or error:
+## Known Behaviors
 
-```js
-{ ok: false, error: "<reason>" }
-```
-
-## Runtime Notes
-
-- **PI**: headless supported (`promptMode=argv`, `outputMode=stdout`)
-- **Claude**: headless supported (`promptMode=argv`, `outputMode=stdout`)
-- **OpenCode**: headless supported (`promptMode=argv`, `outputMode=stdout`)
-- **Kilo plugin**: headless supported (`promptMode=argv`, `outputMode=stdout`)
-- **Hermes**: headless supported but session-gated (`requiresSession=true`, `outputMode=mixed`)
-- **Codex plugin**: currently declares headless unsupported
+- The `--` separator between `--headless` and the task prompt is required to prevent flag misinterpretation
+- MAH strips `--`, `--headless`, and `--output` flags before passing args to the runtime
+- Extensions are loaded in headless mode the same as interactive mode
+- `process.exit()` is used after execution to avoid lingering plugin handles
 
 ## Validation
 
-Run contract validation test:
-
 ```bash
 node --test tests/headless-contract.test.mjs
+node --test tests/headless-*.test.mjs
 ```
 
-Run runtime-specific tests:
+## Troubleshooting
 
-```bash
-node --test tests/headless-pi.test.mjs
-node --test tests/headless-claude.test.mjs
-node --test tests/headless-opencode.test.mjs
-node --test tests/headless-kilo.test.mjs
-node --test tests/headless-hermes.test.mjs
-node --test tests/headless-codex.test.mjs
-```
+**Process hangs after headless run**: The runtime may not support non-interactive mode. Check `mah explain run --headless --trace` to verify the execution plan uses the correct non-interactive flag (e.g., `-p` for PI, `-p` for Claude).
+
+**Wrong prompt injected**: Ensure the task is passed after `--` separator. MAH strips `--` before forwarding to the runtime.
+
+**Empty output**: Some runtimes write to stderr in headless mode. Use `--output=json` to capture both stdout and stderr separately.

@@ -5,6 +5,7 @@ runtimes:
   pi: {}
   claude: {}
   opencode: {}
+  openclaude: {}
   hermes: {}
   kilo:
     model_overrides:
@@ -157,6 +158,10 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: .openclaude/*
+      read: true
+      edit: true
+      bash: true
     - path: .pi/*
       read: true
       edit: true
@@ -232,6 +237,10 @@ domain_profiles:
       read: true
       edit: true
       bash: true
+    - path: .openclaude/*
+      read: true
+      edit: true
+      bash: true
     - path: .github/workflows/*
       read: true
       edit: true
@@ -283,6 +292,9 @@ domain_profiles:
       read: true
       edit: true
     - path: .opencode/*
+      read: true
+      edit: true
+    - path: .openclaude/*
       read: true
       edit: true
     - path: .pi/*
@@ -359,12 +371,14 @@ crews:
       codex: .codex/crew/dev/multi-team.yaml
       kilo: .kilo/crew/dev/multi-team.yaml
       opencode: .opencode/multi-team.yaml
+      openclaude: .openclaude/crew/dev/multi-team.yaml
       hermes: .hermes/crew/dev/config.yaml
     session:
       pi_root: .pi/crew/dev/sessions
       claude_mirror_root: .claude/crew/dev/sessions
       codex_root: .codex/crew/dev/sessions
       kilo_root: .kilo/crew/dev/sessions
+      openclaude_root: .openclaude/crew/dev/sessions
     topology:
       orchestrator: orchestrator
       leads:
@@ -578,6 +592,23 @@ crews:
           - validate bounded storage and confidential memory constraints
     runtime_overrides:
       opencode:
+        permission:
+          task:
+            allow_delegate:
+              orchestrator:
+                - planning-lead
+                - engineering-lead
+                - validation-lead
+              planning-lead:
+                - repo-analyst
+                - solution-architect
+              engineering-lead:
+                - frontend-dev
+                - backend-dev
+              validation-lead:
+                - qa-reviewer
+                - security-reviewer
+      openclaude:
         permission:
           task:
             allow_delegate:

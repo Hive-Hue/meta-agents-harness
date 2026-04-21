@@ -205,8 +205,8 @@ Runtimes can declare headless execution support via `capabilities.headless`:
 capabilities: {
   headless: {
     supported: boolean,        // true if runtime has non-interactive path
-    native: boolean,          // true if headless is native
-    requiresSession: boolean, // true if session is required for headless
+    native: boolean,           // true if headless is native to the runtime
+    requiresSession: boolean,  // true if session is required for headless
     promptMode: "argv" | "stdin" | "env" | "unsupported",
     outputMode: "stdout" | "file" | "mixed"
   }
@@ -217,18 +217,27 @@ Implement `prepareHeadlessRunContext(context)` to return:
 
 ```js
 {
-  ok: boolean,
-  exec: string,        // command to run
-  args: string[],      // arguments
-  passthrough: string[],
-  envOverrides: object,
-  warnings: string[],
-  internal?: object,
-  error?: string       // only when ok:false
+  ok: true,
+  exec: "<binary>",
+  args: [/* base args including non-interactive flag */],
+  passthrough: [/* task prompt */],
+  envOverrides: { /* merged env */ },
+  warnings: [],
+  internal: { mode: "headless", runtime: "<name>" }
 }
 ```
 
 Runtimes that don't support headless should return `{ ok: false, error: "..." }`.
+
+### Implementation Requirements
+
+1. **Use native non-interactive flags**: Each runtime has its own way to run non-interactively. Use the runtime's native flag (e.g., PI uses `-p`, Claude uses `--print`, OpenCode uses `run` subcommand). Do NOT rely on custom env vars or session flags alone.
+
+2. **Load extensions**: Headless mode must load the same extensions as interactive mode. Use the same extension resolution logic (`parsePiExtensionArgs`, `loadPiDefaultExtensions`, or equivalent) to ensure crew config and agent definitions are available.
+
+3. **Task parameter**: `prepareHeadlessRunContext` receives `task` (joined string) and `argv` (array). Prefer `task` when present, fall back to `argv`.
+
+4. **Do not add subcommands that the runtime doesn't have**: Only include CLI flags/subcommands that the runtime actually supports. For example, PI has no `run` subcommand — only pass `-p` and extension flags.
 
 ---
 

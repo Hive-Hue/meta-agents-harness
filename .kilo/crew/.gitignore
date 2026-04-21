@@ -1,4 +1,0 @@
-# Ignore everything in crew except .gitkeep files
-*
-!.gitkeep
-!/**/.gitkeep

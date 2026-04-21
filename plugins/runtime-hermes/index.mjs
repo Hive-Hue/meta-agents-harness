@@ -258,7 +258,7 @@ function shouldBootstrapHermes(args = [], envOverrides = {}) {
 export const runtimePlugin = {
   name: "hermes",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   adapter: {
     name: "hermes",

@@ -156,7 +156,7 @@ function resolvePiSessionLayout(repoRoot, crew, argv = [], baseEnvOverrides = {}
 export const runtimePlugin = {
   name: "pi",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   adapter: {
     name: "pi",
@@ -252,11 +252,22 @@ export const runtimePlugin = {
           error: "PI headless requires a task prompt"
         }
       }
+
+      const extensionParse = parsePiExtensionArgs(repoRoot, argv)
+      const extensionPaths = extensionParse.extensionPaths.length > 0
+        ? extensionParse.extensionPaths
+        : loadPiDefaultExtensions(repoRoot).map((item) => resolveFromRepo(repoRoot, item))
+
+      const missingExtension = extensionPaths.find((item) => !existsSync(item))
+      if (missingExtension) {
+        return { ok: false, error: `PI extension not found: ${rel(repoRoot, missingExtension)}` }
+      }
+
       return {
         ok: true,
         exec: "pi",
-        args: ["run", "--no-session"],
-        passthrough: task ? [task] : argv,
+        args: [...extensionPaths.flatMap((item) => ["-e", item]), "-p"],
+        passthrough: task ? [task] : extensionParse.remaining,
         envOverrides: {
           ...envOverrides,
           PI_MULTI_HEADLESS: "1"
