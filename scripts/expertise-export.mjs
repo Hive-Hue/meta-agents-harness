@@ -219,7 +219,7 @@ export async function exportExpertise(expertise, options = {}) {
   if (options.includeEvidence) {
     const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
     await loadEvidenceFor(expertise.id, { limit: 10 })
-    const metrics = await computeMetrics(expertise.id)
+    const metrics = await computeMetrics(expertise.id, { evidenceRoot: options.evidenceRoot })
     payload.evidence_summary = {
       total_invocations: metrics.total_invocations,
       success_rate: metrics.total_invocations > 0
