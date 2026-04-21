@@ -9,6 +9,21 @@
 5. `mah expertise apply-proposal <file>` applies approved proposals to catalog
 6. `mah expertise lifecycle <id> --to <state>` governs lifecycle transitions with auth + requirements
 
+## Recommended Operator Workflow
+
+| Step | Command | When |
+|---|---|---|
+| **1. Bootstrap** | `mah expertise seed [--force]` | Once per crew, or when agents/skills change in `meta-agents.yaml` |
+| **2. Record** | *(automatic)* | Every pi runtime delegation — no operator action needed |
+| **3. Review changes** | `mah expertise sync --dry-run` | Before sync — see what would change |
+| **4. Sync** | `mah expertise sync` | Periodically: after sprints, before release cuts, or on demand |
+| **5. Propose** | `mah expertise propose --from-evidence <agent>` | When evidence justifies capability/confidence/lifecycle changes |
+| **6. Apply** | `mah expertise apply-proposal <file>` | After human review of proposal JSON |
+| **7. Govern lifecycle** | `mah expertise lifecycle <id> --to <state>` | When lifecycle state change is warranted (e.g., active → experimental) |
+| **8. Export** | `mah expertise export <id> --with-evidence` | When sharing validated expertise across crews |
+
+**Minimal cycle**: seed once → evidence accumulates automatically → sync for updated scores → propose/apply for governance changes.
+
 ## Purpose
 
 Expertise catalog is versioned seed for runtime expertise in MAH.
