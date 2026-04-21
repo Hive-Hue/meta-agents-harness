@@ -246,7 +246,7 @@ test("kilo use persists active crew via MAH core state", () => {
 })
 
 test("codex use persists active crew and runtime artifacts via MAH core state", () => {
-  const restore = () => {}
+  const restore = () => { }
   try {
     const result = run(["--runtime", "codex", "use", "dev"])
     assert.equal(result.status, 0, result.stderr)
@@ -684,7 +684,7 @@ test("opencode explain run resolves to direct cli without wrapper plan", () => {
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "opencode")
   assert.equal(payload.exec, "opencode")
-  assert.deepEqual(payload.execArgs, ["-m", "zai-coding-plan/glm-5"])
+  assert.deepEqual(payload.execArgs, ["-m", "minimax-coding-plan/MiniMax-M2.7"])
 })
 
 test("opencode explain run uses run subcommand when task prompt is provided", () => {
@@ -703,7 +703,7 @@ test("hermes explain run resolves to hermes chat with MAH bootstrap env", () => 
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "hermes")
   assert.equal(payload.exec, "hermes")
-  assert.deepEqual(payload.execArgs, ["chat", "--provider", "zai", "-m", "glm-5"])
+  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "minimax-m2.7"])
   assert.equal(payload.env?.MAH_ACTIVE_CREW, "dev")
   assert.ok(payload.env?.MAH_HERMES_CONFIG)
   assert.ok(payload.env?.MAH_HERMES_MULTI_TEAM)
@@ -729,7 +729,7 @@ test("hermes explain run strips MAH context-memory flags before spawning hermes"
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "hermes")
   assert.equal(payload.exec, "hermes")
-  assert.deepEqual(payload.execArgs, ["chat", "--provider", "zai", "-m", "glm-5"])
+  assert.deepEqual(payload.execArgs, ["chat", "--provider", "minimax", "-m", "minimax-m2.7"])
   assert.match(payload.passthrough.join(" "), /smoke test/)
   assert.equal(payload.passthrough.some((arg) => arg === "--with-context-memory"), false)
   assert.equal(payload.passthrough.some((arg) => arg === "--context-limit"), false)
