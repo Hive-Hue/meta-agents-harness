@@ -353,7 +353,7 @@ test("mah init forwards --ai to bootstrap", () => {
     const mahPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
     const result = spawnSync(process.execPath, [mahPath, "init", "--yes", "--ai", "--name", "ai-test"], {
       cwd: tempDir,
-      env: { ...process.env, PATH: "/usr/bin:/bin" },
+      env: process.env,
       encoding: "utf-8"
     })
     assert.equal(result.status, 0, result.stderr)
@@ -364,28 +364,16 @@ test("mah init forwards --ai to bootstrap", () => {
   }
 })
 
-test("mah sync --check works from a repo using the global binary", () => {
+test("mah sync --check works from a repo using the local script", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-sync-"))
   try {
-    const initResult = spawnSync("mah", ["init", "--yes", "--runtime", "pi"], {
-      cwd: tempDir,
-      env: process.env,
-      encoding: "utf-8"
-    })
+    const initResult = runAt(tempDir, ["init", "--yes", "--runtime", "pi"])
     assert.equal(initResult.status, 0, initResult.stderr)
 
-    const syncResult = spawnSync("mah", ["sync"], {
-      cwd: tempDir,
-      env: process.env,
-      encoding: "utf-8"
-    })
+    const syncResult = runAt(tempDir, ["sync"])
     assert.equal(syncResult.status, 0, syncResult.stderr)
 
-    const checkResult = spawnSync("mah", ["sync", "--check"], {
-      cwd: tempDir,
-      env: process.env,
-      encoding: "utf-8"
-    })
+    const checkResult = runAt(tempDir, ["sync", "--check"])
     assert.equal(checkResult.status, 0, checkResult.stderr)
     assert.match(checkResult.stdout, /sync/i)
   } finally {
@@ -396,20 +384,12 @@ test("mah sync --check works from a repo using the global binary", () => {
 test("mah sync only materializes runtime markers that exist in the repo", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-sync-markers-"))
   try {
-    const initResult = spawnSync("mah", ["init", "--yes", "--runtime", "pi"], {
-      cwd: tempDir,
-      env: process.env,
-      encoding: "utf-8"
-    })
+    const initResult = runAt(tempDir, ["init", "--yes", "--runtime", "pi"])
     assert.equal(initResult.status, 0, initResult.stderr)
     const meta = YAML.parse(readFileSync(path.join(tempDir, "meta-agents.yaml"), "utf-8"))
     const crewId = meta.crews?.[0]?.id || "dev"
 
-    const syncResult = spawnSync("mah", ["sync"], {
-      cwd: tempDir,
-      env: process.env,
-      encoding: "utf-8"
-    })
+    const syncResult = runAt(tempDir, ["sync"])
     assert.equal(syncResult.status, 0, syncResult.stderr)
 
     assert.equal(existsSync(path.join(tempDir, ".pi")), true)
