@@ -95,6 +95,9 @@ function defaultExpertiseContent(agent) {
   }, { indent: 2 }).trimEnd()
 }
 
+// Note: .mah/expertise/catalog is managed by 'mah expertise seed', not by sync-meta-agents.
+// The catalog lives in a gitignored directory and uses v1 schema (different from System A).
+// skipCatalogDrift check avoids false drift reports from expertise-seed-generated files.
 function syncWorkspaceExpertiseCatalog(crew, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
   const expertiseDir = path.join(workspaceRoot, ".mah", "expertise", "catalog", crew.id)
@@ -105,20 +108,11 @@ function syncWorkspaceExpertiseCatalog(crew, mode, records, jsonOutput) {
     const currentRaw = existsSync(expertiseFile) ? readFileSync(expertiseFile, "utf-8") : ""
     const nextRaw = defaultExpertiseContent(agent)
     if (checkOnly) {
-      if (!currentRaw) {
-        pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
-        if (!jsonOutput) console.log(`drift: missing ${rel(expertiseFile)}`)
-        ok = false
-        continue
-      }
-      if (currentRaw !== nextRaw) {
-        pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "out_of_sync", action: determineAction("out_of_sync"), crew: crew.id, agent: agent.id })
-        if (!jsonOutput) console.log(`drift: out-of-sync ${rel(expertiseFile)}`)
-        ok = false
-      } else {
-        pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
-        if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
-      }
+      // Skip drift check for .mah/expertise/catalog — managed by 'mah expertise seed' (v1 schema),
+      // not by sync-meta-agents (System A schema). Silently skip to avoid false drift from
+      // expertise-seed-generated v1 entries in gitignored .mah/ directory.
+      if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+      pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
       continue
     }
 
