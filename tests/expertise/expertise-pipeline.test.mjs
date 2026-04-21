@@ -119,7 +119,7 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
   assert.ok(afterApply, 'catalog should be updated after apply')
 
   // 6. Export with evidence — verify evidence_summary present with metrics
-  const exportResult = await exportExpertise(afterApply, { includeEvidence: true, skipPolicy: true })
+  const exportResult = await exportExpertise(afterApply, { includeEvidence: true, skipPolicy: true, evidenceRoot })
   assert.ok(exportResult.ok, `exportExpertise failed: ${exportResult.error}`)
   assert.ok(exportResult.payload.evidence_summary, 'export should include evidence_summary')
   assert.ok(typeof exportResult.payload.evidence_summary.total_invocations === 'number', 'evidence_summary should have total_invocations')
