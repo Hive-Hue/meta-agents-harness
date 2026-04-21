@@ -53,7 +53,7 @@ export function extractCapabilitiesFromSystemA(systemA) {
 }
 
 export async function syncExpertiseEntry(crew, agentId, options = {}) {
-  const { dryRun = false } = options
+  const { dryRun = false, evidenceRoot: externalEvidenceRoot } = options
   const expertiseId = `${crew}:${agentId}`
 
   const workspaceCatalogRoot = join(workspaceRoot, '.mah', 'expertise', 'catalog')
@@ -75,9 +75,9 @@ export async function syncExpertiseEntry(crew, agentId, options = {}) {
   let changed = false
 
   // System C -> confidence
-  const evidence = await loadEvidenceFor(expertiseId)
+  const evidence = await loadEvidenceFor(expertiseId, { evidenceRoot: externalEvidenceRoot })
   if (evidence.length > 0) {
-    const metrics = await computeMetrics(expertiseId)
+    const metrics = await computeMetrics(expertiseId, { evidenceRoot: externalEvidenceRoot })
     const confidence = computeConfidence(metrics)
 
     const oldScore = Number(catalog.confidence?.score || 0)
@@ -143,7 +143,7 @@ export async function syncExpertiseEntry(crew, agentId, options = {}) {
 }
 
 export async function syncExpertise(options = {}) {
-  const { crew = 'dev', dryRun = false } = options
+  const { crew = 'dev', dryRun = false, evidenceRoot: externalEvidenceRoot } = options
   const errors = []
   const results = []
 
@@ -160,7 +160,7 @@ export async function syncExpertise(options = {}) {
 
   for (const agent of crewDef.agents || []) {
     try {
-      const result = await syncExpertiseEntry(crew, agent.id, { dryRun })
+      const result = await syncExpertiseEntry(crew, agent.id, { dryRun, evidenceRoot: externalEvidenceRoot })
       results.push({ agent: `${crew}:${agent.id}`, ...result })
     } catch (err) {
       errors.push(`${agent.id}: ${err.message}`)
