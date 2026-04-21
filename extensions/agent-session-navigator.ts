@@ -562,6 +562,7 @@ class AgentSessionNavigator {
 		for (let msgIdx = 0; msgIdx < messages.length; msgIdx++) {
 			const msg = messages[msgIdx];
 			const role = msg.role.toUpperCase();
+			const displayRole = role === "ASSISTANT" ? "AGENT" : role;
 			const msgKey = `msg:${msgIdx}`;
 			const isCollapsed = this.collapsed.has(msgKey);
 
@@ -572,7 +573,7 @@ class AgentSessionNavigator {
 			const roleType: TranscriptLine["type"] = role === "USER" ? "role-user" : "role-assistant";
 
 			transcript.push({
-				text: `${collapseIcon} ${roleIcon} [${msgNum}] ${role}`,
+				text: `${collapseIcon} ${roleIcon} [${msgNum}] ${displayRole}`,
 				type: roleType,
 				toggleKey: msgKey,
 			});
@@ -1009,6 +1010,11 @@ class AgentSessionNavigator {
 			...statsPanel,
 		];
 
+		// Viewport for transcript
+		const availableRows = Number.isFinite(this.terminalRows) ? this.terminalRows : 24;
+		// Ensure bodyHeight is at least the sidebar's length so we don't leave empty margin
+		const bodyHeight = Math.max(4, sidebarContent.length, availableRows - headerHeight - 1);
+
 		// ── Transcript (scrollable) ──
 		const allTranscriptLines: { rendered: string; toggleKey?: string }[] = [];
 		allTranscriptLines.push({ rendered: theme.fg("accent", theme.bold(" Transcript")) });
@@ -1025,8 +1031,6 @@ class AgentSessionNavigator {
 			}
 		}
 
-		// Viewport for transcript
-		const bodyHeight = Math.max(4, (Number.isFinite(this.terminalRows) ? this.terminalRows : 24) - headerHeight - 1);
 		this.lastTranscriptLineCount = allTranscriptLines.length;
 		this.lastTranscriptViewport = bodyHeight;
 
