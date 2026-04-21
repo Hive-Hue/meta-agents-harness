@@ -420,11 +420,11 @@ function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: num
 					items.push(child.value);
 					index = child.index;
 				} else {
-				items.push("");
-				index++;
+					items.push("");
+					index++;
+				}
+				continue;
 			}
-			continue;
-		}
 
 			const colonIndex = rest.indexOf(":");
 			if (colonIndex === -1) {
@@ -744,29 +744,29 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 	};
 }
 
-	function resolveConfigPath(cwd: string): string {
-		const envPath = process.env.MAH_MULTI_CONFIG?.trim() || process.env.PI_MULTI_CONFIG?.trim();
-		if (envPath) {
-			const absolute = resolve(cwd, envPath);
-			if (!existsSync(absolute)) {
-				throw new Error(`MAH_MULTI_CONFIG points to a missing file: ${absolute}`);
-			}
-			return absolute;
+function resolveConfigPath(cwd: string): string {
+	const envPath = process.env.MAH_MULTI_CONFIG?.trim() || process.env.PI_MULTI_CONFIG?.trim();
+	if (envPath) {
+		const absolute = resolve(cwd, envPath);
+		if (!existsSync(absolute)) {
+			throw new Error(`MAH_MULTI_CONFIG points to a missing file: ${absolute}`);
 		}
+		return absolute;
+	}
 
-		const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
-		const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+	const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+	const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
 
-		const envCrew = process.env.MAH_ACTIVE_CREW?.trim() || process.env.PI_MULTI_CREW?.trim();
-		if (envCrew) {
-			const byCrew = resolve(cwd, runtimeMarker, "crew", envCrew, "multi-team.yaml");
-			if (!existsSync(byCrew)) {
-				throw new Error(`Active crew "${envCrew}" was set but config was not found at ${byCrew}`);
-			}
-			return byCrew;
+	const envCrew = process.env.MAH_ACTIVE_CREW?.trim() || process.env.PI_MULTI_CREW?.trim();
+	if (envCrew) {
+		const byCrew = resolve(cwd, runtimeMarker, "crew", envCrew, "multi-team.yaml");
+		if (!existsSync(byCrew)) {
+			throw new Error(`Active crew "${envCrew}" was set but config was not found at ${byCrew}`);
 		}
+		return byCrew;
+	}
 
-		const activeCrewPath = resolve(cwd, runtimeMarker, ".active-crew.json");
+	const activeCrewPath = resolve(cwd, runtimeMarker, ".active-crew.json");
 	if (existsSync(activeCrewPath)) {
 		try {
 			const active = JSON.parse(readFileSync(activeCrewPath, "utf-8")) as { source_config?: string };
@@ -780,15 +780,15 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 		}
 	}
 
-		const legacyCandidates = [
-			resolve(cwd, "multi-team.yaml"),
-			resolve(cwd, runtimeMarker, "multi-team.yaml"),
-		];
+	const legacyCandidates = [
+		resolve(cwd, "multi-team.yaml"),
+		resolve(cwd, runtimeMarker, "multi-team.yaml"),
+	];
 	for (const candidate of legacyCandidates) {
 		if (existsSync(candidate)) return candidate;
 	}
 
-		const crewRoot = resolve(cwd, runtimeMarker, "crew");
+	const crewRoot = resolve(cwd, runtimeMarker, "crew");
 	const crewCandidates: string[] = [];
 	if (existsSync(crewRoot)) {
 		for (const entry of readdirSync(crewRoot)) {
@@ -809,15 +809,15 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 	if (crewCandidates.length === 1) {
 		return crewCandidates[0];
 	}
-		if (crewCandidates.length > 1) {
-			const options = crewCandidates.map((candidate) => `- ${candidate}`).join("\n");
-			throw new Error(
-				`Multiple crew configs found. Select a crew first or set MAH_MULTI_CONFIG.\n${options}`
-			);
-		}
-
-		throw new Error("Could not find a multi-team config. Set MAH_MULTI_CONFIG or create .kilo/.pi crew config.");
+	if (crewCandidates.length > 1) {
+		const options = crewCandidates.map((candidate) => `- ${candidate}`).join("\n");
+		throw new Error(
+			`Multiple crew configs found. Select a crew first or set MAH_MULTI_CONFIG.\n${options}`
+		);
 	}
+
+	throw new Error("Could not find a multi-team config. Set MAH_MULTI_CONFIG or create .kilo/.pi crew config.");
+}
 
 function loadConfig(cwd: string): ResolvedConfig {
 	const configPath = resolveConfigPath(cwd);
@@ -832,13 +832,13 @@ function loadConfig(cwd: string): ResolvedConfig {
 		throw new Error("multi-team.yaml must define at least one team.");
 	}
 
-		const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
-		const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
-		const crewRoot = resolve(cwd, runtimeMarker, "crew");
-		const relativeToCrewRoot = relative(crewRoot, baseDir);
-		const isCrewScoped = relativeToCrewRoot !== "" && !relativeToCrewRoot.startsWith("..");
-		const defaultSessionDir = isCrewScoped ? "sessions" : `${runtimeMarker}/multi-team/sessions`;
-		const defaultExpertiseDir = isCrewScoped ? "expertise" : `${runtimeMarker}/expertise`;
+	const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+	const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+	const crewRoot = resolve(cwd, runtimeMarker, "crew");
+	const relativeToCrewRoot = relative(crewRoot, baseDir);
+	const isCrewScoped = relativeToCrewRoot !== "" && !relativeToCrewRoot.startsWith("..");
+	const defaultSessionDir = isCrewScoped ? "sessions" : `${runtimeMarker}/multi-team/sessions`;
+	const defaultExpertiseDir = isCrewScoped ? "expertise" : `${runtimeMarker}/expertise`;
 
 	return {
 		...raw,
@@ -919,10 +919,10 @@ function matchesName(left: string, right: string): boolean {
 	return left.trim().toLowerCase() === right.trim().toLowerCase() || slugify(left) === slugify(right);
 }
 
-	function resolveRuntime(config: ResolvedConfig): RuntimeState {
-		const role = (process.env.MAH_MULTI_ROLE as RuntimeRole | undefined) || (process.env.PI_MULTI_ROLE as RuntimeRole | undefined) || "orchestrator";
-		const agentName = process.env.MAH_MULTI_AGENT?.trim() || process.env.PI_MULTI_AGENT?.trim();
-		const teamName = process.env.MAH_MULTI_TEAM?.trim() || process.env.PI_MULTI_TEAM?.trim();
+function resolveRuntime(config: ResolvedConfig): RuntimeState {
+	const role = (process.env.MAH_MULTI_ROLE as RuntimeRole | undefined) || (process.env.PI_MULTI_ROLE as RuntimeRole | undefined) || "orchestrator";
+	const agentName = process.env.MAH_MULTI_AGENT?.trim() || process.env.PI_MULTI_AGENT?.trim();
+	const teamName = process.env.MAH_MULTI_TEAM?.trim() || process.env.PI_MULTI_TEAM?.trim();
 
 	if (role === "orchestrator") {
 		return {
@@ -2689,8 +2689,8 @@ export default function (pi: ExtensionAPI) {
 		}
 		if (existsSync(mcpBridgePath)) args.splice(args.indexOf("-e"), 0, "-e", mcpBridgePath);
 		if (resumeSession) args.push("-c");
-			if (model && !isKiloRuntimeConfig(config)) args.push("--model", model);
-			args.push(prompt);
+		if (model && !isKiloRuntimeConfig(config)) args.push("--model", model);
+		args.push(prompt);
 
 		appendEvent("delegate_start", {
 			target: child.agent.name,
@@ -2728,29 +2728,29 @@ export default function (pi: ExtensionAPI) {
 		activeDelegations.set(activeKey, resultPromise);
 		resultPromise.then(() => activeDelegations.delete(activeKey)).catch(() => activeDelegations.delete(activeKey));
 
-			const delegationCli = delegationRuntimeCli(config);
-			const proc = spawn(delegationCli, args, {
-				stdio: ["ignore", "pipe", "pipe"],
-				env: {
-					...process.env,
-					MAH_MULTI_CONFIG: config!.configPath,
-					MAH_MULTI_ROLE: child.role,
-					MAH_MULTI_AGENT: child.agent.name,
-					MAH_MULTI_TEAM: child.team?.name || "",
-					MAH_MULTI_SESSION_ID: currentSessionId(),
-					MAH_MULTI_SESSION_ROOT: currentSessionRoot(),
-					MAH_MULTI_PARENT: runtime!.agent.name,
-					MAH_MULTI_DEPTH: String(currentDepth() + 1),
-					PI_MULTI_CONFIG: config!.configPath,
-					PI_MULTI_ROLE: child.role,
-					PI_MULTI_AGENT: child.agent.name,
-					PI_MULTI_TEAM: child.team?.name || "",
-					PI_MULTI_SESSION_ID: currentSessionId(),
-					PI_MULTI_SESSION_ROOT: currentSessionRoot(),
-					PI_MULTI_PARENT: runtime!.agent.name,
-					PI_MULTI_DEPTH: String(currentDepth() + 1),
-				},
-			});
+		const delegationCli = delegationRuntimeCli(config);
+		const proc = spawn(delegationCli, args, {
+			stdio: ["ignore", "pipe", "pipe"],
+			env: {
+				...process.env,
+				MAH_MULTI_CONFIG: config!.configPath,
+				MAH_MULTI_ROLE: child.role,
+				MAH_MULTI_AGENT: child.agent.name,
+				MAH_MULTI_TEAM: child.team?.name || "",
+				MAH_MULTI_SESSION_ID: currentSessionId(),
+				MAH_MULTI_SESSION_ROOT: currentSessionRoot(),
+				MAH_MULTI_PARENT: runtime!.agent.name,
+				MAH_MULTI_DEPTH: String(currentDepth() + 1),
+				PI_MULTI_CONFIG: config!.configPath,
+				PI_MULTI_ROLE: child.role,
+				PI_MULTI_AGENT: child.agent.name,
+				PI_MULTI_TEAM: child.team?.name || "",
+				PI_MULTI_SESSION_ID: currentSessionId(),
+				PI_MULTI_SESSION_ROOT: currentSessionRoot(),
+				PI_MULTI_PARENT: runtime!.agent.name,
+				PI_MULTI_DEPTH: String(currentDepth() + 1),
+			},
+		});
 		childProcesses.set(child.agent.name, proc);
 
 		let buffer = "";
@@ -3056,7 +3056,7 @@ export default function (pi: ExtensionAPI) {
 					note,
 				},
 
-		};
+			};
 		},
 		renderCall(args, theme) {
 			const category = (args as any).category ? `[${(args as any).category}] ` : "";
@@ -3938,6 +3938,14 @@ Note: Controls thinking level for delegated child agents only.`
 			"info",
 		);
 
+		const hintFile = resolve(ctx.cwd, ".pi", ".mah_hint_nl");
+		let hintCount = 0;
+		try { if (existsSync(hintFile)) hintCount = parseInt(readFileSync(hintFile, "utf-8"), 10) || 0; } catch { }
+		const showNewlineHint = hintCount < 3;
+		if (showNewlineHint) {
+			try { writeFileSync(hintFile, String(hintCount + 1)); } catch { }
+		}
+
 		ctx.ui.setFooter((_tui, theme, _footerData) => ({
 			dispose: () => { },
 			invalidate() { },
@@ -4030,7 +4038,14 @@ Note: Controls thinking level for delegated child agents only.`
 					theme.fg("dim", sessionLabel);
 
 				const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
-				return [truncateToWidth(left + pad + right, width)];
+				const footerStr = truncateToWidth(left + pad + right, width);
+
+				if (showNewlineHint) {
+					const hintMsg = theme.fg("dim", " Tip: ") + theme.fg("accent", "\\ + ↵") + theme.fg("dim", " to new line");
+					return [hintMsg, footerStr];
+				}
+
+				return [footerStr];
 			},
 		}));
 	});
