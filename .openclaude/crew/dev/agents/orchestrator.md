@@ -1,6 +1,6 @@
 ---
 name: orchestrator
-model: zai/glm-5
+model: minimax/minimax-m2.7
 role: orchestrator
 team: Orchestration
 mission: Deliver bounded v0.8.0 Context Memory evolution for Meta Agents

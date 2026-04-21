@@ -21,7 +21,7 @@ runtimes:
   corefake: {}
 catalog:
   models:
-    orchestrator_default: zai-coding-plan/glm-5
+    orchestrator_default: minimax-coding-plan/MiniMax-M2.7
     lead_default: minimax-coding-plan/MiniMax-M2.7
     worker_default: openai-codex/gpt-5.3-codex
     qa_default: openai-codex/gpt-5.4-mini

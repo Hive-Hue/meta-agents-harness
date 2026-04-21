@@ -385,7 +385,7 @@ orchestrator:
     use-when: Track durable learnings for orchestrator.
     updatable: true
     max-lines: 10000
-  model: zai/glm-5
+  model: minimax/minimax-m2.7
   model_fallbacks:
     - nvidia/nemotron-3-super-120b-a12b:free
     - zai/glm-5
