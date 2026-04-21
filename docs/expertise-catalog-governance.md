@@ -1,66 +1,74 @@
 # Expertise Catalog Governance
 
+## What Actually Happens Today
+
+1. `mah expertise seed` generates catalog entries from `meta-agents.yaml` with declared capabilities
+2. Pi runtime records evidence after each delegation to `.mah/expertise/evidence/`
+3. `mah expertise sync` reads evidence + System A learnings → updates catalog confidence and discovers capabilities
+4. `mah expertise propose --from-evidence <id>` generates governance proposals from evidence
+5. `mah expertise apply-proposal <file>` applies approved proposals to catalog
+6. `mah expertise lifecycle <id> --to <state>` governs lifecycle transitions with auth + requirements
+
 ## Purpose
 
-The expertise catalog is the versioned seed for runtime expertise in MAH.
-It should be small, explicit, and governed. It is not the evidence store and it is not the registry cache.
+Expertise catalog is versioned seed for runtime expertise in MAH.
+Keep it small, explicit, governed. It is not evidence store and not registry cache.
 
 ## Source Of Truth Layers
 
-- `catalog`: canonical seed data for each crew and agent, stored in the workspace-local `.mah/expertise/catalog`
-- `registry`: derived index rebuilt from the catalog into the workspace-local `.mah/expertise/registry.json`
-- `evidence`: runtime-only learning records stored in the workspace-local `.mah/expertise/evidence`
-- runtime expertise mirrors: generated from the catalog for each runtime, using the current workspace as the target tree
+- `catalog`: canonical seed data for each crew and agent, stored in workspace-local `.mah/expertise/catalog`
+- `registry`: derived index rebuilt from catalog into workspace-local `.mah/expertise/registry.json`
+- `evidence`: runtime-only learning records stored in workspace-local `.mah/expertise/evidence`
+- runtime expertise mirrors: generated from catalog for each runtime, using current workspace as target tree
 
 ## Update Flow
 
-1. Real task execution produces evidence in the runtime evidence store.
-2. `orchestrator` or a `*-lead` summarizes evidence into a proposal for catalog changes.
-3. A reviewer checks whether the change is durable, reusable, and safe.
-4. Approved changes are written into the catalog seed files.
-5. Registry is rebuilt from the catalog into the current workspace's `.mah/`.
-6. Runtime mirrors are resynced from the catalog when needed.
+1. **Seed (Manual):** run `mah expertise seed` once for bootstrap, then on schema or baseline changes.
+2. **Evidence recording (Automated):** pi runtime records evidence after each delegation.
+3. **Sync (Manual):** run `mah expertise sync` periodically or after evidence accumulates.
+4. **Proposal generation (Manual):** run `mah expertise propose` (often `--from-evidence`).
+5. **Review (Manual):** human reviews proposal JSON for durability, safety, and governance fit.
+6. **Apply (Manual):** run `mah expertise apply-proposal <file>` for approved proposal.
+7. **Registry rebuild (Automated):** `apply-proposal` and `sync` rebuild registry.
 
-The primary generator is the CLI command:
+Primary proposal generator:
 
 ```bash
 mah expertise propose <id> --summary "<summary>" --changes '<json>'
 ```
 
-That command is intentionally limited to `orchestrator` and `*-lead` actors.
+Command is intentionally limited to `orchestrator` and `*-lead` actors.
 
-To draft from the evidence store instead of hand-writing the proposal fields:
+Evidence-driven drafting:
 
 ```bash
 mah expertise propose <id> --from-evidence --evidence-limit 5
 ```
 
-That mode summarizes recent evidence, derives a conservative draft change set, and keeps the final approval flow unchanged.
+This drafts conservative changes from recent evidence; approval flow stays manual.
 
 ## Update Rules
 
-- Do not write raw session logs into the catalog.
+- Do not write raw session logs into catalog.
 - Do not move transient observations directly into seed files.
 - Prefer `lessons`, `decisions`, `risks`, and `workflows` for durable updates.
-- Keep the catalog minimal: only the fields needed for routing, validation, trust, and governance.
-- Use `observed` or `validated` only when the evidence is strong enough to justify it.
-- Use proposals for the reviewable step before catalog writes; do not edit the seed directly from transient evidence.
+- Keep catalog minimal: fields needed for routing, validation, trust, governance.
+- Use `observed` or `validated` only when evidence is strong enough.
+- Use proposals as reviewable step before catalog writes.
 
 ## Recommended Ownership
 
-- `planning-lead` and `engineering-lead` can generate proposals from evidence and release plans.
-- `orchestrator` can also generate proposals when coordinating cross-team changes.
-- `validation-lead` reviews whether the proposal matches real execution.
-- `security-reviewer` checks for unsafe confidence inflation or policy drift.
-- `orchestrator` approves the final seed as part of the release baseline.
+- `orchestrator` and `*-lead` can generate proposals (active).
+- `validation-lead` and `security-reviewer` are designated reviewers (role exists).
+- `orchestrator` approves final seed as release baseline.
 
 ## Bootstrap Policy
 
-When the repo is reset, the catalog seed should be recreated from a checked-in bootstrap template, not from runtime data.
-That keeps the foundation fresh while still giving the project a known-good starting point.
+`mah expertise seed` is bootstrap mechanism.
+When repo is reset, regenerate catalog seed from `meta-agents.yaml` declarations, then govern deltas through evidence + proposals.
 
 ## Workspace And Global Overlay
 
-MAH does not load expertise from the global `~/.mah` overlay.
-The global install keeps shared runtime assets such as skills, extensions, plugins, and themes.
-Expertise is a workspace concern and is materialized into `.mah/expertise/catalog` by `mah sync` / `mah generate`.
+MAH does not load expertise from global `~/.mah` overlay.
+Global install keeps shared runtime assets such as skills, extensions, plugins, and themes.
+Expertise is workspace concern and is materialized into `.mah/expertise/catalog` by `mah sync` / `mah generate`.
