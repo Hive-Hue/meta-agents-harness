@@ -11,6 +11,7 @@ export const CANONICAL_MAH_SKILLS = [
   "bootstrap",
   "caveman",
   "caveman-commit",
+  "caveman-crew",
   "caveman-help",
   "caveman-review",
   "caveman-compress",

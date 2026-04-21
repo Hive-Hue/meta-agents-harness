@@ -392,6 +392,7 @@ crews:
           - zero_micromanagement
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-commit
           - caveman-compress
           - caveman-help
@@ -413,6 +414,7 @@ crews:
           - zero_micromanagement
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-commit
           - caveman-compress
           - caveman-help
@@ -433,6 +435,7 @@ crews:
           - zero_micromanagement
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-commit
           - caveman-compress
           - caveman-help
@@ -452,6 +455,7 @@ crews:
           - zero_micromanagement
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-commit
           - caveman-compress
           - caveman-help
@@ -470,6 +474,7 @@ crews:
         skills:
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-compress
           - caveman-help
           - caveman-review
@@ -487,6 +492,7 @@ crews:
         skills:
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-compress
           - caveman-help
           - caveman-review
@@ -503,6 +509,7 @@ crews:
         skills:
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-commit
           - caveman-compress
           - caveman-help
@@ -522,6 +529,7 @@ crews:
         skills:
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-commit
           - caveman-compress
           - caveman-help
@@ -541,6 +549,7 @@ crews:
         skills:
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-compress
           - caveman-help
           - caveman-review
@@ -558,6 +567,7 @@ crews:
         skills:
           - expertise_model
           - caveman
+          - caveman-crew
           - caveman-compress
           - caveman-help
           - caveman-review
