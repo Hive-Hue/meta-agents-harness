@@ -21,15 +21,7 @@ This guide walks through integrating Hermes as a runtime in Meta Agents Harness 
 If you already have a `meta-agents.yaml`, add the Hermes sections:
 
 ```yaml
-# In runtime_detection.marker:
-marker:
-  hermes: ".hermes"
-
-# In runtime_detection.cli:
-cli:
-  hermes:
-    direct_cli: "hermes"
-    wrapper: "hermesh"
+# MAH handles runtime detection internally, so you only need Hermes under runtimes.
 
 # In runtimes:
 runtimes:

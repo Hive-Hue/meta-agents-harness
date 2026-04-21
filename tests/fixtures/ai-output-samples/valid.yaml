@@ -2,35 +2,6 @@ version: 1
 name: "ai-generated"
 description: "AI-generated configuration for testing"
 
-runtime_detection:
-  order:
-    - forced
-    - marker
-    - cli
-  forced:
-    args:
-      - "--runtime=<name>"
-    env:
-      - MAH_RUNTIME
-  marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-    hermes: ".hermes"
-  cli:
-    pi:
-      direct_cli: "pi"
-      wrapper: "pimh"
-    claude:
-      direct_cli: "claude"
-      wrapper: "ccmh"
-    opencode:
-      direct_cli: "opencode"
-      wrapper: "ocmh"
-    hermes:
-      direct_cli: "hermes"
-      wrapper: "hermesh"
-
 runtimes:
   pi:
     wrapper: "pimh"
@@ -54,13 +25,6 @@ catalog:
     orchestrator_default: "zai/glm-4.7"
     lead_default: "zai/glm-4.7"
     worker_default: "zai/glm-5-turbo"
-  skills:
-    delegate_bounded:
-      pi: ".pi/skills/delegate-bounded/SKILL.md"
-    zero_micromanagement:
-      pi: ".pi/skills/zero-micromanagement/SKILL.md"
-    expertise_model:
-      pi: ".pi/skills/expertise-model/SKILL.md"
   domain_profiles:
     read_only_repo:
       - path: "."

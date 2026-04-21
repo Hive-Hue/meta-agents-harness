@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, cpSync,
 import path from "node:path"
 import { resolve, dirname } from "node:path"
 import { spawnSync } from "node:child_process"
+import os from "node:os"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { RUNTIME_ORDER } from "./runtime-adapters.mjs"
@@ -9,10 +10,15 @@ import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
 import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./m3-ops.mjs"
 import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./plugin-loader.mjs"
 import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
+import { resolveMahHome } from "./mah-home.mjs"
+import { resolveWorkspaceRoot } from "./workspace-root.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const repoRoot = path.resolve(__dirname, "..")
+const packageRoot = path.resolve(__dirname, "..")
+
+const repoRoot = resolveWorkspaceRoot(process.cwd())
+const mahHome = resolveMahHome()
 
 // Bootstrap plugin discovery at module load time (top-level await).
 // This ensures plugin runtimes are available for all commands including detect.
@@ -142,33 +148,33 @@ function detectRuntime(cwd, forcedRuntime) {
     return { runtime: forcedRuntime, reason: "forced" }
   }
 
-  const byMarker = Object.entries(runtimeProfiles)
-    .filter(([, profile]) => existsSync(path.join(cwd, profile.markerDir)))
-    .map(([name]) => name)
+  const homeDir = (process.env.HOME || "").trim()
+  let searchDir = cwd
+  while (true) {
+    if (homeDir && searchDir === homeDir) break
 
-  if (byMarker.length === 1) {
-    return { runtime: byMarker[0], reason: "marker" }
-  }
+    const byMarker = Object.entries(runtimeProfiles)
+      .filter(([, profile]) => existsSync(path.join(searchDir, profile.markerDir)))
+      .map(([name]) => name)
 
-  if (byMarker.length > 1) {
-    const strictMarkers = process.argv.includes("--strict-markers") || process.env.MAH_STRICT_MARKERS === "1"
-    if (strictMarkers) {
-      return { runtime: null, reason: `ambiguous-markers:${byMarker.join(",")}` }
+    if (byMarker.length === 1) {
+      return { runtime: byMarker[0], reason: "marker" }
     }
-    const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
-    if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
-    const pluginPreferred = [...byMarker].sort((left, right) => left.localeCompare(right))[0]
-    if (pluginPreferred) return { runtime: pluginPreferred, reason: `markers:${byMarker.join(",")}` }
-  }
 
-  const byCli = orderedRuntimeNames(runtimeProfiles)
-    .map((name) => ({ name, profile: runtimeProfiles[name], status: runtimeExecutableStatus(name) }))
-    .filter(({ status }) => status.directCliAvailable || status.wrapperAvailable)
+    if (byMarker.length > 1) {
+      const strictMarkers = process.argv.includes("--strict-markers") || process.env.MAH_STRICT_MARKERS === "1"
+      if (strictMarkers) {
+        return { runtime: null, reason: `ambiguous-markers:${byMarker.join(",")}` }
+      }
+      const preferred = RUNTIME_ORDER.find((name) => byMarker.includes(name))
+      if (preferred) return { runtime: preferred, reason: `markers:${byMarker.join(",")}` }
+      const pluginPreferred = [...byMarker].sort((left, right) => left.localeCompare(right))[0]
+      if (pluginPreferred) return { runtime: pluginPreferred, reason: `markers:${byMarker.join(",")}` }
+    }
 
-  if (byCli.length > 0) {
-    const selected = byCli[0]
-    const source = selected.status.directCliAvailable ? selected.profile.directCli : selected.profile.wrapper
-    return { runtime: selected.name, reason: `cli:${source}` }
+    const parent = path.dirname(searchDir)
+    if (parent === searchDir) break
+    searchDir = parent
   }
 
   return { runtime: null, reason: "none" }
@@ -184,7 +190,7 @@ function printHelp() {
   console.log("  detect")
   console.log("  doctor")
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate] [args]")
-  console.log("  init [--yes] [--force] [--crew <name>] [--runtime <name>]")
+  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
@@ -322,20 +328,22 @@ function runCliPathSecuritySelfTest() {
 }
 
 function runLocalScript(scriptPath, scriptArgs = []) {
-  const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
+  const resolvedScriptPath = path.isAbsolute(scriptPath) ? scriptPath : path.join(packageRoot, scriptPath)
+  const child = spawnSync(process.execPath, [resolvedScriptPath, ...scriptArgs], {
     cwd: repoRoot,
     env: process.env,
     stdio: "inherit"
   })
   if (typeof child.status === "number") return child.status
   if (child.error) {
-    console.error(`ERROR: failed to run ${scriptPath}: ${child.error.message}`)
+    console.error(`ERROR: failed to run ${resolvedScriptPath}: ${child.error.message}`)
   }
   return 1
 }
 
 function runLocalScriptCapture(scriptPath, scriptArgs = []) {
-  const child = spawnSync(process.execPath, [scriptPath, ...scriptArgs], {
+  const resolvedScriptPath = path.isAbsolute(scriptPath) ? scriptPath : path.join(packageRoot, scriptPath)
+  const child = spawnSync(process.execPath, [resolvedScriptPath, ...scriptArgs], {
     cwd: repoRoot,
     env: process.env,
     encoding: "utf-8"
@@ -684,7 +692,7 @@ function buildCoreManagedCommandPayload(runtime, command, passthrough = []) {
   const payload = {
     runtime,
     command,
-    mode: "core-managed",
+    mode: "mah-managed",
     crew_root: path.join(adapter.markerDir || `.${runtime}`, "crew"),
     active_crew: activeCrew?.crew || "",
     crews
@@ -896,12 +904,16 @@ function printExplain(traceMode, payload) {
 function runInit(argv) {
   const runtime = parseValueArg(argv, "--runtime")
   const crew = parseValueArg(argv, "--crew")
+  const aiFlag = argv.includes("--ai") || argv.includes("--ai-assisted")
+  const projectName = parseValueArg(argv, "--name")
+  const projectDescription = parseValueArg(argv, "--description")
+  const projectBrief = parseValueArg(argv, "--brief")
   const yesFlag = argv.includes("--yes")
   const forceFlag = argv.includes("--force")
   const created = []
   const skipped = []
 
-  const bootstrapArgs = [path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")]
+  const bootstrapArgs = [path.join(packageRoot, "scripts", "bootstrap-meta-agents.mjs")]
   if (!process.stdin.isTTY || yesFlag) {
     bootstrapArgs.push("--non-interactive")
   }
@@ -910,6 +922,18 @@ function runInit(argv) {
   }
   if (crew) {
     bootstrapArgs.push("--crew", crew)
+  }
+  if (aiFlag) {
+    bootstrapArgs.push("--ai")
+  }
+  if (projectName) {
+    bootstrapArgs.push("--name", projectName)
+  }
+  if (projectDescription) {
+    bootstrapArgs.push("--description", projectDescription)
+  }
+  if (projectBrief) {
+    bootstrapArgs.push("--brief", projectBrief)
   }
 
   const bootstrapResult = spawnSync("node", bootstrapArgs, {
@@ -925,8 +949,9 @@ function runInit(argv) {
     skipped.push("meta-agents.yaml")
   }
 
-  const mcpTarget = path.join(repoRoot, ".mcp.json")
-  const mcpExample = path.join(repoRoot, ".mcp.example.json")
+  const cwd = process.cwd()
+  const mcpTarget = path.join(cwd, ".mcp.json")
+  const mcpExample = path.join(packageRoot, ".mcp.example.json")
   if (!existsSync(mcpTarget) && existsSync(mcpExample)) {
     copyFileSync(mcpExample, mcpTarget)
     created.push(".mcp.json")
@@ -934,7 +959,7 @@ function runInit(argv) {
     skipped.push(".mcp.json")
   }
   if (runtime && runtimeProfiles[runtime]) {
-    const markerPath = path.join(repoRoot, runtimeProfiles[runtime].markerDir)
+    const markerPath = path.join(cwd, runtimeProfiles[runtime].markerDir)
     if (!existsSync(markerPath)) {
       mkdirSync(markerPath, { recursive: true })
       created.push(runtimeProfiles[runtime].markerDir)
@@ -996,7 +1021,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const effectiveRuntime = filters.runtime || detectedRuntime || ""
   if (jsonMode) filters.json = true
 
-  // Get all runtimes (built-ins + loaded plugins)
+  // Get all runtimes (bundled plugins + loaded plugins)
   const allRuntimes = await getAllRuntimes()
 
   // Handle subcommands
@@ -1509,7 +1534,7 @@ function printSyncHelp() {
   console.log("mah sync / mah generate — materialize tree artifacts from meta-agents.yaml")
   console.log("")
   console.log("Usage:")
-  console.log("  mah sync              sync all meta-agent files (prompts for confirmation)")
+  console.log("  mah sync              sync files for the runtime markers present in the repo")
   console.log("  mah generate          generate runtime tree artifacts from meta-agents.yaml")
   console.log("  mah generate:tree     alias for `mah generate`")
   console.log("  mah sync --check      check for drift without modifying files")
@@ -1522,42 +1547,34 @@ function printSyncHelp() {
 }
 
 /**
- * Sync plugin runtime entry into meta-agents.yaml.
- * action: "add" — adds the plugin's markerDir entry.
- * action: "remove" — removes the plugin's markerDir entry.
- *
- * This function only updates plugin-owned marker entries.
- * It does not remove user-authored runtime overrides from meta-agents.yaml.
+ * Runtime detection is internal to MAH now.
+ * Plugin install/uninstall still call this hook, but it intentionally does nothing
+ * so the repo-local meta-agents.yaml stays free of runtime_detection noise.
  */
 function syncPluginYaml(pluginName, pluginMeta, action) {
-  const yamlPath = path.join(repoRoot, "meta-agents.yaml")
-  if (!existsSync(yamlPath)) return
+  void pluginName
+  void pluginMeta
+  void action
+}
 
-  let doc = {}
-  try {
-    const raw = readFileSync(yamlPath, "utf-8")
-    doc = YAML.parse(raw) || {}
-  } catch {
-    return
-  }
+function hasMahWorkspaceMarkers(dir) {
+  return [
+    "meta-agents.yaml",
+    ".pi",
+    ".claude",
+    ".opencode",
+    ".hermes",
+    ".codex",
+    ".kilo"
+  ].some((marker) => existsSync(path.join(dir, marker)))
+}
 
-  doc.runtime_detection = doc.runtime_detection || {}
-  doc.runtime_detection.marker = doc.runtime_detection.marker || {}
+function resolvePluginStoreRoot(baseRoot) {
+  return hasMahWorkspaceMarkers(baseRoot) ? baseRoot : mahHome
+}
 
-  if (action === "add") {
-    // Add/update marker entry
-    if (pluginMeta.markerDir) {
-      doc.runtime_detection.marker[pluginName] = pluginMeta.markerDir
-    }
-  } else if (action === "remove") {
-    delete doc.runtime_detection.marker[pluginName]
-  }
-  try {
-    const updated = YAML.stringify(doc, { indent: 2, lineWidth: 0 })
-    writeFileSync(yamlPath, updated, "utf-8")
-  } catch {
-    // non-fatal
-  }
+function resolvePluginDir(baseRoot, pluginName) {
+  return path.join(resolvePluginStoreRoot(baseRoot), "mah-plugins", pluginName)
 }
 
 function printPluginsHelp() {
@@ -1588,7 +1605,7 @@ async function runPlugins(argv, jsonMode = false) {
   }
 
   const subcommand = argv[0] || "list"
-  const mahPluginsDir = path.join(repoRoot, "mah-plugins")
+  const mahPluginsDir = path.join(resolvePluginStoreRoot(repoRoot), "mah-plugins")
 
   if (subcommand === "list") {
     const entries = listLoadedPlugins()
@@ -1623,7 +1640,7 @@ async function runPlugins(argv, jsonMode = false) {
       console.error("ERROR: plugin name could not be determined")
       return 1
     }
-    const targetDir = path.join(mahPluginsDir, pluginName)
+    const targetDir = resolvePluginDir(repoRoot, pluginName)
     if (existsSync(targetDir)) {
       console.error(`ERROR: plugin '${pluginName}' is already installed at ${targetDir}`)
       return 1
@@ -1736,7 +1753,12 @@ async function runPlugins(argv, jsonMode = false) {
       return 1
     }
     // Read plugin metadata from plugin.json (sync, no module import needed)
-    const installedPluginJson = path.join(mahPluginsDir, pluginName, "plugin.json")
+    const pluginRoots = [
+      path.join(repoRoot, "mah-plugins"),
+      path.join(mahHome, "mah-plugins")
+    ]
+    const targetDir = pluginRoots.map((root) => path.join(root, pluginName)).find((candidate) => existsSync(candidate)) || path.join(mahPluginsDir, pluginName)
+    const installedPluginJson = path.join(targetDir, "plugin.json")
     let markerDir = null
     let directCli = null
     let wrapper = null
@@ -1766,7 +1788,6 @@ async function runPlugins(argv, jsonMode = false) {
     // Remove plugin entry from meta-agents.yaml before removing files
     syncPluginYaml(pluginName, { markerDir, directCli, wrapper, configRoot, configPattern }, "remove")
     // First remove from mah-plugins/ directory if present
-    const targetDir = path.join(mahPluginsDir, pluginName)
     if (existsSync(targetDir)) {
       try {
         rmSync(targetDir, { recursive: true })
@@ -2868,7 +2889,8 @@ async function runExpertise(argv, jsonMode = false) {
   const defaultCrew = process.env.MAH_ACTIVE_CREW || 'dev'
 
   // Load expertise modules lazily
-  const { getRegistry } = await import('./expertise-registry.mjs')
+  const { getRegistry, buildRegistry } = await import('./expertise-registry.mjs')
+  const { seedExpertiseCatalog } = await import('./expertise-seed.mjs')
   const { loadExpertiseById } = await import('./expertise-loader.mjs')
   const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
   const { computeConfidence, mergeConfidence } = await import('./expertise-confidence.mjs')
@@ -2882,6 +2904,88 @@ async function runExpertise(argv, jsonMode = false) {
     const resolvedId = resolveExpertiseId(targetId, crew)
     const expertise = await loadExpertiseById(resolvedId)
     return { resolvedId, expertise }
+  }
+
+
+  // ------------------------------------------------------------------
+  // expertise seed [--crew <crew>] [--force] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'seed') {
+    const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
+    const force = subArgv.includes('--force')
+    const crew = targetCrew || defaultCrew
+
+    if (json || jsonMode) {
+      const result = await seedExpertiseCatalog(null, { crew, force })
+      console.log(JSON.stringify({ ok: true, ...result }))
+      return 0
+    }
+
+    const result = await seedExpertiseCatalog(null, { crew, force })
+    if (result.errors.length > 0) {
+      console.error(`Errors during seeding:`)
+      for (const err of result.errors) console.error(`  - ${err}`)
+    }
+    if (result.skipped > 0) {
+      console.log(`Seeded ${result.seeded} entries for crew '${crew}' → ${result.catalogPath}/`)
+      console.log(`Skipped ${result.skipped} existing entries with real data (use --force to overwrite)`)
+    } else {
+      console.log(`Seeded ${result.seeded} entries for crew '${crew}' → ${result.catalogPath}/`)
+    }
+
+    // Rebuild registry
+    const registry = await buildRegistry()
+    console.log(`Rebuilt registry → .mah/expertise/registry.json (${registry.total_count} entries)`)
+    console.log("\nRun 'mah expertise list' to see seeded entries.")
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise sync [--crew <crew>] [--dry-run] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'sync') {
+    const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
+    const dryRun = subArgv.includes('--dry-run')
+    const crew = targetCrew || defaultCrew
+
+    if (json || jsonMode) {
+      const { syncExpertise } = await import('./expertise-sync.mjs')
+      const result = await syncExpertise({ crew, dryRun })
+      console.log(JSON.stringify({ ok: true, ...result }))
+      return 0
+    }
+
+    const { syncExpertise } = await import('./expertise-sync.mjs')
+    const result = await syncExpertise({ crew, dryRun })
+
+    if (result.errors.length > 0) {
+      console.error('Errors:')
+      for (const err of result.errors) console.error(`  - ${err}`)
+    }
+
+    for (const r of result.results) {
+      if (r.skipped) {
+        console.log(`${r.agent}: skipped (${r.reason})`)
+      } else if (!r.changed) {
+        console.log(`${r.agent}: no changes`)
+      } else {
+        for (const change of r.changes) {
+          if (change.type === 'confidence') {
+            console.log(`${r.agent}: confidence ${change.from.score.toFixed(2)}/${change.from.band} → ${change.to.score.toFixed(2)}/${change.to.band} (${change.to.invocations} invocations)`)
+          } else if (change.type === 'capabilities') {
+            console.log(`${r.agent}: +capabilities [${change.added.join(', ')}]`)
+          }
+        }
+      }
+    }
+
+    if (dryRun) {
+      console.log('\nDry-run — nothing written.')
+    } else if (result.results.some(r => r.changed)) {
+      console.log('\nRegistry rebuilt.')
+    }
+
+    return result.errors.length > 0 ? 1 : 0
   }
 
   // ------------------------------------------------------------------
@@ -3203,9 +3307,14 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise export <id> [--output <path>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'export') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log("usage: mah expertise export <id> [--output <path>] [--domain <domain>] [--with-evidence] [--json]")
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     const outputPath = parseValueArg(subArgv, '--output') || ''
     const domain = parseValueArg(subArgv, '--domain') || ''
+    const withEvidence = subArgv.includes('--with-evidence')
     const normalizedId = resolveExpertiseId(targetId)
 
     if (!targetId) {
@@ -3223,7 +3332,7 @@ async function runExpertise(argv, jsonMode = false) {
         return 1
       }
 
-      const result = await exportExpertiseToFile(normalizedId, outputValidation.resolvedPath, { domain })
+      const result = await exportExpertiseToFile(normalizedId, outputValidation.resolvedPath, { domain, includeEvidence: withEvidence })
       if (!result.ok) {
         console.error(`ERROR: export failed: ${result.errors.join('; ')}`)
         return 1
@@ -3245,7 +3354,7 @@ async function runExpertise(argv, jsonMode = false) {
     }
 
     const { exportExpertise } = await import('./expertise-export.mjs')
-    const result = exportExpertise(entry, { domain, skipPolicy: false })
+    const result = await exportExpertise(entry, { domain, skipPolicy: false, includeEvidence: withEvidence })
     if (!result.ok) {
       console.error(`ERROR: export blocked by policy: ${result.error}`)
       return 1
@@ -3367,6 +3476,98 @@ async function runExpertise(argv, jsonMode = false) {
   }
 
   // ------------------------------------------------------------------
+  // expertise apply-proposal <file> [--force] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'apply-proposal') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log("usage: mah expertise apply-proposal <file> [--force] [--json]")
+      return 0
+    }
+    const proposalPath = parseValueArg(subArgv, '') || subArgv[0]
+    const force = subArgv.includes('--force')
+
+    if (!proposalPath) {
+      console.error("ERROR: usage: mah expertise apply-proposal <file> [--force]")
+      return 1
+    }
+
+    const actor = process.env.MAH_AGENT || 'orchestrator'
+    const { applyProposalFromFile } = await import('./expertise-apply-proposal.mjs')
+
+    const pathValidation = validateCliPath(proposalPath, 'read')
+    if (!pathValidation.ok) {
+      console.error(`ERROR: invalid proposal file path: ${pathValidation.error}`)
+      return 1
+    }
+
+    const result = await applyProposalFromFile(pathValidation.resolvedPath, { force, actor })
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result))
+      return result.ok ? 0 : 1
+    }
+
+    if (!result.ok) {
+      if (result.stale) {
+        console.error(`ERROR: ${result.error}`)
+        console.error(`Changed field: ${result.changed_field}`)
+      } else {
+        console.error(`ERROR: ${result.error}`)
+      }
+      return 1
+    }
+
+    console.log(`✓ Applied proposal`)
+    for (const change of result.applied) {
+      console.log(`  ${change.field}: ${JSON.stringify(change.from)} → ${JSON.stringify(change.to)}`)
+    }
+    console.log(`Registry rebuilt (${result.registry_entries} entries)`)
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'lifecycle') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log("usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]")
+      return 0
+    }
+    const targetId = parseValueArg(subArgv, '') || subArgv[0]
+    const targetState = parseValueArg(subArgv, '--to')
+    const actor = parseValueArg(subArgv, '--actor') || process.env.MAH_AGENT || 'orchestrator'
+    const reason = parseValueArg(subArgv, '--reason') || ''
+
+    if (!targetId || !targetState) {
+      console.error("ERROR: usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>]")
+      return 1
+    }
+
+    const { transitionLifecycle } = await import('./expertise-lifecycle-cli.mjs')
+    const result = await transitionLifecycle(targetId, targetState, { actor, reason })
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result))
+      return result.ok ? 0 : 1
+    }
+
+    if (!result.ok) {
+      console.error(`ERROR: ${result.error}`)
+      if (result.allowed_transitions) {
+        console.error(`Allowed transitions from current state: ${result.allowed_transitions.join(', ')}`)
+      }
+      if (result.requirements) {
+        console.error(`Requirements: evidence_count >= ${result.requirements.evidence_count_min}, review_pass_rate >= ${(result.requirements.review_pass_rate_min * 100).toFixed(0)}%`)
+      }
+      return 1
+    }
+
+    console.log(`✓ ${targetId}: ${result.changed.from} → ${result.changed.to}`)
+    console.log(`Registry rebuilt (${result.registry_entries} entries)`)
+    return 0
+  }
+
+  // ------------------------------------------------------------------
   // expertise import <file> [--dry-run] [--json]
   // ------------------------------------------------------------------
   if (sub === 'import') {
@@ -3437,6 +3638,10 @@ mah expertise — Expertise Catalog CLI (v0.7.0)
 Usage:
   mah expertise list                        List all expertise entries
   mah expertise list --crew <crew>         List expertise for a specific crew
+  mah expertise seed                        Seed expertise catalog from meta-agents.yaml
+  mah expertise seed --force                Overwrite existing entries with real data
+  mah expertise sync [--crew <crew>]        Sync confidence + capabilities from evidence + learnings
+  mah expertise sync --dry-run              Show planned changes without writing
   mah expertise list --json                 JSON output
 
   mah expertise show <id>                   Show detailed expertise entry
@@ -3455,7 +3660,13 @@ Usage:
   mah expertise export <id>                 Export expertise to JSON
   mah expertise export <id> --output <path>  Write to file
   mah expertise export <id> --domain <domain>  Check domain policy
+  mah expertise export <id> --with-evidence  Include evidence summary
   mah expertise export <id> --json          JSON output
+
+  mah expertise apply-proposal <file>    Apply approved proposal to catalog
+  mah expertise apply-proposal <file> --force   Apply even if catalog changed
+  mah expertise lifecycle <id> --to <state>  Transition lifecycle state
+  mah expertise lifecycle <id> --to validated --actor orchestrator
 
   mah expertise propose <id>                Create a governed proposal artifact
   mah expertise propose <id> --from-evidence  Draft changes from the evidence store
@@ -3472,6 +3683,8 @@ Usage:
 
 Examples:
   mah expertise list --crew dev
+  mah expertise seed                        Seed expertise catalog from meta-agents.yaml
+  mah expertise seed --crew dev              Seed specific crew
   mah expertise show dev:backend-dev
   mah expertise recommend --task "implement user authentication API"
   mah expertise evidence dev:backend-dev --limit 10
@@ -3526,6 +3739,7 @@ function main() {
         }))
       } else {
         console.log("runtime=unknown")
+        console.log("reason=none")
       }
       process.exitCode = 1
       return
@@ -3550,7 +3764,7 @@ function main() {
   }
 
   if (first === "init") {
-    process.exitCode = runInit(normalizedArgv.slice(1))
+    process.exitCode = runInit(argv.slice(1))
     return
   }
 

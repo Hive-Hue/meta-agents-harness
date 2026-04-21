@@ -1,25 +1,35 @@
-# Expertise Model Foundation (v0.7.0)
+## Expertise Model Foundation (v0.8.0)
 
 ## Status
 
-The Expertise Model is no longer just a naming or documentation layer. In `v0.7.0`, it is an operational foundation for routing, trust calibration, evidence tracking, and bounded export/import.
+Expertise Model is operational foundation for routing, trust calibration, evidence tracking, and bounded export/import in `v0.8.0`.
 
-This document reflects the current implementation in the repository, not the original `v0.3.0` stabilization note.
+## System Topology
+
+Two expertise stores exist with different schemas and purposes:
+
+| | System A (Agent Runtime) | System B (Catalog Governance) |
+|---|---|---|
+| Location | `.<runtime>/crew/<crew>/expertise/<agent>-expertise-model.yaml` | `.mah/expertise/catalog/<crew>/<agent>.yaml` |
+| Schema | Simple: patterns, risks, lessons, decisions, observations... | Rich v1: capabilities, domains, confidence, trust_tier, lifecycle, policy |
+| Written by | `update_expertise_model` tool at runtime | `mah expertise` CLI commands |
+| Synced by | `mah expertise sync` reads System A to discover capabilities | `mah expertise sync` writes confidence updates |
+| Purpose | Per-agent durable working memory | Structured capability metadata for routing, trust, export |
 
 ## What It Is Now
 
-The Expertise Model is a structured object that helps MAH decide:
+Expertise Model is structured object used to decide:
 
-- who is eligible to receive a task
-- who is the best candidate among eligible targets
+- who is eligible to receive task
+- who is best candidate among eligible targets
 - which environments are allowed
 - which trust and validation constraints apply
-- how much confidence the system should assign
-- whether the expertise can be exported or imported under policy
+- how much confidence system should assign
+- whether expertise can be exported or imported under policy
 
 ## Canonical Implementation
 
-The current implementation is spread across:
+Current implementation is spread across:
 
 - [`types/expertise-types.mjs`](../types/expertise-types.mjs)
 - [`scripts/expertise-schema.mjs`](../scripts/expertise-schema.mjs)
@@ -31,12 +41,16 @@ The current implementation is spread across:
 - [`scripts/expertise-lifecycle.mjs`](../scripts/expertise-lifecycle.mjs)
 - [`scripts/expertise-export.mjs`](../scripts/expertise-export.mjs)
 - [`scripts/expertise-validate.mjs`](../scripts/expertise-validate.mjs)
+- [`scripts/expertise-seed.mjs`](../scripts/expertise-seed.mjs)
+- [`scripts/expertise-sync.mjs`](../scripts/expertise-sync.mjs)
+- [`scripts/expertise-apply-proposal.mjs`](../scripts/expertise-apply-proposal.mjs)
+- [`scripts/expertise-lifecycle-cli.mjs`](../scripts/expertise-lifecycle-cli.mjs)
 
 CLI entry points live under `mah expertise` and are wired through [`scripts/meta-agents-harness.mjs`](../scripts/meta-agents-harness.mjs).
 
 ## Current Data Shape
 
-The canonical v1 expertise object includes:
+Canonical v1 expertise object includes:
 
 - `id`
 - `owner`
@@ -53,11 +67,11 @@ The canonical v1 expertise object includes:
 - `evidence_refs`
 - `metadata`
 
-The canonical owner is an object with `agent` and/or `team`, not a freeform string tag.
+Canonical owner is object with `agent` and/or `team`, not freeform string.
 
 ## What It Does
 
-The current release supports:
+Current release supports:
 
 - `mah expertise list`
 - `mah expertise show <id>`
@@ -66,27 +80,41 @@ The current release supports:
 - `mah expertise explain --task "<...>"`
 - `mah expertise export <id>`
 - `mah expertise import <file> --dry-run`
+- `mah expertise seed`
+- `mah expertise sync`
+- `mah expertise propose --from-evidence <id>`
+- `mah expertise apply-proposal <file>`
+- `mah expertise lifecycle <id> --to <state>`
 - `mah validate:expertise`
 
 Behaviorally, MAH now:
 
-- loads canonical expertise from the catalog by id
+- routes with seeded catalog data
 - scores candidate targets with explainable routing data
-- uses confidence and validation as routing signals
-- records and aggregates evidence for later decision support
+- records delegation evidence from pi runtime
+- sync bridges runtime expertise (System A) and catalog governance (System B)
+- updates confidence from evidence and synced signals
 - preserves policy and redaction boundaries during export
+
+## Current Limitations
+
+- Lifecycle transitions are CLI-only — no automatic promotion from sync
+- Capability discovery from System A uses keyword matching — may miss implicit capabilities
+- Evidence recording is best-effort — failures never block delegations
+- `mah expertise recommend` scores keyword overlap — no semantic matching
+- Export is workspace-local — no cross-workspace federation yet
 
 ## What It Is Not
 
-The Expertise Model is not yet:
+Expertise Model is not:
 
-- a full ontology engine
-- a federation handshake protocol
-- a UI product
-- an automatic trust authority
-- a replacement for topology or policy
+- ontology engine
+- federation handshake protocol
+- UI product
+- automatic trust authority
+- replacement for topology or policy
 
-Policy and topology still define what is allowed. Expertise only ranks and annotates within that allowed set.
+Policy and topology still define what is allowed. Expertise ranks and annotates within that allowed set.
 
 ## Relationship To Other MAH Concepts
 
@@ -98,36 +126,34 @@ In practice:
 
 - memory remembers
 - skills instruct
-- expertise decides who should handle the work, within policy
+- expertise decides who should handle work, within policy
 
 ## Operational Notes
 
-- The registry is a summary index, not the source of truth.
-- The catalog remains canonical for expertise content.
-- `show`, `recommend`, `explain`, and `export` now resolve canonical catalog documents by expertise id.
+- Registry is summary index, not source of truth.
+- Catalog is canonical for expertise content and loads from workspace-local `.mah/expertise/catalog`.
+- `show`, `recommend`, `explain`, and `export` resolve canonical catalog docs by expertise id and report workspace-relative paths.
 - `export` redacts sensitive fields such as `owner_id` and evidence details.
-- `validate:expertise` understands the v0.7 owner object model.
-- Lifecycle promotion from `experimental` to `active` now requires review evidence.
-- Evidence is runtime-only and may be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`; tests should use a temp root instead of writing into `.mah/expertise/evidence`.
-- The repository's checked-in `.mah/expertise/evidence` directory is kept empty except for `.gitkeep`; real evidence should be produced by actual tasks.
+- `validate:expertise` understands current owner object model.
+- Lifecycle promotion from `experimental` to `active` requires review evidence.
+- Evidence is runtime-only and may be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`; tests should use temp root.
+- Workspace-local `.mah/expertise/evidence` stays empty except `.gitkeep`; real evidence comes from actual tasks.
 
 ## Evidence Writing Policy
 
-The Expertise Engine now expects high-signal notes and short-lived observations to stay compact:
+Expertise engine expects high-signal notes and compact observations:
 
 - use `lessons`, `decisions`, `risks`, and `workflows` for durable learning
 - reserve `observations` for narrow, time-bound facts
-- compress or prune weak notes before they turn into session logs
-- avoid storing raw transcripts, copied output, or narrative summaries in the expertise files
-
-This keeps the runtime file budget stable and improves the signal-to-noise ratio for future sessions.
+- compress or prune weak notes before they become session logs
+- avoid raw transcripts, copied output, or narrative summaries in expertise files
 
 ## Historical Note
 
-The original `v0.3.0` foundation note described the point where the name changed from mental model to expertise model. That framing is now obsolete as a release description, but the stabilization goal was still useful as a stepping stone.
+Original `v0.3.0` note captured rename and early stabilization. Current document describes implemented `v0.8.0` behavior.
 
 ## Related Release Work
 
-- [`plan/done/v0.7.0-expertise-engine-plan.md`](../plan/done/v0.7.0-expertise-engine-plan.md)
+- [`plan/done/expertise-integration-v0.8.0.md`](../plan/done/expertise-integration-v0.8.0.md)
 - [`specs/meta-agents-harness-expertise-model-spec.md`](../specs/meta-agents-harness-expertise-model-spec.md)
 - [`CHANGELOG.md`](../CHANGELOG.md)

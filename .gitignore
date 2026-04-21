@@ -39,3 +39,4 @@ __pycache__/
 tmp/
 .playwright-cli/
 .mah/
+.env.stitch

@@ -32,7 +32,7 @@ Hermes is integrated through the standard adapter pattern in `scripts/runtime-ad
 |---|---|
 | `name` | `hermes` |
 | `markerDir` | `.hermes` |
-| `wrapper` | `null` (core-integrated path) |
+| `wrapper` | `null` (MAH-managed path) |
 | `directCli` | `hermes` |
 
 ### Detection precedence
@@ -41,7 +41,8 @@ Hermes follows the same detection priority as all runtimes:
 
 1. **Forced**: `--runtime hermes`, `-r hermes`, or `MAH_RUNTIME=hermes`
 2. **Marker**: presence of `.hermes/` directory in the repository
-3. **CLI**: `hermes` executable available in PATH
+
+If the marker is absent, `mah detect` does not infer Hermes from `PATH` alone.
 
 ### Capabilities
 
@@ -68,8 +69,8 @@ Hermes maps to the standard MAH command surface:
 | `mah validate` | Config + runtime validation | Supported |
 | `mah explain` | Resolution plan display | Supported |
 | `mah run` | MAH bootstrap → `hermes chat` | Supported |
-| `mah list:crews` | MAH core-managed crew enumeration | Supported |
-| `mah use <crew>` | MAH core-managed crew activation | Supported |
+| `mah list:crews` | MAH-managed crew enumeration | Supported |
+| `mah use <crew>` | MAH-managed crew activation | Supported |
 | `mah clear` | Crew/session reset | Supported |
 
 If a command cannot be cleanly mapped to Hermes behavior, it fails with a clear, honest error message rather than silently degrading.
@@ -78,7 +79,7 @@ If a command cannot be cleanly mapped to Hermes behavior, it fails with a clear,
 
 ## Session management
 
-Hermes session semantics are handled through MAH's unified session controls and the core-integrated Hermes adapter:
+Hermes session semantics are handled through MAH's unified session controls and the MAH-managed Hermes adapter:
 
 ```bash
 mah --runtime hermes run --session-mode new
@@ -114,7 +115,7 @@ See [`session-management.md`](./session-management.md) for details.
 - Hermes support in `v0.4.0` is an adapter foundation, not full runtime parity.
 - Forced detection, contract checks, and explainability are first-class.
 - `list:crews`, `use`, and `clear` are handled directly by the MAH core.
-- Interactive `run` and `doctor` still depend on an actual `hermes` CLI being available in PATH.
+- Interactive `run` and `doctor` still depend on an actual `hermes` CLI being available in PATH once Hermes has been selected via marker or explicit `--runtime`.
 
 ---
 

@@ -3,7 +3,3 @@ name: 123
 description: "Invalid config for testing validation errors"
 
 crews: "not-an-array"
-
-runtime_detection:
-  order:
-    - forced

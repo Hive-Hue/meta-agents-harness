@@ -89,9 +89,10 @@ The bootstrap creates a minimally valid `meta-agents.yaml` with
 - `version: 1`
 - `name` - Project name
 - `description` - Project description
-- `runtime_detection` - Runtime detection configuration
+- `runtime_detection` - Internal default; omit from YAML unless overriding
 - `runtimes` - Runtime-specific settings
-- `catalog` - Model and skill catalog
+- `catalog` - Model catalog and fallbacks
+- `agents[].skills` - Skill refs enabled for each agent, resolved by convention from `skills/<skill-slug>/SKILL.md`
 - `crews` - At least one crew definition
 
 ### Minimal Crew Structure

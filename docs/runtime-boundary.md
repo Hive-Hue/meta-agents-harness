@@ -2,7 +2,7 @@
 
 ## Canonical Ownership
 
-- `meta-agents.yaml` is the canonical source for crews, topology, models, skills, domains, and runtime projection metadata.
+- `meta-agents.yaml` is the canonical source for crews, topology, models, skill refs, and domains.
 - `scripts/runtime-adapters.mjs` is the canonical source for runtime operational behavior.
 
 ## Why this boundary exists
@@ -15,6 +15,11 @@
 
 - Add declarative data to YAML when it describes reusable crew/config intent.
 - Add operational behavior to adapters when it changes dispatch/runtime execution semantics.
+- Skill path layout is convention-based in MAH (`skills/<skill-slug>/SKILL.md`), so YAML should reference skill IDs rather than per-runtime path matrices.
+- `context_memory` is an internal shared skill default and does not need to be listed in YAML.
+- Runtime adapter and projection rules are internal to MAH and live in `scripts/runtime-adapters.mjs` plus the runtime bridge code, not in user YAML.
+- The global install materializes `~/.mah/` as the preferred runtime overlay for `skills/`, `extensions/` (including `extensions/themes/` for PI themes), `mah-plugins/`, and `scripts/`; it also updates `~/.pi/agent/settings.json` so PI discovers themes from `~/.mah/extensions/themes` before falling back to built-in light/dark.
+- Expertise catalog loading is workspace-local. `mah sync` / `mah generate` materialize `.mah/expertise/catalog` from `meta-agents.yaml`, and `mah expertise list` reads from that workspace tree rather than from the MAH package repository.
 
 ## Headless Execution
 

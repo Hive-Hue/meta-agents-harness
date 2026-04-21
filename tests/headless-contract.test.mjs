@@ -2,7 +2,7 @@ import test from "node:test"
 import assert from "node:assert/strict"
 import { RUNTIME_ADAPTERS } from "../scripts/runtime-adapters.mjs"
 
-test("all built-in adapters declare capabilities.headless", () => {
+test("all bundled runtime plugins declare capabilities.headless", () => {
   for (const [name, adapter] of Object.entries(RUNTIME_ADAPTERS)) {
     assert.ok(adapter.capabilities?.headless, `${name} must declare capabilities.headless`)
   }

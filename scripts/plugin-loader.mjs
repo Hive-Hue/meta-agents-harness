@@ -3,6 +3,7 @@ import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { RUNTIME_ADAPTERS } from "./runtime-adapters.mjs"
 import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
+import { getMahPluginSearchPaths, resolveMahHome } from "./mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -24,9 +25,6 @@ const pluginRegistry = new Map()
 
 // Tracks whether initial plugin discovery has run
 let discoveryRan = false
-
-// Built-in names that always take priority
-const BUILT_IN_RUNTIMES = new Set(["pi", "claude", "opencode", "hermes"])
 
 /**
  * Discover @mah/runtime-* packages in node_modules.
@@ -157,9 +155,9 @@ function validatePluginShape(plugin, mahVersion) {
     }
   }
 
-  // Warn if plugin shadows a built-in
-  if (BUILT_IN_RUNTIMES.has(plugin.name)) {
-    warnings.push(`Plugin ${plugin.name} shadows a built-in runtime — built-in takes priority`)
+  // Warn if plugin shadows a bundled plugin name.
+  if (plugin.name && RUNTIME_ADAPTERS[plugin.name]) {
+    warnings.push(`Plugin ${plugin.name} matches a bundled plugin name — bundled plugin takes priority`)
   }
 
   return { ok: errors.length === 0, errors, warnings }
@@ -258,11 +256,8 @@ export async function loadPlugins(pluginPaths = [], mahVersion = "0.0.0") {
       continue
     }
 
-    // Built-ins take priority — skip registration if same name
-    if (BUILT_IN_RUNTIMES.has(plugin.name)) {
-      console.warn(
-        `[plugin-loader] built-in '${plugin.name}' takes priority over plugin at ${candidate.path}`
-      )
+    // Bundled plugins take priority — skip registration if an installed plugin claims the same name.
+    if (plugin.name && RUNTIME_ADAPTERS[plugin.name]) {
       continue
     }
 
@@ -291,8 +286,8 @@ export async function loadPlugins(pluginPaths = [], mahVersion = "0.0.0") {
 }
 
 /**
- * Get all runtimes — built-ins merged with loaded plugins.
- * Built-ins always take priority over plugins with the same name.
+ * Get all runtimes — bundled plugins merged with installed plugins.
+ * Bundled plugins always take priority over plugins with the same name.
  * Auto-discovers plugins on first call if discovery hasn't run yet.
  * @returns {Object} - Runtime registry { runtimeName: adapter }
  */
@@ -303,10 +298,10 @@ export async function getAllRuntimes() {
     await runPluginDiscovery()
   }
 
-  // Start with built-ins
+  // Start with bundled plugins
   const registry = { ...RUNTIME_ADAPTERS }
 
-  // Merge loaded plugins (built-ins already present, so they take priority)
+  // Merge loaded plugins (bundled plugins already present, so they take priority)
   for (const [name, plugin] of pluginRegistry.entries()) {
     if (!(name in registry)) {
       registry[name] = plugin.adapter || plugin
@@ -335,9 +330,7 @@ async function runPluginDiscovery() {
   if (process.env.MAH_PLUGINS_ENABLED === "0") {
     return
   }
-  const searchPaths = [
-    path.join(packageRoot, "mah-plugins")
-  ]
+  const searchPaths = getMahPluginSearchPaths({ packageRoot, homeRoot: resolveMahHome() })
   await loadPlugins(searchPaths, MAH_VERSION)
 }
 
@@ -376,13 +369,13 @@ export async function validatePlugin(pluginPath) {
 
 /**
  * Unregister a plugin by name. Calls teardown if present.
- * Built-in runtimes cannot be unloaded.
+ * Bundled plugins cannot be unloaded.
  * @param {string} name - Plugin runtime name
- * @returns {boolean} - True if plugin was unloaded, false if not found or is built-in
+ * @returns {boolean} - True if plugin was unloaded, false if not found or is bundled plugin
  */
 export function unloadPlugin(name) {
-  if (BUILT_IN_RUNTIMES.has(name)) {
-    console.warn(`[plugin-loader] cannot unload built-in runtime: ${name}`)
+  if (name && RUNTIME_ADAPTERS[name]) {
+    console.warn(`[plugin-loader] cannot unload bundled plugin: ${name}`)
     return false
   }
 

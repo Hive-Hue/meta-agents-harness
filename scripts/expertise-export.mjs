@@ -21,15 +21,16 @@ import { resolve as resolvePathExport, dirname as dirnameExport } from 'path'
 import { fileURLToPath as fileURLToPathExport } from 'url'
 import { EXPERTISE_SCHEMA_VERSION, VALIDATION_STATUSES, LIFECYCLE_STATES, TRUST_TIERS } from '../types/expertise-types.mjs'
 import { validateExpertise } from './expertise-schema.mjs'
+import { resolveWorkspaceRoot } from './workspace-root.mjs'
 
 const __filenameExport = fileURLToPathExport(import.meta.url)
 const __dirnameExport = dirnameExport(__filenameExport)
-const repoRootExport = resolvePathExport(__dirnameExport, '..')
+const workspaceRootExport = resolveWorkspaceRoot()
 
-// SECURITY: v0.7.0-patch — validate export output path stays under repo root
+// SECURITY: v0.7.0-patch — validate export output path stays under workspace root
 /**
  * Validate that an export output path is safe.
- * @param {string} basePath - Base directory (repo root)
+ * @param {string} basePath - Base directory (workspace root)
  * @param {string} outputPath - User-provided output path
  * @returns {{ ok: boolean, resolvedPath?: string, error?: string }}
  */
@@ -40,7 +41,7 @@ export function validateExportPath(basePath, outputPath) {
   const resolved = resolvePathExport(basePath, outputPath)
   const normalizedBase = resolvePathExport(basePath).replace(/\/+$/, '') + '/'
   if (!resolved.startsWith(normalizedBase)) {
-    return { ok: false, error: `output path '${outputPath}' resolves outside repo root` }
+    return { ok: false, error: `output path '${outputPath}' resolves outside workspace root` }
   }
   return { ok: true, resolvedPath: resolved }
 }
@@ -172,7 +173,7 @@ export function checkExportPolicy(expertise, options = {}) {
  * @param {{ domain?: string, skipPolicy?: boolean }} [options]
  * @returns {{ ok: boolean, payload?: Object, error?: string, warnings?: string[] }}
  */
-export function exportExpertise(expertise, options = {}) {
+export async function exportExpertise(expertise, options = {}) {
   /** @type {string[]} */
   const warnings = []
 
@@ -215,6 +216,20 @@ export function exportExpertise(expertise, options = {}) {
     },
   }
 
+  if (options.includeEvidence) {
+    const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
+    await loadEvidenceFor(expertise.id, { limit: 10 })
+    const metrics = await computeMetrics(expertise.id)
+    payload.evidence_summary = {
+      total_invocations: metrics.total_invocations,
+      success_rate: metrics.total_invocations > 0
+        ? Math.round((metrics.successful_invocations / metrics.total_invocations) * 100) / 100
+        : 0,
+      avg_latency_ms: Math.round(metrics.avg_duration_ms),
+      last_invoked: metrics.last_invoked,
+    }
+  }
+
   return { ok: true, payload, warnings }
 }
 
@@ -225,14 +240,14 @@ export function exportExpertise(expertise, options = {}) {
  * @param {{ domain?: string }} [options]
  * @returns {{ ok: boolean, bundle?: Object, errors: string[], exported: Object[] }}
  */
-export function exportExpertiseBundle(expertiseList, options = {}) {
+export async function exportExpertiseBundle(expertiseList, options = {}) {
   /** @type {Object[]} */
   const exported = []
   /** @type {string[]} */
   const errors = []
 
   for (const exp of expertiseList) {
-    const result = exportExpertise(exp, options)
+    const result = await exportExpertise(exp, options)
     if (result.ok) {
       exported.push(result.payload)
       if (result.warnings?.length) errors.push(...result.warnings)
@@ -537,13 +552,13 @@ export async function exportExpertiseToFile(expertiseId, outputPath, options = {
     return { ok: false, errors: [`expertise '${expertiseId}' not found in catalog`] }
   }
 
-  const result = exportExpertise(entry, options)
+  const result = await exportExpertise(entry, options)
   if (!result.ok) {
     return { ok: false, errors: [result.error] }
   }
 
-  // SECURITY: v0.7.0-patch — validate export path stays under repo root
-  const pathValidation = validateExportPath(repoRootExport, outputPath)
+  // SECURITY: v0.7.0-patch — validate export path stays under workspace root
+  const pathValidation = validateExportPath(workspaceRootExport, outputPath)
   if (!pathValidation.ok) {
     return { ok: false, errors: [pathValidation.error] }
   }
@@ -736,7 +751,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 
   // Test 7: SECURITY path validation for export output
   console.log('Test 7: Export path validation')
-  const safePath = validateExportPath(repoRootExport, '.mah/expertise/exports/self-test.json')
+  const safePath = validateExportPath(workspaceRootExport, '.mah/expertise/exports/self-test.json')
   console.log(`  safe path valid: ${safePath.ok}`)
   const blockedPath = validateExportPath(repoRootExport, '../../etc/passwd')
   console.log(`  traversal blocked: ${blockedPath.ok === false}`)

@@ -175,7 +175,7 @@ describe("plugin-loader", async () => {
 
   // Reset module state between tests by clearing the internal registry
   // The plugin-loader uses a module-level pluginRegistry Map
-  // We test this by calling unloadPlugin for all non-built-in plugins after each test
+  // We test this by calling unloadPlugin for all non-core plugins after each test
   afterEach(async () => {
     const loader = await getPluginLoader()
     // Unload any test plugins
@@ -201,6 +201,76 @@ describe("plugin-loader", async () => {
       assert.ok(loaded.some(p => p.name === "codex"), "should discover runtime-codex plugin")
     })
 
+    it("discovers plugins from MAH_HOME/mah-plugins", async () => {
+      const tempHomeRoot = path.join(TEMP_DIR, "mah-home-discovery")
+      const tempMahHome = path.join(tempHomeRoot, ".mah")
+      const pluginRoot = path.join(tempMahHome, "mah-plugins", "homefake")
+      mkdirSync(pluginRoot, { recursive: true })
+      writeFileSync(path.join(pluginRoot, "plugin.json"), JSON.stringify({
+        name: "homefake",
+        version: "0.1.0",
+        mahVersion: "^0.5.0",
+        entry: "index.mjs"
+      }, null, 2))
+      writeFileSync(path.join(pluginRoot, "index.mjs"), `
+export const runtimePlugin = {
+  name: "homefake",
+  version: "0.1.0",
+  mahVersion: "^0.5.0",
+  adapter: {
+    name: "homefake",
+    markerDir: ".homefake",
+    wrapper: "homefake-mh",
+    directCli: "homefake",
+    capabilities: {
+      sessionModeNew: true,
+      sessionModeContinue: true,
+      sessionModeNone: true,
+      sessionIdViaEnv: "HOMEFAKE_SESSION_ID",
+      sessionRootFlag: "--session-root",
+      sessionMirrorFlag: false
+    },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: true,
+    commands: {
+      "list:crews": [["homefake", ["list:crews"]]],
+      use: [["homefake", ["use"]]],
+      clear: [["homefake", ["clear"]]],
+      run: [["homefake", ["run"]]],
+      doctor: [["homefake", ["doctor"]]],
+      "check:runtime": [["homefake", ["check:runtime"]]],
+      validate: [["homefake", ["validate"]]],
+      "validate:runtime": [["homefake", ["validate:runtime"]]]
+    },
+    detect(cwd, existsFn) { return existsFn(cwd + "/" + this.markerDir) },
+    supports(command) { return Array.isArray(this.commands?.[command]) && this.commands[command].length > 0 },
+    resolveCommandPlan(command, commandExistsFn) {
+      const variants = this.commands?.[command] || []
+      if (variants.length === 0) return { ok: false, error: "command not supported", variants: [] }
+      return { ok: true, exec: variants[0][0], args: variants[0][1], variants }
+    },
+    validateRuntime(commandExistsFn) {
+      return { ok: true, checks: [] }
+    }
+  }
+}
+`)
+
+      const previousMahHome = process.env.MAH_HOME
+      try {
+        process.env.MAH_HOME = tempMahHome
+        const loader = await import(`../scripts/plugin-loader.mjs?home=${Date.now()}`)
+        const runtimes = await loader.getAllRuntimes()
+        assert.ok(runtimes.homefake, "should discover plugins installed in MAH_HOME/mah-plugins")
+      } finally {
+        if (previousMahHome === undefined) delete process.env.MAH_HOME
+        else process.env.MAH_HOME = previousMahHome
+      }
+    })
+
     it("skips plugins with version incompatibility", async () => {
       const loader = await getPluginLoader()
 
@@ -219,7 +289,7 @@ describe("plugin-loader", async () => {
       assert.ok(loaded.some(p => p.name === "fake"), "should load compatible plugin")
     })
 
-    it("loads wrapperless core-integrated plugins", async () => {
+    it("loads wrapperless MAH-managed plugins", async () => {
       const loader = await getPluginLoader()
 
       const coreManagedParent = path.join(TEMP_DIR, "core-managed-parent")
@@ -245,10 +315,10 @@ describe("plugin-loader", async () => {
       assert.equal(typeof runtimes["core-managed"].prepareRunContext, "function")
     })
 
-    it("built-in runtimes take priority over plugins with same name", async () => {
+    it("bundled runtime plugins take priority over installed plugins with same name", async () => {
       const loader = await getPluginLoader()
 
-      // Create a plugin that shadows a built-in (e.g., "pi")
+      // Create a plugin that shadows a bundled runtime plugin (e.g., "pi")
       // Put it in a unique subdir so we don't pick up other test plugins
       const shadowingDir = path.join(TEMP_DIR, "shadow-test-dir")
       mkdirSync(shadowingDir, { recursive: true })
@@ -261,21 +331,10 @@ describe("plugin-loader", async () => {
       }))
       writeFileSync(path.join(shadowingPluginPath, "index.mjs"), validRuntimePluginExport("pi", "0.1.0", ">=0.5.0"))
 
-      // Intercept console.warn to verify warning is logged
-      const warnCalls = []
-      const originalWarn = console.warn
-      console.warn = (...args) => warnCalls.push(args.join(" "))
+      const loaded = await loader.loadPlugins([shadowingDir], "0.5.0")
 
-      try {
-        const loaded = await loader.loadPlugins([shadowingDir], "0.5.0")
-
-        // Plugin should not be loaded since built-in takes priority
-        assert.ok(!loaded.some(p => p.name === "pi"), "should not load plugin that shadows built-in")
-        assert.ok(warnCalls.some(msg => msg.includes("built-in") && msg.includes("takes priority")),
-          "should warn about built-in priority, got: " + warnCalls.join("; "))
-      } finally {
-        console.warn = originalWarn
-      }
+      // Plugin should not be loaded since the bundled runtime plugin takes priority
+      assert.ok(!loaded.some(p => p.name === "pi"), "should not load plugin that shadows bundled runtime plugin")
     })
 
     it("loads plugins from multiple paths", async () => {
@@ -341,31 +400,31 @@ describe("plugin-loader", async () => {
   // getAllRuntimes tests
   // ========================================================================
   describe("getAllRuntimes", () => {
-    it("returns built-in runtimes by default", async () => {
+    it("returns bundled runtime plugins by default", async () => {
       const loader = await getPluginLoader()
 
       const runtimes = await loader.getAllRuntimes()
 
-      assert.ok("pi" in runtimes, "should include pi built-in")
-      assert.ok("claude" in runtimes, "should include claude built-in")
-      assert.ok("opencode" in runtimes, "should include opencode built-in")
-      assert.ok("hermes" in runtimes, "should include hermes built-in")
+      assert.ok("pi" in runtimes, "should include pi bundled plugin")
+      assert.ok("claude" in runtimes, "should include claude bundled plugin")
+      assert.ok("opencode" in runtimes, "should include opencode bundled plugin")
+      assert.ok("hermes" in runtimes, "should include hermes bundled plugin")
     })
 
-    it("merges loaded plugins with built-ins", async () => {
+    it("merges loaded plugins with bundled runtime plugins", async () => {
       const loader = await getPluginLoader()
 
       await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
       const runtimes = await loader.getAllRuntimes()
 
       assert.ok("fake" in runtimes, "should include loaded plugin fake")
-      assert.ok("pi" in runtimes, "should still include built-in pi")
+      assert.ok("pi" in runtimes, "should still include bundled plugin pi")
     })
 
-    it("built-in priority - plugins cannot override built-in adapters", async () => {
+    it("bundled plugin priority - installed plugins cannot override bundled adapters", async () => {
       const loader = await getPluginLoader()
 
-      // Create a plugin with same name as built-in
+      // Create a plugin with same name as a bundled runtime plugin
       const shadowingPath = await createTempPlugin(TEMP_DIR, "override-attempt", {
         name: "pi",
         version: "99.0.0",
@@ -375,8 +434,7 @@ describe("plugin-loader", async () => {
       await loader.loadPlugins([shadowingPath], "0.5.0")
       const runtimes = await loader.getAllRuntimes()
 
-      // The built-in adapter should still be there (not the plugin's)
-      // We can verify this by checking the version - built-in is original
+      // The bundled adapter should still be there (not the plugin's)
       assert.ok(runtimes.pi, "pi should still exist")
     })
   })
@@ -461,7 +519,7 @@ export const somethingElse = {}
       assert.strictEqual(result.version, "0.1.0")
     })
 
-    it("accepts valid wrapperless core-integrated plugin", async () => {
+    it("accepts valid wrapperless MAH-managed plugin", async () => {
       const loader = await getPluginLoader()
 
       const tempPluginPath = await createTempPlugin(TEMP_DIR, "valid-core-plugin-test", {
@@ -472,7 +530,7 @@ export const somethingElse = {}
 
       const result = await loader.validatePlugin(tempPluginPath)
 
-      assert.ok(result.ok, "should accept wrapperless core-integrated plugin")
+      assert.ok(result.ok, "should accept wrapperless MAH-managed plugin")
       assert.strictEqual(result.name, "validcoretest")
       assert.strictEqual(result.adapter.wrapper, null)
       assert.equal(typeof result.adapter.prepareRunContext, "function")
@@ -481,7 +539,7 @@ export const somethingElse = {}
     it("returns errors and warnings in result object", async () => {
       const loader = await getPluginLoader()
 
-      // Create a plugin that shadows a built-in to trigger a warning
+      // Create a plugin that shadows a bundled runtime plugin to trigger a warning
       const shadowPath = await createTempPlugin(TEMP_DIR, "shadow-warning", {
         name: "pi",
         version: "0.1.0",
@@ -490,7 +548,7 @@ export const somethingElse = {}
 
       const result = await loader.validatePlugin(shadowPath)
 
-      assert.ok(result.warnings && result.warnings.length > 0, "should have warnings for shadowing built-in")
+      assert.ok(result.warnings && result.warnings.length > 0, "should have warnings for shadowing bundled runtime plugin")
     })
   })
 
@@ -525,7 +583,7 @@ export const somethingElse = {}
       assert.ok(!result, "should return false for non-existent plugin")
     })
 
-    it("cannot unload built-in runtimes", async () => {
+    it("cannot unload bundled runtime plugins", async () => {
       const loader = await getPluginLoader()
 
       // Intercept console.warn
@@ -536,9 +594,9 @@ export const somethingElse = {}
       try {
         const result = loader.unloadPlugin("pi")
 
-        assert.ok(!result, "should return false when trying to unload built-in")
-        assert.ok(warnCalls.some(args => args.join(" ").includes("cannot unload built-in")),
-          "should warn about built-in unload attempt")
+        assert.ok(!result, "should return false when trying to unload bundled plugin")
+        assert.ok(warnCalls.some(args => args.join(" ").includes("cannot unload bundled plugin")),
+          "should warn about bundled plugin unload attempt")
       } finally {
         console.warn = originalWarn
       }

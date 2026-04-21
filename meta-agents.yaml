@@ -1,27 +1,6 @@
 version: 1
 name: meta-agents-harness
 description: Unified source-of-truth for crews, roles, skills, expertise, models, domains, and runtime projections.
-runtime_detection:
-  order:
-    - forced
-    - marker
-    - cli
-  forced:
-    args:
-      - --runtime=<name>
-      - --runtime <name>
-      - -r <name>
-      - -f <name>
-    env:
-      - MAH_RUNTIME
-  marker:
-    pi: .pi
-    hermes: .hermes
-    opencode: .opencode
-    codex: .codex
-    corefake: .corefake
-    kilo: .kilo
-    claude: .claude
 runtimes:
   pi: {}
   claude: {}
@@ -41,10 +20,10 @@ runtimes:
   corefake: {}
 catalog:
   models:
-    orchestrator_default: zai-coding-plan/glm-5-turbo
+    orchestrator_default: zai-coding-plan/glm-5
     lead_default: minimax-coding-plan/MiniMax-M2.7
-    worker_default: minimax-coding-plan/MiniMax-M2.7
-    qa_default: openai-codex/gpt-5.3-codex
+    worker_default: openai-codex/gpt-5.3-codex
+    qa_default: openai-codex/gpt-5.4-mini
   model_fallbacks:
     orchestrator_default:
       - nvidia/nemotron-3-super-120b-a12b:free
@@ -58,79 +37,6 @@ catalog:
       - zai/glm-5
       - minimax/minimax-m2.7
       - nvidia/nemotron-3-super-120b-a12b:free
-  skills:
-    context_memory:
-      opencode: skills/context-memory/SKILL.md
-      claude: skills/context-memory/SKILL.md
-      kilo: skills/context-memory/SKILL.md
-      pi: skills/context-memory/SKILL.md
-      hermes: skills/context-memory/SKILL.md
-      codex: skills/context-memory/SKILL.md
-    delegate_bounded:
-      opencode: skills/delegate_bounded/SKILL.md
-      claude: skills/delegate_bounded/SKILL.md
-      kilo: skills/delegate_bounded/SKILL.md
-      pi: skills/delegate_bounded/SKILL.md
-      hermes: skills/delegate_bounded/SKILL.md
-      codex: skills/delegate_bounded/SKILL.md
-    zero_micromanagement:
-      opencode: skills/zero_micromanagement/SKILL.md
-      claude: skills/zero_micromanagement/SKILL.md
-      kilo: skills/zero_micromanagement/SKILL.md
-      pi: skills/zero_micromanagement/SKILL.md
-      hermes: skills/zero_micromanagement/SKILL.md
-      codex: skills/zero_micromanagement/SKILL.md
-    expertise_model:
-      opencode: skills/expertise_model/SKILL.md
-      claude: skills/expertise_model/SKILL.md
-      kilo: skills/expertise_model/SKILL.md
-      pi: skills/expertise_model/SKILL.md
-      hermes: skills/expertise_model/SKILL.md
-      codex: skills/expertise_model/SKILL.md
-    active_listener:
-      opencode: skills/active_listener/SKILL.md
-      claude: skills/active_listener/SKILL.md
-      kilo: skills/active_listener/SKILL.md
-      pi: skills/active_listener/SKILL.md
-      hermes: skills/active_listener/SKILL.md
-      codex: skills/active_listener/SKILL.md
-    agentic_pert:
-      opencode: skills/agentic_pert/SKILL.md
-      claude: skills/agentic_pert/SKILL.md
-      kilo: skills/agentic_pert/SKILL.md
-      pi: skills/agentic_pert/SKILL.md
-      hermes: skills/agentic_pert/SKILL.md
-      codex: skills/agentic_pert/SKILL.md
-    figma_via_codex:
-      opencode: skills/figma_via_codex/SKILL.md
-      claude: skills/figma_via_codex/SKILL.md
-      kilo: skills/figma_via_codex/SKILL.md
-      pi: skills/figma_via_codex/SKILL.md
-      hermes: skills/figma_via_codex/SKILL.md
-      codex: skills/figma_via_codex/SKILL.md
-    multi_team_bootstrap:
-      opencode: skills/multi_team_bootstrap/SKILL.md
-      claude: skills/multi_team_bootstrap/SKILL.md
-      kilo: skills/multi_team_bootstrap/SKILL.md
-      pi: skills/multi_team_bootstrap/SKILL.md
-      hermes: skills/multi_team_bootstrap/SKILL.md
-      codex: skills/multi_team_bootstrap/SKILL.md
-    web_research:
-      opencode: skills/web_research/SKILL.md
-      claude: skills/web_research/SKILL.md
-      kilo: skills/web_research/SKILL.md
-      pi: skills/web_research/SKILL.md
-      hermes: skills/web_research/SKILL.md
-      codex: skills/web_research/SKILL.md
-    zeplin_mcp_ops:
-      opencode: skills/zeplin_mcp_ops/SKILL.md
-      claude: skills/zeplin_mcp_ops/SKILL.md
-      kilo: skills/zeplin_mcp_ops/SKILL.md
-      pi: skills/zeplin_mcp_ops/SKILL.md
-      hermes: skills/zeplin_mcp_ops/SKILL.md
-      codex: skills/zeplin_mcp_ops/SKILL.md
-  shared_skills:
-    - context_memory
 domain_profiles:
   read_only_repo:
     - path: .
@@ -485,6 +391,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: read_only_repo
         sprint_responsibilities:
           - control v0.8.0 scope
@@ -501,6 +412,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: planning_delivery
         sprint_responsibilities:
           - translate Context Memory plan into executable backlog
@@ -516,6 +432,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: runtime_impl
         sprint_responsibilities:
           - coordinate schema, index, retrieval, and runtime integration streams
@@ -530,6 +451,11 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: validation_runtime
         sprint_responsibilities:
           - define quality gates for schema, retrieval, and bootstrap injection
@@ -543,6 +469,10 @@ crews:
         expertise: repo-analyst-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: read_only_repo
         sprint_responsibilities:
           - map real codebase integration points for Context Memory
@@ -556,6 +486,10 @@ crews:
         expertise: solution-architect-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: planning_delivery
         sprint_responsibilities:
           - define context memory document, index, and retrieval contracts
@@ -568,6 +502,11 @@ crews:
         expertise: frontend-dev-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile:
           - cli_operator_surface
           - runtime_impl
@@ -582,6 +521,11 @@ crews:
         expertise: backend-dev-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-commit
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile:
           - cli_operator_surface
           - runtime_impl
@@ -596,6 +540,10 @@ crews:
         expertise: qa-reviewer-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: validation_runtime
         sprint_responsibilities:
           - run context unit, integration, and contract tests
@@ -609,6 +557,10 @@ crews:
         expertise: security-reviewer-expertise-model
         skills:
           - expertise_model
+          - caveman
+          - caveman-compress
+          - caveman-help
+          - caveman-review
         domain_profile: validation_runtime
         sprint_responsibilities:
           - review path traversal, prompt inflation, and memory poisoning risks
@@ -643,30 +595,3 @@ crews:
         multi_team:
           session_root: .pi/crew/dev/sessions
           extension_entry: extensions/multi-team.ts
-adapters:
-  source_of_truth: meta-agents.yaml
-  mapping_rules:
-    roles_to_runtime:
-      opencode: agent files + permission.task
-      claude: agent files + CCR route map + .mcp.json
-      kilo: crew multi-team.yaml + generated agents + generated expertise
-      pi: crew multi-team.yaml + extensions/multi-team.ts
-      hermes: crew config + runtime capability projection
-    expertise_to_runtime:
-      opencode: .opencode/crew/<crew>/expertise/<agent>-expertise-model.yaml
-      claude: .claude/crew/<crew>/expertise/<agent>-expertise-model.yaml
-      kilo: .kilo/crew/<crew>/expertise/<agent>-expertise-model.yaml
-      pi: .pi/crew/<crew>/expertise/<agent>-expertise-model.yaml
-      hermes: .hermes/crew/<crew>/expertise/<agent>-expertise-model.yaml
-    skills_to_runtime:
-      opencode: .opencode/skills/*/SKILL.md
-      claude: .claude/skills/*/SKILL.md
-      kilo: .kilo/skills/*/SKILL.md
-      pi: .pi/skills/*/SKILL.md
-      hermes: .hermes/skills/*/SKILL.md
-    domain_to_runtime:
-      opencode: permission.read/edit/bash
-      claude: tool + routing scope
-      kilo: domain.read/upsert/delete + session scope
-      pi: domain.read/upsert/delete + session scope
-      hermes: capability and workspace scope projection

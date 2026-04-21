@@ -17,6 +17,15 @@ cd meta-agents-harness
 npm run setup
 ```
 
+If you want a global install from the repository checkout, use:
+
+```bash
+npm run install:global
+```
+
+That exposes both `mah` and `meta-agents-harness` on your PATH.
+It also prepares `~/.mah/` with the default MAH assets (`skills/`, `extensions/`, `mah-plugins/`, and `scripts/`). Expertise is workspace-local and is materialized under `.mah/expertise/` by `mah sync` / `mah generate`.
+
 ### 2. Verify Installation
 
 ```bash
@@ -148,7 +157,7 @@ AI-assisted mode generates enhanced configurations based on your project context
 
 - **Runtime CLI**: `pi` or `opencode` installed and available in PATH
 - **API Key**: Configured in the runtime CLI (not passed to MAH directly)
-- **Skill File**: `bootstrap-config-architect` skill available
+- **Skill File**: `bootstrap` skill available
 
 ### Usage
 
@@ -179,7 +188,7 @@ mah init --yes --ai \
 If AI-assisted mode fails (no runtime, missing skill, API error), MAH automatically falls back to logical mode:
 
 ```
-bootstrap: bootstrap-config-architect skill not found, falling back to logical mode
+bootstrap: bootstrap skill not found, falling back to logical mode
 bootstrap: created meta-agents.yaml
 ```
 
@@ -195,21 +204,13 @@ The bootstrap generates a valid `meta-agents.yaml` with:
 version: 1                          # Config schema version
 name: "my-project"                  # Project name
 description: "Project description"  # Project description
-runtime_detection:                  # How MAH detects runtimes
-  order: ["forced", "marker", "cli"]
-  marker:
-    pi: ".pi"
-    claude: ".claude"
-    opencode: ".opencode"
-    hermes: ".hermes"
-runtimes:                           # Runtime configurations
+runtimes:                           # Runtime configurations (runtime detection is internal)
   pi: { ... }
   claude: { ... }
   opencode: { ... }
   hermes: { ... }
 catalog:                            # Shared resources
   models: { ... }
-  skills: { ... }
   domain_profiles: { ... }
 crews:                              # Team definitions
   - id: "dev"
@@ -295,6 +296,8 @@ npm run sync:meta
 # Check for drift without writing
 npm run check:meta-sync
 ```
+
+`mah generate` and `mah sync` materialize the current workspace's `.mah/` artifacts. They do not depend on a cloned MAH repository; the package install supplies the default overlay, and the workspace owns its own generated expertise catalog, registry, and evidence tree.
 
 ### 3. Select a Crew
 
@@ -417,7 +420,7 @@ mah init --yes --force
 
 **Possible causes:**
 1. No `pi` or `opencode` CLI installed
-2. Skill file `bootstrap-config-architect/SKILL.md` missing
+2. Skill file `bootstrap/SKILL.md` missing
 3. API key not configured in runtime CLI
 
 **Solution:** Check runtime availability:
@@ -428,7 +431,7 @@ which pi
 which opencode
 
 # Check skill file exists
-ls .opencode/skills/bootstrap-config-architect/SKILL.md
+ls .opencode/skills/bootstrap/SKILL.md
 ```
 
 ### Invalid Configuration After Bootstrap
@@ -466,7 +469,7 @@ After bootstrap:
 
 1. **Customize Configuration** - Edit `meta-agents.yaml` to match your project
 2. **Add Custom Crews** - Define teams for your specific workflows
-3. **Configure Skills** - Add or modify skills in the catalog
+3. **Configure Skills** - Add or modify skill files under `skills/` (skill refs are convention-based)
 4. **Set Up Domain Profiles** - Define access control for agents
 5. **Explore Commands** - See [README.md](../README.md) for full command reference
 

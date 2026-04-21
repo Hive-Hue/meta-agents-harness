@@ -2,7 +2,7 @@
 
 ## Overview
 
-MAH provides unified session controls through the core-integrated Hermes adapter. For Hermes, session management follows the standard MAH session model with bounded Hermes-specific adaptations.
+MAH provides unified session controls through the MAH-managed Hermes adapter. For Hermes, session management follows the standard MAH session model with bounded Hermes-specific adaptations.
 
 ---
 
@@ -87,7 +87,7 @@ mah --runtime hermes run --session-mode continue --session-id <id>
 
 Resumes a specific session by its identifier.
 
-MAH passes the session ID through the core adapter, which translates it to Hermes resume arguments.
+MAH passes the session ID through the Hermes adapter, which translates it to Hermes resume arguments.
 
 ---
 

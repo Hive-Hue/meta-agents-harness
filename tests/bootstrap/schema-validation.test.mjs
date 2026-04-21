@@ -39,7 +39,7 @@ test.describe("Schema Validation - Generated Structure", () => {
       assert.equal(config.version, 1)
       assert.equal(typeof config.name, "string")
       assert.ok(config.name.length > 0)
-      assert.ok(config.runtime_detection)
+      assert.equal(config.runtime_detection, undefined)
       assert.ok(config.runtimes)
       assert.ok(config.catalog)
       assert.ok(Array.isArray(config.crews) && config.crews.length >= 1)
@@ -84,17 +84,12 @@ test.describe("Schema Validation - Generated Structure", () => {
     }
   })
 
-  test("SV-005: All runtime detection fields present", () => {
+  test("SV-005: Runtime detection is omitted from generated config", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(config.runtime_detection)
-      assert.ok(Array.isArray(config.runtime_detection.order))
-      assert.ok(config.runtime_detection.order.length >= 1)
-      assert.ok(config.runtime_detection.forced)
-      assert.ok(config.runtime_detection.marker)
-      assert.ok(config.runtime_detection.cli)
+      assert.equal(config.runtime_detection, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -128,15 +123,16 @@ test.describe("Schema Validation - Generated Structure", () => {
     }
   })
 
-  test("SV-008: Catalog skills present with defaults", () => {
+  test("SV-008: Catalog skills are resolved by convention", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(config.catalog.skills)
-      assert.ok(config.catalog.skills.delegate_bounded)
-      assert.ok(config.catalog.skills.zero_micromanagement)
-      assert.ok(config.catalog.skills.expertise_model)
+      assert.equal(config.catalog.skills, undefined)
+      assert.equal(config.catalog.shared_skills, undefined)
+      assert.ok(existsSync(path.join(repoRoot, "skills", "delegate-bounded", "SKILL.md")))
+      assert.ok(existsSync(path.join(repoRoot, "skills", "zero-micromanagement", "SKILL.md")))
+      assert.ok(existsSync(path.join(repoRoot, "skills", "expertise-model", "SKILL.md")))
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -198,13 +194,12 @@ test.describe("Required Fields Presence and Format", () => {
     }
   })
 
-  test("RF-003: Runtime detection order is array with at least 1 element", () => {
+  test("RF-003: Runtime detection is internal and omitted from generated config", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(Array.isArray(config.runtime_detection.order))
-      assert.ok(config.runtime_detection.order.length >= 1)
+      assert.equal(config.runtime_detection, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -332,7 +327,7 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-005: Skills refs use catalog", () => {
+  test("OF-005: Skills refs use canonical skill paths", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -341,7 +336,11 @@ test.describe("Optional Fields Default Values", () => {
         for (const agent of crew.agents) {
           if (agent.skills) {
             for (const skill of agent.skills) {
-              assert.ok(config.catalog.skills[skill], `Skill ${skill} must exist in catalog.skills`)
+              const skillSlug = skill.replaceAll("_", "-")
+              assert.ok(
+                existsSync(path.join(repoRoot, "skills", skillSlug, "SKILL.md")),
+                `Skill ${skill} must exist at skills/${skillSlug}/SKILL.md`
+              )
             }
           }
         }
@@ -387,7 +386,6 @@ test.describe("Data Type Validation", () => {
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(Array.isArray(config.runtime_detection.order))
       assert.ok(Array.isArray(config.crews))
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
@@ -399,7 +397,7 @@ test.describe("Data Type Validation", () => {
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.equal(typeof config.runtime_detection, "object")
+      assert.equal(config.runtime_detection, undefined)
       assert.equal(typeof config.runtimes, "object")
       assert.equal(typeof config.catalog, "object")
     } finally {
@@ -438,7 +436,7 @@ test.describe("Data Type Validation", () => {
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(config.runtime_detection.cli)
+      assert.equal(config.runtime_detection, undefined)
       assert.ok(config.catalog.models)
       assert.ok(config.crews[0].topology)
       assert.ok(config.crews[0].agents)
@@ -466,7 +464,7 @@ test.describe("Reference Integrity", () => {
     }
   })
 
-  test("RI-002: Skill refs resolve to catalog.skills", () => {
+  test("RI-002: Skill refs resolve to canonical skill paths", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -475,7 +473,11 @@ test.describe("Reference Integrity", () => {
         for (const agent of crew.agents) {
           if (agent.skills) {
             for (const skill of agent.skills) {
-              assert.ok(config.catalog.skills[skill], `Skill ${skill} not found in catalog.skills`)
+              const skillSlug = skill.replaceAll("_", "-")
+              assert.ok(
+                existsSync(path.join(repoRoot, "skills", skillSlug, "SKILL.md")),
+                `Skill ${skill} not found at skills/${skillSlug}/SKILL.md`
+              )
             }
           }
         }
@@ -591,9 +593,7 @@ test.describe("Reference Integrity", () => {
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      for (const [marker, runtime] of Object.entries(config.runtime_detection.marker)) {
-        assert.ok(config.runtimes[runtime], `Runtime ${runtime} referenced by marker ${marker} not found`)
-      }
+      assert.equal(config.runtime_detection, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }

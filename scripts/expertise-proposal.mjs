@@ -10,11 +10,12 @@ import { fileURLToPath } from 'node:url'
 import { loadExpertiseById } from './expertise-loader.mjs'
 import { validateExportPath } from './expertise-export.mjs'
 import { loadEvidenceFor, computeMetrics } from './expertise-evidence-store.mjs'
+import { resolveWorkspaceRoot } from './workspace-root.mjs'
 import { PROPOSAL_SCHEMA_VERSION } from '../types/expertise-types.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const repoRoot = resolvePath(__dirname, '..')
+const workspaceRoot = resolveWorkspaceRoot()
 
 function nowStamp() {
   return new Date().toISOString()
@@ -108,7 +109,7 @@ export function buildExpertiseProposal({
       auto_apply: false,
     },
     source: {
-      catalog_path: targetExpertise.__source_file ? resolvePath(repoRoot, targetExpertise.__source_file) : null,
+      catalog_path: targetExpertise.__source_file ? targetExpertise.__source_file : null,
     },
   }
 
@@ -195,7 +196,7 @@ export function writeProposalToFile(proposal, outputPath) {
     return { ok: false, errors: validation.errors }
   }
 
-  const safe = validateExportPath(repoRoot, outputPath)
+  const safe = validateExportPath(workspaceRoot, outputPath)
   if (!safe.ok) {
     return { ok: false, errors: [safe.error] }
   }
@@ -207,7 +208,7 @@ export function writeProposalToFile(proposal, outputPath) {
 }
 
 export function loadProposalFile(filePath) {
-  const resolved = resolvePath(repoRoot, filePath)
+  const resolved = resolvePath(workspaceRoot, filePath)
   if (!existsSync(resolved)) return { ok: false, error: `proposal file not found: ${filePath}` }
   try {
     const payload = JSON.parse(readFileSync(resolved, 'utf-8'))

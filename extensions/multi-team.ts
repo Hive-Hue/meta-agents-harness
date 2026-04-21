@@ -7,7 +7,7 @@
  * - Worker: executes code tasks directly within its ownership domain
  *
  * The runtime is driven by a selected crew config (typically .pi/crew/<crew>/multi-team.yaml)
- * plus shared skills under .pi/skills/.
+ * plus shared assets from the MAH overlay, which prefers ~/.mah/ and falls back to the local repo.
  *
  * Usage:
  *   pi -e extensions/multi-team.ts
@@ -220,6 +220,23 @@ function shortText(value: string, limit = 180): string {
 	return normalized.length > limit ? normalized.slice(0, limit - 3) + "..." : normalized;
 }
 
+/**
+ * Derive task type from task description keywords.
+ * @param {string} task
+ * @returns {string}
+ */
+function deriveTaskType(task: string): string {
+	const t = (task || "").toLowerCase();
+	if (t.includes("fix") || t.includes("bug")) return "bugfix";
+	if (t.includes("implement") || t.includes("build") || t.includes("write") || t.includes("add") || t.includes("create")) return "implementation";
+	if (t.includes("test") || t.includes("verify") || t.includes("check")) return "testing";
+	if (t.includes("review") || t.includes("audit")) return "review";
+	if (t.includes("refactor")) return "refactoring";
+	if (t.includes("doc") || t.includes("readme") || t.includes("comment")) return "documentation";
+	if (t.includes("security") || t.includes("vuln")) return "security";
+	return "general";
+}
+
 function middleEllipsis(value: string, limit: number): string {
 	const normalized = value.replace(/\s+/g, " ").trim();
 	if (limit <= 0) return "";
@@ -306,15 +323,21 @@ function parseInlineArray(token: string): string[] {
 		.split(",")
 		.map((part) => part.trim())
 		.filter(Boolean)
-		.map((part) => part.replace(/^['"]|['"]$/g, ""));
+		.map((part) => {
+			const stripped = part.replace(/^['"]|['"]$/g, "");
+			return stripped.replace(/\\(.)/g, "$1").replace(/''/g, "'");
+		});
 }
 
 function parseScalarToken(token: string): any {
 	if (token === "[]") return [];
 	if (token === "{}") return {};
 	if (token.startsWith("[") && token.endsWith("]")) return parseInlineArray(token);
-	if ((token.startsWith(`"`) && token.endsWith(`"`)) || (token.startsWith("'") && token.endsWith("'"))) {
-		return token.slice(1, -1);
+	if (token.startsWith(`"`) && token.endsWith(`"`)) {
+		return token.slice(1, -1).replace(/\\(.)/g, "$1");
+	}
+	if (token.startsWith(`'`) && token.endsWith(`'`)) {
+		return token.slice(1, -1).replace(/''/g, "'");
 	}
 	if (token === "true") return true;
 	if (token === "false") return false;
@@ -422,8 +445,9 @@ function parseYamlBlock(lines: ParsedYamlLine[], startIndex: number, indent: num
 
 			const colonIndex = rest.indexOf(":");
 			if (colonIndex === -1) {
-				items.push(parseScalarToken(rest));
-				index++;
+				const wrapped = consumeWrappedScalar(lines, index + 1, indent);
+				items.push([parseScalarToken(rest), wrapped.value].filter(Boolean).join(" ").trim());
+				index = wrapped.index;
 				continue;
 			}
 
@@ -737,29 +761,29 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 	};
 }
 
-	function resolveConfigPath(cwd: string): string {
-		const envPath = process.env.MAH_MULTI_CONFIG?.trim() || process.env.PI_MULTI_CONFIG?.trim();
-		if (envPath) {
-			const absolute = resolve(cwd, envPath);
-			if (!existsSync(absolute)) {
-				throw new Error(`MAH_MULTI_CONFIG points to a missing file: ${absolute}`);
-			}
-			return absolute;
+function resolveConfigPath(cwd: string): string {
+	const envPath = process.env.MAH_MULTI_CONFIG?.trim() || process.env.PI_MULTI_CONFIG?.trim();
+	if (envPath) {
+		const absolute = resolve(cwd, envPath);
+		if (!existsSync(absolute)) {
+			throw new Error(`MAH_MULTI_CONFIG points to a missing file: ${absolute}`);
 		}
+		return absolute;
+	}
 
-		const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
-		const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+	const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+	const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
 
-		const envCrew = process.env.MAH_ACTIVE_CREW?.trim() || process.env.PI_MULTI_CREW?.trim();
-		if (envCrew) {
-			const byCrew = resolve(cwd, runtimeMarker, "crew", envCrew, "multi-team.yaml");
-			if (!existsSync(byCrew)) {
-				throw new Error(`Active crew "${envCrew}" was set but config was not found at ${byCrew}`);
-			}
-			return byCrew;
+	const envCrew = process.env.MAH_ACTIVE_CREW?.trim() || process.env.PI_MULTI_CREW?.trim();
+	if (envCrew) {
+		const byCrew = resolve(cwd, runtimeMarker, "crew", envCrew, "multi-team.yaml");
+		if (!existsSync(byCrew)) {
+			throw new Error(`Active crew "${envCrew}" was set but config was not found at ${byCrew}`);
 		}
+		return byCrew;
+	}
 
-		const activeCrewPath = resolve(cwd, runtimeMarker, ".active-crew.json");
+	const activeCrewPath = resolve(cwd, runtimeMarker, ".active-crew.json");
 	if (existsSync(activeCrewPath)) {
 		try {
 			const active = JSON.parse(readFileSync(activeCrewPath, "utf-8")) as { source_config?: string };
@@ -773,15 +797,15 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 		}
 	}
 
-		const legacyCandidates = [
-			resolve(cwd, "multi-team.yaml"),
-			resolve(cwd, runtimeMarker, "multi-team.yaml"),
-		];
+	const legacyCandidates = [
+		resolve(cwd, "multi-team.yaml"),
+		resolve(cwd, runtimeMarker, "multi-team.yaml"),
+	];
 	for (const candidate of legacyCandidates) {
 		if (existsSync(candidate)) return candidate;
 	}
 
-		const crewRoot = resolve(cwd, runtimeMarker, "crew");
+	const crewRoot = resolve(cwd, runtimeMarker, "crew");
 	const crewCandidates: string[] = [];
 	if (existsSync(crewRoot)) {
 		for (const entry of readdirSync(crewRoot)) {
@@ -802,15 +826,15 @@ function effectiveDomain(config: ResolvedConfig, agent: AgentConfig): DomainConf
 	if (crewCandidates.length === 1) {
 		return crewCandidates[0];
 	}
-		if (crewCandidates.length > 1) {
-			const options = crewCandidates.map((candidate) => `- ${candidate}`).join("\n");
-			throw new Error(
-				`Multiple crew configs found. Select a crew first or set MAH_MULTI_CONFIG.\n${options}`
-			);
-		}
-
-		throw new Error("Could not find a multi-team config. Set MAH_MULTI_CONFIG or create .kilo/.pi crew config.");
+	if (crewCandidates.length > 1) {
+		const options = crewCandidates.map((candidate) => `- ${candidate}`).join("\n");
+		throw new Error(
+			`Multiple crew configs found. Select a crew first or set MAH_MULTI_CONFIG.\n${options}`
+		);
 	}
+
+	throw new Error("Could not find a multi-team config. Set MAH_MULTI_CONFIG or create .kilo/.pi crew config.");
+}
 
 function loadConfig(cwd: string): ResolvedConfig {
 	const configPath = resolveConfigPath(cwd);
@@ -825,13 +849,13 @@ function loadConfig(cwd: string): ResolvedConfig {
 		throw new Error("multi-team.yaml must define at least one team.");
 	}
 
-		const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
-		const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
-		const crewRoot = resolve(cwd, runtimeMarker, "crew");
-		const relativeToCrewRoot = relative(crewRoot, baseDir);
-		const isCrewScoped = relativeToCrewRoot !== "" && !relativeToCrewRoot.startsWith("..");
-		const defaultSessionDir = isCrewScoped ? "sessions" : `${runtimeMarker}/multi-team/sessions`;
-		const defaultExpertiseDir = isCrewScoped ? "expertise" : `${runtimeMarker}/expertise`;
+	const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+	const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+	const crewRoot = resolve(cwd, runtimeMarker, "crew");
+	const relativeToCrewRoot = relative(crewRoot, baseDir);
+	const isCrewScoped = relativeToCrewRoot !== "" && !relativeToCrewRoot.startsWith("..");
+	const defaultSessionDir = isCrewScoped ? "sessions" : `${runtimeMarker}/multi-team/sessions`;
+	const defaultExpertiseDir = isCrewScoped ? "expertise" : `${runtimeMarker}/expertise`;
 
 	return {
 		...raw,
@@ -912,10 +936,10 @@ function matchesName(left: string, right: string): boolean {
 	return left.trim().toLowerCase() === right.trim().toLowerCase() || slugify(left) === slugify(right);
 }
 
-	function resolveRuntime(config: ResolvedConfig): RuntimeState {
-		const role = (process.env.MAH_MULTI_ROLE as RuntimeRole | undefined) || (process.env.PI_MULTI_ROLE as RuntimeRole | undefined) || "orchestrator";
-		const agentName = process.env.MAH_MULTI_AGENT?.trim() || process.env.PI_MULTI_AGENT?.trim();
-		const teamName = process.env.MAH_MULTI_TEAM?.trim() || process.env.PI_MULTI_TEAM?.trim();
+function resolveRuntime(config: ResolvedConfig): RuntimeState {
+	const role = (process.env.MAH_MULTI_ROLE as RuntimeRole | undefined) || (process.env.PI_MULTI_ROLE as RuntimeRole | undefined) || "orchestrator";
+	const agentName = process.env.MAH_MULTI_AGENT?.trim() || process.env.PI_MULTI_AGENT?.trim();
+	const teamName = process.env.MAH_MULTI_TEAM?.trim() || process.env.PI_MULTI_TEAM?.trim();
 
 	if (role === "orchestrator") {
 		return {
@@ -1348,9 +1372,9 @@ function artifactFileName(parts: string[], extension = "md"): string {
 
 function yamlScalar(value: any): string {
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
-	if (value === null || value === undefined) return '""';
+	if (value === null || value === undefined) return "''";
 	const text = String(value);
-	return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+	return `'${text.replace(/'/g, "''")}'`;
 }
 
 function stringifyYaml(value: any, indent = 0): string {
@@ -1588,7 +1612,8 @@ export default function (pi: ExtensionAPI) {
 		if (!runtime) return "";
 		const fileName = artifactFileName([runtime.agent.name, kind, label]);
 		const fullPath = sessionPath("artifacts", fileName);
-		const relativePath = relative(currentSessionRoot(), fullPath);
+		const sessionRelativePath = relative(currentSessionRoot(), fullPath);
+		const repoRelativePath = relative(config.repoRoot, fullPath);
 		writeFileSync(fullPath, compactArtifactContent(content));
 		appendJsonl("artifacts/index.jsonl", {
 			type: "artifact",
@@ -1596,14 +1621,14 @@ export default function (pi: ExtensionAPI) {
 			sessionId: currentSessionId(),
 			kind,
 			label,
-			path: relativePath,
+			path: sessionRelativePath,
 			...sessionProcessInfo(),
 			...redactSensitiveValue(metadata),
 		});
 		mutateSessionIndex((index) => {
 			index.counts.artifacts = (index.counts.artifacts || 0) + 1;
 		});
-		return relativePath;
+		return repoRelativePath;
 	}
 
 	function ensureSessionLayout() {
@@ -2129,31 +2154,91 @@ export default function (pi: ExtensionAPI) {
 		const statusColor = state.status === "idle" ? "dim"
 			: state.status === "running" ? "accent"
 				: state.status === "done" ? "success" : "error";
+
+		// Status icons — animated spinner for running
+		const CARD_SPINNERS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+		const spinIdx = Math.floor(Date.now() / 80) % CARD_SPINNERS.length;
 		const statusIcon = state.status === "idle" ? "○"
-			: state.status === "running" ? "●"
+			: state.status === "running" ? CARD_SPINNERS[spinIdx]
 				: state.status === "done" ? "✓" : "✗";
+
+		// Role badge with icon
+		const roleIcon = state.role === "lead" ? "◆" : "◇";
 		const roleLabel = state.role === "lead" ? "Lead" : "Worker";
-		const titleText = shortText(displayName(state.agent.name), contentWidth);
-		const metaText = shortText(state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel, contentWidth);
-		const statusText = shortText(`${statusIcon} ${state.status}${state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : ""}`, contentWidth);
+
+		// Title row
+		const titleText = shortText(displayName(state.agent.name), contentWidth - 2);
+
+		// Meta row: role badge + team
+		const metaText = shortText(`${roleIcon} ${state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel}`, contentWidth);
+
+		// Status row: icon + status + elapsed + run count
+		const elapsedText = state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : "";
+		const runLabel = state.runCount > 0 ? ` #${state.runCount}` : "";
+		const statusText = shortText(`${statusIcon} ${state.status}${elapsedText}${runLabel}`, contentWidth);
+
+		// Task row
 		const taskText = shortText(state.task || state.agent.description || "idle", contentWidth);
+
+		// Last line preview (truncated)
+		const hasLastLine = state.status === "running" && !!state.lastLine.trim();
+		const lastLineText = hasLastLine
+			? shortText(`↳ ${state.lastLine.trim()}`, contentWidth)
+			: "";
+
+		// Card assembly
 		const title = theme.fg("accent", theme.bold(titleText));
 		const meta = theme.fg("dim", metaText);
 		const status = theme.fg(statusColor, statusText);
 		const task = theme.fg("muted", taskText);
-		const top = "┌" + "─".repeat(width) + "┐";
-		const bot = "└" + "─".repeat(width) + "┘";
+
+		// Top border with status-colored accent
+		const accentWidth = Math.min(width, 4);
+		const topAccent = theme.fg(statusColor, "━".repeat(accentWidth));
+		const topRest = theme.fg("dim", "─".repeat(Math.max(0, width - accentWidth)));
+		const top = theme.fg("dim", "┌") + topAccent + topRest + theme.fg("dim", "┐");
+		const bot = theme.fg("dim", "└") + theme.fg("dim", "─".repeat(width)) + theme.fg("dim", "┘");
+
 		const row = (content: string, visible: string) =>
 			theme.fg("dim", "│") + " " + content + " ".repeat(Math.max(0, contentWidth - visibleWidth(visible))) + theme.fg("dim", "│");
 
-		return [
-			theme.fg("dim", top),
+		// Progress bar for running agents
+		let progressRow = "";
+		if (state.status === "running") {
+			const barWidth = Math.max(4, contentWidth - 2);
+			const elapsed = Math.round(state.elapsed / 1000);
+			const cycle = elapsed % barWidth;
+			const barChars = Array(barWidth).fill("─");
+			// Animated sweep
+			for (let k = 0; k < 3 && cycle + k < barWidth; k++) {
+				barChars[cycle + k] = "━";
+			}
+			const barStr = barChars.join("");
+			const barVisible = ` ${barStr} `;
+			progressRow = theme.fg("dim", "│") + " " +
+				theme.fg("accent", barStr) +
+				" ".repeat(Math.max(0, contentWidth - visibleWidth(barStr))) +
+				theme.fg("dim", "│");
+		}
+
+		const rows = [
+			top,
 			row(title, titleText),
 			row(meta, metaText),
 			row(status, statusText),
 			row(task, taskText),
-			theme.fg("dim", bot),
 		];
+
+		if (hasLastLine) {
+			rows.push(row(theme.fg("dim", lastLineText), lastLineText));
+		}
+
+		if (progressRow) {
+			rows.push(progressRow);
+		}
+
+		rows.push(bot);
+		return rows;
 	}
 
 	function updateWidget() {
@@ -2169,34 +2254,67 @@ export default function (pi: ExtensionAPI) {
 					}
 
 					const items = Array.from(cards.values());
+					const lines: string[] = [];
+
+					// ── Header summary bar (opencode-style) ──
+					const running = items.filter((c) => c.status === "running").length;
+					const done = items.filter((c) => c.status === "done").length;
+					const errored = items.filter((c) => c.status === "error").length;
+					const idle = items.filter((c) => c.status === "idle").length;
+
+					const WIDGET_SPINNERS = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+					const wSpinIdx = Math.floor(Date.now() / 80) % WIDGET_SPINNERS.length;
+					const spinChar = running > 0 ? WIDGET_SPINNERS[wSpinIdx] : "●";
+
+					const headerParts: string[] = [];
+					headerParts.push(theme.fg("accent", theme.bold(` ${spinChar} Agents`)));
+					if (running > 0) headerParts.push(theme.fg("accent", ` ${running} running`));
+					if (done > 0) headerParts.push(theme.fg("success", ` ${done} done`));
+					if (errored > 0) headerParts.push(theme.fg("error", ` ${errored} error`));
+					if (idle > 0) headerParts.push(theme.fg("dim", ` ${idle} idle`));
+
+					const headerLeft = headerParts.join(theme.fg("dim", " ·"));
+					const roleName = runtime.role === "orchestrator" ? "Orchestrator" : "Lead";
+					const headerRight = theme.fg("dim", `${roleName} `);
+					const headerPad = Math.max(0, width - visibleWidth(headerLeft) - visibleWidth(headerRight));
+					lines.push(truncateToWidth(headerLeft + " ".repeat(headerPad) + headerRight, width));
+					lines.push(theme.fg("accent", "━".repeat(Math.min(4, width))) + theme.fg("dim", "─".repeat(Math.max(0, width - 4))));
+
+					// ── Cards grid ──
 					const cols = Math.min(runtime.role === "orchestrator" ? 3 : 2, items.length);
 					const gap = 1;
 					const colWidth = Math.floor((width - gap * (cols - 1)) / cols);
-					const lines: string[] = [];
 
 					for (let i = 0; i < items.length; i += cols) {
 						const rowItems = items.slice(i, i + cols);
 						const cardRows = rowItems.map((item) => renderCard(item, colWidth, theme));
-						const cardHeight = cardRows[0]?.length || 0;
-						while (cardRows.length < cols) cardRows.push(Array(cardHeight).fill(" ".repeat(colWidth)));
-						for (let row = 0; row < cardRows[0].length; row++) {
+
+						// Normalize card heights (cards now vary in height)
+						const maxHeight = Math.max(...cardRows.map((cr) => cr.length));
+						for (const cr of cardRows) {
+							while (cr.length < maxHeight) {
+								cr.push(" ".repeat(colWidth));
+							}
+						}
+
+						// Fill remaining columns with blanks
+						while (cardRows.length < cols) cardRows.push(Array(maxHeight).fill(" ".repeat(colWidth)));
+
+						for (let row = 0; row < maxHeight; row++) {
 							lines.push(cardRows.map((card) => card[row] || "").join(" ".repeat(gap)));
 						}
 					}
 
-					const runningWithLast = items.filter((item) =>
-						item.status === "running" && !!item.lastLine.trim()
-					);
-					if (runningWithLast.length > 0) {
-						lines.push(theme.fg("dim", "─".repeat(Math.max(1, width))));
-						for (const item of runningWithLast) {
-							const teamLabel = item.teamName || displayName(item.agent.name);
-							const prefix = `- ${teamLabel}: `;
-							const available = Math.max(8, width - visibleWidth(prefix));
-							const suffix = middleEllipsis(item.lastLine, available);
-							lines.push(truncateToWidth(theme.fg("dim", prefix + suffix), width));
-						}
-					}
+					// ── Footer status bar ──
+					const totalElapsed = items.reduce((sum, c) => sum + (c.status !== "idle" ? c.elapsed : 0), 0);
+					const totalRuns = items.reduce((sum, c) => sum + c.runCount, 0);
+					const footerLeft = theme.fg("dim", ` ${items.length} agents · ${totalRuns} total runs`);
+					const footerRight = totalElapsed > 0
+						? theme.fg("dim", `${Math.round(totalElapsed / 1000)}s elapsed `)
+						: "";
+					const footerPad = Math.max(0, width - visibleWidth(footerLeft) - visibleWidth(footerRight));
+					lines.push(theme.fg("dim", "─".repeat(width)));
+					lines.push(truncateToWidth(footerLeft + " ".repeat(footerPad) + footerRight, width));
 
 					text.setText(lines.join("\n"));
 					return text.render(width);
@@ -2589,8 +2707,8 @@ export default function (pi: ExtensionAPI) {
 		}
 		if (existsSync(mcpBridgePath)) args.splice(args.indexOf("-e"), 0, "-e", mcpBridgePath);
 		if (resumeSession) args.push("-c");
-			if (model && !isKiloRuntimeConfig(config)) args.push("--model", model);
-			args.push(prompt);
+		if (model && !isKiloRuntimeConfig(config)) args.push("--model", model);
+		args.push(prompt);
 
 		appendEvent("delegate_start", {
 			target: child.agent.name,
@@ -2628,29 +2746,29 @@ export default function (pi: ExtensionAPI) {
 		activeDelegations.set(activeKey, resultPromise);
 		resultPromise.then(() => activeDelegations.delete(activeKey)).catch(() => activeDelegations.delete(activeKey));
 
-			const delegationCli = delegationRuntimeCli(config);
-			const proc = spawn(delegationCli, args, {
-				stdio: ["ignore", "pipe", "pipe"],
-				env: {
-					...process.env,
-					MAH_MULTI_CONFIG: config!.configPath,
-					MAH_MULTI_ROLE: child.role,
-					MAH_MULTI_AGENT: child.agent.name,
-					MAH_MULTI_TEAM: child.team?.name || "",
-					MAH_MULTI_SESSION_ID: currentSessionId(),
-					MAH_MULTI_SESSION_ROOT: currentSessionRoot(),
-					MAH_MULTI_PARENT: runtime!.agent.name,
-					MAH_MULTI_DEPTH: String(currentDepth() + 1),
-					PI_MULTI_CONFIG: config!.configPath,
-					PI_MULTI_ROLE: child.role,
-					PI_MULTI_AGENT: child.agent.name,
-					PI_MULTI_TEAM: child.team?.name || "",
-					PI_MULTI_SESSION_ID: currentSessionId(),
-					PI_MULTI_SESSION_ROOT: currentSessionRoot(),
-					PI_MULTI_PARENT: runtime!.agent.name,
-					PI_MULTI_DEPTH: String(currentDepth() + 1),
-				},
-			});
+		const delegationCli = delegationRuntimeCli(config);
+		const proc = spawn(delegationCli, args, {
+			stdio: ["ignore", "pipe", "pipe"],
+			env: {
+				...process.env,
+				MAH_MULTI_CONFIG: config!.configPath,
+				MAH_MULTI_ROLE: child.role,
+				MAH_MULTI_AGENT: child.agent.name,
+				MAH_MULTI_TEAM: child.team?.name || "",
+				MAH_MULTI_SESSION_ID: currentSessionId(),
+				MAH_MULTI_SESSION_ROOT: currentSessionRoot(),
+				MAH_MULTI_PARENT: runtime!.agent.name,
+				MAH_MULTI_DEPTH: String(currentDepth() + 1),
+				PI_MULTI_CONFIG: config!.configPath,
+				PI_MULTI_ROLE: child.role,
+				PI_MULTI_AGENT: child.agent.name,
+				PI_MULTI_TEAM: child.team?.name || "",
+				PI_MULTI_SESSION_ID: currentSessionId(),
+				PI_MULTI_SESSION_ROOT: currentSessionRoot(),
+				PI_MULTI_PARENT: runtime!.agent.name,
+				PI_MULTI_DEPTH: String(currentDepth() + 1),
+			},
+		});
 		childProcesses.set(child.agent.name, proc);
 
 		let buffer = "";
@@ -2956,7 +3074,7 @@ export default function (pi: ExtensionAPI) {
 					note,
 				},
 
-		};
+			};
 		},
 		renderCall(args, theme) {
 			const category = (args as any).category ? `[${(args as any).category}] ` : "";
@@ -3027,6 +3145,26 @@ export default function (pi: ExtensionAPI) {
 				effectiveTarget, status, elapsed, result.output,
 				result.artifactPath || null, header,
 			);
+
+			// Record evidence (best-effort — never block delegation result)
+			;(async () => {
+				try {
+					const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+					const crew = process.env.MAH_ACTIVE_CREW || "dev";
+					await recordEvidence({
+						expertise_id: `${crew}:${effectiveTarget}`,
+						outcome: result.exitCode === 0 ? "success" : "failure",
+						task_type: deriveTaskType(effectiveTask),
+						task_description: shortText(effectiveTask, 200),
+						duration_ms: Math.round(result.elapsed),
+						source_agent: runtime!.agent.name,
+						source_session: currentSessionId() || "unknown",
+					});
+				} catch {
+					// best-effort
+				}
+			})();
+
 			return {
 				content: [{ type: "text", text: body }],
 				details: {
@@ -3285,6 +3423,31 @@ export default function (pi: ExtensionAPI) {
 					content,
 				].join("\n");
 			}).join("\n\n");
+
+			// Record evidence for each target (best-effort — never block result)
+			;(async () => {
+				try {
+					const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+					const crew = process.env.MAH_ACTIVE_CREW || "dev";
+					for (const result of results) {
+						try {
+							await recordEvidence({
+								expertise_id: `${crew}:${result.target}`,
+								outcome: result.exitCode === 0 ? "success" : "failure",
+								task_type: deriveTaskType(task),
+								task_description: shortText(task, 200),
+								duration_ms: Math.round(result.elapsed),
+								source_agent: runtime!.agent.name,
+								source_session: currentSessionId() || "unknown",
+							});
+						} catch {
+							// best-effort per-target
+						}
+					}
+				} catch {
+					// best-effort
+				}
+			})();
 
 			const rerouteSummary = Array.from(reroutedWorkersByLead.entries())
 				.map(([lead, info]) => `- ${lead} (${info.teamName}): ${Array.from(info.workers).join(", ")}`)
@@ -3838,6 +4001,14 @@ Note: Controls thinking level for delegated child agents only.`
 			"info",
 		);
 
+		const hintFile = resolve(ctx.cwd, ".pi", ".mah_hint_nl");
+		let hintCount = 0;
+		try { if (existsSync(hintFile)) hintCount = parseInt(readFileSync(hintFile, "utf-8"), 10) || 0; } catch { }
+		const showNewlineHint = hintCount < 3;
+		if (showNewlineHint) {
+			try { writeFileSync(hintFile, String(hintCount + 1)); } catch { }
+		}
+
 		ctx.ui.setFooter((_tui, theme, _footerData) => ({
 			dispose: () => { },
 			invalidate() { },
@@ -3930,7 +4101,14 @@ Note: Controls thinking level for delegated child agents only.`
 					theme.fg("dim", sessionLabel);
 
 				const pad = " ".repeat(Math.max(1, width - visibleWidth(left) - visibleWidth(right)));
-				return [truncateToWidth(left + pad + right, width)];
+				const footerStr = truncateToWidth(left + pad + right, width);
+
+				if (showNewlineHint) {
+					const hintMsg = theme.fg("dim", " Tip: ") + theme.fg("accent", "\\ + ↵") + theme.fg("dim", " to new line");
+					return [hintMsg, footerStr];
+				}
+
+				return [footerStr];
 			},
 		}));
 	});

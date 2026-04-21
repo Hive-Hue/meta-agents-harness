@@ -273,7 +273,7 @@ test.describe("plugins e2e", () => {
     assert.equal(installedPlugin.version, "0.0.1")
   })
 
-  test("mah plugins install accepts wrapperless core-integrated plugin", () => {
+  test("mah plugins install accepts wrapperless MAH-managed plugin", () => {
     const installResult = runMah(["plugins", "install", CORE_PLUGIN_SOURCE])
 
     assert.equal(installResult.status, 0, installResult.stderr)

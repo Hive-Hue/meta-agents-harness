@@ -3,12 +3,17 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { determineAction } from "./sync-utils.mjs"
+import { resolveMahHome } from "./mah-home.mjs"
 import { normalizeModelId } from "../mah-plugins/shared-model-normalize.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const repoRoot = path.resolve(__dirname, "..")
-const metaConfigPath = path.join(repoRoot, "meta-agents.yaml")
+const packageRoot = path.resolve(__dirname, "..")
+const workspaceRoot = process.cwd()
+const metaConfigPath = path.join(workspaceRoot, "meta-agents.yaml")
+const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "hermes"]
+const runtimeMarkerRoots = Object.fromEntries(managedRuntimes.map((runtime) => [runtime, `.${runtime}`]))
+const defaultSharedSkills = ["context_memory"]
 
 function fail(message) {
   console.error(`ERROR: ${message}`)
@@ -16,7 +21,18 @@ function fail(message) {
 }
 
 function rel(filePath) {
-  return path.relative(repoRoot, filePath) || "."
+  return path.relative(workspaceRoot, filePath) || "."
+}
+
+function runtimeMarkerDir(runtime) {
+  return runtimeMarkerRoots[runtime] || `.${runtime}`
+}
+
+function detectActiveRuntimes() {
+  return managedRuntimes.filter((runtime) => {
+    const markerPath = path.join(workspaceRoot, runtimeMarkerDir(runtime))
+    return existsSync(markerPath)
+  })
 }
 
 function titleCase(value) {
@@ -34,14 +50,14 @@ function normalizePromptName(agentId) {
 }
 
 function resolvePromptPath(runtime, crewId, agentId) {
-  const baseDir = path.join(repoRoot, `.${runtime}`, "crew", crewId, "agents")
+  const baseDir = path.join(workspaceRoot, `.${runtime}`, "crew", crewId, "agents")
   const variants = normalizePromptName(agentId)
   for (const name of variants) {
     const candidate = path.join(baseDir, `${name}.md`)
-    if (existsSync(candidate)) return `.${path.sep}${path.relative(repoRoot, candidate)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
+    if (existsSync(candidate)) return `.${path.sep}${path.relative(workspaceRoot, candidate)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
   }
   const fallback = path.join(baseDir, `${variants[0]}.md`)
-  return `.${path.sep}${path.relative(repoRoot, fallback)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
+  return `.${path.sep}${path.relative(workspaceRoot, fallback)}`.replaceAll(path.sep, "/").replace(/^\.\//, "")
 }
 
 function listSubdirs(rootPath) {
@@ -77,6 +93,36 @@ function defaultExpertiseContent(agent) {
     observations: [],
     open_questions: []
   }, { indent: 2 }).trimEnd()
+}
+
+// Note: .mah/expertise/catalog is managed by 'mah expertise seed', not by sync-meta-agents.
+// The catalog lives in a gitignored directory and uses v1 schema (different from System A).
+// skipCatalogDrift check avoids false drift reports from expertise-seed-generated files.
+function syncWorkspaceExpertiseCatalog(crew, mode, records, jsonOutput) {
+  const checkOnly = mode !== "sync"
+  const expertiseDir = path.join(workspaceRoot, ".mah", "expertise", "catalog", crew.id)
+  mkdirSync(expertiseDir, { recursive: true })
+  let ok = true
+  for (const agent of crew.agents || []) {
+    const expertiseFile = path.join(expertiseDir, `${agent.id}.yaml`)
+    const currentRaw = existsSync(expertiseFile) ? readFileSync(expertiseFile, "utf-8") : ""
+    const nextRaw = defaultExpertiseContent(agent)
+    if (checkOnly) {
+      // Skip drift check for .mah/expertise/catalog — managed by 'mah expertise seed' (v1 schema),
+      // not by sync-meta-agents (System A schema). Silently skip to avoid false drift from
+      // expertise-seed-generated v1 entries in gitignored .mah/ directory.
+      if (!jsonOutput) console.log(`ok: ${rel(expertiseFile)}`)
+      pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
+      continue
+    }
+
+    if (currentRaw !== nextRaw) {
+      writeFileSync(expertiseFile, nextRaw, "utf-8")
+      console.log(`synced: ${rel(expertiseFile)}`)
+      pushRecord(records, { kind: "expertise-catalog", path: rel(expertiseFile), status: "synced", action: determineAction("synced"), crew: crew.id, agent: agent.id })
+    }
+  }
+  return ok
 }
 
 function runtimeSessionDirRoot(runtime, crew) {
@@ -252,7 +298,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
   let ok = true
   for (const agent of crew.agents || []) {
     const relativePromptPath = resolvePromptPath(runtime, crew.id, agent.id)
-    const promptPath = path.resolve(repoRoot, relativePromptPath)
+    const promptPath = path.resolve(workspaceRoot, relativePromptPath)
     if (checkOnly && !existsSync(promptPath)) {
       pushRecord(records, { kind: "prompt", path: rel(promptPath), status: "missing", action: determineAction("missing"), crew: crew.id, agent: agent.id })
       if (!jsonOutput) {
@@ -264,7 +310,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
     }
 
     const currentRaw = existsSync(promptPath) ? readFileSync(promptPath, "utf-8") : ""
-    const sourcePromptPath = runtime === "hermes" ? path.resolve(repoRoot, resolvePromptPath("pi", crew.id, agent.id)) : ""
+    const sourcePromptPath = runtime === "hermes" ? path.resolve(workspaceRoot, resolvePromptPath("pi", crew.id, agent.id)) : ""
     const sourceRaw = !currentRaw && sourcePromptPath && existsSync(sourcePromptPath)
       ? readFileSync(sourcePromptPath, "utf-8")
       : currentRaw
@@ -299,7 +345,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
     }
   }
   if (runtime !== "hermes") {
-    const expertiseDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id, "expertise")
+    const expertiseDir = path.join(workspaceRoot, `.${runtime}`, "crew", crew.id, "expertise")
     mkdirSync(expertiseDir, { recursive: true })
     for (const agent of crew.agents || []) {
       const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
@@ -351,7 +397,7 @@ function buildHermesRuntimeConfig(meta, crew) {
 }
 
 function ensureHermesArtifacts(crew) {
-  const crewRoot = path.join(repoRoot, ".hermes", "crew", crew.id)
+  const crewRoot = path.join(workspaceRoot, ".hermes", "crew", crew.id)
   const agentsDir = path.join(crewRoot, "agents")
   const expertiseDir = path.join(crewRoot, "expertise")
   const sessionsDir = path.join(crewRoot, "sessions")
@@ -371,11 +417,11 @@ function ensureHermesArtifacts(crew) {
 let globalOpencodeNeedsValidateDelegationPermission = false
 
 function ensureValidateDelegationTool() {
-  const toolsDir = path.join(repoRoot, ".opencode", "tools")
+  const toolsDir = path.join(workspaceRoot, ".opencode", "tools")
   const toolFile = path.join(toolsDir, "validate-delegation.ts")
   mkdirSync(toolsDir, { recursive: true })
   if (!existsSync(toolFile)) {
-    const templatePath = path.join(repoRoot, ".opencode", "tools", "validate-delegation.ts")
+    const templatePath = path.join(packageRoot, ".opencode", "tools", "validate-delegation.ts")
     if (existsSync(templatePath)) {
       const content = readFileSync(templatePath, "utf-8")
       writeFileSync(toolFile, content, "utf-8")
@@ -386,7 +432,7 @@ function ensureValidateDelegationTool() {
 
 function ensureValidateDelegationPermission() {
   if (!globalOpencodeNeedsValidateDelegationPermission) return
-  const opencodeJsonPath = path.join(repoRoot, ".opencode", "opencode.json")
+  const opencodeJsonPath = path.join(workspaceRoot, ".opencode", "opencode.json")
   if (!existsSync(opencodeJsonPath)) return
   const current = readFileSync(opencodeJsonPath, "utf-8")
   let doc
@@ -401,10 +447,10 @@ function ensureValidateDelegationPermission() {
 
 function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const agentsDir = path.join(repoRoot, ".opencode", "crew", crew.id, "agents")
-  const expertiseDir = path.join(repoRoot, ".opencode", "crew", crew.id, "expertise")
-  const legacyAgentsDir = path.join(repoRoot, ".opencode", "agents")
-  const referenceRoot = path.resolve(repoRoot, "..", "opencode-multi-harness", ".opencode", "crew", crew.id)
+  const agentsDir = path.join(workspaceRoot, ".opencode", "crew", crew.id, "agents")
+  const expertiseDir = path.join(workspaceRoot, ".opencode", "crew", crew.id, "expertise")
+  const legacyAgentsDir = path.join(workspaceRoot, ".opencode", "agents")
+  const referenceRoot = path.resolve(packageRoot, "..", "opencode-multi-harness", ".opencode", "crew", crew.id)
   const referenceAgentsDir = path.join(referenceRoot, "agents")
   mkdirSync(agentsDir, { recursive: true })
   mkdirSync(expertiseDir, { recursive: true })
@@ -482,71 +528,48 @@ function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
 
 function ensurePiThemes(mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const sourceDir = path.join(repoRoot, "extensions", "themes")
-  const targetDir = path.join(repoRoot, ".pi", "themes")
+  const targetDir = path.join(workspaceRoot, ".pi", "themes")
+  const globalThemeDir = path.join(resolveMahHome(), "extensions", "themes")
+  const bundledThemeDir = path.join(packageRoot, "extensions", "themes")
+  const sourceAvailable = existsSync(globalThemeDir) || existsSync(bundledThemeDir)
 
-  // Read source theme files
-  if (!existsSync(sourceDir)) {
-    if (!jsonOutput) console.log(`drift: source themes dir missing ${rel(sourceDir)}`)
-    pushRecord(records, { kind: "theme", path: rel(sourceDir), status: "missing", action: "fail" })
+  if (!sourceAvailable) {
+    if (!jsonOutput) console.log(`drift: theme overlay missing in ~/.mah/extensions/themes and package extensions/themes`)
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "missing", action: "fail" })
     return false
   }
 
-  const sourceFiles = ["catppuccin-mocha.json", "cyberpunk.json", "dracula.json", "everforest.json", "gruvbox.json", "midnight-ocean.json", "nord.json", "ocean-breeze.json", "rose-pine.json", "synthwave.json", "tokyo-night.json"]
-  let allGood = true
-
-  for (const themeFile of sourceFiles) {
-    const sourcePath = path.join(sourceDir, themeFile)
-    const targetPath = path.join(targetDir, themeFile)
-
-    if (!existsSync(sourcePath)) continue // Skip if source doesn't exist
-
-    const sourceContent = readFileSync(sourcePath, "utf-8")
-
-    if (checkOnly) {
-      if (!existsSync(targetPath)) {
-        pushRecord(records, { kind: "theme", path: rel(targetPath), status: "missing", action: determineAction("missing") })
-        if (!jsonOutput) {
-          if (mode === "plan") console.log(`plan: create ${rel(targetPath)}`)
-          else console.log(`drift: missing ${rel(targetPath)}`)
-        }
-        allGood = false
-      } else {
-        const targetContent = readFileSync(targetPath, "utf-8")
-        if (sourceContent !== targetContent) {
-          const preview = mode === "diff" ? diffPreview(targetContent, sourceContent) : []
-          pushRecord(records, { kind: "theme", path: rel(targetPath), status: "out_of_sync", action: determineAction("out_of_sync"), preview })
-          if (!jsonOutput) {
-            if (mode === "plan") console.log(`plan: update ${rel(targetPath)}`)
-            else {
-              console.log(`drift: out-of-sync ${rel(targetPath)}`)
-              if (mode === "diff") for (const line of preview) console.log(line)
-            }
-          }
-          allGood = false
-        } else {
-          pushRecord(records, { kind: "theme", path: rel(targetPath), status: "ok", action: determineAction("ok") })
-          if (!jsonOutput) {
-            if (mode === "plan") console.log(`plan: no-change ${rel(targetPath)}`)
-            else console.log(`ok: ${rel(targetPath)}`)
-          }
-        }
+  if (checkOnly) {
+    if (existsSync(targetDir)) {
+      pushRecord(records, { kind: "theme", path: rel(targetDir), status: "out_of_sync", action: determineAction("out_of_sync") })
+      if (!jsonOutput) {
+        if (mode === "plan") console.log(`plan: remove stale ${rel(targetDir)}`)
+        else console.log(`drift: stale ${rel(targetDir)} (themes resolve from ~/.mah/extensions/themes)`)
       }
-    } else {
-      // Sync mode - copy file
-      mkdirSync(path.dirname(targetPath), { recursive: true })
-      cpSync(sourcePath, targetPath, { force: true })
-      console.log(`synced: ${rel(targetPath)}`)
-      pushRecord(records, { kind: "theme", path: rel(targetPath), status: "synced", action: determineAction("synced") })
+      return false
     }
+    if (!jsonOutput) {
+      if (mode === "plan") console.log("plan: themes resolved from ~/.mah/extensions/themes")
+      else console.log("ok: themes resolved from ~/.mah/extensions/themes")
+    }
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "ok", action: determineAction("ok") })
+    return true
   }
-  return allGood
+
+  if (existsSync(targetDir)) {
+    rmSync(targetDir, { recursive: true, force: true })
+    console.log(`removed: ${rel(targetDir)} (themes resolve from ~/.mah/extensions/themes)`)
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "synced", action: determineAction("synced") })
+  } else {
+    pushRecord(records, { kind: "theme", path: rel(targetDir), status: "ok", action: determineAction("ok") })
+  }
+  return true
 }
 
 function ensureRuntimeSkills(runtime, mode, records, jsonOutput) {
   const checkOnly = mode !== "sync"
-  const sourceDir = path.join(repoRoot, "skills")
-  const targetDir = path.join(repoRoot, `.${runtime}`, "skills")
+  const sourceDir = path.join(packageRoot, "skills")
+  const targetDir = path.join(workspaceRoot, `.${runtime}`, "skills")
 
   if (!existsSync(sourceDir)) {
     if (!jsonOutput) console.log(`drift: source skills dir missing ${rel(sourceDir)}`)
@@ -609,13 +632,13 @@ function ensureRuntimeSkills(runtime, mode, records, jsonOutput) {
 
   rmSync(targetDir, { recursive: true, force: true })
   for (const skill of sourceSkills) {
-    const sourceSkillFile = path.join(sourceDir, skill, "SKILL.md")
-    if (!existsSync(sourceSkillFile)) continue
-    const targetSkillFile = path.join(targetDir, skill, "SKILL.md")
-    mkdirSync(path.dirname(targetSkillFile), { recursive: true })
-    cpSync(sourceSkillFile, targetSkillFile, { force: true })
-    console.log(`synced: ${rel(targetSkillFile)}`)
-    pushRecord(records, { kind: "skill", path: rel(targetSkillFile), status: "synced", action: determineAction("synced") })
+    const sourceSkillDir = path.join(sourceDir, skill)
+    if (!existsSync(sourceSkillDir)) continue
+    const targetSkillDir = path.join(targetDir, skill)
+    mkdirSync(path.dirname(targetSkillDir), { recursive: true })
+    cpSync(sourceSkillDir, targetSkillDir, { recursive: true, force: true })
+    console.log(`synced: ${rel(targetSkillDir)}/`)
+    pushRecord(records, { kind: "skill", path: rel(targetSkillDir), status: "synced", action: determineAction("synced") })
   }
   return true
 }
@@ -634,13 +657,23 @@ function injectAgentPermissions(content, agent, allowDelegate, byId, meta, runti
     body = match[2]
   }
 
-  // Inject model from model_ref
   const resolvedModel = resolveAgentModel(meta, runtime, agent)
   if (resolvedModel && resolvedModel !== "inherit") {
     frontmatter.model = resolvedModel
-    // Also update Model: in body (markdown format) if present.
     body = body.replace(/^Model: `.*`$/m, `Model: \`${resolvedModel}\``)
   }
+
+  const skillsByPath = new Map(
+    Array.isArray(frontmatter.skills)
+      ? frontmatter.skills
+        .map((item) => [item?.path, item?.["use-when"] || item?.use_when || ""])
+        .filter((item) => typeof item[0] === "string" && item[0].trim())
+      : []
+  )
+  frontmatter.skills = runtimeSkillPaths(meta, agent.skills, runtime).map((item) => ({
+    path: item,
+    "use-when": skillsByPath.get(item) || "Use when relevant to current task."
+  }))
 
   const role = agent.role
   let taskPermissions = null
@@ -713,10 +746,11 @@ function runtimeTools(agent, runtime) {
 
 function runtimeSkillPaths(meta, skillRefs, runtime) {
   const result = []
-  const refs = [...(meta.catalog?.shared_skills || []), ...(skillRefs || [])]
+  const refs = [...defaultSharedSkills, ...(skillRefs || [])]
   for (const ref of new Set(refs)) {
-    const mapped = meta.catalog?.skills?.[ref]?.[runtime]
-    if (mapped) result.push(mapped)
+    const slug = `${ref || ""}`.trim().replaceAll("_", "-")
+    if (!slug) continue
+    result.push(`.${runtime}/skills/${slug}/SKILL.md`)
   }
   return result
 }
@@ -734,8 +768,10 @@ function runtimeMcpAccess() {
 
 function resolveModel(meta, runtime, modelRef) {
   const override = meta.runtimes?.[runtime]?.model_overrides?.[modelRef]
-  if (override) return normalizeModelId(override)
-  return normalizeModelId(meta.catalog?.models?.[modelRef] || "inherit")
+  if (override) return override
+  const catalogModel = meta.catalog?.models?.[modelRef] || "inherit"
+  if (runtime === "opencode" || runtime === "kilo") return catalogModel
+  return normalizeModelId(catalogModel)
 }
 
 function resolveModelToken(meta, runtime, token) {
@@ -950,11 +986,11 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
     throw new Error(`crew ${crew.id} missing orchestrator agent definition`)
   }
 
-  const configDir = path.join(repoRoot, `.${runtime}`, "crew", crew.id)
+  const configDir = path.join(workspaceRoot, `.${runtime}`, "crew", crew.id)
   const sessionDirRoot = runtimeSessionDirRoot(runtime, crew)
 
-  const sessionDir = path.relative(configDir, path.resolve(repoRoot, sessionDirRoot))
-  const expertiseDir = path.relative(configDir, path.resolve(repoRoot, `.${runtime}/crew/${crew.id}/expertise`))
+  const sessionDir = path.relative(configDir, path.resolve(workspaceRoot, sessionDirRoot))
+  const expertiseDir = path.relative(configDir, path.resolve(workspaceRoot, `.${runtime}/crew/${crew.id}/expertise`))
   const doc = {
     name: `${titleCase(crew.id)}MultiTeam`,
     ...crewRuntimeMetadata(crew),
@@ -1033,6 +1069,7 @@ const jsonOutput = argv.includes("--json")
 const raw = readFileSync(metaConfigPath, "utf-8")
 const metaDoc = YAML.parse(raw)
 const records = []
+const activeRuntimes = detectActiveRuntimes()
 
 if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   fail("meta-agents.yaml has no crews")
@@ -1040,40 +1077,52 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
   let allGood = true
 
   for (const crew of metaDoc.crews) {
-    const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
-    const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
-    const codexYaml = buildRuntimeCrewDoc(metaDoc, crew, "codex")
-    const kiloYaml = buildRuntimeCrewDoc(metaDoc, crew, "kilo")
-    const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
-    const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
-    const hermesConfig = buildHermesRuntimeConfig(metaDoc, crew)
-
-    const piPath = path.join(repoRoot, ".pi", "crew", crew.id, "multi-team.yaml")
-    const claudePath = path.join(repoRoot, ".claude", "crew", crew.id, "multi-team.yaml")
-    const codexPath = path.join(repoRoot, ".codex", "crew", crew.id, "multi-team.yaml")
-    const kiloPath = path.join(repoRoot, ".kilo", "crew", crew.id, "multi-team.yaml")
-    const opencodeCrewPath = path.join(repoRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
-    const hermesCrewPath = path.join(repoRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
-    const hermesConfigPath = path.join(repoRoot, ".hermes", "crew", crew.id, "config.yaml")
-
-    allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(codexPath, codexYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(kiloPath, kiloYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
-    allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
-    allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "codex", mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
-    allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
-    allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
-    for (const rt of ["pi", "claude", "codex", "kilo", "opencode", "hermes"]) {
+    allGood = syncWorkspaceExpertiseCatalog(crew, mode, records, jsonOutput) && allGood
+    if (activeRuntimes.includes("pi")) {
+      const piYaml = buildRuntimeCrewDoc(metaDoc, crew, "pi")
+      const piPath = path.join(workspaceRoot, ".pi", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(piPath, piYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "pi", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("claude")) {
+      const claudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "claude")
+      const claudePath = path.join(workspaceRoot, ".claude", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(claudePath, claudeYaml, mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("codex")) {
+      const codexYaml = buildRuntimeCrewDoc(metaDoc, crew, "codex")
+      const codexPath = path.join(workspaceRoot, ".codex", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(codexPath, codexYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "codex", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("kilo")) {
+      const kiloYaml = buildRuntimeCrewDoc(metaDoc, crew, "kilo")
+      const kiloPath = path.join(workspaceRoot, ".kilo", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(kiloPath, kiloYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "kilo", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("opencode")) {
+      const opencodeYaml = buildRuntimeCrewDoc(metaDoc, crew, "opencode")
+      const opencodeCrewPath = path.join(workspaceRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
+      allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("hermes")) {
+      const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
+      const hermesConfig = buildHermesRuntimeConfig(metaDoc, crew)
+      const hermesCrewPath = path.join(workspaceRoot, ".hermes", "crew", crew.id, "multi-team.yaml")
+      const hermesConfigPath = path.join(workspaceRoot, ".hermes", "crew", crew.id, "config.yaml")
+      allGood = writeOrCheck(hermesCrewPath, hermesYaml, mode, records, jsonOutput) && allGood
+      allGood = writeOrCheck(hermesConfigPath, hermesConfig, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "hermes", mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("pi")) {
+      allGood = ensurePiThemes(mode, records, jsonOutput) && allGood
+    }
+    for (const rt of activeRuntimes) {
       allGood = ensureRuntimeSkills(rt, mode, records, jsonOutput) && allGood
     }
-
-    if (!checkOnly) {
+    if (!checkOnly && activeRuntimes.includes("hermes")) {
       ensureHermesArtifacts(crew)
     }
   }

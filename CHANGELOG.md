@@ -4,7 +4,79 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
-## [0.8.0] - 2026-04-18
+## [0.8.0]
+
+### Added
+- Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
+- Workspace-aware root resolution so a global `mah` command operates on the current repo instead of the package install directory
+- `meta-agents-harness` packaging alias and install scripts for local/global usage
+- `npm run stitch:secrets` to populate `GOOGLE_CLOUD_PROJECT` and `STITCH_ACCESS_TOKEN` directly in the target repo `.env` without overwriting the rest of the file
+- Caveman skill suite (`caveman`, `caveman-commit`, `caveman-compress`, `caveman-help`, `caveman-review`) registered on all agents across all teams
+- `.env.stitch` added to `.gitignore` to prevent credential leaks
+- Regression test for YAML scalar round-trip backslash preservation
+
+- **Expertise Integration (4-phase)** — seed→evidence→sync→governance pipeline connecting agent runtime learnings (System A) to structured catalog metadata (System B)
+- `mah expertise seed` CLI command — generates populated v1 expertise catalog entries from `meta-agents.yaml` agent definitions with role-specific capabilities, domains, confidence, lifecycle, and trust tier
+- `mah expertise sync` CLI command — bridges evidence store + agent learnings into catalog confidence updates and capability discovery from System A keyword scanning
+- `mah expertise apply-proposal <file>` CLI command — applies approved governance proposals to catalog with stale detection, actor authorization, and registry rebuild
+- `mah expertise lifecycle <id> --to <state>` CLI command — governed lifecycle state transitions with authorization and evidence requirements
+- `mah expertise export <id> --with-evidence` — bundles evidence metrics (invocation count, success rate, latency) into export payload
+- Evidence recording in pi runtime — `delegate_agent` and `delegate_agents_parallel` in `multi-team.ts` now record delegation outcomes to the evidence store after each completion
+- `scripts/expertise-seed.mjs` — catalog seeding with capability/domain derivation from agent identity
+- `scripts/expertise-sync.mjs` — sync bridge reading evidence + System A learnings, computing confidence, discovering capabilities
+- `scripts/expertise-apply-proposal.mjs` — proposal application with stale detection and actor auth
+- `scripts/expertise-lifecycle-cli.mjs` — lifecycle transition CLI wrapping the state machine
+- `scripts/expertise-export.mjs` enhanced — optional `includeEvidence` for metrics bundling
+- `.claude/scripts/update-expertise-model-mcp.mjs` — MCP stdio server for opencode/claude-code runtimes exposing `update-expertise-model` tool
+- `tests/expertise/evidence-recording.test.mjs` — 3 tests for runtime evidence recording
+- `tests/expertise/expertise-sync.test.mjs` — 4 tests for sync bridge
+- `tests/expertise/expertise-governance.test.mjs` — 6 tests for governance surfaces
+- `tests/expertise/update-expertise-model-mcp.test.mjs` — 18 tests for MCP script (YAML round-trip, category normalization, byte limit)
+
+### Changed
+- Runtime detection now follows a stricter plugin-first model: forced runtime flags and repository markers only
+- Detection no longer infers a runtime from an executable on `PATH` when the workspace has no runtime markers
+- Runtime terminology across docs and loader output now uses plugin-based language instead of built-in/core runtime wording
+- Bundled runtime plugins remain prioritized over installed plugins with the same name
+- Skill path resolution now uses a convention-based default (`skills/<skill-slug>/SKILL.md`) instead of a per-runtime matrix in `meta-agents.yaml`
+- Expertise catalog resolution is now workspace-local only, and reports workspace paths instead of package-repo paths
+- Orchestrator model updated from `glm-5-turbo` to `glm-5`
+- Skill sync now copies entire skill directories (including scripts) instead of only `SKILL.md`
+- Agent skill injection preserves existing `use-when` metadata from frontmatter instead of overwriting
+- Model resolution for opencode and kilo runtimes returns raw catalog model IDs (no normalization)
+- `detectRuntime` now walks up the directory tree to find markers (stops at HOME boundary)
+- Smoke tests strip `MAH_RUNTIME` and related env vars so marker detection tests work in any environment
+- Skill list assertions in tests use subset checks instead of exact match
+
+- Expertise catalog now seeded with role-specific capabilities for all 10 agents — routing engine (`mah expertise recommend`, `mah expertise explain`) returns scored recommendations instead of falling back
+- Expertise catalog schema upgraded from empty shells to full v1 schema with `id`, `owner`, `capabilities`, `domains`, `confidence`, `validation_status`, `lifecycle`, `trust_tier`, `policy`
+
+### Fixed
+- Expertise YAML scalar serialization used double-quote style with backslash escaping but the parser never unescaped, causing `\\` to double on every load→save cycle. Switched to single-quote style with proper unescaping in both `parseScalarToken` and `parseInlineArray`
+- `mah detect` now walks up from nested directories to find runtime markers
+- `mah detect` no longer leaks markers from HOME into subdirectory workspaces
+- Empty workspaces now return `runtime=unknown` and `reason=none` instead of inheriting markers from the home directory
+- Global `mah sync` and related script dispatch now resolve package-owned script paths instead of expecting a local `scripts/` directory in the target repo
+- `mah init` now writes `.mcp.json` and runtime markers into the caller repo instead of the MAH package directory
+- `mah sync` now materializes only the runtime markers present in the current repo
+- `mah generate` / `mah expertise list` now operate on workspace-local `.mah` artifacts and no longer depend on a cloned MAH repository
+- Global installs now clear stale `~/.mah/expertise/catalog` and `registry.json` leftovers instead of reseeding expertise from the package
+- `mah init --ai` now forwards AI bootstrap flags to the bootstrap script and uses the bundled `bootstrap` skill instead of the retired `bootstrap-config-architect` name
+- AI-assisted `mah init` now tries available runtimes in priority order (`opencode`, `codex`, `kilo`, `pi`) instead of getting stuck on a failing `pi` first
+- Added regression coverage for AI bootstrap runtime selection so later runtimes can take over when earlier ones fail
+- `mah run` for PI now falls back to the MAH package's bundled `extensions/` assets when the current repo does not have local extension files
+- The custom `multi-team.yaml` parser now keeps all teams when list items wrap across multiple lines, so PI multi-team runs surface every lead instead of truncating after the first team
+- MCP bridge tool calls now return controlled timeout errors instead of throwing out of the runtime, and Stitch gets a longer per-request timeout in PI MCP config
+- Increased the PI Stitch MCP timeout again for long-running `generate_screen_from_text` calls
+- Added regression coverage for the PI theme overlay registration so the global settings expose `~/.mah/extensions/themes`
+- Added regression coverage for `mah run -c` resolving PI extensions from `~/.mah`
+
+- Expertise skill SKILL.md now includes `## Where Is Your File` section pointing agents to `Declared expertise file` in Agent Contract — agents can now locate their expertise file
+- `persistArtifact` in `multi-team.ts` now returns repo-root-relative paths instead of session-relative paths — `read()` resolves correctly from repo root
+- `deriveCapabilities` in `expertise-seed.mjs` uses `agent.id` not `agent.role` — role is generic (worker/lead), id is specific (backend-dev)
+- `.claude/scripts/update-expertise-model-mcp.mjs` YAML handling replaced hand-rolled regex parser with `yaml.parse()`/`yaml.stringify()` — fixes round-trip data loss, quote escaping, multiline notes
+- MCP script replaced mixed `require("fs")` with top-level `readdirSync` import for ESM compatibility
+- Registry `.mah/expertise/registry.json` no longer points to stale `/tmp/` paths — seeded entries use workspace-relative catalog roots
 
 ### Added
 - **Context Memory Engine (M4 — PR1+PR2+PR3+PR4)** — new canonical layer for operational context retrieval, separate from Expertise routing

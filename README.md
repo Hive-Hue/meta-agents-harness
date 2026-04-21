@@ -105,9 +105,10 @@ Detection currently follows this priority:
 
 1. forced runtime via `--runtime`, `-r`, `-f`, or `MAH_RUNTIME`
 2. runtime marker directory in the repository (`.pi`, `.claude`, `.opencode`, `.hermes`)
-3. installed runtime executable or compatibility shim available in the environment
 
-This allows the same repository to remain runtime-aware while preserving explicit overrides for CI, local debugging, or controlled execution.
+If no runtime marker is present, detection returns `unknown` unless you force a runtime explicitly.
+
+These defaults are internal to MAH. New `meta-agents.yaml` files no longer need a `runtime_detection` block unless you are overriding the standard behavior.
 
 ---
 
@@ -137,7 +138,7 @@ mah plugins uninstall <name>         # remove an installed plugin
 
 Installed plugins persist across MAH updates. See [`docs/plugin-api.md`](./docs/plugin-api.md) for the full plugin contract, manifest format, discovery mechanism, and CLI API.
 
-Plugins can be wrapper-based or core-integrated. In the core-integrated model, MAH owns crew state and generated artifacts, and the plugin only maps that context into the runtime's direct CLI.
+Plugins can be wrapper-based or MAH-managed. In the MAH-managed model, MAH owns crew state and generated artifacts, and the plugin only maps that context into the runtime's direct CLI.
 
 ---
 
@@ -191,13 +192,13 @@ The project uses `meta-agents.yaml` as the canonical multi-runtime configuration
 
 This config is used to define:
 
-- runtime detection metadata
+- runtime detection behavior (internal defaults)
 - runtime-specific config roots and optional runtime entrypoint overrides
 - model catalog and fallbacks
-- skill references
+- skill references resolved by convention
 - domain profiles
 - multi-team crew topology
-- runtime overrides and mapping rules
+- runtime overrides
 
 ### 3. Generated runtime artifacts
 
@@ -250,12 +251,14 @@ See [`docs/hermes/`](./docs/hermes/) for the complete Hermes integration guide.
 
 In `v0.7.0`, the expertise model is treated as an operational foundation concept:
 
-- canonical catalog loading by expertise id
+- canonical catalog loading by expertise id from the workspace-local `.mah/expertise/catalog`
 - evidence-backed routing and explainability
 - validation, lifecycle, export/import, and governance boundaries
 - runtime evidence storage that can be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`
 
-The checked-in `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
+`mah generate`, `mah sync`, and `mah expertise list` do not depend on a cloned MAH repo. The global install prepares `~/.mah/` with the canonical skills, extensions, plugins, and themes, while each workspace gets its own generated `.mah/` expertise catalog, cache, and evidence tree as needed.
+
+The workspace-local `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
 
 See: `docs/expertise-model-foundation.md`
 
@@ -372,13 +375,26 @@ node bin/mah --help
 Or install it globally:
 
 ```bash
-npm install -g .
+npm run install:global
 ```
+
+This prepares `~/.mah/` with the default MAH assets. MAH prefers that global overlay first, then complements it with any local repo assets that exist:
+
+- `skills/`
+- `extensions/`
+- `mah-plugins/`
+- `scripts/`
 
 Then:
 
 ```bash
 mah --help
+```
+
+You can also invoke the package name directly after a global install:
+
+```bash
+meta-agents-harness --help
 ```
 
 ---
@@ -484,7 +500,9 @@ The repository includes:
 - [`examples/crew-dev.complete.example.yaml`](./examples/crew-dev.complete.example.yaml)
 - [`examples/crew-marketing.complete.example.yaml`](./examples/crew-marketing.complete.example.yaml)
 
-Use these files to understand and author crew topology, model mapping, skill references, and runtime-specific overrides.
+Use these files to understand and author crew topology, model mapping, agent skill refs, and runtime-specific overrides.
+
+Skill paths are resolved by convention: a skill ref like `context_memory` maps to `skills/context-memory/SKILL.md` internally, and `context_memory` is applied as a default MAH skill without needing any catalog skill map.
 
 ---
 
@@ -582,7 +600,7 @@ Boundary details are documented in `docs/runtime-boundary.md`.
 
 A runtime should be represented as an explicit contract rather than implicit command branching scattered through the dispatcher. MAH now supports two integration styles:
 
-- core-integrated runtimes, where MAH manages crew state, generated tree lookup, and run preparation before calling the runtime CLI directly
+- MAH-managed runtimes, where MAH manages crew state, generated tree lookup, and run preparation before calling the runtime CLI directly
 - compatibility-shim runtimes, where a repo-local wrapper still bridges missing runtime primitives
 
 Illustrative direction:
@@ -599,7 +617,7 @@ interface RuntimeAdapter {
 }
 ```
 
-`plugins/runtime-kilo` is the reference plugin for the core-integrated model in this branch. The built-in runtimes (`pi`, `claude`, `opencode`, `hermes`) now follow the same MAH-owned orchestration path, with wrappers kept only as an optional compatibility escape hatch for future runtimes that may need them.
+`plugins/runtime-kilo` is the reference plugin for the MAH-managed model in this branch. The bundled runtime plugins (`pi`, `claude`, `opencode`, `hermes`) follow the same orchestration path, with wrappers kept only as an optional compatibility escape hatch for future plugins that may need them.
 
 ---
 
@@ -623,7 +641,7 @@ It is the best branch to inspect for **roadmap**, **direction**, and **product a
 Possible causes:
 
 - the repository has no `.pi`, `.claude`, `.opencode`, or `.hermes` marker
-- no relevant runtime executable is available
+- no relevant runtime plugin is present
 - no explicit `--runtime` was passed
 
 Try:
@@ -638,7 +656,7 @@ mah --runtime opencode detect
 Try:
 
 - running `npm run setup`
-- verifying runtime executable or optional wrapper availability
+- verifying runtime plugin presence and optional wrapper availability
 - forcing a known runtime explicitly
 
 ### MCP configuration missing
@@ -681,8 +699,10 @@ node bin/mah --help
 Or install globally:
 
 ```bash
-npm install -g .
+npm run install:global
 ```
+
+That prepares `~/.mah/` with the default MAH assets and makes the global `mah` entrypoint available. MAH prefers the global overlay first and uses local repo assets only as a complement when a global asset is absent.
 
 ---
 
