@@ -29,7 +29,6 @@ Tiered compression for MAH crew communication.
 - Orchestrator translates wenyan-full → ultra before showing user.
 - Code blocks, diffs, commit messages: **never compressed**. Exact syntax.
 - Security warnings, destructive ops: drop compression, full clarity, resume after.
-- Every agent that delegates to children MUST forward the [CAVEMAN_CREW] block verbatim. Stripping it breaks the chain.
 
 ## Injection
 
@@ -45,7 +44,6 @@ Rules: drop articles, filler, pleasantries, hedging. Classical Chinese register.
 Classical particles (之/乃/為/其). Technical terms exact. Code blocks unchanged.
 Fragments OK. One word when one word enough.
 Drop for: security warnings, destructive ops, clarification requests. Resume after.
-Propagation: if you delegate to child agents, append this entire [CAVEMAN_CREW] block verbatim to every child task. Do not strip or summarize it.
 [/CAVEMAN_CREW]
 ```
 

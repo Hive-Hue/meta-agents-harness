@@ -4,6 +4,35 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
+## [Unreleased]
+
+### Fixed
+
+- `mah run --headless` completely overhauled for correct non-interactive execution across all runtimes
+- PI headless now uses native `-p` flag instead of incorrect `run` subcommand
+- Claude headless now uses native `-p` flag instead of `--print --no-session-persistence`
+- Kilo headless now uses native `run` subcommand instead of incorrect `--no-interactive` flag
+- Hermes headless splash output automatically stripped for clean response
+- `dispatchHeadless` now correctly passes `task` to adapter `prepareHeadlessRunContext`
+- `--` end-of-options separator stripped from passthrough to prevent runtime confusion
+- PI headless adapter now loads default extensions (was missing entirely)
+- `process.exit()` replaces `return` in headless path to prevent event loop hang
+- Headless `runCommand` uses `stdio: ["ignore", "pipe", "pipe"]` to prevent stdin blocking
+- `main()` made async to support headless await paths
+- `mah plugins install` now supports `--force` flag for reinstalling existing plugins
+- Plugin ownership guardrail: engineering team cannot write `mah-plugins/` — requires manual sync or `mah plugins install --force`
+
+### Changed
+
+- `docs/headless-runtime.md` rewritten with accurate runtime-specific headless flags
+- `docs/plugin-api.md` headless capability section updated with implementation guidance
+- Runtime headless adapters: PI, Claude, Kilo, Hermes all use native non-interactive CLI flags
+- `plugins/runtime-*/index.mjs` and `scripts/runtime-core-integrations.mjs` headless args updated
+
+### Added
+
+- `tests/headless-bugs.test.mjs` — tests for `--` stripping, task propagation, and PI extension loading
+
 ## [0.8.0] - 2026-04-21
 
 ### Added

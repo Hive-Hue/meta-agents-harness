@@ -27,7 +27,7 @@ async function createTempPlugin(tempDir, name, pluginJson, indexContent) {
 }
 
 // Helper to create a valid runtimePlugin export string
-function validRuntimePluginExport(name = "test", version = "0.1.0", mahVersion = "^0.5.0") {
+function validRuntimePluginExport(name = "test", version = "0.1.0", mahVersion = "^0.8.0") {
   return `
 export const runtimePlugin = {
   name: "${name}",
@@ -82,7 +82,7 @@ export const runtimePlugin = {
 `
 }
 
-function validCoreManagedRuntimePluginExport(name = "testcore", version = "0.1.0", mahVersion = "^0.5.0") {
+function validCoreManagedRuntimePluginExport(name = "testcore", version = "0.1.0", mahVersion = "^0.8.0") {
   return `
 export const runtimePlugin = {
   name: "${name}",
@@ -195,7 +195,7 @@ describe("plugin-loader", async () => {
       const loader = await getPluginLoader()
 
       // Use the runtime-fake fixture - pass parent dir that contains plugin subdirs
-      const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
+      const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
 
       assert.ok(loaded.some(p => p.name === "fake"), "should discover runtime-fake plugin")
       assert.ok(loaded.some(p => p.name === "codex"), "should discover runtime-codex plugin")
@@ -209,14 +209,14 @@ describe("plugin-loader", async () => {
       writeFileSync(path.join(pluginRoot, "plugin.json"), JSON.stringify({
         name: "homefake",
         version: "0.1.0",
-        mahVersion: "^0.5.0",
+        mahVersion: "^0.8.0",
         entry: "index.mjs"
       }, null, 2))
       writeFileSync(path.join(pluginRoot, "index.mjs"), `
 export const runtimePlugin = {
   name: "homefake",
   version: "0.1.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
   adapter: {
     name: "homefake",
     markerDir: ".homefake",
@@ -274,7 +274,7 @@ export const runtimePlugin = {
     it("skips plugins with version incompatibility", async () => {
       const loader = await getPluginLoader()
 
-      // runtime-fake requires ^0.5.0, so version 0.4.0 should be incompatible
+      // runtime-fake requires ^0.8.0, so version 0.4.0 should be incompatible
       const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.4.0")
 
       assert.ok(!loaded.some(p => p.name === "fake"), "should skip incompatible plugin")
@@ -283,8 +283,8 @@ export const runtimePlugin = {
     it("accepts plugins with compatible version", async () => {
       const loader = await getPluginLoader()
 
-      // runtime-fake requires ^0.5.0, version 0.6.0 should be compatible
-      const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.6.0")
+      // runtime-fake requires ^0.8.0, version 0.9.0 should be compatible
+      const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.9.0")
 
       assert.ok(loaded.some(p => p.name === "fake"), "should load compatible plugin")
     })
@@ -300,14 +300,14 @@ export const runtimePlugin = {
       writeFileSync(path.join(pluginPath, "plugin.json"), JSON.stringify({
         name: "core-managed",
         version: "0.1.0",
-        mahVersion: ">=0.5.0"
+        mahVersion: ">=0.8.0"
       }))
       writeFileSync(
         path.join(pluginPath, "index.mjs"),
-        validCoreManagedRuntimePluginExport("core-managed", "0.1.0", ">=0.5.0")
+        validCoreManagedRuntimePluginExport("core-managed", "0.1.0", ">=0.8.0")
       )
 
-      const loaded = await loader.loadPlugins([coreManagedParent], "0.5.0")
+      const loaded = await loader.loadPlugins([coreManagedParent], "0.8.0")
       const runtimes = await loader.getAllRuntimes()
 
       assert.ok(loaded.some(p => p.name === "core-managed"), "should load wrapperless plugin")
@@ -327,11 +327,11 @@ export const runtimePlugin = {
       writeFileSync(path.join(shadowingPluginPath, "plugin.json"), JSON.stringify({
         name: "pi",
         version: "0.1.0",
-        mahVersion: ">=0.5.0"
+        mahVersion: ">=0.8.0"
       }))
-      writeFileSync(path.join(shadowingPluginPath, "index.mjs"), validRuntimePluginExport("pi", "0.1.0", ">=0.5.0"))
+      writeFileSync(path.join(shadowingPluginPath, "index.mjs"), validRuntimePluginExport("pi", "0.1.0", ">=0.8.0"))
 
-      const loaded = await loader.loadPlugins([shadowingDir], "0.5.0")
+      const loaded = await loader.loadPlugins([shadowingDir], "0.8.0")
 
       // Plugin should not be loaded since the bundled runtime plugin takes priority
       assert.ok(!loaded.some(p => p.name === "pi"), "should not load plugin that shadows bundled runtime plugin")
@@ -347,18 +347,18 @@ export const runtimePlugin = {
       const plugin1Path = path.join(multiDir, "plugin1")
       mkdirSync(plugin1Path, { recursive: true })
       writeFileSync(path.join(plugin1Path, "plugin.json"), JSON.stringify({
-        name: "plugin1", version: "0.1.0", mahVersion: ">=0.5.0"
+        name: "plugin1", version: "0.1.0", mahVersion: ">=0.8.0"
       }))
-      writeFileSync(path.join(plugin1Path, "index.mjs"), validRuntimePluginExport("plugin1", "0.1.0", ">=0.5.0"))
+      writeFileSync(path.join(plugin1Path, "index.mjs"), validRuntimePluginExport("plugin1", "0.1.0", ">=0.8.0"))
 
       const plugin2Path = path.join(multiDir, "plugin2")
       mkdirSync(plugin2Path, { recursive: true })
       writeFileSync(path.join(plugin2Path, "plugin.json"), JSON.stringify({
-        name: "plugin2", version: "0.1.0", mahVersion: ">=0.5.0"
+        name: "plugin2", version: "0.1.0", mahVersion: ">=0.8.0"
       }))
-      writeFileSync(path.join(plugin2Path, "index.mjs"), validRuntimePluginExport("plugin2", "0.1.0", ">=0.5.0"))
+      writeFileSync(path.join(plugin2Path, "index.mjs"), validRuntimePluginExport("plugin2", "0.1.0", ">=0.8.0"))
 
-      const loaded = await loader.loadPlugins([multiDir], "0.5.0")
+      const loaded = await loader.loadPlugins([multiDir], "0.8.0")
 
       assert.ok(loaded.some(p => p.name === "plugin1"), "should load plugin1, got: " + loaded.map(p => p.name).join(", "))
       assert.ok(loaded.some(p => p.name === "plugin2"), "should load plugin2")
@@ -374,12 +374,12 @@ export const runtimePlugin = {
       const pluginPath = path.join(dedupParentDir, "dedup-test")
       mkdirSync(pluginPath, { recursive: true })
       writeFileSync(path.join(pluginPath, "plugin.json"), JSON.stringify({
-        name: "dedup", version: "0.1.0", mahVersion: ">=0.5.0"
+        name: "dedup", version: "0.1.0", mahVersion: ">=0.8.0"
       }))
-      writeFileSync(path.join(pluginPath, "index.mjs"), validRuntimePluginExport("dedup", "0.1.0", ">=0.5.0"))
+      writeFileSync(path.join(pluginPath, "index.mjs"), validRuntimePluginExport("dedup", "0.1.0", ">=0.8.0"))
 
       // Pass the same parent dir twice (simulating same plugin being found via two paths)
-      const loaded = await loader.loadPlugins([dedupParentDir, dedupParentDir], "0.5.0")
+      const loaded = await loader.loadPlugins([dedupParentDir, dedupParentDir], "0.8.0")
 
       const dedupPlugins = loaded.filter(p => p.name === "dedup")
       assert.ok(dedupPlugins.length === 1, "should deduplicate same path passed twice, got: " + dedupPlugins.length)
@@ -389,7 +389,7 @@ export const runtimePlugin = {
       const loader = await getPluginLoader()
 
       // Use FIXTURE_PLUGINS_DIR (the parent dir) not FIXTURE_PLUGIN (the plugin dir itself)
-      const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
+      const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
       const runtimes = await loader.getAllRuntimes()
 
       assert.ok("fake" in runtimes, "loaded plugin should be in getAllRuntimes")
@@ -414,7 +414,7 @@ export const runtimePlugin = {
     it("merges loaded plugins with bundled runtime plugins", async () => {
       const loader = await getPluginLoader()
 
-      await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
+      await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
       const runtimes = await loader.getAllRuntimes()
 
       assert.ok("fake" in runtimes, "should include loaded plugin fake")
@@ -428,10 +428,10 @@ export const runtimePlugin = {
       const shadowingPath = await createTempPlugin(TEMP_DIR, "override-attempt", {
         name: "pi",
         version: "99.0.0",
-        mahVersion: "^0.5.0"
-      }, validRuntimePluginExport("pi", "99.0.0", "^0.5.0"))
+        mahVersion: "^0.8.0"
+      }, validRuntimePluginExport("pi", "99.0.0", "^0.8.0"))
 
-      await loader.loadPlugins([shadowingPath], "0.5.0")
+      await loader.loadPlugins([shadowingPath], "0.8.0")
       const runtimes = await loader.getAllRuntimes()
 
       // The bundled adapter should still be there (not the plugin's)
@@ -489,7 +489,7 @@ export const runtimePlugin = {
       const noExportPath = await createTempPlugin(TEMP_DIR, "no-export", {
         name: "noexport",
         version: "0.1.0",
-        mahVersion: "^0.5.0"
+        mahVersion: "^0.8.0"
       }, `
 // No runtimePlugin export here
 export const somethingElse = {}
@@ -543,8 +543,8 @@ export const somethingElse = {}
       const shadowPath = await createTempPlugin(TEMP_DIR, "shadow-warning", {
         name: "pi",
         version: "0.1.0",
-        mahVersion: "^0.5.0"
-      }, validRuntimePluginExport("pi", "0.1.0", "^0.5.0"))
+        mahVersion: "^0.8.0"
+      }, validRuntimePluginExport("pi", "0.1.0", "^0.8.0"))
 
       const result = await loader.validatePlugin(shadowPath)
 
@@ -560,7 +560,7 @@ export const somethingElse = {}
       const loader = await getPluginLoader()
 
       // Load a plugin first
-      await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
+      await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
 
       // Verify it's in the registry
       let runtimes = await loader.getAllRuntimes()
@@ -643,7 +643,7 @@ export { teardownCalled }
 `)
 
       // Note: we need to pass the parent temp dir and load from there
-      await loader.loadPlugins([TEMP_DIR], "0.5.0")
+      await loader.loadPlugins([TEMP_DIR], "0.8.0")
       const unloaded = loader.unloadPlugin("teardownplugin")
 
       assert.ok(unloaded, "should unload plugin with teardown")
@@ -655,10 +655,10 @@ export { teardownCalled }
       const loader = await getPluginLoader()
 
       // Load, unload, reload
-      await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
+      await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
       loader.unloadPlugin("fake")
 
-      const reloaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.5.0")
+      const reloaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
 
       assert.ok(reloaded.some(p => p.name === "fake"), "should be able to reload plugin after unload")
     })
@@ -673,7 +673,7 @@ export { teardownCalled }
 
       // This test verifies discovery mechanism works
       // We pass an empty array for mah-plugins paths so only node_modules is scanned
-      const loaded = await loader.loadPlugins([], "0.5.0")
+      const loaded = await loader.loadPlugins([], "0.8.0")
 
       // If there are any @mah/runtime-* packages in node_modules, they would be loaded
       // We just verify the function returns without error and structure is correct

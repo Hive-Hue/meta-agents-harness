@@ -322,7 +322,7 @@ export const runtimePlugin = {
   // --- Identification ---
   name: "kilo",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   // --- RuntimeAdapter ---
   adapter: {
@@ -456,7 +456,7 @@ export const runtimePlugin = {
       return {
         ok: true,
         exec: this.directCli,
-        args: ["--no-interactive"],
+        args: ["run"],
         passthrough: task ? [task] : argv,
         envOverrides: {
           ...envOverrides,

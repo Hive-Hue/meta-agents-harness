@@ -201,7 +201,7 @@ function buildClaudeAgents(repoRoot, configPath, config, fullPrompts, strictHier
 export const runtimePlugin = {
   name: "claude",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   adapter: {
     name: "claude",
@@ -218,7 +218,7 @@ export const runtimePlugin = {
       sessionRootFlag: false,
       sessionMirrorFlag: true,
       sessionContinueArgs: ["--continue"],
-      sessionNoneArgs: ["--print", "--no-session-persistence"],
+      sessionNoneArgs: ["-p"],
       headless: {
         supported: true,
         native: true,
@@ -296,7 +296,7 @@ export const runtimePlugin = {
       return {
         ok: true,
         exec: "claude",
-        args: ["--print", "--no-session-persistence"],
+        args: ["-p"],
         passthrough: task ? [task] : argv,
         envOverrides: {
           ...envOverrides,

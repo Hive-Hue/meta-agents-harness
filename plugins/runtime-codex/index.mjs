@@ -369,7 +369,7 @@ function buildCodexRunContext({ repoRoot, crew, configPath, argv = [], envOverri
 export const runtimePlugin = {
   name: "codex",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   adapter: {
     name: "codex",

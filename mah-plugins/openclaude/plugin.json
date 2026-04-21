@@ -1,0 +1,12 @@
+{
+  "name": "openclaude",
+  "version": "1.0.0",
+  "mahVersion": "^0.8.0",
+  "markerDir": ".openclaude",
+  "directCli": "openclaude",
+  "wrapper": null,
+  "configRoot": ".openclaude",
+  "configPattern": ".openclaude/crew/<crew>/multi-team.yaml",
+  "entry": "index.mjs",
+  "description": "OpenClaude runtime plugin. Integrates the openclaude CLI (multi-provider Claude Code fork) with MAH core-managed crew context, sessions, and provider configuration."
+}

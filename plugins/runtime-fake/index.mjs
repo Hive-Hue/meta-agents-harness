@@ -72,7 +72,7 @@ const adapter = createFakeAdapter({
 export const runtimePlugin = {
   name: "fake",
   version: "0.0.1",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
   adapter,
   init(ctx) {
     // called after loading successful

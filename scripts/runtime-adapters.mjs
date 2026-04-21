@@ -3,26 +3,31 @@ import path from "node:path"
 import {
   activateClaudeCrewState,
   activateHermesCrewState,
+  activateOpenclaudeCrewState,
   activateOpencodeCrewState,
   activatePiCrewState,
   clearClaudeCrewState,
   clearHermesCrewState,
+  clearOpenclaudeCrewState,
   clearOpencodeCrewState,
   clearPiCrewState,
   executeClaudePreparedRun,
   executeHermesPreparedRun,
+  executeOpenclaudePreparedRun,
   executeOpencodePreparedRun,
   prepareClaudeHeadlessRunContext,
   prepareClaudeRunContext,
   prepareHermesHeadlessRunContext,
   prepareHermesRunContext,
+  prepareOpenclaudeHeadlessRunContext,
+  prepareOpenclaudeRunContext,
   prepareOpencodeHeadlessRunContext,
   prepareOpencodeRunContext,
   preparePiHeadlessRunContext,
   preparePiRunContext
 } from "./runtime-core-integrations.mjs"
 
-export const RUNTIME_ORDER = ["pi", "claude", "opencode", "hermes"]
+export const RUNTIME_ORDER = ["pi", "claude", "opencode", "openclaude", "hermes"]
 
 function variantPathExists(candidatePath) {
   if (!candidatePath || typeof candidatePath !== "string") return false
@@ -239,6 +244,56 @@ export const RUNTIME_ADAPTERS = {
     },
     prepareHeadlessRunContext(context) {
       return prepareOpencodeHeadlessRunContext(context)
+    }
+  }),
+  openclaude: createAdapter({
+    name: "openclaude",
+    markerDir: ".openclaude",
+    configPattern: ".openclaude/crew/<crew>/multi-team.yaml",
+    wrapper: null,
+    directCli: "openclaude",
+    capabilities: {
+      sessionModeNew: false,
+      sessionModeContinue: true,
+      sessionModeNone: true,
+      sessionIdFlag: "--session-id",
+      sessionRootFlag: false,
+      sessionMirrorFlag: true,
+      sessionContinueArgs: ["--continue"],
+      sessionNoneArgs: ["-p"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
+    },
+    supportsSessions: true,
+    sessionListCommand: null,
+    sessionExportCommand: null,
+    sessionDeleteCommand: null,
+    supportsSessionNew: false,
+    commands: {
+      doctor: [["openclaude", ["--help"]]],
+      "check:runtime": [["openclaude", ["--help"]]],
+      validate: [["openclaude", ["--help"]]],
+      "validate:runtime": [["openclaude", ["--help"]]]
+    },
+    activateCrew(context) {
+      return activateOpenclaudeCrewState(context)
+    },
+    clearCrewState(context) {
+      return clearOpenclaudeCrewState(context)
+    },
+    prepareRunContext(context) {
+      return prepareOpenclaudeRunContext(context)
+    },
+    executePreparedRun(context) {
+      return executeOpenclaudePreparedRun(context)
+    },
+    prepareHeadlessRunContext(context) {
+      return prepareOpenclaudeHeadlessRunContext(context)
     }
   }),
   hermes: createAdapter({

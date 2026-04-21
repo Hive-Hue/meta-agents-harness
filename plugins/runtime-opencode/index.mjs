@@ -135,7 +135,7 @@ function materializeOpencodeAgents(repoRoot, crew, hierarchy) {
 export const runtimePlugin = {
   name: "opencode",
   version: "1.0.0",
-  mahVersion: "^0.5.0",
+  mahVersion: "^0.8.0",
 
   adapter: {
     name: "opencode",

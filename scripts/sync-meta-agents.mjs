@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename)
 const packageRoot = path.resolve(__dirname, "..")
 const workspaceRoot = process.cwd()
 const metaConfigPath = path.join(workspaceRoot, "meta-agents.yaml")
-const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "hermes"]
+const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "openclaude", "hermes"]
 const runtimeMarkerRoots = Object.fromEntries(managedRuntimes.map((runtime) => [runtime, `.${runtime}`]))
 const defaultSharedSkills = ["context_memory"]
 
@@ -137,6 +137,9 @@ function runtimeSessionDirRoot(runtime, crew) {
   }
   if (runtime === "kilo") {
     return crew.session?.kilo_root || `.${runtime}/crew/${crew.id}/sessions`
+  }
+  if (runtime === "openclaude") {
+    return crew.session?.openclaude_root || `.${runtime}/crew/${crew.id}/sessions`
   }
   return crew.session?.opencode_root || `.opencode/crew/${crew.id}/sessions`
 }
@@ -1106,6 +1109,12 @@ if (!Array.isArray(metaDoc?.crews) || metaDoc.crews.length === 0) {
       const opencodeCrewPath = path.join(workspaceRoot, ".opencode", "crew", crew.id, "multi-team.yaml")
       allGood = writeOrCheck(opencodeCrewPath, opencodeYaml, mode, records, jsonOutput) && allGood
       allGood = ensureOpencodeArtifacts(crew, mode, records, jsonOutput) && allGood
+    }
+    if (activeRuntimes.includes("openclaude")) {
+      const openclaudeYaml = buildRuntimeCrewDoc(metaDoc, crew, "openclaude")
+      const openclaudeCrewPath = path.join(workspaceRoot, ".openclaude", "crew", crew.id, "multi-team.yaml")
+      allGood = writeOrCheck(openclaudeCrewPath, openclaudeYaml, mode, records, jsonOutput) && allGood
+      allGood = syncRuntimePrompts(metaDoc, crew, "openclaude", mode, records, jsonOutput) && allGood
     }
     if (activeRuntimes.includes("hermes")) {
       const hermesYaml = buildRuntimeCrewDoc(metaDoc, crew, "hermes")
