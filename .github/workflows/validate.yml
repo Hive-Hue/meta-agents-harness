@@ -40,5 +40,8 @@ jobs:
       - name: Validate canonical config
         run: npm run validate:config
 
+      - name: Run expertise integration tests
+        run: node --test tests/expertise/*.test.mjs
+
       - name: Validate canonical sync drift
         run: npm run check:meta-sync
