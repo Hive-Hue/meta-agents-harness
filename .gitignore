@@ -44,3 +44,11 @@ tmp/
 .playwright-cli/
 .mah/
 .env.stitch
+
+.openclaude-profile.json
+.claude-profile.json
+.pi-profile.json
+.hermes-profile.json
+.kilo-profile.json
+.opencode-profile.json
+*-profile.json
