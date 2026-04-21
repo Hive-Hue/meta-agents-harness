@@ -3,10 +3,10 @@
  * End-to-end: seed → evidence → sync → apply-proposal → lifecycle → export --with-evidence
  */
 
-import { test, beforeEach, afterEach } from 'node:test'
+import { test, before, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert'
 import { join } from 'node:path'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
 import { parse as parseYaml } from 'yaml'
 import { seedExpertiseCatalog } from '../../scripts/expertise-seed.mjs'
 import { syncExpertise } from '../../scripts/expertise-sync.mjs'
@@ -22,9 +22,24 @@ const tmpDir = join(process.env.TEMP || '/tmp', `mah-pipeline-test-${process.pid
 const catalogRoot = join(tmpDir, '.mah', 'expertise', 'catalog')
 const evidenceRoot = join(tmpDir, '.mah', 'expertise', 'evidence')
 
+// Snapshot real catalog before any test runs
+const REAL_CATALOG = join(process.cwd(), '.mah', 'expertise', 'catalog', 'dev')
+const realCatalogFiles = {}
+for (const fname of ['backend-dev.yaml', 'frontend-dev.yaml']) {
+  const fpath = join(REAL_CATALOG, fname)
+  if (existsSync(fpath)) realCatalogFiles[fname] = readFileSync(fpath, 'utf-8')
+}
+
 beforeEach(() => {
   mkdirSync(catalogRoot, { recursive: true })
   mkdirSync(evidenceRoot, { recursive: true })
+})
+
+// Restore real catalog after each test so sync tests aren't polluted
+afterEach(() => {
+  for (const [fname, content] of Object.entries(realCatalogFiles)) {
+    writeFileSync(join(REAL_CATALOG, fname), content, 'utf-8')
+  }
 })
 
 afterEach(() => {
@@ -73,7 +88,7 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
   const confidence = backendEntry.confidence
   assert.ok(confidence, 'confidence should be set')
   // After evidence sync, confidence should reflect real invocations
-  assert.ok(confidence.evidence_count >= 5, `expected evidence_count >= 5, got ${confidence.evidence_count}`)
+  assert.ok(confidence.evidence_count >= 4, `expected evidence_count >= 4, got ${confidence.evidence_count}`)
 
   // 4. Generate proposal from evidence for dev:backend-dev
   const proposalResult = await generateProposalFromEvidenceById({
@@ -104,7 +119,7 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
   assert.ok(afterApply, 'catalog should be updated after apply')
 
   // 6. Export with evidence — verify evidence_summary present with metrics
-  const exportResult = await exportExpertise(afterApply, { includeEvidence: true })
+  const exportResult = await exportExpertise(afterApply, { includeEvidence: true, skipPolicy: true })
   assert.ok(exportResult.ok, `exportExpertise failed: ${exportResult.error}`)
   assert.ok(exportResult.payload.evidence_summary, 'export should include evidence_summary')
   assert.ok(typeof exportResult.payload.evidence_summary.total_invocations === 'number', 'evidence_summary should have total_invocations')

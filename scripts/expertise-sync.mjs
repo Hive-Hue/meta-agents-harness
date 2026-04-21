@@ -13,6 +13,7 @@ import { resolveMahHome } from './mah-home.mjs'
 import { resolveWorkspaceRoot } from './workspace-root.mjs'
 
 const workspaceRoot = resolveWorkspaceRoot()
+const V1_FIELDS = ['id', 'schema_version', 'owner', 'capabilities', 'domains', 'input_contract', 'allowed_environments', 'validation_status', 'confidence', 'trust_tier', 'lifecycle', 'policy', 'evidence_refs', 'metadata']
 
 // Keyword → capability mapping
 const CAPABILITY_KEYWORDS = [
@@ -131,7 +132,11 @@ export async function syncExpertiseEntry(crew, agentId, options = {}) {
   }
 
   if (changed && !dryRun) {
-    writeFileSync(catalogPath, stringifyYaml(catalog, { indent: 2, lineWidth: 0 }), 'utf-8')
+    const cleanCatalog = {}
+    for (const key of V1_FIELDS) {
+      if (key in catalog) cleanCatalog[key] = catalog[key]
+    }
+    writeFileSync(catalogPath, stringifyYaml(cleanCatalog, { indent: 2, lineWidth: 0 }), 'utf-8')
   }
 
   return { skipped: false, changed, changes }
