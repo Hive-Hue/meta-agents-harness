@@ -173,7 +173,7 @@ export function checkExportPolicy(expertise, options = {}) {
  * @param {{ domain?: string, skipPolicy?: boolean }} [options]
  * @returns {{ ok: boolean, payload?: Object, error?: string, warnings?: string[] }}
  */
-export function exportExpertise(expertise, options = {}) {
+export async function exportExpertise(expertise, options = {}) {
   /** @type {string[]} */
   const warnings = []
 
@@ -216,6 +216,20 @@ export function exportExpertise(expertise, options = {}) {
     },
   }
 
+  if (options.includeEvidence) {
+    const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
+    await loadEvidenceFor(expertise.id, { limit: 10 })
+    const metrics = await computeMetrics(expertise.id)
+    payload.evidence_summary = {
+      total_invocations: metrics.total_invocations,
+      success_rate: metrics.total_invocations > 0
+        ? Math.round((metrics.successful_invocations / metrics.total_invocations) * 100) / 100
+        : 0,
+      avg_latency_ms: Math.round(metrics.avg_duration_ms),
+      last_invoked: metrics.last_invoked,
+    }
+  }
+
   return { ok: true, payload, warnings }
 }
 
@@ -226,14 +240,14 @@ export function exportExpertise(expertise, options = {}) {
  * @param {{ domain?: string }} [options]
  * @returns {{ ok: boolean, bundle?: Object, errors: string[], exported: Object[] }}
  */
-export function exportExpertiseBundle(expertiseList, options = {}) {
+export async function exportExpertiseBundle(expertiseList, options = {}) {
   /** @type {Object[]} */
   const exported = []
   /** @type {string[]} */
   const errors = []
 
   for (const exp of expertiseList) {
-    const result = exportExpertise(exp, options)
+    const result = await exportExpertise(exp, options)
     if (result.ok) {
       exported.push(result.payload)
       if (result.warnings?.length) errors.push(...result.warnings)
@@ -538,7 +552,7 @@ export async function exportExpertiseToFile(expertiseId, outputPath, options = {
     return { ok: false, errors: [`expertise '${expertiseId}' not found in catalog`] }
   }
 
-  const result = exportExpertise(entry, options)
+  const result = await exportExpertise(entry, options)
   if (!result.ok) {
     return { ok: false, errors: [result.error] }
   }

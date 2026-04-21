@@ -220,6 +220,23 @@ function shortText(value: string, limit = 180): string {
 	return normalized.length > limit ? normalized.slice(0, limit - 3) + "..." : normalized;
 }
 
+/**
+ * Derive task type from task description keywords.
+ * @param {string} task
+ * @returns {string}
+ */
+function deriveTaskType(task: string): string {
+	const t = (task || "").toLowerCase();
+	if (t.includes("fix") || t.includes("bug")) return "bugfix";
+	if (t.includes("implement") || t.includes("build") || t.includes("write") || t.includes("add") || t.includes("create")) return "implementation";
+	if (t.includes("test") || t.includes("verify") || t.includes("check")) return "testing";
+	if (t.includes("review") || t.includes("audit")) return "review";
+	if (t.includes("refactor")) return "refactoring";
+	if (t.includes("doc") || t.includes("readme") || t.includes("comment")) return "documentation";
+	if (t.includes("security") || t.includes("vuln")) return "security";
+	return "general";
+}
+
 function middleEllipsis(value: string, limit: number): string {
 	const normalized = value.replace(/\s+/g, " ").trim();
 	if (limit <= 0) return "";
@@ -1595,7 +1612,8 @@ export default function (pi: ExtensionAPI) {
 		if (!runtime) return "";
 		const fileName = artifactFileName([runtime.agent.name, kind, label]);
 		const fullPath = sessionPath("artifacts", fileName);
-		const relativePath = relative(currentSessionRoot(), fullPath);
+		const sessionRelativePath = relative(currentSessionRoot(), fullPath);
+		const repoRelativePath = relative(config.repoRoot, fullPath);
 		writeFileSync(fullPath, compactArtifactContent(content));
 		appendJsonl("artifacts/index.jsonl", {
 			type: "artifact",
@@ -1603,14 +1621,14 @@ export default function (pi: ExtensionAPI) {
 			sessionId: currentSessionId(),
 			kind,
 			label,
-			path: relativePath,
+			path: sessionRelativePath,
 			...sessionProcessInfo(),
 			...redactSensitiveValue(metadata),
 		});
 		mutateSessionIndex((index) => {
 			index.counts.artifacts = (index.counts.artifacts || 0) + 1;
 		});
-		return relativePath;
+		return repoRelativePath;
 	}
 
 	function ensureSessionLayout() {
@@ -3127,6 +3145,26 @@ export default function (pi: ExtensionAPI) {
 				effectiveTarget, status, elapsed, result.output,
 				result.artifactPath || null, header,
 			);
+
+			// Record evidence (best-effort — never block delegation result)
+			;(async () => {
+				try {
+					const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+					const crew = process.env.MAH_ACTIVE_CREW || "dev";
+					await recordEvidence({
+						expertise_id: `${crew}:${effectiveTarget}`,
+						outcome: result.exitCode === 0 ? "success" : "failure",
+						task_type: deriveTaskType(effectiveTask),
+						task_description: shortText(effectiveTask, 200),
+						duration_ms: Math.round(result.elapsed),
+						source_agent: runtime!.agent.name,
+						source_session: currentSessionId() || "unknown",
+					});
+				} catch {
+					// best-effort
+				}
+			})();
+
 			return {
 				content: [{ type: "text", text: body }],
 				details: {
@@ -3385,6 +3423,31 @@ export default function (pi: ExtensionAPI) {
 					content,
 				].join("\n");
 			}).join("\n\n");
+
+			// Record evidence for each target (best-effort — never block result)
+			;(async () => {
+				try {
+					const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+					const crew = process.env.MAH_ACTIVE_CREW || "dev";
+					for (const result of results) {
+						try {
+							await recordEvidence({
+								expertise_id: `${crew}:${result.target}`,
+								outcome: result.exitCode === 0 ? "success" : "failure",
+								task_type: deriveTaskType(task),
+								task_description: shortText(task, 200),
+								duration_ms: Math.round(result.elapsed),
+								source_agent: runtime!.agent.name,
+								source_session: currentSessionId() || "unknown",
+							});
+						} catch {
+							// best-effort per-target
+						}
+					}
+				} catch {
+					// best-effort
+				}
+			})();
 
 			const rerouteSummary = Array.from(reroutedWorkersByLead.entries())
 				.map(([lead, info]) => `- ${lead} (${info.teamName}): ${Array.from(info.workers).join(", ")}`)

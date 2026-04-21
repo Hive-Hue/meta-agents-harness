@@ -2889,7 +2889,8 @@ async function runExpertise(argv, jsonMode = false) {
   const defaultCrew = process.env.MAH_ACTIVE_CREW || 'dev'
 
   // Load expertise modules lazily
-  const { getRegistry } = await import('./expertise-registry.mjs')
+  const { getRegistry, buildRegistry } = await import('./expertise-registry.mjs')
+  const { seedExpertiseCatalog } = await import('./expertise-seed.mjs')
   const { loadExpertiseById } = await import('./expertise-loader.mjs')
   const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
   const { computeConfidence, mergeConfidence } = await import('./expertise-confidence.mjs')
@@ -2903,6 +2904,88 @@ async function runExpertise(argv, jsonMode = false) {
     const resolvedId = resolveExpertiseId(targetId, crew)
     const expertise = await loadExpertiseById(resolvedId)
     return { resolvedId, expertise }
+  }
+
+
+  // ------------------------------------------------------------------
+  // expertise seed [--crew <crew>] [--force] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'seed') {
+    const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
+    const force = subArgv.includes('--force')
+    const crew = targetCrew || defaultCrew
+
+    if (json || jsonMode) {
+      const result = await seedExpertiseCatalog(null, { crew, force })
+      console.log(JSON.stringify({ ok: true, ...result }))
+      return 0
+    }
+
+    const result = await seedExpertiseCatalog(null, { crew, force })
+    if (result.errors.length > 0) {
+      console.error(`Errors during seeding:`)
+      for (const err of result.errors) console.error(`  - ${err}`)
+    }
+    if (result.skipped > 0) {
+      console.log(`Seeded ${result.seeded} entries for crew '${crew}' → ${result.catalogPath}/`)
+      console.log(`Skipped ${result.skipped} existing entries with real data (use --force to overwrite)`)
+    } else {
+      console.log(`Seeded ${result.seeded} entries for crew '${crew}' → ${result.catalogPath}/`)
+    }
+
+    // Rebuild registry
+    const registry = await buildRegistry()
+    console.log(`Rebuilt registry → .mah/expertise/registry.json (${registry.total_count} entries)`)
+    console.log("\nRun 'mah expertise list' to see seeded entries.")
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise sync [--crew <crew>] [--dry-run] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'sync') {
+    const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
+    const dryRun = subArgv.includes('--dry-run')
+    const crew = targetCrew || defaultCrew
+
+    if (json || jsonMode) {
+      const { syncExpertise } = await import('./expertise-sync.mjs')
+      const result = await syncExpertise({ crew, dryRun })
+      console.log(JSON.stringify({ ok: true, ...result }))
+      return 0
+    }
+
+    const { syncExpertise } = await import('./expertise-sync.mjs')
+    const result = await syncExpertise({ crew, dryRun })
+
+    if (result.errors.length > 0) {
+      console.error('Errors:')
+      for (const err of result.errors) console.error(`  - ${err}`)
+    }
+
+    for (const r of result.results) {
+      if (r.skipped) {
+        console.log(`${r.agent}: skipped (${r.reason})`)
+      } else if (!r.changed) {
+        console.log(`${r.agent}: no changes`)
+      } else {
+        for (const change of r.changes) {
+          if (change.type === 'confidence') {
+            console.log(`${r.agent}: confidence ${change.from.score.toFixed(2)}/${change.from.band} → ${change.to.score.toFixed(2)}/${change.to.band} (${change.to.invocations} invocations)`)
+          } else if (change.type === 'capabilities') {
+            console.log(`${r.agent}: +capabilities [${change.added.join(', ')}]`)
+          }
+        }
+      }
+    }
+
+    if (dryRun) {
+      console.log('\nDry-run — nothing written.')
+    } else if (result.results.some(r => r.changed)) {
+      console.log('\nRegistry rebuilt.')
+    }
+
+    return result.errors.length > 0 ? 1 : 0
   }
 
   // ------------------------------------------------------------------
@@ -3224,9 +3307,14 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise export <id> [--output <path>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'export') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log("usage: mah expertise export <id> [--output <path>] [--domain <domain>] [--with-evidence] [--json]")
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     const outputPath = parseValueArg(subArgv, '--output') || ''
     const domain = parseValueArg(subArgv, '--domain') || ''
+    const withEvidence = subArgv.includes('--with-evidence')
     const normalizedId = resolveExpertiseId(targetId)
 
     if (!targetId) {
@@ -3244,7 +3332,7 @@ async function runExpertise(argv, jsonMode = false) {
         return 1
       }
 
-      const result = await exportExpertiseToFile(normalizedId, outputValidation.resolvedPath, { domain })
+      const result = await exportExpertiseToFile(normalizedId, outputValidation.resolvedPath, { domain, includeEvidence: withEvidence })
       if (!result.ok) {
         console.error(`ERROR: export failed: ${result.errors.join('; ')}`)
         return 1
@@ -3266,7 +3354,7 @@ async function runExpertise(argv, jsonMode = false) {
     }
 
     const { exportExpertise } = await import('./expertise-export.mjs')
-    const result = exportExpertise(entry, { domain, skipPolicy: false })
+    const result = await exportExpertise(entry, { domain, skipPolicy: false, includeEvidence: withEvidence })
     if (!result.ok) {
       console.error(`ERROR: export blocked by policy: ${result.error}`)
       return 1
@@ -3388,6 +3476,98 @@ async function runExpertise(argv, jsonMode = false) {
   }
 
   // ------------------------------------------------------------------
+  // expertise apply-proposal <file> [--force] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'apply-proposal') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log("usage: mah expertise apply-proposal <file> [--force] [--json]")
+      return 0
+    }
+    const proposalPath = parseValueArg(subArgv, '') || subArgv[0]
+    const force = subArgv.includes('--force')
+
+    if (!proposalPath) {
+      console.error("ERROR: usage: mah expertise apply-proposal <file> [--force]")
+      return 1
+    }
+
+    const actor = process.env.MAH_AGENT || 'orchestrator'
+    const { applyProposalFromFile } = await import('./expertise-apply-proposal.mjs')
+
+    const pathValidation = validateCliPath(proposalPath, 'read')
+    if (!pathValidation.ok) {
+      console.error(`ERROR: invalid proposal file path: ${pathValidation.error}`)
+      return 1
+    }
+
+    const result = await applyProposalFromFile(pathValidation.resolvedPath, { force, actor })
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result))
+      return result.ok ? 0 : 1
+    }
+
+    if (!result.ok) {
+      if (result.stale) {
+        console.error(`ERROR: ${result.error}`)
+        console.error(`Changed field: ${result.changed_field}`)
+      } else {
+        console.error(`ERROR: ${result.error}`)
+      }
+      return 1
+    }
+
+    console.log(`✓ Applied proposal`)
+    for (const change of result.applied) {
+      console.log(`  ${change.field}: ${JSON.stringify(change.from)} → ${JSON.stringify(change.to)}`)
+    }
+    console.log(`Registry rebuilt (${result.registry_entries} entries)`)
+    return 0
+  }
+
+  // ------------------------------------------------------------------
+  // expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]
+  // ------------------------------------------------------------------
+  if (sub === 'lifecycle') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log("usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]")
+      return 0
+    }
+    const targetId = parseValueArg(subArgv, '') || subArgv[0]
+    const targetState = parseValueArg(subArgv, '--to')
+    const actor = parseValueArg(subArgv, '--actor') || process.env.MAH_AGENT || 'orchestrator'
+    const reason = parseValueArg(subArgv, '--reason') || ''
+
+    if (!targetId || !targetState) {
+      console.error("ERROR: usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>]")
+      return 1
+    }
+
+    const { transitionLifecycle } = await import('./expertise-lifecycle-cli.mjs')
+    const result = await transitionLifecycle(targetId, targetState, { actor, reason })
+
+    if (jsonMode) {
+      console.log(JSON.stringify(result))
+      return result.ok ? 0 : 1
+    }
+
+    if (!result.ok) {
+      console.error(`ERROR: ${result.error}`)
+      if (result.allowed_transitions) {
+        console.error(`Allowed transitions from current state: ${result.allowed_transitions.join(', ')}`)
+      }
+      if (result.requirements) {
+        console.error(`Requirements: evidence_count >= ${result.requirements.evidence_count_min}, review_pass_rate >= ${(result.requirements.review_pass_rate_min * 100).toFixed(0)}%`)
+      }
+      return 1
+    }
+
+    console.log(`✓ ${targetId}: ${result.changed.from} → ${result.changed.to}`)
+    console.log(`Registry rebuilt (${result.registry_entries} entries)`)
+    return 0
+  }
+
+  // ------------------------------------------------------------------
   // expertise import <file> [--dry-run] [--json]
   // ------------------------------------------------------------------
   if (sub === 'import') {
@@ -3458,6 +3638,10 @@ mah expertise — Expertise Catalog CLI (v0.7.0)
 Usage:
   mah expertise list                        List all expertise entries
   mah expertise list --crew <crew>         List expertise for a specific crew
+  mah expertise seed                        Seed expertise catalog from meta-agents.yaml
+  mah expertise seed --force                Overwrite existing entries with real data
+  mah expertise sync [--crew <crew>]        Sync confidence + capabilities from evidence + learnings
+  mah expertise sync --dry-run              Show planned changes without writing
   mah expertise list --json                 JSON output
 
   mah expertise show <id>                   Show detailed expertise entry
@@ -3476,7 +3660,13 @@ Usage:
   mah expertise export <id>                 Export expertise to JSON
   mah expertise export <id> --output <path>  Write to file
   mah expertise export <id> --domain <domain>  Check domain policy
+  mah expertise export <id> --with-evidence  Include evidence summary
   mah expertise export <id> --json          JSON output
+
+  mah expertise apply-proposal <file>    Apply approved proposal to catalog
+  mah expertise apply-proposal <file> --force   Apply even if catalog changed
+  mah expertise lifecycle <id> --to <state>  Transition lifecycle state
+  mah expertise lifecycle <id> --to validated --actor orchestrator
 
   mah expertise propose <id>                Create a governed proposal artifact
   mah expertise propose <id> --from-evidence  Draft changes from the evidence store
@@ -3493,6 +3683,8 @@ Usage:
 
 Examples:
   mah expertise list --crew dev
+  mah expertise seed                        Seed expertise catalog from meta-agents.yaml
+  mah expertise seed --crew dev              Seed specific crew
   mah expertise show dev:backend-dev
   mah expertise recommend --task "implement user authentication API"
   mah expertise evidence dev:backend-dev --limit 10
