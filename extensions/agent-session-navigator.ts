@@ -41,6 +41,8 @@ interface AgentSessionSummary {
 	costTotal: number;
 	lastUser: string;
 	lastAssistant: string;
+	team: string;
+	model: string;
 }
 
 interface TranscriptCacheEntry {
@@ -98,7 +100,36 @@ function textFromContent(content: any, message?: any): string {
 	return stopReason && stopReason !== "endTurn" ? `[stopReason] ${stopReason}` : "";
 }
 
-function summarizeSessionFile(filePath: string): AgentSessionSummary {
+function loadTeams(cwd: string): Record<string, string> {
+	const map: Record<string, string> = {};
+	try {
+		const yamlPath = join(cwd, "meta-agents.yaml");
+		if (existsSync(yamlPath)) {
+			const yaml = readFileSync(yamlPath, "utf-8");
+			const lines = yaml.split("\n");
+			let currentId: string | null = null;
+			for (const line of lines) {
+				const idMatch = line.match(/^\s+-\s*id:\s*(.+)$/);
+				if (idMatch) {
+					currentId = idMatch[1].trim();
+					continue;
+				}
+				if (currentId) {
+					const teamMatch = line.match(/^\s+team:\s*(.+)$/);
+					if (teamMatch) {
+						map[currentId] = teamMatch[1].trim();
+						currentId = null;
+					}
+				}
+			}
+		}
+	} catch {
+		// Ignore parse errors, fallback to unknown
+	}
+	return map;
+}
+
+function summarizeSessionFile(filePath: string, teamMap: Record<string, string>): AgentSessionSummary {
 	let userCount = 0;
 	let assistantCount = 0;
 	let tokenIn = 0;
@@ -106,6 +137,7 @@ function summarizeSessionFile(filePath: string): AgentSessionSummary {
 	let costTotal = 0;
 	let lastUser = "";
 	let lastAssistant = "";
+	let model = "";
 
 	let updatedEpoch = 0;
 	try {
@@ -124,7 +156,15 @@ function summarizeSessionFile(filePath: string): AgentSessionSummary {
 			continue;
 		}
 
+		if (parsed?.type === "model_change" && parsed.modelId) {
+			model = parsed.provider ? `${parsed.provider}/${parsed.modelId}` : parsed.modelId;
+		}
+
 		if (parsed?.type !== "message" || !parsed?.message) continue;
+
+		if (parsed.message?.model && !model) {
+			model = parsed.message.model;
+		}
 
 		const role = parsed.message.role;
 		const contentText = textFromContent(parsed.message.content || [], parsed.message);
@@ -140,8 +180,9 @@ function summarizeSessionFile(filePath: string): AgentSessionSummary {
 		}
 	}
 
+	const agentName = normalizeAgentNameFromFile(filePath);
 	return {
-		agent: normalizeAgentNameFromFile(filePath),
+		agent: agentName,
 		path: filePath,
 		updatedAt: new Date(updatedEpoch).toISOString(),
 		updatedEpoch,
@@ -152,6 +193,8 @@ function summarizeSessionFile(filePath: string): AgentSessionSummary {
 		costTotal,
 		lastUser: lastUser.trim(),
 		lastAssistant: lastAssistant.trim(),
+		team: teamMap[agentName] || "unknown",
+		model: model || "unknown",
 	};
 }
 
@@ -245,7 +288,9 @@ function loadSummaries(cwd: string): { stateDir: string | null; summaries: Agent
 		.filter((name) => name.endsWith(".session.jsonl"))
 		.map((name) => resolve(stateDir, name))
 		.sort((a, b) => normalizeAgentNameFromFile(a).localeCompare(normalizeAgentNameFromFile(b)));
-	const summaries = files.map((filePath) => summarizeSessionFile(filePath));
+		
+	const teamMap = loadTeams(cwd);
+	const summaries = files.map((filePath) => summarizeSessionFile(filePath, teamMap));
 	return { stateDir, summaries };
 }
 
@@ -289,6 +334,9 @@ class AgentSessionNavigator {
 		private close: () => void,
 		private requestRender: () => void,
 	) {
+		// Enable SGR Mouse Tracking (1000 = normal config, 1006 = SGR format)
+		process.stdout.write("\x1b[?1000h\x1b[?1006h");
+
 		this.refresh(true);
 		this.spinnerInterval = setInterval(() => {
 			this.spinnerFrame = (this.spinnerFrame + 1) % SPINNER_FRAMES.length;
@@ -296,6 +344,9 @@ class AgentSessionNavigator {
 	}
 
 	dispose(): void {
+		// Disable SGR Mouse Tracking
+		process.stdout.write("\x1b[?1000l\x1b[?1006l");
+
 		if (this.spinnerInterval) {
 			clearInterval(this.spinnerInterval);
 			this.spinnerInterval = null;
@@ -902,10 +953,9 @@ class AgentSessionNavigator {
 		lines.push(theme.fg("dim", ` ${toolHint}`));
 
 		lines.push("");
-		const innerW = Math.max(1, width - 2);
-		const relPath = relative(this.cwd, selected.path);
-		const pathDisplay = relPath.length > innerW ? "…" + relPath.slice(-(innerW - 1)) : relPath;
-		lines.push(truncateToWidth(theme.fg("dim", ` ${pathDisplay}`), width));
+		const teamName = selected.team === "unknown" ? "unknown" : displayName(selected.team);
+		lines.push(truncateToWidth(theme.fg("dim", ` Team:  ${teamName}`), width));
+		lines.push(truncateToWidth(theme.fg("dim", ` Model: ${selected.model}`), width));
 
 		return lines;
 	}
