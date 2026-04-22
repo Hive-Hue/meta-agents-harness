@@ -52,3 +52,6 @@ tmp/
 .kilo-profile.json
 .opencode-profile.json
 *-profile.json
+
+meta-agents.yaml
+meta-agents.backup.yaml
