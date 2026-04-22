@@ -52,3 +52,8 @@ tmp/
 .kilo-profile.json
 .opencode-profile.json
 *-profile.json
+
+# Local meta-agents overrides (keep example tracked)
+meta-agents.yaml
+meta-agents.backup.yaml
+!meta-agents.example.yaml
