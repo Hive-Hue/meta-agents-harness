@@ -616,7 +616,45 @@ Support cross-team exchange and confidential execution-aware expertise.
 
 ---
 
-## 26. Risks
+## 26. Practical Value Assessment
+
+Not every proposed capability has the same product value. Some gaps are core to the model, while others are only worth building once the system has real scale and repeated cross-team use.
+
+### High-Value Gaps
+
+These have strong real-world value when implemented well:
+
+- expertise-aware routing using trust, validation, and environment constraints
+- distinct declared, observed, and trusted expertise states
+- lifecycle governance for active, restricted, deprecated, and experimental expertise
+- policy-aware export/import with redaction and approval boundaries
+- confidential execution and trust-tier aware control
+
+### Conditional Value Gaps
+
+These are useful, but mainly after the core system is already working:
+
+- expertise bundles for onboarding or domain packaging
+- discoverable registry views for repeated “who can do this?” queries
+- richer quality metrics beyond basic confidence and evidence counts
+
+### Likely Over-Engineering If Built Too Early
+
+These become expensive before they become useful:
+
+- a fully generalized ontology layer
+- a highly sophisticated routing scorer with opaque weighting
+- federated handshakes without real cross-team exchange demand
+
+### Rule Of Thumb
+
+If a capability reduces delegation errors, avoids policy violations, lowers review load, or improves reusable specialization, it is probably real value.
+
+If it only adds abstraction, generality, or future-proofing without changing actual decisions, it is probably premature.
+
+---
+
+## 27. Risks
 
 ### Product Risks
 - making expertise too abstract and hard to manage
@@ -635,7 +673,7 @@ Support cross-team exchange and confidential execution-aware expertise.
 
 ---
 
-## 27. Final Recommendation
+## 28. Final Recommendation
 
 The Expertise Model should be treated as a high-value core feature.
 
