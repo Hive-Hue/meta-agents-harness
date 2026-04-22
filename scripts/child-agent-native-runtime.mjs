@@ -72,7 +72,13 @@ export const nativeRuntimeAdapter = {
         ctx.targetRuntime,
         "--agent",
         ctx.effectiveLogicalTarget,
-        ctx.task
+        [
+          "You are a child agent executing a delegated task.",
+          "You must return a concise final result and never stay silent.",
+          "If you delegate internally, mention the worker agents you used and the result they returned.",
+          "End with a single clear result line.",
+          `Task: ${ctx.task}`
+        ].join("\n")
       ],
       envOverrides,
       warnings: []
@@ -84,4 +90,3 @@ const _validation = validateChildAgentAdapter(nativeRuntimeAdapter)
 if (!_validation.ok) {
   console.error("[child-agent-native-runtime] adapter validation failed:", _validation.errors)
 }
-

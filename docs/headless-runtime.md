@@ -8,6 +8,29 @@ Non-interactive runtime execution with deterministic output capture.
 mah run --headless -- "your task prompt"
 ```
 
+Targeted delegation in headless mode:
+
+```bash
+mah -r pi delegate --target planning-lead --headless --task "ask planning team workers to echo: OK" --execute
+```
+
+## When to Use Which
+
+| Command | Scope | Authorization model | Best for |
+|---------|-------|---------------------|----------|
+| `mah run --headless -- "..."` | Direct runtime execution in current/default agent | No logical target policy check | Fast task execution |
+| `mah delegate --target <agent> --headless --task "..." --execute` | Specific logical target agent | Enforced by crew topology | Role-specific execution and team boundaries |
+
+Examples:
+
+```bash
+# Direct execution (default/current agent)
+mah --headless run -- "ask planning team workers to echo: OK"
+
+# Target-specific execution (planning-lead)
+mah -r pi delegate --target planning-lead --headless --task "ask planning team workers to echo: OK" --execute
+```
+
 Structured output:
 
 ```bash

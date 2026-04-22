@@ -439,6 +439,46 @@ test.describe('mah delegate integration', () => {
     assert.ok(result.includes('logical_target=planning-lead'), 'should reference planning-lead')
   })
 
+  test('delegate --headless propagates headless execution to pi runtime', () => {
+    const tempBin = path.join(repoRoot, '.tmp-mah-headless-bin')
+    const captureFile = path.join(repoRoot, '.tmp-mah-headless-capture.txt')
+    mkdirSync(tempBin, { recursive: true })
+    try {
+      writeFileSync(
+        path.join(tempBin, 'pi'),
+        [
+          '#!/usr/bin/env bash',
+          `printf "%s\\n" "$*" > "${captureFile}"`,
+          'exit 0'
+        ].join('\n'),
+        { mode: 0o755 }
+      )
+
+      const result = execSync(
+        'node bin/mah -r pi delegate --target planning-lead --task "ask planning team workers to echo: OK" --crew dev --headless --execute',
+        {
+          cwd: repoRoot,
+          env: {
+            ...process.env,
+            PATH: `${tempBin}:${process.env.PATH}`,
+            MAH_ACTIVE_CREW: 'dev'
+          },
+          encoding: 'utf-8'
+        }
+      )
+
+      assert.match(result, /ok=true/)
+      assert.match(result, /mode=headless/)
+      assert.match(result, /--- executing ---/)
+      const captured = readFileSync(captureFile, 'utf-8')
+      assert.match(captured, /-p/)
+      assert.match(captured, /ask planning team workers to echo: OK/)
+    } finally {
+      rmSync(tempBin, { recursive: true, force: true })
+      rmSync(captureFile, { force: true })
+    }
+  })
+
   // 14. mah delegate --auto --task "..." --crew dev auto-selects best candidate
   test('delegate --auto mode auto-selects a candidate without crashing', () => {
     // Should not crash CLI - mahRaw catches errors and returns stdout or ''

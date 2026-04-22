@@ -268,6 +268,15 @@ function stripHeadlessArgs(argv) {
   return argv.filter((item) => item !== "--headless" && item !== "--" && !item.startsWith("--output=") && !item.startsWith("-o="))
 }
 
+function sanitizeEnvOverrides(envOverrides = {}) {
+  const sensitiveKeyPattern = /(api[_-]?key|token|secret|password|pass|private|credential|oauth|bearer|pat)/i
+  const redacted = {}
+  for (const [key, value] of Object.entries(envOverrides || {})) {
+    redacted[key] = sensitiveKeyPattern.test(key) ? "[redacted]" : value
+  }
+  return redacted
+}
+
 function parseFilterArgs(argv) {
   return {
     runtime: parseValueArg(argv, "--runtime", "-r"),
@@ -2089,11 +2098,12 @@ function isSyncLikeCommand(command) {
  * - --target <agent>: verify explicit target against policy, then score all candidates
  *                     and emit expertise_warning if explicit target isn't the best match
  */
-async function runDelegate(passthrough) {
+async function runDelegate(passthrough, options = {}) {
   const startTimeMs = Date.now()
   const execute = passthrough.includes("--execute") || passthrough.includes("-x")
+  const headless = options.headless === true
   const autoMode = passthrough.includes("--auto")
-  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x" && a !== "--auto")
+  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x" && a !== "--auto" && a !== "--headless")
   const target = parseValueArg(runArgs, "--target")
   const task = parseValueArg(runArgs, "--task")
   const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
@@ -2311,6 +2321,77 @@ async function runDelegate(passthrough) {
     return 1
   }
 
+  if (headless) {
+    // For native delegation, reuse MAH's proven headless run pipeline instead of
+    // reconstructing runtime-specific headless plans inline.
+    if (result.context.mode === "native-same-runtime") {
+      result.plan = {
+        ...result.plan,
+        mode: "headless",
+        exec: process.execPath,
+        args: [
+          "scripts/meta-agents-harness.mjs",
+          "--headless",
+          "run",
+          "--runtime",
+          result.context.targetRuntime,
+          "--agent",
+          result.context.effectiveLogicalTarget,
+          "--",
+          delegatedTask
+        ],
+        envOverrides: {
+          ...(result.plan.envOverrides || {}),
+          MAH_ACTIVE_CREW: crew
+        },
+        warnings: [
+          ...(result.plan.warnings || []),
+          "headless execution delegated to MAH run pipeline"
+        ]
+      }
+    } else {
+      const adapter = runtimeProfiles[result.context.targetRuntime]
+      if (!adapter) {
+        console.error(`ERROR: runtime '${result.context.targetRuntime}' not found`)
+        return 1
+      }
+      if (typeof adapter.prepareHeadlessRunContext !== "function") {
+        console.error(`ERROR: runtime '${result.context.targetRuntime}' does not support headless execution`)
+        return 1
+      }
+      const headlessPlan = adapter.prepareHeadlessRunContext({
+        repoRoot,
+        runtime: result.context.targetRuntime,
+        adapter,
+        crew,
+        task: result.plan?.passthrough?.join(" ") || delegatedTask,
+        argv: result.plan?.passthrough || [],
+        envOverrides: {
+          ...result.plan.envOverrides,
+          MAH_ACTIVE_CREW: crew
+        }
+      })
+      if (!headlessPlan || headlessPlan.error) {
+        console.error(`ERROR: ${headlessPlan?.error || "failed to prepare headless run context"}`)
+        return 1
+      }
+      result.plan = {
+        ...result.plan,
+        mode: headlessPlan.mode || result.plan.mode,
+        exec: headlessPlan.exec || result.plan.exec,
+        args: headlessPlan.args || result.plan.args,
+        envOverrides: {
+          ...(result.plan.envOverrides || {}),
+          ...(headlessPlan.envOverrides || {})
+        },
+        warnings: [
+          ...(result.plan.warnings || []),
+          ...(headlessPlan.warnings || [])
+        ]
+      }
+    }
+  }
+
   if (canonicalTargetModel) {
     result.plan.envOverrides = {
       ...(result.plan.envOverrides || {}),
@@ -2328,7 +2409,8 @@ async function runDelegate(passthrough) {
   console.log(`exec=${result.plan.exec}`)
   console.log(`args=${result.plan.args.join(" ")}`)
   if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
-    console.log(`env_overrides=${Object.entries(result.plan.envOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
+    const safeEnvOverrides = sanitizeEnvOverrides(result.plan.envOverrides)
+    console.log(`env_overrides=${Object.entries(safeEnvOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
   }
   if (result.warnings && result.warnings.length > 0) {
     for (const w of result.warnings) {
@@ -2357,16 +2439,20 @@ async function runDelegate(passthrough) {
     console.log("--- executing ---")
     const { spawnSync } = await import("node:child_process")
     const forceCanonicalModelOutput = modelIdentityTask && Boolean(canonicalTargetModel)
-    const child = spawnSync(result.plan.exec, result.plan.args, {
+    const child = spawnSync(result.plan.exec, [...(result.plan.args || []), ...(result.plan.passthrough || [])], {
       cwd: repoRoot,
       env: { ...process.env, ...result.plan.envOverrides },
-      stdio: forceCanonicalModelOutput ? "pipe" : "inherit"
+      stdio: (forceCanonicalModelOutput || headless) ? "pipe" : "inherit"
     })
+    const stdout = child.stdout ? child.stdout.toString() : ""
+    const stderr = child.stderr ? child.stderr.toString() : ""
+    if (headless && stdout) process.stdout.write(stdout)
+    if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
+    if (headless && !stdout.trim() && !stderr.trim()) {
+      console.log("child_stdout=<empty>")
+      console.log("child_stderr=<empty>")
+    }
     if (forceCanonicalModelOutput) {
-      const stdout = child.stdout ? child.stdout.toString() : ""
-      const stderr = child.stderr ? child.stderr.toString() : ""
-      if (stdout) process.stdout.write(stdout)
-      if (stderr) process.stderr.write(stderr)
       const canonicalLine = canonicalTargetModel.trim().toLowerCase()
       const outputLines = `${stdout}\n${stderr}`
         .split(/\r?\n/)
@@ -3855,8 +3941,9 @@ function main() {
       // Use original argv (not normalizedArgv) because delegate needs --runtime for target runtime,
       // not for MAH's own runtime detection. normalizedArgv strips --runtime.
       // argv = process.argv.slice(2), so argv[0] = 'delegate'. Skip it.
-      const delegateArgv = argv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
-      process.exitCode = await runDelegate(delegateArgv)
+      const delegateHeadless = argv.includes("--headless")
+      const delegateArgv = normalizedArgv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
+      process.exitCode = await runDelegate(delegateArgv, { headless: delegateHeadless })
     })()
     return
   }

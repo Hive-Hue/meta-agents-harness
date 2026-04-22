@@ -45,6 +45,23 @@ The runtime where the child agent will actually execute.
 
 Use a single logical delegation call (`delegate_agent` / `mah_delegate_agent`) and let MAH resolve execution mode and runtime adapter.
 
+### `delegate` vs `run` (Practical Difference)
+
+Use `mah delegate` when you need agent-targeted execution with topology enforcement.  
+Use `mah run` when you want direct execution in the current/default agent context.
+
+| Command | What it guarantees | Typical use case |
+|---------|---------------------|------------------|
+| `mah delegate --target <agent> --task "..." --execute` | Executes as a specific logical target after policy checks | "This must be run by `planning-lead`" |
+| `mah run --headless -- "..."` | Executes directly in runtime context (usually orchestrator/default agent) | "Just do this task now" |
+
+`delegate` enforces crew topology first:
+- orchestrator -> leads
+- lead -> own team workers
+- worker -> cannot delegate
+
+`run` does not perform this logical-target authorization step.
+
 ### CLI
 
 ```bash
@@ -56,6 +73,12 @@ mah delegate --target backend-dev --runtime codex --task "Implement the parser"
 
 # Show delegation plan
 mah explain delegate --target backend-dev --runtime codex --task "..."
+
+# Headless, target-specific delegation (execute as planning-lead)
+mah -r pi delegate --target planning-lead --headless --task "ask planning team workers to echo: OK" --execute
+
+# Headless direct run (execute in current/default agent context)
+mah --headless run -- "ask planning team workers to echo: OK"
 ```
 
 `--runtime` is an optional execution hint. Authorization remains topology-based.
