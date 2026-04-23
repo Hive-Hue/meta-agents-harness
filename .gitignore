@@ -53,7 +53,12 @@ tmp/
 .opencode-profile.json
 *-profile.json
 
-# Local meta-agents overrides (keep example tracked)
 meta-agents.yaml
 meta-agents.backup.yaml
-!meta-agents.example.yaml
+# Local MAH sync artifacts
+.claude/crew/dev/multi-team.yaml
+.openclaude/crew/dev/multi-team.yaml
+.openclaude/crew/dev/agents/engineering_lead.md
+.openclaude/crew/dev/agents/planning_lead.md
+.openclaude/crew/dev/agents/solution_architect.md
+.openclaude/crew/dev/agents/validation_lead.md
