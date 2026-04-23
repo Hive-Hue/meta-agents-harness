@@ -30,8 +30,9 @@ __pycache__/
 .openclaude/crew/*/sessions/
 .opencode/crew/*/sessions/
 .opencode/crew/*
+.openclaude/crew/*
 .hermes/crew/*/sessions/
-.kilo/crew/*/sessions/
+.kilo/crew/*
 .codex/crew/*/sessions/
 .codex/skills/
 .claude/skills/
@@ -57,8 +58,3 @@ meta-agents.yaml
 meta-agents.backup.yaml
 # Local MAH sync artifacts
 .claude/crew/dev/multi-team.yaml
-.openclaude/crew/dev/multi-team.yaml
-.openclaude/crew/dev/agents/engineering_lead.md
-.openclaude/crew/dev/agents/planning_lead.md
-.openclaude/crew/dev/agents/solution_architect.md
-.openclaude/crew/dev/agents/validation_lead.md
