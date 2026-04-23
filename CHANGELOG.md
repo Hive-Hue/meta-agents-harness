@@ -34,6 +34,28 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 - `tests/headless-bugs.test.mjs` — tests for `--` stripping, task propagation, and PI extension loading
 
+## [0.9.0] - 2026-04-23
+
+### Added
+- `mah expertise recommend` and `mah expertise explain` now produce concise ≤5-line text summaries by default; `--verbose` flag preserves full trace output
+- `mah expertise explain --agent <name>` inspects a specific agent routing suitability without requiring a task-level comparison
+- `mah context explain` default output is now concise and operator-friendly; `--verbose` flag preserves full breakdown
+- `mah context proposals list/show/promote/reject` governance workflow for context memory proposals
+- `mah explain state` surface for assistant state introspection
+- "Context Manager" adopted as public subsystem name; `mah context` CLI namespace unchanged
+
+### Changed
+- Text output of `mah expertise recommend` and `mah expertise explain` refactored for operator clarity; `--json` output unchanged
+- `mah context explain` default output tightened to concise 4-5 line summary; full breakdown via `--verbose`
+- `docs/context-memory.md` renamed to `docs/context-manager.md`; all docs updated with new subsystem name
+- `scripts/context-memory-cli.mjs` removed (stale stub; active CLI lives in `scripts/meta-agents-harness.mjs`)
+- All operator-facing strings in CLI updated from "Context Memory" to "Context Manager"
+
+### Documentation
+- `docs/context-manager.md` — updated operator reference with Context Manager naming
+- `docs/README.md` updated with Context Manager terminology
+
+
 ## [0.8.0] - 2026-04-21
 
 ### Added
@@ -150,7 +172,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Documentation
 - `docs/context-memory.md` — Complete operator reference for Context Memory v0.8.0
 - `docs/README.md` — Updated with Context Memory in Core Concepts
-- `plan/slices/context-memory-pr1-schema.md` — PR1 technical specification
+- `plan/slices/context-memory-finalization-slices.md` — consolidated Context Memory slice plan and historical baseline
 - `plan/context-memory-v0.8.0.md` — Full feature plan and rationale
 
 ## [0.7.0] - 2026-04-16
@@ -549,7 +571,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Documentation
 - `docs/context-memory.md` — Complete operator reference for Context Memory v0.8.0
 - `docs/README.md` — Updated with Context Memory in Core Concepts
-- `plan/slices/context-memory-pr1-schema.md` — PR1 technical specification
+- `plan/slices/context-memory-finalization-slices.md` — consolidated Context Memory slice plan and historical baseline
 - `plan/context-memory-v0.8.0.md` — Full feature plan and rationale
 
 ## [0.7.0] - 2026-04-16

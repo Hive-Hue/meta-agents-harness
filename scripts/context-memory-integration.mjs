@@ -52,6 +52,12 @@ function extractTaskFromArgs(args = []) {
   for (let i = 0; i < args.length; i += 1) {
     const token = `${args[i] || ""}`
     if (!token) continue
+    if (token === "--task" && args[i + 1]) {
+      return `${args[i + 1] || ""}`.trim()
+    }
+    if (token.startsWith("--task=")) {
+      return token.slice("--task=".length).trim()
+    }
     if (token.startsWith("--query=")) {
       return token.slice("--query=".length).trim()
     }
@@ -181,4 +187,66 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
   }
 
   return block
+}
+
+/**
+ * Build a context_memory explain payload for `mah explain run`.
+ * Does NOT inject into runtime — only returns diagnostic JSON.
+ * @param {string[]} args - CLI args
+ * @returns {{ enabled: boolean, status: string, mode?: string, limit?: number, matched_docs?: object[], summary_blocks?: string[], error_message?: string }}
+ */
+export function buildContextMemoryExplainPayload(args = []) {
+  const { limit, mode } = parseContextMemoryOptions(args)
+  if (!isContextMemoryEnabled(args)) {
+    return { enabled: false, status: "disabled", mode, limit, matched_docs: [], summary_blocks: [] }
+  }
+  const contextRoot = resolve(repoRoot, ".mah", "context")
+  const indexPath = resolve(contextRoot, "index", "operational-context.index.json")
+
+  let index = loadIndex(indexPath)
+  if (!index || !index.entries || index.entries.length === 0) {
+    try {
+      buildOperationalIndex(contextRoot, { rebuild: false })
+      index = loadIndex(indexPath)
+    } catch {
+      index = null
+    }
+  }
+
+  if (!index || !index.entries || index.entries.length === 0) {
+    return { enabled: true, status: "missing-corpus", mode, limit }
+  }
+
+  try {
+    const task = extractTaskFromArgs(args)
+    let result = retrieveDocuments({ agent: "*", task }, index)
+    if (!result.matched_docs || result.matched_docs.length === 0) {
+      result = retrieveDocuments({ task }, index)
+    }
+
+    if (!result.matched_docs || result.matched_docs.length === 0) {
+      return { enabled: true, status: "no-match", mode, limit, matched_docs: [], summary_blocks: [] }
+    }
+
+    return {
+      enabled: true,
+      status: "matched",
+      mode,
+      limit,
+      matched_docs: result.matched_docs.slice(0, limit).map((doc) => ({
+        id: doc.id,
+        score: doc.score,
+        reasons: doc.reasons || [],
+      })),
+      summary_blocks: (result.summary_blocks || []).slice(0, limit),
+    }
+  } catch (err) {
+    return {
+      enabled: true,
+      status: "error",
+      mode,
+      limit,
+      error_message: err?.message || String(err),
+    }
+  }
 }

@@ -12,6 +12,8 @@ import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, get
 import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
 import { resolveMahHome } from "./mah-home.mjs"
 import { resolveWorkspaceRoot } from "./workspace-root.mjs"
+import { buildContextMemoryExplainPayload } from "./context-memory-integration.mjs"
+import { buildAssistantStatePayload } from "./assistant-state.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -189,7 +191,7 @@ function printHelp() {
   console.log("Commands:")
   console.log("  detect")
   console.log("  doctor")
-  console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate] [args]")
+  console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
   console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
@@ -232,6 +234,8 @@ function printHelp() {
   console.log("  --agent <name>")
   console.log("  --strict-markers")
   console.log("  --headless                 run in non-interactive mode")
+  console.log("  --verbose                  show full execution plan and child output")
+  console.log("  --quiet                    suppress delegate execution noise (default for --execute)")
   console.log("  --output <json|text>")
   console.log("  -o <json|text>")
 }
@@ -268,6 +272,20 @@ function stripHeadlessArgs(argv) {
   return argv.filter((item) => item !== "--headless" && item !== "--" && !item.startsWith("--output=") && !item.startsWith("-o="))
 }
 
+function extractCodexQuietOutput(raw = "") {
+  const text = `${raw || ""}`.replace(/\r\n/g, "\n")
+  if (!text.trim()) return ""
+  const marker = "\ncodex\n"
+  const lastMarker = text.lastIndexOf(marker)
+  if (lastMarker >= 0) {
+    const start = lastMarker + marker.length
+    const nextTokens = text.indexOf("\ntokens used", start)
+    const segment = (nextTokens >= 0 ? text.slice(start, nextTokens) : text.slice(start)).trim()
+    if (segment) return `${segment}\n`
+  }
+  return ""
+}
+
 function sanitizeEnvOverrides(envOverrides = {}) {
   const sensitiveKeyPattern = /(api[_-]?key|token|secret|password|pass|private|credential|oauth|bearer|pat)/i
   const redacted = {}
@@ -281,6 +299,8 @@ function parseFilterArgs(argv) {
   return {
     runtime: parseValueArg(argv, "--runtime", "-r"),
     crew: parseValueArg(argv, "--crew"),
+    agent: parseValueArg(argv, "--agent"),
+    task: parseValueArg(argv, "--task"),
     run: parseValueArg(argv, "--run"),
     json: hasFlag(argv, "--json"),
     mermaid: hasFlag(argv, "--mermaid"),
@@ -2102,8 +2122,10 @@ async function runDelegate(passthrough, options = {}) {
   const startTimeMs = Date.now()
   const execute = passthrough.includes("--execute") || passthrough.includes("-x")
   const headless = options.headless === true
+  const verbose = passthrough.includes("--verbose")
+  const quiet = !verbose && !passthrough.includes("--quiet=false")
   const autoMode = passthrough.includes("--auto")
-  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x" && a !== "--auto" && a !== "--headless")
+  const runArgs = passthrough.filter(a => !["--execute", "-x", "--auto", "--headless", "--verbose", "--quiet"].includes(a))
   const target = parseValueArg(runArgs, "--target")
   const task = parseValueArg(runArgs, "--task")
   const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
@@ -2322,6 +2344,8 @@ async function runDelegate(passthrough, options = {}) {
   }
 
   if (headless) {
+    let headlessPlan
+
     // For native delegation, reuse MAH's proven headless run pipeline instead of
     // reconstructing runtime-specific headless plans inline.
     if (result.context.mode === "native-same-runtime") {
@@ -2349,6 +2373,11 @@ async function runDelegate(passthrough, options = {}) {
           "headless execution delegated to MAH run pipeline"
         ]
       }
+    } else if (result.context.mode === "cross-runtime-sidecar") {
+      // Sidecar adapter already prepared the complete headless plan — use it directly
+      // No need to call prepareHeadlessRunContext on target runtime adapter
+      headlessPlan = result.plan
+      result.plan = headlessPlan
     } else {
       const adapter = runtimeProfiles[result.context.targetRuntime]
       if (!adapter) {
@@ -2359,7 +2388,7 @@ async function runDelegate(passthrough, options = {}) {
         console.error(`ERROR: runtime '${result.context.targetRuntime}' does not support headless execution`)
         return 1
       }
-      const headlessPlan = adapter.prepareHeadlessRunContext({
+      headlessPlan = adapter.prepareHeadlessRunContext({
         repoRoot,
         runtime: result.context.targetRuntime,
         adapter,
@@ -2399,44 +2428,46 @@ async function runDelegate(passthrough, options = {}) {
     }
   }
 
-  // Structured output (key=value, consistent with other mah commands)
-  console.log("ok=true")
-  console.log(`logical_target=${effectiveTarget}`)
-  console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
-  console.log(`mode=${result.context.mode}`)
-  console.log(`source_runtime=${result.context.sourceRuntime}`)
-  console.log(`target_runtime=${result.context.targetRuntime}`)
-  console.log(`exec=${result.plan.exec}`)
-  console.log(`args=${result.plan.args.join(" ")}`)
-  if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
-    const safeEnvOverrides = sanitizeEnvOverrides(result.plan.envOverrides)
-    console.log(`env_overrides=${Object.entries(safeEnvOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
-  }
-  if (result.warnings && result.warnings.length > 0) {
-    for (const w of result.warnings) {
-      console.log(`warning=${w}`)
+  if (verbose || !execute || !quiet) {
+    // Structured output (key=value, consistent with other mah commands)
+    console.log("ok=true")
+    console.log(`logical_target=${effectiveTarget}`)
+    console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
+    console.log(`mode=${result.context.mode}`)
+    console.log(`source_runtime=${result.context.sourceRuntime}`)
+    console.log(`target_runtime=${result.context.targetRuntime}`)
+    console.log(`exec=${result.plan.exec}`)
+    console.log(`args=${result.plan.args.join(" ")}`)
+    if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
+      const safeEnvOverrides = sanitizeEnvOverrides(result.plan.envOverrides)
+      console.log(`env_overrides=${Object.entries(safeEnvOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
+    }
+    if (result.warnings && result.warnings.length > 0) {
+      for (const w of result.warnings) {
+        console.log(`warning=${w}`)
+      }
+    }
+
+    // Expertise scoring output fields
+    if (expertiseSelected) {
+      console.log(`expertise_selected=${expertiseSelected}`)
+    }
+    if (expertiseScore !== null) {
+      console.log(`expertise_score=${expertiseScore.toFixed(3)}`)
+    }
+    if (expertiseWarning) {
+      console.log(`expertise_warning=${expertiseWarning}`)
+    }
+    if (canonicalTargetModel) {
+      console.log(`model_canonical=${canonicalTargetModel}`)
+    }
+    if (modelIdentityTask) {
+      console.log(`model_identity_task=true`)
     }
   }
 
-  // Expertise scoring output fields
-  if (expertiseSelected) {
-    console.log(`expertise_selected=${expertiseSelected}`)
-  }
-  if (expertiseScore !== null) {
-    console.log(`expertise_score=${expertiseScore.toFixed(3)}`)
-  }
-  if (expertiseWarning) {
-    console.log(`expertise_warning=${expertiseWarning}`)
-  }
-  if (canonicalTargetModel) {
-    console.log(`model_canonical=${canonicalTargetModel}`)
-  }
-  if (modelIdentityTask) {
-    console.log(`model_identity_task=true`)
-  }
-
   if (execute) {
-    console.log("--- executing ---")
+    if (verbose || !quiet) console.log("--- executing ---")
     const { spawnSync } = await import("node:child_process")
     const forceCanonicalModelOutput = modelIdentityTask && Boolean(canonicalTargetModel)
     const child = spawnSync(result.plan.exec, [...(result.plan.args || []), ...(result.plan.passthrough || [])], {
@@ -2446,9 +2477,23 @@ async function runDelegate(passthrough, options = {}) {
     })
     const stdout = child.stdout ? child.stdout.toString() : ""
     const stderr = child.stderr ? child.stderr.toString() : ""
-    if (headless && stdout) process.stdout.write(stdout)
-    if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
-    if (headless && !stdout.trim() && !stderr.trim()) {
+    if (headless && verbose) {
+      if (stdout) process.stdout.write(stdout)
+      if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
+    } else if (headless && quiet) {
+      if (result.context.targetRuntime === "codex" && result.context.mode === "cross-runtime-sidecar") {
+        const reduced = extractCodexQuietOutput(stdout)
+        if (reduced) process.stdout.write(reduced)
+      } else if (stdout.trim()) {
+        process.stdout.write(`${stdout.trim()}\n`)
+      }
+      const exitCode = typeof child.status === "number" ? child.status : 1
+      if (exitCode !== 0 && stderr.trim()) process.stderr.write(`${stderr.trim()}\n`)
+    } else {
+      if (headless && stdout) process.stdout.write(stdout)
+      if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
+    }
+    if ((verbose || !quiet) && headless && !stdout.trim() && !stderr.trim()) {
       console.log("child_stdout=<empty>")
       console.log("child_stderr=<empty>")
     }
@@ -2464,7 +2509,7 @@ async function runDelegate(passthrough, options = {}) {
       }
     }
     const exitCode = typeof child.status === "number" ? child.status : 1
-    console.log(`exit_code=${exitCode}`)
+    if (verbose || !quiet || exitCode !== 0) console.log(`exit_code=${exitCode}`)
     if (child.error) console.log(`error=${child.error.message}`)
     // Record evidence for executed delegation
     await recordDelegationEvidence({
@@ -2546,16 +2591,17 @@ async function recordDelegationEvidence({ crew, expertiseId, taskDescription, ou
 // ---------------------------------------------------------------------------
 
 /**
- * Parse --crew, --json, and other common flags from argv.
+ * Parse --crew, --json, --verbose, and other common flags from argv.
  * @param {string[]} argv
- * @returns {{ crew: string, json: boolean, extras: string[] }}
+ * @returns {{ crew: string, json: boolean, verbose: boolean, extras: string[] }}
  */
 function parseExpertiseFlags(argv) {
   const crew = parseValueArg(argv, '--crew') || process.env.MAH_ACTIVE_CREW || 'dev'
   const json = argv.includes('--json')
+  const verbose = argv.includes('--verbose')
   // Strip flags from extras
-  const extras = argv.filter(a => !a.startsWith('--') || a === '--json' || a.startsWith('--crew') || a.startsWith('--limit'))
-  return { crew, json, extras }
+  const extras = argv.filter(a => !a.startsWith('--') || a === '--json' || a === '--verbose' || a.startsWith('--crew') || a.startsWith('--limit'))
+  return { crew, json, verbose, extras }
 }
 
 /**
@@ -2588,6 +2634,37 @@ function formatValidation(status) {
   return map[status] || status
 }
 
+function joinOrNone(arr) {
+  return Array.isArray(arr) && arr.length > 0 ? arr.join(', ') : 'none'
+}
+
+function summarizeCapabilityFit(task, candidate) {
+  const expertise = candidate?.expertise || {}
+  const taskText = String(task || '').toLowerCase()
+  const capMatches = (expertise.capabilities || [])
+    .map(c => c?.name || c)
+    .filter(Boolean)
+    .filter(c => taskText.includes(String(c).toLowerCase()))
+    .slice(0, 2)
+  const domainMatches = (expertise.domains || [])
+    .filter(Boolean)
+    .filter(d => taskText.includes(String(d).toLowerCase()))
+    .slice(0, 2)
+
+  if (capMatches.length > 0) return `capability match: ${capMatches.join(', ')}`
+  if (domainMatches.length > 0) return `domain match: ${domainMatches.join(', ')}`
+  return 'general expertise fit'
+}
+
+function topEvidenceHint(scoreData, scoringResult) {
+  const penalties = scoreData?.penalties_applied || []
+  const blocked = scoreData?.blocked_filters || []
+  if (blocked.length > 0) return `blocked by ${blocked[0]}`
+  if (penalties.length > 0) return `penalty: ${penalties[0]}`
+  if (scoringResult?.explain?.selected_reason) return scoringResult.explain.selected_reason
+  return 'ranked by match + confidence'
+}
+
 /**
  * Run expertise subcommand.
  * @param {string[]} argv
@@ -2602,23 +2679,27 @@ async function runContext(argv, jsonMode = false) {
   if (!sub || sub === "--help" || sub === "-h") {
     console.log(`Usage: mah context <subcommand> [options]
 
-Context Memory — operational context retrieval for MAH agents
+Context Manager — operational context retrieval for MAH agents
 
 Subcommands:
-  validate [--strict] [--path <dir>]   Validate context memory documents
+  validate [--strict] [--path <dir>]   Validate context manager documents
   index [--rebuild]                    Build or update the context index
-  list [--agent <name>] [--capability] List context memory documents
+  list [--agent <name>] [--capability] List context manager documents
   show <id>                            Show a specific context document
   find --agent <name> --task "<desc>"  Find relevant context for a task
-  explain --agent <name> --task "<desc>" Explain retrieval reasoning
+  explain --agent <name> --task "<desc>" [--verbose] Explain retrieval reasoning
   propose --from-session <ref>         Create memory proposal from session
+  proposals list [--json]             List proposals with statuses
+  proposals show <id> [--json]        Show proposal with overlap detection
+  proposals promote <id> [--stability <level>] [--force] [--json]  Promote to operational
+  proposals reject <id> --reason "..." [--json]  Reject proposal
 
 Options:
   --json        JSON output mode
   --strict      Strict validation (unknown fields = errors)
   --help, -h    Show this help message
 
-Context Memory is separate from Expertise routing. It provides operational
+Context Manager is separate from Expertise routing. It provides operational
 detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     return 0
   }
@@ -2718,8 +2799,8 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     if (jsonMode) {
       console.log(JSON.stringify({ documents: docs }, null, 2))
     } else {
-      if (docs.length === 0) { console.log("No context memory documents found."); return 0 }
-      console.log("=== Context Memory Documents ===\n")
+      if (docs.length === 0) { console.log("No context manager documents found."); return 0 }
+      console.log("=== Context Manager Documents ===\n")
       console.log("ID".padEnd(60) + " Kind".padEnd(22) + " Stability".padEnd(12) + " Priority".padEnd(10))
       console.log("─".repeat(60) + " " + "─".repeat(22) + " " + "─".repeat(12) + " " + "─".repeat(10))
       for (const d of docs) console.log(d.id.padEnd(60) + " " + d.kind.padEnd(22) + " " + d.stability.padEnd(12) + " " + d.priority.padEnd(10))
@@ -2795,7 +2876,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
         errors: result.errors,
       }, null, 2))
     } else {
-      console.log("=== Context Memory Index ===")
+      console.log("=== Context Manager Index ===")
       console.log("Total documents: " + result.total_documents)
       console.log("New: " + result.new)
       console.log("Updated: " + result.updated)
@@ -2858,7 +2939,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
         console.log("No matching documents found.")
         return 0
       }
-      console.log("=== Context Memory Retrieval ===")
+      console.log("=== Context Manager Retrieval ===")
       console.log("Task: " + task)
       console.log("Agent: " + agent)
       if (capability_hint) console.log("Capability hint: " + capability_hint)
@@ -2879,28 +2960,26 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     return 0
   }
 
-  // --- mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
+  // --- mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose] [--json] ---
   if (sub === "explain") {
     const agentIdx = subArgv.indexOf("--agent")
     const taskIdx = subArgv.indexOf("--task")
     const capIdx = subArgv.indexOf("--capability")
+    const verbose = subArgv.includes("--verbose")
 
     const agent = agentIdx >= 0 ? subArgv[agentIdx + 1] : null
     const task = taskIdx >= 0 ? subArgv[taskIdx + 1] : null
     const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
     if (!agent || !task) {
-      console.error("ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>]")
+      console.error("ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose]")
       return 1
     }
 
     const { loadIndex, buildOperationalIndex, retrieveDocuments, scoreDocument } = await import("./context-memory-schema.mjs")
 
-    // Try to load existing index first, build if needed
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
     let index = loadIndex(indexPath)
-
-    // If index is empty or doesn't exist, build from operational corpus only
     if (!index || !index.entries || index.entries.length === 0) {
       buildOperationalIndex(contextRoot, { rebuild: false })
       index = loadIndex(indexPath)
@@ -2911,7 +2990,6 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
 
     const request = { agent, task, capability_hint, available_tools: null, available_mcp: null }
 
-    // Score all docs for explanation
     const allScored = []
     for (const entry of index.entries || []) {
       const r = scoreDocument(entry, request)
@@ -2941,8 +3019,8 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           top_scores: allScored.slice(0, 5).map(s => ({ id: s.id, score: s.score, reasons: s.reasons })),
         },
       }, null, 2))
-    } else {
-      console.log("=== Context Memory Retrieval Explanation ===")
+    } else if (verbose) {
+      console.log("=== Context Manager Retrieval Explanation ===")
       console.log("Task: " + task)
       console.log("Agent: " + agent)
       if (capability_hint) console.log("Capability hint: " + capability_hint)
@@ -2971,6 +3049,15 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
         const scoreStr = (s.score * 100).toFixed(0) + "%"
         console.log((s.id || "").padEnd(55) + scoreStr.padStart(8) + " " + stability.padEnd(11) + " " + s.reasons.join("; "))
       }
+    } else {
+      const top = result.matched_docs.slice(0, 3)
+      console.log(`Context retrieval for ${agent} — "${task}"`)
+      console.log("")
+      console.log(`Matched: ${result.matched_docs.length} docs (confidence: ${result.confidence})`)
+      for (const m of top) {
+        console.log(`  ${m.id} (${(m.score * 100).toFixed(0)}%) — ${(m.reasons || []).join('; ')}`)
+      }
+      console.log("Use --verbose for full breakdown.")
     }
     return 0
   }
@@ -3002,7 +3089,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     }
 
     const prop = result.proposal
-    console.log("=== Context Memory Proposal Created ===")
+    console.log("=== Context Manager Proposal Created ===")
     console.log("File:    " + writeResult.file_path)
     console.log("Status:  draft (requires review)")
     console.log("Source:  " + prop.source_type + " — " + prop.source_ref)
@@ -3021,6 +3108,105 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     console.log("  2. If approved, move to .mah/context/operational/")
     console.log("  3. Set stability: draft → curated → stable")
     return 0
+  }
+
+  // --- mah context proposals list|show|promote|reject ---
+  if (sub === "proposals") {
+    const govAction = subArgv[0]
+    const govArgv = subArgv.slice(1)
+    const govJson = govArgv.includes("--json") || jsonMode
+
+    const { listProposalSummaries, showProposal, promoteProposal, rejectProposal } = await import("./context-memory-proposal.mjs")
+
+    if (!govAction || govAction === "list") {
+      const summaries = listProposalSummaries(repoRoot)
+      if (govJson) {
+        console.log(JSON.stringify({ proposals: summaries }, null, 2))
+      } else {
+        if (summaries.length === 0) { console.log("No proposals found."); return 0 }
+        console.log("=== Context Manager Proposals ===\n")
+        console.log("ID".padEnd(38) + " Status".padEnd(12) + " Proposed Doc ID".padEnd(50) + " Source")
+        console.log("\u2500".repeat(38) + " " + "\u2500".repeat(12) + " " + "\u2500".repeat(50) + " " + "\u2500".repeat(30))
+        for (const s of summaries) {
+          console.log((s.id || "").slice(0, 36).padEnd(38) + (s.status || "").padEnd(12) + (s.proposed_document_id || "").slice(0, 48).padEnd(50) + (s.source_ref || "").slice(0, 30))
+        }
+        console.log("\n" + summaries.length + " proposal(s).")
+      }
+      return 0
+    }
+
+    if (govAction === "show") {
+      const proposalId = govArgv.find(a => !a.startsWith("-"))
+      if (!proposalId) { console.error("ERROR: usage: mah context proposals show <proposal-id>"); return 1 }
+      const result = showProposal(repoRoot, proposalId)
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (govJson) {
+        console.log(JSON.stringify(result, null, 2))
+      } else {
+        const p = result.proposal
+        console.log("=== Proposal: " + p.id + " ===\n")
+        console.log("Status:     " + p.status)
+        console.log("Source:     " + p.source_type + " \u2014 " + p.source_ref)
+        console.log("Proposed:   " + p.proposed_document_id)
+        console.log("Summary:    " + (p.summary || "(none)"))
+        console.log("File:       " + result.file_path)
+        if (result.overlaps && result.overlaps.length > 0) {
+          console.log("\nOverlaps detected:")
+          for (const o of result.overlaps) console.log("  [" + o.type + "] " + o.message)
+        }
+        console.log("\n--- Body ---\n" + (result.body || "(empty)"))
+      }
+      return 0
+    }
+
+    if (govAction === "promote") {
+      const proposalId = govArgv.find(a => !a.startsWith("-"))
+      if (!proposalId) { console.error("ERROR: usage: mah context proposals promote <proposal-id> [--stability <level>] [--force]"); return 1 }
+      const stabIdx = govArgv.indexOf("--stability")
+      const stability = stabIdx >= 0 ? govArgv[stabIdx + 1] : "curated"
+      const force = govArgv.includes("--force")
+      const result = await promoteProposal(repoRoot, proposalId, stability, { force })
+      if (!result.ok) {
+        if (result.overlaps && result.overlaps.length > 0) {
+          console.error("ERROR: " + result.error)
+          for (const o of result.overlaps) console.error("  [" + o.type + "] " + o.message)
+          return 1
+        }
+        console.error("ERROR: " + result.error); return 1
+      }
+      if (govJson) {
+        console.log(JSON.stringify({ ok: true, target_path: result.target_path, overlaps: result.overlaps }, null, 2))
+      } else {
+        console.log("=== Proposal Promoted ===")
+        console.log("Target: " + result.target_path)
+        if (result.overlaps && result.overlaps.length > 0) {
+          console.log("Warnings:")
+          for (const o of result.overlaps) console.log("  [" + o.type + "] " + o.message)
+        }
+      }
+      return 0
+    }
+
+    if (govAction === "reject") {
+      const proposalId = govArgv.find(a => !a.startsWith("-"))
+      const reasonIdx = govArgv.indexOf("--reason")
+      const reason = reasonIdx >= 0 ? govArgv[reasonIdx + 1] : ""
+      if (!proposalId) { console.error("ERROR: usage: mah context proposals reject <proposal-id> --reason \"...\""); return 1 }
+      if (!reason) { console.error("ERROR: --reason is required for rejection"); return 1 }
+      const result = rejectProposal(repoRoot, proposalId, reason)
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (govJson) {
+        console.log(JSON.stringify({ ok: true, file_path: result.file_path }, null, 2))
+      } else {
+        console.log("=== Proposal Rejected ===")
+        console.log("File:   " + result.file_path)
+        console.log("Reason: " + reason)
+      }
+      return 0
+    }
+
+    console.error("ERROR: unknown proposals subcommand '" + govAction + "'. Use: list, show, promote, reject")
+    return 1
   }
 
   console.error("ERROR: unknown context subcommand \x27" + sub + "\x27. Run \x27mah context --help\x27 for usage.")
@@ -3235,7 +3421,7 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'recommend') {
     const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
-    const { crew, json } = parseExpertiseFlags(subArgv)
+    const { crew, json, verbose } = parseExpertiseFlags(subArgv)
     const effectiveCrew = crew || defaultCrew
 
     if (!task) {
@@ -3284,30 +3470,48 @@ async function runExpertise(argv, jsonMode = false) {
       return 0
     }
 
-    console.log(`=== Expertise Recommendation ===\n`)
-    console.log(`Task: "${task}"`)
-    console.log(`Crew: ${effectiveCrew}\n`)
-
     const sortedScores = Object.entries(scoringResult.scores || {})
       .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
 
-    console.log(`Candidates (${candidates.length}):\n`)
-    for (const [id, scoreData] of sortedScores) {
-      const bar = scoreData?.final_score > 0
-        ? `█`.repeat(Math.round(scoreData.final_score * 10)).padEnd(10, '░')
-        : '░'.repeat(10)
-      const marker = id === scoringResult.selected ? '→ ' : '  '
-      console.log(`${marker}${bar} ${(scoreData?.final_score || 0).toFixed(3)}  ${id}`)
+    if (verbose) {
+      console.log(`=== Expertise Recommendation ===\n`)
+      console.log(`Task: "${task}"`)
+      console.log(`Crew: ${effectiveCrew}\n`)
+      console.log(`Candidates (${candidates.length}):\n`)
+      for (const [id, scoreData] of sortedScores) {
+        const bar = scoreData?.final_score > 0
+          ? `█`.repeat(Math.round(scoreData.final_score * 10)).padEnd(10, '░')
+          : '░'.repeat(10)
+        const marker = id === scoringResult.selected ? '→ ' : '  '
+        console.log(`${marker}${bar} ${(scoreData?.final_score || 0).toFixed(3)}  ${id}`)
+      }
+      console.log('')
+      if (scoringResult.selected) {
+        console.log(`Recommended: ${scoringResult.selected} (score: ${(scoringResult.scores[scoringResult.selected]?.final_score || 0).toFixed(3)})`)
+      }
+      if (scoringResult.escalation) {
+        console.log(`⚠ Escalation: ${scoringResult.fallback_reason || 'score below threshold'}`)
+      }
+      console.log("\nUse 'mah expertise explain --task \"<task>\" --verbose' for full decision trace.")
+      return 0
     }
 
-    console.log('')
-    if (scoringResult.selected) {
-      console.log(`Recommended: ${scoringResult.selected} (score: ${(scoringResult.scores[scoringResult.selected]?.final_score || 0).toFixed(3)})`)
-    }
-    if (scoringResult.escalation) {
-      console.log(`⚠ Escalation: ${scoringResult.fallback_reason || 'score below threshold'}`)
-    }
-    console.log("\nUse 'mah expertise explain --task \"<task>\"' for full decision trace.")
+    const selectedId = scoringResult.selected
+    const selectedScore = selectedId ? scoringResult.scores?.[selectedId] : null
+    const selectedCandidate = candidates.find(c => c.id === selectedId)
+    const fitReason = summarizeCapabilityFit(task, selectedCandidate)
+    const penalties = joinOrNone(selectedScore?.penalties_applied)
+    const evidenceHint = topEvidenceHint(selectedScore, scoringResult)
+    const escalationText = scoringResult.escalation
+      ? `yes — ${scoringResult.fallback_reason || 'score below threshold'}`
+      : 'no'
+
+    console.log(`Recommended: ${selectedId || 'none'} (${(selectedScore?.final_score || 0).toFixed(3)}) — ${fitReason}`)
+    console.log(`Confidence: ${selectedScore?.confidence_band || 'unknown'} | Penalties: ${penalties}`)
+    console.log(`Evidence: ${evidenceHint}`)
+    if (scoringResult.explain?.selected_reason) console.log(`Reason: ${scoringResult.explain.selected_reason}`)
+    console.log(`Escalation: ${escalationText}`)
+    console.log('Use --verbose for full trace.')
     return 0
   }
 
@@ -3358,11 +3562,12 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'explain') {
     const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
-    const { crew, json } = parseExpertiseFlags(subArgv)
+    const agentFlag = parseValueArg(subArgv, '--agent')
+    const { crew, json, verbose } = parseExpertiseFlags(subArgv)
     const effectiveCrew = crew || defaultCrew
 
     if (!task) {
-      console.error("ERROR: usage: mah expertise explain --task '<task>' [--crew <crew>]")
+      console.error("ERROR: usage: mah expertise explain --task '<task>' [--crew <crew>] [--agent <name>]")
       return 1
     }
 
@@ -3403,47 +3608,85 @@ async function runExpertise(argv, jsonMode = false) {
       return 0
     }
 
-    console.log(`=== Expertise Routing Trace ===\n`)
-    console.log(`Task: "${task}"`)
-    console.log(`Source: ${sourceAgent}  |  Crew: ${effectiveCrew}\n`)
-
-    console.log('── Decision Filters ──')
-    console.log('  [1] policy/topology allowed set')
-    console.log('  [2] environment compatibility')
-    console.log('  [3] trust tier requirement')
-    console.log('  [4] lifecycle blocking (restricted/revoked)')
-    console.log('  [5] expertise match score')
-    console.log('  [6] confidence + evidence freshness\n')
-
     const sorted = Object.entries(scoringResult.scores || {})
       .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
 
-    console.log('── Scoring Breakdown ──')
-    for (const [id, scoreData] of sorted) {
-      if (!scoreData) continue
-      console.log(`\n  ${id}:`)
-      console.log(`    expertise_match: ${scoreData.match_score?.toFixed(3) || '—'}`)
-      console.log(`    confidence_adj:  ${scoreData.confidence_adjustment?.toFixed(3) || '—'}`)
-      console.log(`    penalty:         ${scoreData.penalty?.toFixed(3) || '—'}`)
-      console.log(`    ─ final:         ${scoreData.final_score?.toFixed(3) || '—'}`)
-      if (scoreData.penalties_applied?.length) {
-        console.log(`    penalties:       ${scoreData.penalties_applied.join(', ')}`)
+    if (verbose) {
+      console.log(`=== Expertise Routing Trace ===\n`)
+      console.log(`Task: "${task}"`)
+      console.log(`Source: ${sourceAgent}  |  Crew: ${effectiveCrew}\n`)
+
+      console.log('── Decision Filters ──')
+      console.log('  [1] policy/topology allowed set')
+      console.log('  [2] environment compatibility')
+      console.log('  [3] trust tier requirement')
+      console.log('  [4] lifecycle blocking (restricted/revoked)')
+      console.log('  [5] expertise match score')
+      console.log('  [6] confidence + evidence freshness\n')
+
+      console.log('── Scoring Breakdown ──')
+      for (const [id, scoreData] of sorted) {
+        if (!scoreData) continue
+        console.log(`\n  ${id}:`)
+        console.log(`    expertise_match: ${scoreData.match_score?.toFixed(3) || '—'}`)
+        console.log(`    confidence_adj:  ${scoreData.confidence_adjustment?.toFixed(3) || '—'}`)
+        console.log(`    penalty:         ${scoreData.penalty?.toFixed(3) || '—'}`)
+        console.log(`    ─ final:         ${scoreData.final_score?.toFixed(3) || '—'}`)
+        if (scoreData.penalties_applied?.length) {
+          console.log(`    penalties:       ${scoreData.penalties_applied.join(', ')}`)
+        }
+        if (scoreData.blocked_filters?.length) {
+          console.log(`    BLOCKED: ${scoreData.blocked_filters.join('; ')}`)
+        }
       }
-      if (scoreData.blocked_filters?.length) {
-        console.log(`    BLOCKED: ${scoreData.blocked_filters.join('; ')}`)
+
+      console.log('\n── Decision ──')
+      if (scoringResult.selected) {
+        const topScore = scoringResult.scores[scoringResult.selected]
+        console.log(`  Selected: ${scoringResult.selected}`)
+        console.log(`  Score: ${(topScore?.final_score || 0).toFixed(3)}`)
+        if (topScore?.confidence_band) console.log(`  Confidence band: ${topScore.confidence_band}`)
       }
+      if (scoringResult.escalation) {
+        console.log(`  ⚠ ESCALATION RECOMMENDED: ${scoringResult.fallback_reason}`)
+      }
+      return 0
     }
 
-    console.log('\n── Decision ──')
-    if (scoringResult.selected) {
-      const topScore = scoringResult.scores[scoringResult.selected]
-      console.log(`  Selected: ${scoringResult.selected}`)
-      console.log(`  Score: ${(topScore?.final_score || 0).toFixed(3)}`)
-      if (topScore?.confidence_band) console.log(`  Confidence band: ${topScore.confidence_band}`)
+    if (agentFlag) {
+      const scoreData = scoringResult.scores?.[agentFlag]
+      if (!scoreData) {
+        console.error(`ERROR: agent '${agentFlag}' not found in crew '${effectiveCrew}'`)
+        return 1
+      }
+      const verdict = agentFlag === scoringResult.selected
+        ? 'selected'
+        : (scoreData.final_score > 0 ? 'qualified-but-not-top' : 'below-threshold')
+      const evidence = topEvidenceHint(scoreData, scoringResult)
+      console.log(`Agent ${agentFlag} for "${task}" (crew: ${effectiveCrew}):\n`)
+      console.log(`Score: ${(scoreData.final_score || 0).toFixed(3)} | Match: ${(scoreData.match_score || 0).toFixed(3)} | Confidence: ${scoreData.confidence_band || 'unknown'}`)
+      console.log(`Penalties: ${joinOrNone(scoreData.penalties_applied)} | Blocked: ${joinOrNone(scoreData.blocked_filters)}`)
+      console.log(`Evidence: ${evidence}\n`)
+      if (verdict === 'qualified-but-not-top') {
+        console.log('Verdict: qualified-but-not-top')
+      } else if (verdict === 'below-threshold') {
+        console.log('Verdict: below-threshold')
+      } else {
+        console.log('Verdict: selected')
+      }
+      return 0
     }
-    if (scoringResult.escalation) {
-      console.log(`  ⚠ ESCALATION RECOMMENDED: ${scoringResult.fallback_reason}`)
+
+    console.log(`Routing for "${task}" (crew: ${effectiveCrew}):\n`)
+    const top3 = sorted.slice(0, 3)
+    for (let i = 0; i < top3.length; i++) {
+      const [id, scoreData] = top3[i]
+      const candidate = candidates.find(c => c.id === id)
+      console.log(`${i + 1}. ${id} (${(scoreData?.final_score || 0).toFixed(3)}) — ${summarizeCapabilityFit(task, candidate)}`)
+      console.log(`   Penalties: ${joinOrNone(scoreData?.penalties_applied)} | Blocked: ${joinOrNone(scoreData?.blocked_filters)}`)
     }
+    if (scoringResult.explain?.selected_reason) console.log(`\nReason: ${scoringResult.explain.selected_reason}`)
+    console.log(`Selected: ${scoringResult.selected || 'none'} | Use --verbose for full trace.`)
     return 0
   }
 
@@ -3792,13 +4035,15 @@ Usage:
   mah expertise show <id> --json            JSON output
 
   mah expertise recommend --task '<desc>'   Recommend best candidate for task
+  mah expertise recommend --task '<desc>' --verbose   Full scoring trace text
   mah expertise recommend --task '<desc>' --json   JSON output
 
   mah expertise evidence <id>               Show evidence events for expertise
   mah expertise evidence <id> --limit 20   Limit to 20 events
   mah expertise evidence <id> --json        JSON output
 
-  mah expertise explain --task '<desc>'     Full routing decision trace
+  mah expertise explain --task '<desc>' [--agent <name>]   Routing decision trace
+  mah expertise explain --task '<desc>' --verbose   Full routing decision trace
   mah expertise explain --task '<desc>' --json   JSON output
 
   mah expertise export <id>                 Export expertise to JSON
@@ -3831,6 +4076,9 @@ Examples:
   mah expertise seed --crew dev              Seed specific crew
   mah expertise show dev:backend-dev
   mah expertise recommend --task "implement user authentication API"
+  mah expertise recommend --task "implement user authentication API" --verbose
+  mah expertise explain --task "implement user authentication API" --agent backend-dev
+  mah expertise explain --task "implement user authentication API" --verbose
   mah expertise evidence dev:backend-dev --limit 10
   mah expertise export dev:backend-dev --output .mah/expertise/exported/backend-dev.json
   mah expertise propose dev:backend-dev --summary "Promote backend-dev after v0.7.0 evidence accumulation" --changes '{"validation_status":"validated"}'
@@ -3942,7 +4190,7 @@ function main() {
       // not for MAH's own runtime detection. normalizedArgv strips --runtime.
       // argv = process.argv.slice(2), so argv[0] = 'delegate'. Skip it.
       const delegateHeadless = argv.includes("--headless")
-      const delegateArgv = normalizedArgv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
+      const delegateArgv = argv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
       process.exitCode = await runDelegate(delegateArgv, { headless: delegateHeadless })
     })()
     return
@@ -4157,6 +4405,39 @@ function main() {
       process.exitCode = runtimeResult.runtime ? 0 : 1
       return
     }
+
+    if (explainCommand === "state") {
+      const statePayload = buildAssistantStatePayload({
+        repoRoot,
+        crew: explainFilters.crew || "",
+        agent: explainFilters.agent || "",
+        task: explainFilters.task || "",
+        runtime: runtimeResult.runtime || ""
+      })
+      if (jsonMode) {
+        printDiagnosticPayload(createDiagnosticPayload("explain", {
+          status: 0,
+          runtime: runtimeResult.runtime,
+          reason: runtimeResult.reason,
+          data: { target: "state", payload: statePayload }
+        }))
+      } else {
+        console.log("Assistant State")
+        console.log(`  Crew:     ${statePayload.crew}`)
+        console.log(`  Agent:    ${statePayload.agent}`)
+        console.log(`  Runtime:  ${statePayload.runtime}`)
+        console.log(`  Expertise: ${statePayload.expertise.selected || "none"} (confidence: ${typeof statePayload.expertise.confidence === "number" ? statePayload.expertise.confidence.toFixed(2) : "n/a"})`)
+        console.log(`  Context:  ${statePayload.context_memory.status} (${(statePayload.context_memory.matched_docs || []).length} docs)`)
+        console.log(`  Session:  ${statePayload.session.mode}${statePayload.session.session_id ? ` ${statePayload.session.session_id}` : ""}`)
+        console.log(`  Provenance: ${statePayload.provenance.status}`)
+        console.log(`  Readiness: ${statePayload.readiness.status}`)
+        for (const note of statePayload.readiness.notes || []) {
+          console.log(`    - ${note}`)
+        }
+      }
+      return
+    }
+
     if (!runtimeResult.runtime) {
       console.error(`ERROR: could not detect runtime. Use --runtime <${orderedRuntimeNames(runtimeProfiles).join("|")}>`)
       process.exitCode = 1
@@ -4452,6 +4733,9 @@ function main() {
           crewContext,
           internal: headlessPlan.internal || {}
         }
+        if (normalizedArgv.includes("--with-context-memory")) {
+          payload.context_memory = buildContextMemoryExplainPayload(passthrough)
+        }
         if (jsonMode) {
           printDiagnosticPayload(createDiagnosticPayload("explain", {
             status: 0,
@@ -4482,6 +4766,9 @@ function main() {
         warnings: plan.warnings || [],
         candidates: plan.candidates || [],
         crewContext
+      }
+      if (normalizedArgv.includes("--with-context-memory")) {
+        payload.context_memory = buildContextMemoryExplainPayload(passthrough)
       }
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {

@@ -1,14 +1,14 @@
-# Context Memory (v0.8.0)
+# Context Manager (v0.8.0)
 
 ## Status
 
-Context Memory is an operational layer for retrieving relevant task context after expertise-based routing has selected an agent. It provides bounded, explainable, reusable operational memory without interfering with routing decisions.
+Context Manager is an operational layer for retrieving relevant task context after expertise-based routing has selected an agent. It provides bounded, explainable, reusable operational memory without interfering with routing decisions.
 
 This document covers the v0.8.0 implementation.
 
 ## What It Is
 
-Context Memory answers the question: **What does this agent need to remember to execute this task well?**
+Context Manager answers the question: **What does this agent need to remember to execute this task well?**
 
 It is separate from Expertise, which answers: **Which agent should receive this task?**
 
@@ -17,7 +17,7 @@ It is separate from Expertise, which answers: **Which agent should receive this 
 | Layer | Role | CLI |
 |---|---|---|
 | Expertise | Who should act | mah expertise |
-| Context Memory | What to remember | mah context |
+| Context Manager | What to remember | mah context |
 | Sessions | Ephemeral continuity | mah sessions |
 | Provenance | Audit trail | via sessions |
 | Evidence | Structured signals | via expertise |
@@ -141,6 +141,57 @@ Session ID format: runtime:crew:sessionId (e.g., hermes:dev:abc123)
 
 Proposals are written to .mah/context/proposals/ with status: draft. Review and promote manually.
 
+### mah context proposals list
+
+List all proposals with their current status.
+
+\u0060\u0060\u0060
+mah context proposals list [--json]
+\u0060\u0060\u0060
+
+- \u0060--json\u0060 \u2014 output as JSON array
+- Default: human-readable table with ID, status, proposed document ID, source
+
+### mah context proposals show
+
+Display full proposal metadata, rationale, and overlap detection results.
+
+\u0060\u0060\u0060
+mah context proposals show <proposal-id> [--json]
+\u0060\u0060\u0060
+
+- \u0060--json\u0060 \u2014 output as JSON object
+- Includes overlap warnings for duplicate targets, same session, similar titles
+
+### mah context proposals promote
+
+Promote a draft proposal to the operational corpus. Validates the proposal and its proposed document before writing.
+
+\u0060\u0060\u0060
+mah context proposals promote <proposal-id> [--stability curated|draft|auto] [--force] [--json]
+\u0060\u0060\u0060
+
+- \u0060--stability\u0060 \u2014 set stability level for the promoted document (default: \u0060curated\u0060)
+- \u0060--force\u0060 \u2014 proceed even if overlaps detected
+- \u0060--json\u0060 \u2014 output as JSON
+- Writes curated document to \u0060.mah/context/operational/<id>.md\u0060
+- Updates proposal status to \u0060promoted\u0060 with timestamp
+- Refuses to overwrite existing operational documents
+- Refuses path traversal or unsafe filenames
+
+### mah context proposals reject
+
+Reject a draft proposal with a reason. The proposal file is preserved for audit.
+
+\u0060\u0060\u0060
+mah context proposals reject <proposal-id> --reason "..." [--json]
+\u0060\u0060\u0060
+
+- \u0060--reason\u0060 \u2014 **required** explanation for rejection
+- \u0060--json\u0060 \u2014 output as JSON
+- Updates proposal status to \u0060rejected\u0060 with reason and timestamp
+- Proposal file is never deleted
+
 ## Retrieval Algorithm
 
 Input: task, agent, [capability_hint], [available_tools], [available_mcp]
@@ -185,6 +236,15 @@ Derived memory proposals are created from sessions:
 4. If approved: move to .mah/context/operational/ and set stability
 5. Rebuild index: mah context index --rebuild
 
+Proposals follow a governed state machine:
+
+- **draft** → created by \u0060mah context propose --from-session\u0060
+- **draft** → \u0060promoted\u0060 via \u0060mah context proposals promote <id>\u0060 (validates, writes to operational)
+- **draft** → \u0060rejected\u0060 via \u0060mah context proposals reject <id> --reason "..."\u0060 (preserves file)
+- State transitions are one-way: promoted and rejected proposals cannot be re-promoted or re-rejected.
+
+Promotion never happens automatically from \u0060propose\u0060. Every promotion requires explicit operator action.
+
 ## Storage Layout
 
 \`\`\`
@@ -206,7 +266,7 @@ Derived memory proposals are created from sessions:
 - No vector DB or embedding dependency
 - No Obsidian dependency; Obsidian is optional as an editor only
 - .md and .qmd treated identically
-- Context Memory has zero role in routing decisions
+- Context Manager has zero role in routing decisions
 - `tests/fixtures/context-memory/` is validation data only and is never part of the operational corpus
 - Raw session transcripts are not automatically promoted
 - All proposals require human review before corpus entry
