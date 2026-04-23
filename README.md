@@ -22,13 +22,15 @@ Multi-agent teams often end up fragmented across runtime-specific repos and oper
 
 Meta Agents Harness solves that by providing:
 
-- **one CLI surface** for multiple runtimes
-- **runtime-aware dispatch** with deterministic detection
-- **shared multi-team topology** (`orchestrator -> leads -> workers`)
-- **canonical config generation** for runtime-specific artifacts
-- **incremental migration path** from runtime-specific harnesses to a unified entrypoint
+- **expertise-aware routing** — agents matched by skill and capability, not just name
+- **operational context memory** — the right docs fetched per task, per agent
+- **session and lifecycle visibility** — see execution as it happens, resume or inspect any session
+- **compounding loop** — successful runs improve future routing through governed expertise sync
+- **one CLI surface** for multiple runtimes with runtime-aware dispatch
+- **shared multi-team topology** (`orchestrator → leads → workers`)
+- **AI-assisted bootstrap** as optional acceleration, not a requirement
 
-This makes it easier to standardize operations without forcing teams to abandon the runtime they already use.
+Route the right agent, load the right context, show the work, compound over time.
 
 ---
 
@@ -51,6 +53,8 @@ mah init --yes --crew my-team --name "My Project" --description "Project descrip
 # Force overwrite existing config
 mah init --yes --force
 ```
+
+> `mah init` produces an expertise-aware topology — not just a config file. Each agent gets a capability profile that drives routing.
 
 ### Verify Your Setup
 
@@ -184,6 +188,11 @@ mah list:crews
 mah use dev
 mah clear
 mah run
+mah expertise recommend --task "fix auth middleware"  # route by capability
+mah expertise sync                                    # strengthen routing from session outcomes
+mah context find --agent worker-1 --task "fix auth"   # fetch operational memory
+mah context propose --from-session pi:dev:abc123      # governed learning
+mah sessions status                                   # see what's running
 ```
 
 ### 2. Canonical configuration
@@ -261,6 +270,17 @@ In `v0.7.0`, the expertise model is treated as an operational foundation concept
 The workspace-local `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
 
 See: `docs/expertise-model-foundation.md`
+
+### 7. Context Manager
+
+The Context Manager provides bounded operational memory fetched per task:
+
+- **per-agent, per-task retrieval** — `mah context find --agent <agent> --task "<task>"`
+- **governed proposals** — `mah context propose --from-session <ref>` creates a draft for human review
+- **no auto-promotion** — every context entry is curated before it enters the operational corpus
+- **runtime-agnostic** — `.md` and `.qmd` sources, no vector DB dependency
+
+See: `docs/context-manager.md`
 
 ---
 

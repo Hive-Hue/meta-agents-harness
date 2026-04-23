@@ -31,7 +31,86 @@ function extractSessionSignals(session) {
   for (const kw of keywords) {
     if (summary.toLowerCase().includes(kw)) capabilityHints.push(kw.replace(/-/g, "_"))
   }
-  return { signals, agent: session.agent || null, capability_hints: [...new Set(capabilityHints)] }
+  const delegationSignals = extractDelegationSignals(session.source_path)
+  signals.push(...delegationSignals.signals)
+  capabilityHints.push(...delegationSignals.capability_hints)
+  return { signals, agent: session.agent || null, capability_hints: [...new Set(capabilityHints)], delegationSignals }
+}
+
+function extractDelegationSignals(sessionPath) {
+  const signals = []
+  const capabilityHints = []
+  const taskSignals = []
+  if (!sessionPath || !existsSync(sessionPath)) {
+    return { signals, capability_hints: [], task_signals: [] }
+  }
+  const artifactsDir = join(sessionPath, "artifacts")
+  if (!existsSync(artifactsDir)) {
+    return { signals, capability_hints: [], task_signals: [] }
+  }
+  let delegationFiles
+  try {
+    delegationFiles = readdirSync(artifactsDir).filter(f => f.includes("delegation") && f.endsWith(".md"))
+  } catch {
+    return { signals, capability_hints: [], task_signals: [] }
+  }
+  const CAVEMAN_BLOCK_RE = /\[CAVEMAN_CREW\].*?\]/gs
+  const delegationRe = /Target:\s*(.+)/i
+  const exitRe = /Exit code:\s*(\d+)/i
+  const outcomeRe = /1\.\s*Outcome.*?$(.*?)(?=^2\. |^## |\Z)/gm
+  const taskRe = /^##\s*Task$/mi
+  for (const file of delegationFiles) {
+    const filePath = join(artifactsDir, file)
+    let content
+    try {
+      content = readFileSync(filePath, "utf-8")
+    } catch {
+      continue
+    }
+    const targetMatch = delegationRe.exec(content)
+    const target = targetMatch ? targetMatch[1].trim() : null
+    const exitMatch = exitRe.exec(content)
+    const exitCode = exitMatch ? exitMatch[1].trim() : null
+    if (target) signals.push("delegation:" + target + ":" + (exitCode === "0" ? "success" : "failure"))
+    if (exitCode === "0") {
+      signals.push("outcome:success:" + target)
+    } else if (exitCode !== null) {
+      signals.push("outcome:failure:" + target)
+      const outcomeMatch = outcomeRe.exec(content)
+      if (outcomeMatch) {
+        const outcome = outcomeMatch[1].trim().split("\n")[0].substring(0, 120)
+        if (outcome) signals.push("failure_note:" + outcome)
+      }
+    }
+    const taskMatch = taskRe.exec(content)
+    if (taskMatch) {
+      const taskStart = taskMatch.index
+      const taskChunk = content.substring(taskStart, taskStart + 600)
+      const taskClean = taskChunk.replace(CAVEMAN_BLOCK_RE, "").trim()
+      const taskLines = taskClean.split("\n").slice(1, 6)
+        .map(l => l.replace(/^#+\s*/, "").trim())
+        .filter(l => l && !/^(Target|Exit code|Tool calls|- )/.test(l))
+        .join(" ")
+        .substring(0, 200)
+      if (taskLines) {
+        taskSignals.push({ target, task: taskLines })
+        const taskKeywords = ["implement", "write", "update", "add", "fix", "review", "analyze", "delegate", "plan", "design", "test"]
+        for (const kw of taskKeywords) {
+          if (taskLines.toLowerCase().includes(kw)) {
+            capabilityHints.push(kw.replace(/-/g, "_"))
+          }
+        }
+      }
+    }
+  }
+  const successCount = signals.filter(s => s.startsWith("outcome:success:")).length
+  const failureCount = signals.filter(s => s.startsWith("outcome:failure:")).length
+  const total = successCount + failureCount
+  if (total > 0) {
+    signals.unshift(`delegation_summary:${successCount}ok/${total}total`)
+    signals.push(`success_rate:${Math.round((successCount / total) * 100)}%`)
+  }
+  return { signals, capability_hints: [...new Set(capabilityHints)], task_signals: taskSignals }
 }
 
 function deriveProposedId(agent, capabilityHints, crew) {
@@ -41,42 +120,59 @@ function deriveProposedId(agent, capabilityHints, crew) {
   return crew + "/" + (agent || "agent") + "/" + cap + "/" + date + "-" + cap + "-" + rand
 }
 
-function deriveSummary(signals) {
+function deriveSummary(signals, taskSignals = []) {
+  const delegationSummary = signals.find(x => x.startsWith("delegation_summary:"))
+  if (delegationSummary) return delegationSummary
   const s = signals.find(x => x.startsWith("Session summary:")) || ""
   const text = s.replace("Session summary: ", "")
+  if (taskSignals.length > 0) {
+    const taskTexts = taskSignals.map(t => t.task).filter(Boolean)
+    if (taskTexts.length > 0) return taskTexts[0].substring(0, 117) + "..."
+  }
   return text.length > 120 ? text.slice(0, 117) + "..." : text
 }
 
-function deriveRationale(session, signals) {
+function deriveRationale(session, signals, taskSignals = []) {
   const parts = []
   parts.push("Derived from session: " + (session.id || "unknown"))
   if (session.crew) parts.push("Crew: " + session.crew)
   if (session.runtime) parts.push("Runtime: " + session.runtime)
   if (session.last_active_at) parts.push("Last active: " + session.last_active_at)
+  const delegationSummary = signals.find(x => x.startsWith("delegation_summary:"))
+  const successRate = signals.find(x => x.startsWith("success_rate:"))
+  if (delegationSummary) parts.push(delegationSummary)
+  if (successRate) parts.push(successRate)
   parts.push("")
   parts.push("Key signals:")
-  for (const sig of signals.slice(0, 5)) parts.push("- " + sig)
+  for (const sig of signals.slice(0, 10)) parts.push("- " + sig)
+  if (taskSignals.length > 0) {
+    parts.push("")
+    parts.push("Tasks observed in session:")
+    for (const t of taskSignals.slice(0, 5)) {
+      parts.push("- [" + (t.target || "?") + "] " + t.task.substring(0, 100))
+    }
+  }
   return parts.join("\n")
 }
 
 export function proposeFromSession(repoRoot, sessionIdFull) {
   const { ok, session, error } = findSession(repoRoot, sessionIdFull)
   if (!ok) return { ok: false, error }
-  const { signals, agent, capability_hints } = extractSessionSignals(session)
+  const { signals, agent, capability_hints, delegationSignals } = extractSessionSignals(session)
+  const taskSignals = (delegationSignals && delegationSignals.task_signals) ? delegationSignals.task_signals : []
   const proposalId = randomUUID()
   const proposedId = deriveProposedId(agent, capability_hints, session.crew || "dev")
-  const summary = deriveSummary(signals)
-  const rationale = deriveRationale(session, signals)
+  const summary = deriveSummary(signals, taskSignals)
+  const rationale = deriveRationale(session, signals, taskSignals)
   const proposedFrontmatter = {
     id: proposedId, kind: "operational-memory",
     crew: session.crew || "dev",
     agent: agent || (session.crew ? session.crew + "-lead" : "agent"),
-    capabilities: capability_hints.length > 0 ? capability_hints : ["general"],
+    capabilities: capability_hints.length > 0 ? [...new Set(capability_hints)] : ["general"],
     stability: "draft", source_type: "derived",
     last_reviewed_at: new Date().toISOString().slice(0, 10),
   }
-  const summarySignal = signals.find(x => x.startsWith("Session summary:")) || ""
-  const bodyContent = summarySignal ? "# Operational Pattern\n\n" + summarySignal.replace("Session summary: ", "") : "# Operational Pattern\n\nOperational memory derived from session."
+  const bodyContent = buildProposalBody(signals, taskSignals)
   const proposal = {
     proposal_version: CONTEXT_MEMORY_PROPOSAL_VERSION,
     id: proposalId, status: "draft",
@@ -88,6 +184,46 @@ export function proposeFromSession(repoRoot, sessionIdFull) {
     summary, rationale, reviewers: ["orchestrator"], existing_refs: [],
   }
   return { ok: true, proposal, signals }
+}
+
+function buildProposalBody(signals, taskSignals) {
+  const lines = []
+  lines.push("# Operational Pattern")
+  lines.push("")
+  const delegationSummary = signals.find(x => x.startsWith("delegation_summary:"))
+  const successRate = signals.find(x => x.startsWith("success_rate:"))
+  if (delegationSummary) {
+    lines.push("## Delegation Summary")
+    lines.push("")
+    lines.push(delegationSummary)
+    if (successRate) lines.push(successRate)
+    lines.push("")
+  }
+  if (taskSignals.length > 0) {
+    lines.push("## Tasks in Session")
+    lines.push("")
+    for (const t of taskSignals) {
+      lines.push("- **" + (t.target || "unknown") + "**: " + t.task.substring(0, 200))
+    }
+    lines.push("")
+  }
+  const sessionSummary = signals.find(x => x.startsWith("Session summary:"))
+  if (sessionSummary) {
+    lines.push("## Session Notes")
+    lines.push("")
+    lines.push(sessionSummary.replace("Session summary: ", ""))
+    lines.push("")
+  }
+  const failureNotes = signals.filter(s => s.startsWith("failure_note:"))
+  if (failureNotes.length > 0) {
+    lines.push("## Failure Notes")
+    lines.push("")
+    for (const n of failureNotes) lines.push("- " + n.replace("failure_note:", ""))
+    lines.push("")
+  }
+  lines.push("---")
+  lines.push("*This document was auto-generated from session delegation artifacts. Review before promoting to operational.*")
+  return lines.join("\n")
 }
 
 export function writeProposal(repoRoot, proposal) {

@@ -55,11 +55,18 @@ MODES:
   2. AI-assisted: Invokes an AI model with the bootstrap skill
      to generate a tailored configuration based on project context
 
-AI-ASSISTED MODE:
-  Requires opencode, codex, kilo, or pi CLI to be available.
-  Tries available runtimes in priority order until one succeeds.
-  Uses the bootstrap skill to analyze repository context
-  and generate a production-ready meta-agents.yaml.
+AI-ASSISTED MODE (optional acceleration):
+  Uses available AI runtime (opencode, codex, kilo, or pi) to generate a
+  tailored meta-agents.yaml. Runs in headless/non-interactive mode —
+  no TUI, no session persistence, print-and-exit.
+
+  What v0.9 adds to the generated config:
+  - Expertise-aware routing: agents selected by skill match, not just order
+  - Context Manager: operational memory fetched per task at runtime
+  - Visible execution: lifecycle events, session status, trace on demand
+
+  AI bootstrap is OPTIONAL. Logical mode produces a valid config without
+  any runtime or API key. Use --ai only when you want topology suggestions.
 
 EXAMPLES:
   # Interactive mode
@@ -474,7 +481,9 @@ async function main() {
       const result = await runAiAssistedGeneration(inputs, repoContext, skillPath)
       if (result.success) {
         console.log(`bootstrap: created ${path.relative(cwd, targetPath)} via ${result.runtime}`)
-        console.log("bootstrap: ai-assisted generation complete")
+        console.log("bootstrap: expertise-aware topology generated")
+        console.log(`bootstrap: next: run \`mah expertise recommend --task "your first task"\` to route by capability`)
+        console.log("bootstrap: see .mah/expertise/ for the catalog")
         return
       }
       console.log("bootstrap: ai-assisted generation failed, falling back to logical mode")
@@ -491,6 +500,7 @@ async function main() {
   mkdirSync(path.dirname(targetPath), { recursive: true })
   writeFileSync(targetPath, out)
   console.log(`bootstrap: created ${path.relative(cwd, targetPath)}`)
+  console.log("bootstrap: expertise-aware topology generated — run `mah expertise recommend --task \"your first task\"` to route by capability")
 }
 
 await main()

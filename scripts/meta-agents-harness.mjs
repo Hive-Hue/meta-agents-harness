@@ -191,8 +191,10 @@ function printHelp() {
   console.log("Commands:")
   console.log("  detect")
   console.log("  doctor")
+  console.log("  expertise [list|show|seed|sync|recommend|explain|evidence|export|propose|apply-proposal|lifecycle|import]  Expertise catalog management")
+  console.log("  context [find|explain|list|show|validate|index|propose|proposals]  Context Manager — operational context retrieval")
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
-  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]")
+  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]  Generate config (add --ai for expertise-aware topology)")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
@@ -928,6 +930,9 @@ function printExplain(traceMode, payload) {
   }
   if (payload.active_crew) console.log(`active_crew=${payload.active_crew}`)
   if (payload.target_crew) console.log(`target_crew=${payload.target_crew}`)
+  if (payload.command === "run") {
+    console.log("lifecycle_sequence=queued → routed → running → completed|failed")
+  }
 }
 
 function runInit(argv) {
@@ -1027,6 +1032,7 @@ function printSessionsHelp() {
   console.log("  mah sessions new --runtime <name>    # Start a new session (runtime-dependent)")
   console.log("  mah sessions new --runtime <name> --dry-run  # Preview without spawning")
   console.log("  mah sessions export <id>             # Export session to $MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz")
+  console.log("  mah sessions status <session-id>     # Show lifecycle state and timeline")
   console.log("  mah sessions delete <id> --yes       # Delete session (requires --yes confirmation)")
   console.log("  mah sessions --help                  # Show this help")
   console.log("")
@@ -1043,6 +1049,57 @@ function printSessionsHelp() {
   console.log("")
 }
 
+async function runSessionsStatus(sessionId, jsonMode = false) {
+  const { getLifecycleEvents, collectSessions } = await import('./m3-ops.mjs')
+  const { getCurrentState } = await import('../types/lifecycle-event-types.mjs')
+
+  if (!sessionId) {
+    console.error("ERROR: session-id required")
+    console.error("Usage: mah sessions status <session-id> [--json]")
+    return 1
+  }
+
+  const sessions = collectSessions(repoRoot, {})
+  const found = sessions.find(s => s.id === sessionId)
+  const events = getLifecycleEvents(repoRoot, sessionId)
+  const currentState = getCurrentState(events)
+
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      session_id: sessionId,
+      current_state: currentState,
+      runtime: found?.runtime || sessionId.split(':')[0] || 'unknown',
+      crew: found?.crew || sessionId.split(':')[1] || 'unknown',
+      session_id_short: found?.session_id || sessionId.split(':')[2] || sessionId,
+      events,
+      event_count: events.length,
+      timeline: events.map(e => ({ event: e.event, timestamp: e.timestamp }))
+    }, null, 2))
+    return 0
+  }
+
+  console.log(`Session: ${sessionId}`)
+  console.log(`State:   ${currentState}`)
+
+  if (events.length > 0) {
+    console.log(`Timeline (${events.length} events):`)
+    for (const ev of events) {
+      const ts = ev.timestamp ? new Date(ev.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '—'
+      let line = `  ${ts}  ${ev.event.padEnd(16)}`
+      if (ev.event === 'routed' && ev.agent) line += ` → ${ev.agent} (conf: ${typeof ev.routing_confidence === 'number' ? (ev.routing_confidence * 100).toFixed(0) + '%' : '?'})`
+      if (ev.event === 'routed' && ev.routing_reason) line += ` — ${ev.routing_reason}`
+      if (ev.event === 'completed') line += ` (exit: ${ev.result_code})`
+      if (ev.event === 'failed') line += ` — ${ev.result_reason || 'failed'}`
+      if (ev.event === 'context_loaded') line += ` (${ev.context_count || 0} docs)`
+      console.log(line)
+    }
+  } else {
+    console.log("No lifecycle events recorded yet.")
+  }
+
+  return 0
+}
+
 async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const subcommand = argv[0] || "list"
   const filters = parseFilterArgs(argv)
@@ -1054,6 +1111,11 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const allRuntimes = await getAllRuntimes()
 
   // Handle subcommands
+  if (subcommand === 'status') {
+    const sessionId = argv[1]
+    return runSessionsStatus(sessionId, jsonMode)
+  }
+
   if (subcommand === "list") {
     const rows = collectSessions(repoRoot, { runtime: effectiveRuntime, crew: filters.crew }, allRuntimes)
     if (filters.json) {
@@ -2023,7 +2085,7 @@ function stripHermesSplash(text) {
   return result || clean.trim()
 }
 
-function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
+async function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
   const adapter = runtimeProfiles[runtime]
   if (!adapter) {
     return {
@@ -2046,6 +2108,12 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
   const normalizedPassthrough = stripHeadlessArgs(passthrough)
   const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
   const envOverrides = { ...normalized.envOverrides }
+  const { recordLifecycleEvent } = await import("./m3-ops.mjs")
+  const headlessSessionId = `${runtime}:mah:headless-${Date.now()}`
+  recordLifecycleEvent(repoRoot, headlessSessionId, {
+    event: "running",
+    details: { task: (normalized?.args?.join(" ") || "").substring(0, 100), runtime }
+  })
 
   // Get headless execution plan from adapter
   const headlessPlan = adapter.prepareHeadlessRunContext({
@@ -2063,7 +2131,8 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
       status: 1,
       stdout: "",
       stderr: headlessPlan?.error || "failed to prepare headless run context",
-      error: headlessPlan?.error || "failed to prepare headless run context"
+      error: headlessPlan?.error || "failed to prepare headless run context",
+      sessionId: headlessSessionId
     }
   }
 
@@ -2075,6 +2144,11 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
     { headless: true }
   )
+  recordLifecycleEvent(repoRoot, headlessSessionId, {
+    event: result.status === 0 ? "completed" : "failed",
+    result_code: result.status,
+    result_reason: result.status === 0 ? "headless-execution-success" : (result.error || "headless-execution-failed")
+  })
 
   // Format output based on output mode
   if (outputMode === "json") {
@@ -2086,7 +2160,8 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
       stderr: result.stderr || "",
       crew: headlessPlan.crew || "",
       session_id: headlessPlan.session_id || "",
-      execution_time_ms: headlessPlan.execution_time_ms || 0
+      execution_time_ms: headlessPlan.execution_time_ms || 0,
+      sessionId: headlessSessionId
     }
     return envelope
   }
@@ -2101,7 +2176,7 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     result.stderr = stripHermesSplash(result.stderr)
   }
   process.stdout.write(result.stdout || "")
-  return result
+  return { ...result, sessionId: headlessSessionId }
 }
 
 function isSyncLikeCommand(command) {
@@ -2120,6 +2195,7 @@ function isSyncLikeCommand(command) {
  */
 async function runDelegate(passthrough, options = {}) {
   const startTimeMs = Date.now()
+  const { recordLifecycleEvent } = await import("./m3-ops.mjs")
   const execute = passthrough.includes("--execute") || passthrough.includes("-x")
   const headless = options.headless === true
   const verbose = passthrough.includes("--verbose")
@@ -2159,6 +2235,11 @@ async function runDelegate(passthrough, options = {}) {
   const runtimeFromGlobalFlag = parseRuntimeBeforeCommand(process.argv.slice(2), "delegate")
   const sourceRuntime = process.env.MAH_RUNTIME || runtimeFromGlobalFlag || "pi"
   const effectiveTargetRuntime = targetRuntime || sourceRuntime
+  const delegateSessionId = `${sourceRuntime}:${crew || "default"}:delegate-${Date.now()}`
+  recordLifecycleEvent(repoRoot, delegateSessionId, {
+    event: "queued",
+    details: { task: (task || "").substring(0, 100), autoMode, sourceAgent: sourceAgent || "" }
+  })
 
   // Initialize expertise-related variables
   let expertiseSelected = null
@@ -2343,6 +2424,15 @@ async function runDelegate(passthrough, options = {}) {
     return 1
   }
 
+  recordLifecycleEvent(repoRoot, delegateSessionId, {
+    event: "routed",
+    agent: effectiveTarget,
+    agent_name: effectiveTarget,
+    routing_reason: expertiseWarning || "expertise-scored",
+    routing_confidence: expertiseScore,
+    details: { targetRuntime: result?.context?.targetRuntime || "", sourceRuntime }
+  })
+
   if (headless) {
     let headlessPlan
 
@@ -2509,6 +2599,26 @@ async function runDelegate(passthrough, options = {}) {
       }
     }
     const exitCode = typeof child.status === "number" ? child.status : 1
+    recordLifecycleEvent(repoRoot, delegateSessionId, {
+      event: exitCode === 0 ? "completed" : "failed",
+      result_code: exitCode,
+      result_reason: exitCode === 0 ? "success" : "non-zero exit",
+      error_detail: exitCode !== 0 ? { exitCode } : null
+    })
+    if (verbose && delegateSessionId) {
+      const { getLifecycleEvents } = await import("./m3-ops.mjs")
+      const delegateEvents = getLifecycleEvents(repoRoot, delegateSessionId)
+      if (delegateEvents.length > 0) {
+        console.log("\nLifecycle timeline:")
+        for (const ev of delegateEvents) {
+          const ts = ev.timestamp ? new Date(ev.timestamp).toISOString().substring(11, 19) : "—"
+          let line = `  [${ts}] ${ev.event}`
+          if (ev.agent) line += ` → ${ev.agent} (conf: ${typeof ev.routing_confidence === "number" ? (ev.routing_confidence * 100).toFixed(0) + "%" : "?"})`
+          if (ev.result_code !== undefined) line += ` (exit: ${ev.result_code})`
+          console.log(line)
+        }
+      }
+    }
     if (verbose || !quiet || exitCode !== 0) console.log(`exit_code=${exitCode}`)
     if (child.error) console.log(`error=${child.error.message}`)
     // Record evidence for executed delegation
@@ -2688,7 +2798,7 @@ Subcommands:
   show <id>                            Show a specific context document
   find --agent <name> --task "<desc>"  Find relevant context for a task
   explain --agent <name> --task "<desc>" [--verbose] Explain retrieval reasoning
-  propose --from-session <ref>         Create memory proposal from session
+  propose --from-session <ref>         Create governed memory proposal from session (requires review before promotion)
   proposals list [--json]             List proposals with statuses
   proposals show <id> [--json]        Show proposal with overlap detection
   proposals promote <id> [--stability <level>] [--force] [--json]  Promote to operational
@@ -2892,6 +3002,27 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
 
   // --- mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
   if (sub === "find") {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json]
+
+Find operational context documents relevant to a task for a specific agent.
+
+Arguments:
+  --agent <name>     Agent name (e.g. backend-dev)
+  --task "<desc>"    Task description to match against context
+  --capability <cap> Optional capability hint to narrow retrieval
+  --json             JSON output mode
+
+Output:
+  Matched documents with relevance score, capability tags, and excerpt.
+  Returns top matches with the most specific capability signal.
+
+Examples:
+  mah context find --agent backend-dev --task "implement clickup integration"
+  mah context find --agent planning-lead --task "sprint planning" --capability backlog-planning
+`)
+      return 0
+    }
     const agentIdx = subArgv.indexOf("--agent")
     const taskIdx = subArgv.indexOf("--task")
     const capIdx = subArgv.indexOf("--capability")
@@ -2902,7 +3033,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
     if (!agent || !task) {
-      console.error("ERROR: usage: mah context find --agent <name> --task "<desc>" [--capability <cap>]")
+      console.error('ERROR: usage: mah context find --agent <name> --task "<desc>" [--capability <cap>]')
       return 1
     }
 
@@ -2962,6 +3093,30 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
 
   // --- mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose] [--json] ---
   if (sub === "explain") {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose] [--json]
+
+Explain retrieval reasoning for a context find operation — why each document matched or didn't match.
+
+Arguments:
+  --agent <name>     Agent name (e.g. backend-dev)
+  --task "<desc>"    Task description used in retrieval
+  --capability <cap> Optional capability hint used in retrieval
+  --verbose          Show full per-document scoring breakdown
+  --json             JSON output mode (includes scoring rationale per document)
+
+Output (default text mode):
+  - Brief explanation of top match relevance
+  - Capability fit summary
+  Concise by default (4-5 lines). Use --verbose for full per-document breakdown.
+
+Examples:
+  mah context explain --agent backend-dev --task "implement clickup integration"
+  mah context explain --agent backend-dev --task "implement clickup integration" --verbose
+  mah context explain --agent backend-dev --task "implement clickup integration" --json
+`)
+      return 0
+    }
     const agentIdx = subArgv.indexOf("--agent")
     const taskIdx = subArgv.indexOf("--task")
     const capIdx = subArgv.indexOf("--capability")
@@ -2972,7 +3127,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
     if (!agent || !task) {
-      console.error("ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose]")
+      console.error('ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose]')
       return 1
     }
 
@@ -3104,9 +3259,9 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     }
     console.log("")
     console.log("Next steps:")
-    console.log("  1. Review the proposal at: " + writeResult.file_path)
-    console.log("  2. If approved, move to .mah/context/operational/")
-    console.log("  3. Set stability: draft → curated → stable")
+    console.log("  1. Review proposal for quality and relevance (no auto-promotion): " + writeResult.file_path)
+    console.log("  2. If approved, promote via: mah context proposals promote <id>")
+    console.log("  3. Rebuild index: mah context index --rebuild")
     return 0
   }
 
@@ -3241,6 +3396,23 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise seed [--crew <crew>] [--force] [--json]
   // ------------------------------------------------------------------
   if (sub === 'seed') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise seed [--crew <crew>] [--force] [--json]
+
+Seed expertise catalog entries from meta-agents.yaml agent declarations.
+
+Arguments:
+  --crew <crew>    Crew to seed (default: active crew from MAH_ACTIVE_CREW or 'dev')
+  --force          Overwrite existing entries with fresh data from meta-agents.yaml
+  --json           JSON output mode
+
+Examples:
+  mah expertise seed                       Seed default crew
+  mah expertise seed --force             Overwrite existing entries
+  mah expertise seed --crew dev           Seed specific crew
+`)
+      return 0
+    }
     const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
     const force = subArgv.includes('--force')
     const crew = targetCrew || defaultCrew
@@ -3274,6 +3446,28 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise sync [--crew <crew>] [--dry-run] [--json]
   // ------------------------------------------------------------------
   if (sub === 'sync') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise sync [--crew <crew>] [--dry-run] [--json]
+
+Sync confidence scores and discover capabilities from evidence + System A learnings.
+Strengthens routing over time — each sync compounds session outcomes into better agent selection.
+
+Arguments:
+  --crew <crew>    Crew to sync (default: active crew from MAH_ACTIVE_CREW or 'dev')
+  --dry-run        Show what would change without writing to catalog
+  --json           JSON output mode
+
+What gets updated:
+  - confidence.score and confidence.band from evidence invocation counts
+  - capabilities[] list from keyword detection in runtime expertise files
+
+Examples:
+  mah expertise sync --dry-run           Preview changes
+  mah expertise sync                    Execute sync
+  mah expertise sync --crew dev         Sync specific crew
+`)
+      return 0
+    }
     const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
     const dryRun = subArgv.includes('--dry-run')
     const crew = targetCrew || defaultCrew
@@ -3322,6 +3516,25 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise list [--crew <crew>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'list') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise list [--crew <crew>] [--json]
+
+List all expertise entries in the catalog.
+
+Arguments:
+  --crew <crew>    Filter by crew (default: all crews)
+  --json           JSON output mode
+
+Output shows: ID, Lifecycle, Band (confidence band), Validation status, Owner
+Example output row: dev:backend-dev   active   high   validated   backend-dev
+
+Examples:
+  mah expertise list                     List all entries
+  mah expertise list --crew dev          List specific crew
+  mah expertise list --json             JSON output
+`)
+      return 0
+    }
     const { crew, json } = parseExpertiseFlags(subArgv)
     const registry = await getRegistry()
     const entries = registry.entries.filter(e => !crew || e.id.startsWith(`${crew}:`) || e.id === crew)
@@ -3359,6 +3572,26 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise show <id> [--json]
   // ------------------------------------------------------------------
   if (sub === 'show') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise show <id> [--json]
+
+Show detailed expertise entry for a specific agent.
+
+Arguments:
+  <id>             Expertise ID (e.g. dev:backend-dev)
+  --json            JSON output mode (includes live metrics: invocations, success rate, avg duration)
+
+What it shows:
+  - Full YAML frontmatter: capabilities, domains, lifecycle, validation_status, trust_tier
+  - Confidence: score, band, evidence_count
+  - Evidence metrics (live): total_invocations, successful_invocations, avg_duration_ms
+
+Examples:
+  mah expertise show dev:backend-dev
+  mah expertise show dev:backend-dev --json
+`)
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     if (!targetId) {
       console.error("ERROR: usage: mah expertise show <id>")
@@ -3420,6 +3653,31 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise recommend --task "<task>" [--crew <crew>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'recommend') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise recommend --task '<task description>' [--crew <crew>] [--json] [--verbose]
+
+Recommend the best candidate agent for a task based on expertise routing scores.
+
+Arguments:
+  --task '<desc>'  Task description (required)
+  --crew <crew>    Crew to score against (default: active crew)
+  --json           JSON output mode (machine-readable, stable contract)
+  --verbose        Full scoring trace text (filters, penalties, per-candidate breakdown)
+
+Output (default text mode):
+  - Top recommended agent
+  - Confidence score and band
+  - Short capability-fit explanation
+  - Evidence summary and applicable constraints/penalties
+  Concise by default (≤5 lines). Use --verbose for full decision trace.
+
+Examples:
+  mah expertise recommend --task "implement user authentication API"
+  mah expertise recommend --task "implement user authentication API" --verbose
+  mah expertise recommend --task "implement user authentication API" --json
+`)
+      return 0
+    }
     const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
     const { crew, json, verbose } = parseExpertiseFlags(subArgv)
     const effectiveCrew = crew || defaultCrew
@@ -3519,6 +3777,27 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise evidence <id> [--limit N] [--json]
   // ------------------------------------------------------------------
   if (sub === 'evidence') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise evidence <id> [--limit <N>] [--json]
+
+Show evidence events recorded for an expertise entry. Evidence is recorded automatically
+by the pi runtime after each delegate_agent/delegate_agents_parallel call.
+
+Arguments:
+  <id>             Expertise ID (e.g. dev:backend-dev)
+  --limit <N>      Limit to N most recent events (default: 50, max: 500)
+  --json           JSON output mode
+
+Output includes: event timestamp, outcome (success/failure), task type, duration
+Aggregated metrics: total_invocations, successful_invocations, success_rate, avg_duration_ms
+
+Examples:
+  mah expertise evidence dev:backend-dev
+  mah expertise evidence dev:backend-dev --limit 10
+  mah expertise evidence dev:backend-dev --json
+`)
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     const limitArg = parseValueArg(subArgv, '--limit') || subArgv.find(a => !a.startsWith('--') && a !== targetId)
     const limit = limitArg ? parseInt(limitArg, 10) : 50
@@ -3561,6 +3840,37 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise explain --task "<task>" [--crew <crew>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'explain') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise explain --task '<task>' [--crew <crew>] [--agent <name>] [--json] [--verbose]
+
+Explain routing decision rationale for a task, or inspect a specific agent's suitability.
+
+Arguments:
+  --task '<desc>'  Task description (required)
+  --crew <crew>    Crew to score against (default: active crew)
+  --agent <name>   Inspect suitability of a specific agent (no task-level comparison)
+  --json           JSON output mode (includes explain object with filters_run, blocking, scoring_summary)
+  --verbose        Full routing decision trace text (all filters and per-candidate scores)
+
+Output (default text mode):
+  - Recommended agent (or inspected agent if --agent used)
+  - Confidence score and band
+  - Short capability-fit explanation
+  - Short evidence summary
+  - Relevant constraints/penalties
+  Concise by default. Use --verbose for full decision trace.
+
+Without --agent: scores all candidates, ranks by final_score, returns top match.
+With --agent: returns suitability for the specified agent without ranking all candidates.
+
+Examples:
+  mah expertise explain --task "implement user authentication API"
+  mah expertise explain --task "implement user authentication API" --verbose
+  mah expertise explain --task "implement user authentication API" --agent backend-dev
+  mah expertise explain --task "implement user authentication API" --json
+`)
+      return 0
+    }
     const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
     const agentFlag = parseValueArg(subArgv, '--agent')
     const { crew, json, verbose } = parseExpertiseFlags(subArgv)
@@ -3695,7 +4005,28 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'export') {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
-      console.log("usage: mah expertise export <id> [--output <path>] [--domain <domain>] [--with-evidence] [--json]")
+      console.log(`Usage: mah expertise export <id> [--output <path>] [--domain <domain>] [--with-evidence] [--json]
+
+Export an expertise entry to JSON. Can optionally include evidence metrics.
+
+Arguments:
+  <id>             Expertise ID (e.g. dev:backend-dev)
+  --output <path>  Write export to file instead of stdout
+  --domain <name>  Check domain policy for a specific domain
+  --with-evidence  Include evidence metrics summary in export
+  --json           JSON output mode
+
+Notes:
+  - Export may be blocked by federated_allowed=false policy
+  - Sensitive fields (owner_id, evidence details) are redacted in export
+  - Use --domain to validate domain policy before exporting
+
+Examples:
+  mah expertise export dev:backend-dev
+  mah expertise export dev:backend-dev --output .mah/expertise/exported/backend-dev.json
+  mah expertise export dev:backend-dev --with-evidence
+  mah expertise export dev:backend-dev --domain software-engineering
+`)
       return 0
     }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
@@ -3761,6 +4092,41 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise propose <id> [--output <path>] [--summary <text>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'propose') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise propose <id> [options]
+
+Create a governed proposal artifact for catalog changes. Proposals require human review
+before apply-proposal. Generation is restricted to orchestrator and *-lead actors.
+
+Arguments:
+  <id>                   Expertise ID (e.g. dev:backend-dev)
+  --from-evidence        Draft changes from evidence store (default limit: 5 events)
+  --evidence-limit <N>   Number of recent evidence events to inspect (default: 5)
+  --summary <text>       Proposal summary
+  --rationale <text>     Rationale for the change
+  --changes '<json>'    Manual change specification (JSON object)
+  --evidence-refs <ids>  Comma-separated evidence IDs to include
+  --reviewers <roles>    Comma-separated reviewer roles (default: validation-lead,security-reviewer)
+  --output <path>        Write proposal YAML to file (required for apply-proposal)
+  --json                 JSON output mode
+
+Workflow:
+  1. Generate proposal with: mah expertise propose <id> --from-evidence --output <file>
+  2. Human reviews the proposal YAML at <file>
+  3. Apply with: mah expertise apply-proposal <file>
+
+Note: Without --output, proposal is written to stdout only (not usable by apply-proposal).
+
+Examples:
+  mah expertise propose dev:backend-dev --from-evidence --evidence-limit 5 \\
+    --summary "Evidence-backed confidence update" \\
+    --output .mah/expertise/proposals/proposal-dev-backend-dev.yaml
+  mah expertise propose dev:backend-dev --from-evidence --evidence-limit 10 --json
+  mah expertise propose dev:backend-dev --summary "Promote to validated" \\
+    --changes '{"validation_status":"validated"}' --output proposal.yaml
+`)
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     const outputPath = parseValueArg(subArgv, '--output') || ''
     const summary = parseValueArg(subArgv, '--summary') || ''
@@ -3867,7 +4233,33 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'apply-proposal') {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
-      console.log("usage: mah expertise apply-proposal <file> [--force] [--json]")
+      console.log(`Usage: mah expertise apply-proposal <file> [--force] [--json]
+
+Apply an approved proposal to the expertise catalog. This is the write step after
+human review — do NOT apply without reviewing the proposal first.
+
+Arguments:
+  <file>          Path to proposal YAML (generated by 'mah expertise propose')
+  --force         Apply even if catalog changed since proposal was generated
+  --json          JSON output mode
+
+What gets updated:
+  - validation_status, confidence.score/band, capabilities[], domains[]
+  - lifecycle state (if proposed)
+  - metadata.lessons[] (if evidence was used)
+
+After apply:
+  - Registry is rebuilt automatically (.mah/expertise/registry.json)
+  - Run 'mah expertise show <id>' to confirm changes persisted
+
+CAUTION: apply-proposal modifies catalog YAML files. Use --force only when
+the proposal is recent and the catalog has not drifted.
+
+Examples:
+  mah expertise apply-proposal .mah/expertise/proposals/proposal-dev-backend-dev.yaml
+  mah expertise apply-proposal .mah/expertise/proposals/proposal-dev-backend-dev.yaml --force
+  mah expertise apply-proposal .mah/expertise/proposals/proposal-dev-backend-dev.yaml --json
+`)
       return 0
     }
     const proposalPath = parseValueArg(subArgv, '') || subArgv[0]
@@ -3917,7 +4309,38 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'lifecycle') {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
-      console.log("usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]")
+      console.log(`Usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]
+
+Transition an expertise entry's lifecycle state with authorization and evidence requirements.
+
+Arguments:
+  <id>              Expertise ID (e.g. dev:backend-dev)
+  --to <state>      Target lifecycle state (required)
+  --actor <role>    Authorizing role (default: MAH_AGENT env var or 'orchestrator')
+  --reason <text>   Reason for the transition (required for transitions out of 'active')
+  --json            JSON output mode
+
+Valid lifecycle states and transitions:
+  experimental → active     Requires: evidence_count ≥ 5, confidence ≥ 0.6
+  active → restricted       Requires: trust_tier drop OR repeated failures
+  restricted → revoked     Requires: governance policy violation (needs security-reviewer + orchestrator)
+  restricted → active       Requires: remediation accepted
+  active → experimental     Requires: explicit reversion reason
+
+Lifecycle policy:
+  - Transitions out of 'active' always require --reason
+  - Transitions into 'active' require evidence_count ≥ 5
+  - 'restricted' and 'revoked' require security-reviewer authorization
+
+After transition:
+  - Registry is rebuilt automatically
+  - Run 'mah expertise show <id>' to confirm new lifecycle state
+
+Examples:
+  mah expertise lifecycle dev:backend-dev --to validated --actor validation-lead
+  mah expertise lifecycle dev:backend-dev --to restricted \\
+    --actor security-reviewer --reason "Repeated delegation failures"
+`)
       return 0
     }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
@@ -3958,6 +4381,34 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise import <file> [--dry-run] [--json]
   // ------------------------------------------------------------------
   if (sub === 'import') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise import <file> [--dry-run] [--lenient] [--json]
+
+Import an expertise entry from a JSON export file. Validates against the v1 schema before writing.
+
+Arguments:
+  <file>          Path to expertise JSON file (from 'mah expertise export')
+  --dry-run       Validate without writing to catalog
+  --lenient       Allow unknown fields (forward-compatibility mode)
+  --json          JSON output mode
+
+Validation:
+  - Strict by default: unknown fields cause validation failure
+  - Use --lenient to allow forward-compat with future schema extensions
+  - Always run with --dry-run first to catch schema mismatches
+
+What it does:
+  - Validates schema version, owner, capabilities, domains, policy
+  - Writes to .mah/expertise/catalog/<crew>/<agent>.yaml
+  - Registry is NOT rebuilt automatically (run 'mah expertise sync' after import)
+
+Examples:
+  mah expertise import .mah/expertise/exported/backend-dev.json --dry-run
+  mah expertise import .mah/expertise/exported/backend-dev.json --lenient
+  mah expertise import .mah/expertise/exported/backend-dev.json --json
+`)
+      return 0
+    }
     const filePath = parseValueArg(subArgv, '') || subArgv[0]
     const dryRun = subArgv.includes('--dry-run')
     const lenient = subArgv.includes('--lenient')
@@ -4020,7 +4471,7 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === '--help' || sub === '-h' || sub === 'help' || !sub) {
     console.log(`
-mah expertise — Expertise Catalog CLI (v0.7.0)
+mah expertise — Expertise Catalog CLI (v0.9.0)
 
 Usage:
   mah expertise list                        List all expertise entries
@@ -4042,7 +4493,7 @@ Usage:
   mah expertise evidence <id> --limit 20   Limit to 20 events
   mah expertise evidence <id> --json        JSON output
 
-  mah expertise explain --task '<desc>' [--agent <name>]   Routing decision trace
+  mah expertise explain --task '<desc>' [--agent <name>]   Explain routing decision (concise by default, --verbose for full trace)
   mah expertise explain --task '<desc>' --verbose   Full routing decision trace
   mah expertise explain --task '<desc>' --json   JSON output
 
@@ -4093,7 +4544,7 @@ Examples:
   return 1
 }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2)
   const traceMode = hasFlag(argv, "--trace")
   const jsonMode = hasFlag(argv, "--json")
@@ -4900,9 +5351,17 @@ function main() {
   // Check for headless mode on run command
   if (command === "run" && hasHeadlessFlag(argv)) {
     const outputMode = parseOutputMode(argv)
-    const result = dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
+    const result = await dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
     if (outputMode === "json") {
       console.log(JSON.stringify(result, null, 2))
+    }
+    if (outputMode !== "json" && result.sessionId) {
+      const { getLifecycleEvents } = await import("./m3-ops.mjs")
+      const events = getLifecycleEvents(repoRoot, result.sessionId)
+      if (events.length > 0) {
+        const timeline = events.map(e => e.event).join(" → ")
+        console.log(`Lifecycle: ${timeline}`)
+      }
     }
     const exitCode = typeof result.status === "number" ? result.status : 1
     process.exit(exitCode)

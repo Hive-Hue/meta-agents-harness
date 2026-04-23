@@ -17,7 +17,8 @@ export const CANONICAL_MAH_SKILLS = [
   "caveman-compress",
   "delegate-bounded",
   "context-memory",
-  "expertise-model"
+  "expertise-model",
+  "expertise-governance"
 ]
 
 function firstExisting(paths = []) {

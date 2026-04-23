@@ -151,7 +151,7 @@ mah init --yes
 
 ## AI-Assisted Bootstrap
 
-AI-assisted mode generates enhanced configurations based on your project context.
+AI-assisted mode is an **optional acceleration** that uses an available AI runtime to generate a tailored configuration. Logical mode produces a fully valid config without any runtime or API key.
 
 ### Requirements
 
@@ -178,10 +178,15 @@ mah init --yes --ai \
 
 ### What AI-Assisted Mode Does
 
-1. **Analyzes repository context** - Reads README, detects runtime markers
-2. **Generates tailored configuration** - Creates topology matching project needs
-3. **Infers sensible defaults** - Chooses appropriate crews, agents, and profiles
-4. **Falls back gracefully** - If AI fails, uses logical mode automatically
+1. **Analyzes repository context** — reads README, detects runtime markers
+2. **Generates tailored configuration** — creates topology matching project needs
+3. **Infers sensible defaults** — chooses appropriate crews, agents, and profiles
+4. **Falls back gracefully** — if AI fails, uses logical mode automatically
+
+With v0.9, AI-assisted bootstrap can also:
+5. **Configure expertise-aware routing** — agents matched by skill, not just order
+6. **Set up Context Manager** — operational memory fetched per task at runtime
+7. **Enable visible execution** — lifecycle events, session status, and trace on demand
 
 ### Fallback Behavior
 
@@ -191,6 +196,10 @@ If AI-assisted mode fails (no runtime, missing skill, API error), MAH automatica
 bootstrap: bootstrap skill not found, falling back to logical mode
 bootstrap: created meta-agents.yaml
 ```
+
+> **Note:** AI-assisted bootstrap runs the AI runtime in headless/non-interactive mode.
+> For `pi`, this uses the `-p` flag (`pi --skill <path> -p "<prompt>"`) which prints
+> the response and exits without launching a TUI session.
 
 ---
 
@@ -506,7 +515,7 @@ mah init --yes \
 ### AI-Enhanced Bootstrap
 
 ```bash
-# Let AI design the topology
+# AI-assisted (optional — generates expertise-aware topology)
 mah init --yes --ai \
   --brief "Microservices e-commerce platform with event-driven architecture"
 ```

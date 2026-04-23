@@ -1,10 +1,10 @@
-# Context Manager (v0.8.0)
+# Context Manager (v0.9.0)
 
 ## Status
 
 Context Manager is an operational layer for retrieving relevant task context after expertise-based routing has selected an agent. It provides bounded, explainable, reusable operational memory without interfering with routing decisions.
 
-This document covers the v0.8.0 implementation.
+This document covers the v0.9.0 implementation.
 
 ## What It Is
 
@@ -244,6 +244,8 @@ Proposals follow a governed state machine:
 - State transitions are one-way: promoted and rejected proposals cannot be re-promoted or re-rejected.
 
 Promotion never happens automatically from \u0060propose\u0060. Every promotion requires explicit operator action.
+
+This is governed learning, not a raw memory dump. No auto-promotion. No transcript is ingested without human review. The cycle is: session → draft proposal → human review → curate → promote → available for retrieval. Each curated proposal compounds the system's operational knowledge.
 
 ## Storage Layout
 

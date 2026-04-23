@@ -87,3 +87,9 @@ When repo is reset, regenerate catalog seed from `meta-agents.yaml` declarations
 MAH does not load expertise from global `~/.mah` overlay.
 Global install keeps shared runtime assets such as skills, extensions, plugins, and themes.
 Expertise is workspace concern and is materialized into `.mah/expertise/catalog` by `mah sync` / `mah generate`.
+
+## Automation Skill
+
+The [`skills/expertise-governance/SKILL.md`](../../skills/expertise-governance/SKILL.md) skill provides an automated orchestrator workflow for running the full governance cycle (steps 1–8) across all agents. It includes eligibility rules, evidence-limit guidance, human review criteria, lifecycle transition table, and quality gates.
+
+Use the skill when running governance on a schedule or before release cuts — it automates preparation steps while keeping human review as a required checkpoint before `apply-proposal`.

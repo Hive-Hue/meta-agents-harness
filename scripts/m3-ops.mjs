@@ -333,6 +333,31 @@ export function readProvenance(repoRoot, { limit = 200, run = "" } = {}) {
   return out.slice(Math.max(0, out.length - limit))
 }
 
+const LIFECYCLE_EVENTS_DIR = '.mah/sessions/lifecycle-events'
+
+export function recordLifecycleEvent(repoRoot, sessionIdFull, event) {
+  const eventsDir = path.join(repoRoot, LIFECYCLE_EVENTS_DIR)
+  if (!existsSync(eventsDir)) mkdirSync(eventsDir, { recursive: true })
+
+  const safeId = sessionIdFull.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const eventFile = path.join(eventsDir, `${safeId}.json`)
+
+  let events = []
+  if (existsSync(eventFile)) {
+    try { events = JSON.parse(readFileSync(eventFile, 'utf-8')) } catch {}
+  }
+
+  events.push({ ...event, timestamp: event.timestamp || new Date().toISOString() })
+  writeFileSync(eventFile, JSON.stringify(events, null, 2))
+}
+
+export function getLifecycleEvents(repoRoot, sessionIdFull) {
+  const safeId = sessionIdFull.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const eventFile = path.join(repoRoot, LIFECYCLE_EVENTS_DIR, `${safeId}.json`)
+  if (!existsSync(eventFile)) return []
+  try { return JSON.parse(readFileSync(eventFile, 'utf-8')) } catch { return [] }
+}
+
 export function buildCrewGraph(metaDoc, crewId) {
   const crew = (metaDoc.crews || []).find((item) => item.id === crewId) || (metaDoc.crews || [])[0]
   if (!crew) return { crew: "", nodes: [], edges: [] }

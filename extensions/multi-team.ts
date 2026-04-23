@@ -217,7 +217,10 @@ function slugify(value: string): string {
 
 function shortText(value: string, limit = 180): string {
 	const normalized = value.replace(/\s+/g, " ").trim();
-	return normalized.length > limit ? normalized.slice(0, limit - 3) + "..." : normalized;
+	if (limit <= 0) return "";
+	if (visibleWidth(normalized) <= limit) return normalized;
+	if (limit <= 3) return truncateToWidth(normalized, limit);
+	return truncateToWidth(normalized, limit - 3) + "...";
 }
 
 /**
@@ -2199,8 +2202,11 @@ export default function (pi: ExtensionAPI) {
 		const top = theme.fg("dim", "┌") + topAccent + topRest + theme.fg("dim", "┐");
 		const bot = theme.fg("dim", "└") + theme.fg("dim", "─".repeat(width)) + theme.fg("dim", "┘");
 
-		const row = (content: string, visible: string) =>
-			theme.fg("dim", "│") + " " + content + " ".repeat(Math.max(0, contentWidth - visibleWidth(visible))) + theme.fg("dim", "│");
+		const row = (content: string, visible: string) => {
+			const safeVisible = truncateToWidth(visible, contentWidth);
+			const safeContent = truncateToWidth(content, contentWidth);
+			return theme.fg("dim", "│") + " " + safeContent + " ".repeat(Math.max(0, contentWidth - visibleWidth(safeVisible))) + theme.fg("dim", "│");
+		};
 
 		// Progress bar for running agents
 		let progressRow = "";
