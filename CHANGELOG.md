@@ -7,6 +7,16 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ## [Unreleased]
 
+### Added
+
+- `mah run` and `mah delegate` now record canonical lifecycle events (`queued → routed → running → completed/failed`) to `.mah/sessions/lifecycle-events/`
+- `LifecycleEvent` type defined with structured fields for routing summary, context count, and result reason
+
+### Changed
+
+- Evidence store now defaults to workspace-local `.mah/expertise/evidence/` instead of `~/.mah/expertise/evidence/` (env var `MAH_EXPERTISE_EVIDENCE_ROOT` still works for cross-workspace shared evidence)
+- Session provenance expanded with lifecycle event recording as a separate event stream
+
 ### Fixed
 
 - `mah run --headless` completely overhauled for correct non-interactive execution across all runtimes
@@ -18,10 +28,42 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `--` end-of-options separator stripped from passthrough to prevent runtime confusion
 - PI headless adapter now loads default extensions (was missing entirely)
 - `process.exit()` replaces `return` in headless path to prevent event loop hang
-- Headless `runCommand` uses `stdio: ["ignore", "pipe", "pipe"]` to prevent stdin blocking
-- `main()` made async to support headless await paths
-- `mah plugins install` now supports `--force` flag for reinstalling existing plugins
-- Plugin ownership guardrail: engineering team cannot write `mah-plugins/` — requires manual sync or `mah plugins install --force`
+
+## [0.9.0] - 2026-04-23
+
+### Added
+
+- `mah expertise recommend --task "..."` and `mah expertise explain --task "..."` produce concise ≤5-line output by default; `--verbose` preserves full trace (S1)
+- `mah expertise seed` populates an empty catalog so routing commands work on first use (S1)
+- "Context Manager" adopted as public subsystem name; `mah context` CLI namespace unchanged (S2)
+- `mah context explain` default output is now concise and operator-friendly (S2)
+- File-based lifecycle event persistence in `.mah/sessions/lifecycle-events/` (S3)
+- `mah sessions status <session-id>` with text and JSON read model (S4)
+- Delegate lifecycle events (`queued → routed → completed/failed`); `--trace` and `--verbose` show lifecycle timeline (S5)
+- `tests/delegate-lifecycle-e2e.test.mjs` — 7 e2e cases covering delegate lifecycle persistence + CLI integration (S5)
+- Compounding loop documented in `docs/expertise-model-foundation.md`; `mah expertise sync` framed as operational strengthening (S6)
+- `mah context propose` CLI help updated with governed learning language; no auto-promotion (S6)
+- `docs/context-manager.md` Proposal Flow reinforced with governed curation paragraph (S6)
+- README.md rewritten with v0.9 value story: expertise-aware routing, context memory, session visibility, compounding loop (S7)
+- Bootstrap success output reframed as "expertise-aware topology generated" with next-step guidance (S7)
+- `scripts/bootstrap-meta-agents.mjs` AI-assisted and logical success messages updated (S7)
+
+### Changed
+
+- `mah expertise sync` help text now mentions compounding and routing strengthening
+- `mah context propose` help text now mentions governed curation and review requirement
+- README.md "Why this exists" section rewritten with v0.9 product narrative
+- README.md CLI examples expanded with expertise, context, and sessions commands
+
+### Fixed
+
+- Empty expertise catalog blocked routing commands — `mah expertise seed` now required before first use
+
+### Note
+
+- S8 (Bounded Governance Add-ons) excluded from v0.9.0; deferred to v0.9.x
+
+## [0.8.0] - 2026-04-21
 
 ### Changed
 
@@ -29,37 +71,15 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `docs/plugin-api.md` headless capability section updated with implementation guidance
 - Runtime headless adapters: PI, Claude, Kilo, Hermes all use native non-interactive CLI flags
 - `plugins/runtime-*/index.mjs` and `scripts/runtime-core-integrations.mjs` headless args updated
+- Headless `runCommand` uses `stdio: ["ignore", "pipe", "pipe"]` to prevent stdin blocking
+- `main()` made async to support headless await paths
+- `mah plugins install` now supports `--force` flag for reinstalling existing plugins
+- Plugin ownership guardrail: engineering team cannot write `mah-plugins/` — requires manual sync or `mah plugins install --force`
 
 ### Added
 
-- `tests/headless-bugs.test.mjs` — tests for `--` stripping, task propagation, and PI extension loading
-
-## [0.9.0] - 2026-04-23
-
-### Added
-- `mah expertise recommend` and `mah expertise explain` now produce concise ≤5-line text summaries by default; `--verbose` flag preserves full trace output
-- `mah expertise explain --agent <name>` inspects a specific agent routing suitability without requiring a task-level comparison
-- `mah context explain` default output is now concise and operator-friendly; `--verbose` flag preserves full breakdown
-- `mah context proposals list/show/promote/reject` governance workflow for context memory proposals
-- `mah explain state` surface for assistant state introspection
-- "Context Manager" adopted as public subsystem name; `mah context` CLI namespace unchanged
-
-### Changed
-- Text output of `mah expertise recommend` and `mah expertise explain` refactored for operator clarity; `--json` output unchanged
-- `mah context explain` default output tightened to concise 4-5 line summary; full breakdown via `--verbose`
-- `docs/context-memory.md` renamed to `docs/context-manager.md`; all docs updated with new subsystem name
-- `scripts/context-memory-cli.mjs` removed (stale stub; active CLI lives in `scripts/meta-agents-harness.mjs`)
-- All operator-facing strings in CLI updated from "Context Memory" to "Context Manager"
-
-### Documentation
-- `docs/context-manager.md` — updated operator reference with Context Manager naming
-- `docs/README.md` updated with Context Manager terminology
-
-
-## [0.8.0] - 2026-04-21
-
-### Added
 - Global install support for the `mah`/`meta-agents-harness` CLI entrypoint
+- `tests/headless-bugs.test.mjs` — tests for `--` stripping, task propagation, and PI extension loading
 - Workspace-aware root resolution so a global `mah` command operates on the current repo instead of the package install directory
 - `meta-agents-harness` packaging alias and install scripts for local/global usage
 - `npm run stitch:secrets` to populate `GOOGLE_CLOUD_PROJECT` and `STITCH_ACCESS_TOKEN` directly in the target repo `.env` without overwriting the rest of the file

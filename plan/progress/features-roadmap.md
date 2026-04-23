@@ -172,7 +172,7 @@ Esse modelo evita meta-config excessiva, mas também não deixa o YAML totalment
 
 - [done] documento de execução salvo em [`plan/context-memory-v0.8.0.md`](../context-memory-v0.8.0.md)
 - [done] naming final definido como `Context Memory`
-- [done] PR1 spec em [`plan/slices/context-memory-pr1-schema.md`](../slices/context-memory-pr1-schema.md)
+- [done] Context Memory slice planning consolidated in [`plan/slices/context-memory-finalization-slices.md`](../slices/context-memory-finalization-slices.md)
 - [done] schema e contratos em `types/context-memory-types.mjs`, `scripts/context-memory-validate.mjs`, `scripts/context-memory-schema.mjs`
 - [done] storage canônico em `.mah/context/` com subdiretórios operational/, index/, proposals/, cache/
 - [done] `mah context validate`, `mah context list`, `mah context show` implementados
@@ -186,4 +186,3 @@ Esse modelo evita meta-config excessiva, mas também não deixa o YAML totalment
 - [done] proposal flow com `sessions`/`provenance` (PR4) — mah context propose --from-session <ref>
 - [done] boundary com `Expertise` documentado em `plan/context-memory-v0.8.0.md`
 - [done] nenhuma dependência de vector DB ou Obsidian
-

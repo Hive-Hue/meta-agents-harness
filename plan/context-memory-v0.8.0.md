@@ -1,199 +1,236 @@
-# Plano de Execução — `v0.8.0` Context Memory
+# Execution Plan — `v0.8.0` Context Memory
 
 ## Status
 
-- execução do plano: [planned]
-- resultado esperado:
-  - MAH passa a suportar uma camada canônica de **Operational Context Memory** para uso pós-roteamento
-  - agentes conseguem recuperar contexto operacional altamente relevante por capability/tarefa sem degradar o roteamento por expertise
-  - o produto ganha uma base viável de **persistência de memória operacional** entre sessões e runtimes
-- observação:
-  - esta feature não substitui `Expertise`, `Sessions`, `Provenance` ou `Evidence`
-  - esta feature complementa essas camadas e aproxima o MAH de uma **assistant layer** de alto nível, runtime-agnostic, reutilizável sobre OpenCode, Hermes e outros runtimes
+- plan execution: [partially delivered]
+- audit status: repo-audited against current implementation on 2026-04-22
+- expected outcome:
+  - MAH supports a canonical layer of **Operational Context Memory** for post-routing use
+  - agents can retrieve highly relevant operational context by capability and task without degrading expertise-based routing
+  - the product gains a viable base for **persistent operational memory** across sessions and runtimes
+- note:
+  - this feature does not replace `Expertise`, `Sessions`, `Provenance`, or `Evidence`
+  - this feature complements those layers and moves MAH closer to a high-level, runtime-agnostic, reusable **assistant layer** over Hermes, OpenCode, and other runtimes
 
-## Contexto
+## Current Audit Summary
 
-O MAH já possui camadas importantes, mas ainda fragmentadas:
+### Milestone Status
 
-- `Expertise` estruturada para routing, confiança, validação e policy
-- `Sessions` para continuidade e injeção bounded de contexto entre runtimes
-- `Provenance` para retenção auditável
-- prompts, skills e MCPs como superfícies operacionais de execução
+| Milestone | Status | Summary |
+|---|---|---|
+| M1 — Context Memory Foundation | delivered | Schema, validation, corpus layout, boundary docs, and canonical smoke doc exist. |
+| M2 — Indexing + Retrieval MVP | delivered | Deterministic index, retrieval, and explain surfaces are implemented. |
+| M3 — Runtime Injection (bounded) | partial | Hermes bootstrap injection exists, but there is still no clear operator-facing surface showing the exact retrieved context used for a run. |
+| M4 — CLI + Operator UX | delivered | `mah context` namespace exists with `validate`, `list`, `show`, `index`, `find`, `explain`, and `propose`. |
+| M5 — Persistent Learning Proposal Flow | partial | Session-derived proposal drafts exist, but promote/reject workflow and basic dedupe/merge are still missing. |
+| M6 — Assistant Layer Base | not delivered | No canonical `assistant-state` model or operator-facing state surface exists yet. |
 
-O gap atual é:
+### Workstream Status
 
-- o roteamento decide **quem** deve executar
-- mas o sistema ainda não possui uma camada canônica e bounded que ajude o agente escolhido a lembrar **como** executar bem uma tarefa específica dentro de sua expertise
+| Workstream | Status | Summary |
+|---|---|---|
+| W1 — Naming, Boundary, Product Spec | delivered | Context Memory boundary is documented and naming is stable for `v0.8.0`. |
+| W2 — Modeling and Validation | delivered | Types, schema parsing, validation, and fixtures exist. |
+| W3 — Parsing and Indexing | delivered | Frontmatter parsing, snippet extraction, hashing, and deterministic index building exist. |
+| W4 — Retrieval Engine | delivered | Lexical and metadata-aware retrieval with explainability exists. |
+| W5 — Runtime Integration | partial | Hermes integration and bounded flags exist; visibility of the injected result is still incomplete. |
+| W6 — CLI and Operability | delivered | Operator CLI is implemented in `mah context`. |
+| W7 — Persistent Proposal Flow | partial | Proposal generation exists; governance and promotion workflow remain incomplete. |
+| W8 — Tests and Safety | partial | Core tests and bounds exist, but remaining gaps depend on M3, M5, and M6 completion. |
 
-Exemplo:
+### Suggested Slice Status
 
-- `planning-lead` pode ser roteado para `backlog-planning`
-- mas o conhecimento operacional relevante para esta tarefa pode variar:
-  - uso de ClickUp via MCP diretamente
-  - critérios de decomposição de backlog
-  - fluxo de milestones
-  - uso de skills de gestão/PERT
-  - fallback quando um sistema esperado não está disponível
+| Slice | Status | Notes |
+|---|---|---|
+| PR1 — Schema + validate + storage layout | delivered | Historical slice content is consolidated in [`plan/slices/context-memory-finalization-slices.md`](./slices/context-memory-finalization-slices.md). |
+| PR2 — Index + retrieval MVP | delivered | Implemented in code; no standalone slice doc was preserved. |
+| PR3 — Hermes/runtime bootstrap integration | partial | Runtime injection landed, but runtime-visible retrieval trace is still missing. |
+| PR4 — Persistent proposal flow | partial | Session-based draft proposal generation landed; governance workflow is still missing. |
+| PR5 — Product docs + assistant-layer framing | partial | Product docs exist, but the assistant-state base remains unfinished. |
 
-Hoje isso tende a ficar espalhado em:
+## Context
 
-- prompt estático do agente
-- memória curta de sessão
-- notas ad hoc
-- conhecimento implícito do operador
+MAH already had important layers, but they were still fragmented:
 
-Isso limita:
+- structured `Expertise` for routing, trust, validation, and policy
+- `Sessions` for continuity and bounded context injection across runtimes
+- `Provenance` for auditable retention
+- prompts, skills, and MCPs as execution surfaces
 
-- persistência útil entre sessões
-- transferibilidade entre runtimes
-- explainability do contexto usado na execução
-- evolução do MAH como camada de assistência de alto nível
+The gap was:
 
-## Tese da Feature
+- routing decides **who** should execute
+- but the system still lacked a canonical, bounded layer that helps the selected agent remember **how** to execute a task well inside its expertise
 
-Criar uma nova camada canônica chamada **Context Memory** ou **Operational Context Memory**, separada de `Expertise`, para:
+Example:
 
-1. recuperar contexto operacional após o roteamento
-2. enriquecer bootstrap e execução do agente selecionado
-3. persistir memória operacional curada entre sessões
-4. permitir evolução futura do MAH como **assistant substrate** acima dos runtimes
-5. manter o playbook de backlog-planning explícito para ClickUp MCP, sem exigir uma skill intermediária dedicada
+- `planning-lead` may be routed for `backlog-planning`
+- but the relevant operational knowledge for that task may vary:
+  - using ClickUp directly through MCP
+  - backlog decomposition criteria
+  - milestone flow
+  - use of planning or PERT skills
+  - fallback paths when an expected system is not available
 
-Princípio central:
+Before Context Memory, that knowledge tended to be scattered across:
 
-- `Expertise` decide **quem deve receber a tarefa**
-- `Context Memory` decide **o que esse agente precisa lembrar para executar bem**
+- static agent prompts
+- short-lived session memory
+- ad hoc notes
+- operator implicit knowledge
 
-## Outcome de Produto (`v0.8.0`)
+That limited:
 
-Ao final do release, MAH deve suportar:
+- useful persistence across sessions
+- transferability across runtimes
+- explainability of the context used during execution
+- MAH evolution as a higher-level assistant layer
 
-1. corpus versionado de memória operacional por crew/agente/capability
-2. schema e validação para arquivos de contexto (`.md`/`.qmd`)
-3. indexação canônica e bounded desse corpus
-4. retrieval explainable por tarefa, agent e capability
-5. integração opcional com bootstrap de runtime para injeção bounded de contexto
-6. proposal flow para transformar sinais de sessão/proveniência em memória persistente curada
-7. base arquitetural para MAH atuar como **layer de assistência de alto nível**, e não apenas surface de dispatch
+## Feature Thesis
 
-## Escopo do `v0.8.0` (In)
+Create a new canonical layer called **Context Memory** or **Operational Context Memory**, explicitly separate from `Expertise`, to:
 
-- nova camada `mah context`
-- suporte a `.md` e `.qmd`
-- frontmatter estruturado
-- index local com rebuild determinístico
-- retrieval lexical/metadata-aware, bounded e explainable
-- integração inicial com bootstrap de runtime, priorizando Hermes
-- proposal flow de memória derivada de sessões/proveniência
-- testes de contrato, integração e regressão
-- documentação e governança do corpus operacional
+1. retrieve operational context after routing
+2. enrich bootstrap and execution for the selected agent
+3. persist curated operational memory across sessions
+4. allow future MAH evolution as an **assistant substrate** above runtimes
+5. keep the backlog-planning playbook explicit for ClickUp MCP without requiring a dedicated intermediate skill
 
-## Fora do Escopo (Out)
+Core principle:
 
-- vector DB obrigatório
-- Obsidian como dependência do core
-- knowledge graph completo
-- auto-write não revisado a partir de transcript bruto
-- substituição do `mah expertise recommend/explain`
-- replay total de memória autobiográfica do agente
-- autonomia irrestrita baseada em memória não validada
+- `Expertise` decides **who should receive the task**
+- `Context Memory` decides **what that agent needs to remember to execute well**
 
-## Problema de Produto
+## Product Outcome for `v0.8.0`
 
-## Problema 1 — Pós-roteamento sem memória operacional
+By the end of the release, MAH should support:
 
-O roteamento por expertise responde:
+1. a versioned operational memory corpus by crew, agent, and capability
+2. schema and validation for context files (`.md` and `.qmd`)
+3. deterministic and bounded indexing of that corpus
+4. explainable retrieval by task, agent, and capability
+5. optional runtime bootstrap integration for bounded context injection
+6. a proposal flow that turns session and provenance signals into curated persistent memory candidates
+7. an architectural base for MAH to act as a **high-level assistance layer**, not only a dispatch surface
 
-- quem é o melhor candidato
-- quem é permitido
-- qual nível de confiança se aplica
+## Scope for `v0.8.0` (In)
 
-Mas não responde:
+- new `mah context` layer
+- support for `.md` and `.qmd`
+- structured frontmatter
+- local deterministic index with rebuild support
+- lexical and metadata-aware retrieval, bounded and explainable
+- initial runtime bootstrap integration, prioritizing Hermes
+- proposal flow for memory derived from sessions and provenance
+- contract, integration, and regression tests
+- documentation and governance for the operational corpus
 
-- quais playbooks operacionais usar
-- qual MCP é o melhor ponto de integração
-- quais skills são mais relevantes para esta tarefa
-- quais gotchas já conhecidos importam para esta capability
+## Out of Scope
 
-## Problema 2 — Memória persistente mal distribuída
+- mandatory vector database
+- Obsidian as a core dependency
+- a full knowledge graph
+- unreviewed auto-write from raw transcripts
+- replacing `mah expertise recommend/explain`
+- full autobiographical replay of agent memory
+- unrestricted autonomy driven by unvalidated memory
 
-Hoje a memória útil tende a se perder entre:
+## Product Problem
 
-- sessão efêmera
-- expertise compacta limitada por budget
-- artefatos espalhados em docs/plan/specs
+### Problem 1 — Post-routing without operational memory
 
-Isso gera:
+Expertise-based routing answers:
 
-- rederivação recorrente do mesmo contexto operacional
-- dependência do runtime/sessão atual
-- baixa transferibilidade entre operadores e runtimes
+- who is the best candidate
+- who is allowed
+- what confidence level applies
 
-## Problema 3 — MAH ainda não é uma assistant layer completa
+But it does not answer:
 
-Para o MAH evoluir de orchestration layer para uma assistant layer de alto nível, ele precisa conseguir:
+- which operational playbooks to use
+- which MCP is the best integration point
+- which skills are most relevant for this task
+- which known gotchas matter for this capability
 
-1. decidir quem deve agir
-2. recuperar contexto operacional útil
-3. lembrar aprendizados entre sessões
-4. injetar isso bounded em diferentes runtimes
+### Problem 2 — Persistent memory was poorly distributed
 
-Sem isso, o runtime continua sendo o principal “dono” da memória prática.
+Useful memory was previously lost between:
 
-## Proposta
+- ephemeral session state
+- compact expertise constrained by budget
+- artifacts scattered across `docs/`, `plan/`, and `specs/`
 
-Separar explicitamente cinco camadas:
+That caused:
+
+- repeated re-derivation of the same operational context
+- dependence on the current runtime and active session
+- weak transferability across operators and runtimes
+
+### Problem 3 — MAH was not yet a complete assistant layer
+
+For MAH to evolve from orchestration layer into a higher-level assistant layer, it must be able to:
+
+1. decide who should act
+2. retrieve useful operational context
+3. retain learnings across sessions
+4. inject that context in a bounded way across runtimes
+
+Without that, the runtime remains the primary owner of practical memory.
+
+## Proposal
+
+Explicitly separate five layers:
 
 1. `Expertise`
-- inteligência de capability, trust, lifecycle, policy e routing
+   - capability intelligence, trust, lifecycle, policy, and routing
 
 2. `Context Memory`
-- memória operacional curada por agent/capability/task pattern
+   - curated operational memory by agent, capability, and task pattern
 
 3. `Sessions`
-- continuidade de trabalho recente e injection cross-runtime
+   - continuity of recent work and cross-runtime injection
 
 4. `Provenance`
-- trilha auditável do que ocorreu
+   - auditable trail of what happened
 
 5. `Evidence`
-- sinais estruturados que alimentam expertise e propostas
+   - structured signals feeding expertise and proposal flows
 
-## Princípio de boundary
+## Boundary Principle
 
 `Context Memory`:
 
-- não participa do ranking de roteamento
-- não concede permissão
-- não altera policy
-- não substitui expertise
-- não recebe logs brutos diretamente
+- does not participate in routing ranking
+- does not grant permission
+- does not alter policy
+- does not replace expertise
+- does not ingest raw logs directly
 
-Seu papel é exclusivamente **enriquecer execução pós-roteamento**.
+Its role is exclusively to **enrich post-routing execution**.
 
-## Arquitetura Alvo (`v0.8.0`)
+## Target Architecture for `v0.8.0`
 
-## Camadas
+### Layers
 
 1. `Context Corpus`
-- arquivos canônicos `.md`/`.qmd`
-- versionados no repositório
-- escritos para reuso operacional
-- o smoke doc canônico de backlog-planning neste release é `.mah/context/operational/dev/planning-lead/backlog-planning/clickup-backlog-triage.md`
+   - canonical `.md` and `.qmd` files
+   - versioned in the repository
+   - written for operational reuse
+   - the canonical backlog-planning smoke doc in this release is `.mah/context/operational/dev/planning-lead/backlog-planning/clickup-backlog-triage.md`
 
 2. `Context Index`
-- índice derivado com metadata, snippets e chaves de busca
+   - derived index with metadata, snippets, and search keys
 
 3. `Retrieval Engine`
-- seleciona top-N contextos relevantes por tarefa/capability/ferramentas
+   - selects top-N relevant contexts by task, capability, and available tools
 
 4. `Runtime Injection Layer`
-- integra o contexto recuperado ao bootstrap do runtime
+   - integrates retrieved context into runtime bootstrap
 
 5. `Proposal Layer`
-- transforma sinais de sessões/proveniência em rascunhos de memória persistente
+   - turns session and provenance signals into draft persistent memory
 
-## Estruturas de dados (proposta inicial)
+### Data Structures (initial proposal)
 
 - `types/context-memory-types.mjs`
   - `ContextMemoryDocument`
@@ -202,13 +239,13 @@ Seu papel é exclusivamente **enriquecer execução pós-roteamento**.
   - `ContextMemoryRetrievalResult`
   - `ContextMemoryProposal`
 
-- Diretórios:
+- directories:
   - `.mah/context/operational/`
   - `.mah/context/index/`
   - `.mah/context/proposals/`
   - `.mah/context/cache/`
 
-## Organização de conteúdo
+### Content Organization
 
 ```text
 .mah/context/operational/
@@ -225,7 +262,7 @@ Seu papel é exclusivamente **enriquecer execução pós-roteamento**.
         splitting-guidelines.md
 ```
 
-## Frontmatter proposto
+### Proposed Frontmatter
 
 ```yaml
 ---
@@ -256,254 +293,358 @@ refs:
 ---
 ```
 
-## Relação com `Expertise`
+## Relationship with `Expertise`
 
-Exemplo:
+Example:
 
-- `planning-lead` continua tendo capability `backlog-planning` no catálogo de expertise
-- o roteamento usa esse dado estruturado para selecioná-lo
-- após a seleção, o retrieval busca documentos operacionais ligados a:
+- `planning-lead` still owns the `backlog-planning` capability in the expertise catalog
+- routing uses that structured data to select the agent
+- after selection, retrieval searches operational documents linked to:
   - `agent=planning-lead`
   - `capability=backlog-planning`
   - `systems=clickup`
-  - `task_patterns` compatíveis com a tarefa
-- o playbook recuperado explicita o caminho operacional via ClickUp MCP
+  - `task_patterns` compatible with the task
+- the retrieved playbook makes the ClickUp MCP path explicit
 
-Ou seja:
+In other words:
 
-- `Expertise` continua pequena, estruturada e governada
-- `Context Memory` absorve o detalhe operacional reutilizável
+- `Expertise` remains small, structured, and governed
+- `Context Memory` absorbs reusable operational detail
 
-## Relação com persistência de memória
+## Relationship with Memory Persistence
 
-## Memória persistente viável
+### Viable Persistent Memory
 
-Esta feature resolve um problema importante de persistência:
+This feature solves an important persistence problem:
 
-- memória operacional relevante não deve depender apenas de sessão ativa ou do runtime
+- relevant operational memory should not depend only on the active session or runtime
 
-Em vez de persistir transcript bruto, o MAH passa a persistir:
+Instead of persisting raw transcripts, MAH persists:
 
-1. `memória curada`
-- playbooks, padrões, heurísticas, integrações, gotchas
+1. `curated memory`
+   - playbooks, patterns, heuristics, integrations, gotchas
 
-2. `memória derivada`
-- propostas geradas a partir de sessões, provenance e evidence
+2. `derived memory`
+   - proposals generated from sessions, provenance, and evidence
 
-3. `memória efêmera`
-- snippets recuperados apenas para a execução atual
+3. `ephemeral memory`
+   - snippets retrieved only for the current execution
 
-## Modelo de persistência em 3 níveis
+### Three-Level Persistence Model
 
-### N1 — Curated Operational Memory
+#### N1 — Curated Operational Memory
 
-- versionada
-- auditável
-- revisável
-- estável
+- versioned
+- auditable
+- reviewable
+- stable
 
-### N2 — Derived Memory Proposals
+#### N2 — Derived Memory Proposals
 
-- gerada de sessões/proveniência/evidence
-- não entra automaticamente no corpus
-- requer revisão humana
+- generated from sessions, provenance, or evidence
+- never enters the corpus automatically
+- requires human review
 
-### N3 — Runtime Injected Memory
+#### N3 — Runtime Injected Memory
 
-- resultado do retrieval bounded
-- não persiste como truth por si só
+- result of bounded retrieval
+- does not become system truth by itself
 
-## Benefício
+### Benefit
 
-Isso dá ao MAH uma forma **segura e explicável** de persistência de memória útil:
+This gives MAH a **safe and explainable** form of useful memory persistence:
 
-- sem depender do runtime
-- sem inflar prompt fixo
-- sem transformar logs em conhecimento canônico
-- sem misturar capability intelligence com operational detail
+- without depending on the runtime
+- without inflating the fixed prompt
+- without turning logs into canonical knowledge
+- without mixing capability intelligence with operational detail
 
-## Evolução do Propósito do MAH
+## Evolution of the MAH Purpose
 
-## Posição atual
+### Current Position
 
-Hoje o MAH é:
+Today MAH is:
 
-- orchestration layer
-- runtime-agnostic control plane
-- expertise-aware routing layer
-- session/provenance bridge
+- an orchestration layer
+- a runtime-agnostic control plane
+- an expertise-aware routing layer
+- a session and provenance bridge
 
-## Posição futura
+### Future Position
 
-Com `Context Memory`, o MAH passa a ser também:
+With `Context Memory`, MAH also becomes:
 
-- context orchestration layer
-- operational memory layer
-- assistant state layer
+- a context orchestration layer
+- an operational memory layer
+- an assistant state layer
 
-Isso o aproxima de um produto de alto nível no estilo:
+That moves it closer to a higher-level product in the direction of:
 
-- evolução do OpenClaw
-- selective absorption de padrões úteis do Hermes
-- coordinator/assistant substrate acima dos runtimes
+- evolution beyond prior orchestration shells
+- selective absorption of useful runtime patterns
+- a coordinator and assistant substrate above runtimes
 
-Sem virar:
+Without becoming:
 
-- fork de Hermes
-- runtime opinionated shell
-- produto acoplado a uma UX específica como Obsidian
+- a fork of any specific runtime
+- a runtime-opinionated shell
+- a product tightly coupled to a specific UX such as Obsidian
 
 ## Milestones
 
 ## M1 — Context Memory Foundation
 
-Entrega:
+**Current status:** delivered
 
-- schema e tipos do documento operacional
-- parser de frontmatter para `.md` e `.qmd`
-- regras de validação
-- storage layout canônico
-- docs de boundary e naming
-- playbooks de backlog-planning referenciam ClickUp MCP diretamente no corpus operacional
+Delivery:
 
-Critérios de aceite:
+- operational document schema and types
+- frontmatter parser for `.md` and `.qmd`
+- validation rules
+- canonical storage layout
+- boundary and naming docs
+- backlog-planning playbooks reference ClickUp MCP directly in the operational corpus
 
-- documentos inválidos falham em `mah context validate`
-- formatos `.md` e `.qmd` suportados igualmente
-- o schema é estável e documentado
-- não há ambiguidade com `Expertise`
+Already delivered:
+
+- `types/context-memory-types.mjs`
+- `scripts/context-memory-schema.mjs`
+- `scripts/context-memory-validate.mjs`
+- `.mah/context/operational/`, `.mah/context/index/`, `.mah/context/proposals/`, `.mah/context/cache/`
+- canonical smoke doc at `.mah/context/operational/dev/planning-lead/backlog-planning/clickup-backlog-triage.md`
+- boundary documentation in `docs/context-memory.md` and this plan
+
+Still missing:
+
+- none for the original M1 scope
+
+Acceptance criteria:
+
+- invalid documents fail in `mah context validate`
+- `.md` and `.qmd` are supported equally
+- the schema is stable and documented
+- there is no ambiguity with `Expertise`
 
 ## M2 — Indexing + Retrieval MVP
 
-Entrega:
+**Current status:** delivered
 
-- index local determinístico
-- retrieval por `agent`, `capability`, `task`, `systems`, `tools`
-- explainability do retrieval
-- limites de tamanho, profundidade e file-count
-- hints de backlog-planning devem apontar para ClickUp MCP quando o doc operacional mencionar backlog grooming ou task creation
+Delivery:
 
-Critérios de aceite:
+- deterministic local index
+- retrieval by `agent`, `capability`, `task`, `systems`, and `tools`
+- retrieval explainability
+- size, depth, and file-count limits
+- backlog-planning hints point to ClickUp MCP when operational docs mention backlog grooming or task creation
 
-- `mah context find --agent planning-lead --task "<...>"` retorna top-N úteis
-- retrieval não lê corpus inteiro a cada execução
-- explain informa por que cada item foi escolhido
-- retrieval é bounded por limites explícitos
+Already delivered:
+
+- `mah context index [--rebuild]`
+- `mah context find --agent <name> --task "<desc>"`
+- `mah context explain --agent <name> --task "<desc>"`
+- retrieval scoring in `scripts/context-memory-schema.mjs`
+- corpus-vs-fixture separation tests in `tests/context-memory.test.mjs`
+
+Still missing:
+
+- none for the original M2 scope
+
+Acceptance criteria:
+
+- `mah context find --agent planning-lead --task "<...>"` returns useful top-N results
+- retrieval does not read the full corpus on every execution
+- explain surfaces report why each item was selected
+- retrieval is bounded by explicit limits
 
 ## M3 — Runtime Injection (bounded)
 
-Entrega:
+**Current status:** partial
 
-- integração com bootstrap Hermes
-- bloco adicional de contexto operacional no bootstrap query
-- flags de opt-in e limites de injeção
-- fallback seguro quando o corpus não existir
+Delivery:
 
-Critérios de aceite:
+- Hermes bootstrap integration
+- additional operational context block in the bootstrap query
+- opt-in flags and injection limits
+- safe fallback when the corpus does not exist
 
-- nenhum runtime quebra sem corpus
-- contexto injetado é resumido e bounded
-- `mah explain run` ou superfície equivalente mostra o contexto usado
-- runtime continua com semântica honesta
+Already delivered:
+
+- runtime integration in `scripts/runtime-core-integrations.mjs`
+- retrieval-to-bootstrap projection in `scripts/context-memory-integration.mjs`
+- Hermes opt-in through `MAH_CONTEXT_MEMORY=1` or `--with-context-memory`
+- MAH-only flags `--context-limit` and `--context-mode`
+- tests proving these flags are consumed by MAH and stripped before Hermes launch
+
+Still missing:
+
+- a clear operator-facing surface showing the exact retrieved context used for a run
+- a runtime-agnostic explanation surface equivalent to the original `mah explain run` expectation
+
+Acceptance criteria:
+
+- no runtime breaks without a corpus
+- injected context is summarized and bounded
+- `mah explain run` or an equivalent surface shows the context used
+- the runtime continues to have honest semantics
 
 ## M4 — CLI + Operator UX
 
-Entrega:
+**Current status:** delivered
 
-- namespace `mah context`
-- comandos:
+Delivery:
+
+- `mah context` namespace
+- commands:
   - `list`
   - `show <id>`
   - `find --agent --task`
   - `explain --agent --task`
   - `validate`
   - `index`
-- `--json` para automação
+- `--json` for automation
 
-Critérios de aceite:
+Already delivered:
 
-- operador consegue responder:
-  - qual contexto operacional foi recuperado
-  - por que ele foi recuperado
-  - quais ferramentas/sistemas foram assumidos
+- `mah context validate`
+- `mah context list`
+- `mah context show`
+- `mah context index`
+- `mah context find`
+- `mah context explain`
+- `mah context propose`
+
+Still missing:
+
+- none for the original M4 scope
+
+Acceptance criteria:
+
+- the operator can answer:
+  - which operational context was retrieved
+  - why it was retrieved
+  - which tools and systems were assumed
 
 ## M5 — Persistent Learning Proposal Flow
 
-Entrega:
+**Current status:** partial
 
-- proposal layer a partir de:
+Delivery:
+
+- proposal layer sourced from:
   - `sessions`
   - `provenance`
   - `evidence`
-- drafts em `.mah/context/proposals/`
-- merge/dedupe básico
-- governança de promoção para corpus curado
+- drafts in `.mah/context/proposals/`
+- basic merge and dedupe
+- governance for promotion into the curated corpus
 
-Critérios de aceite:
+Already delivered:
 
-- memória derivada não entra automaticamente no corpus
-- proposals têm explain e fonte rastreável
-- o operador/reviewer consegue promover ou descartar aprendizado
+- `scripts/context-memory-proposal.mjs`
+- `mah context propose --from-session <session-ref>`
+- draft proposal writes to `.mah/context/proposals/`
+- proposal schema validation support in `scripts/context-memory-validate.mjs`
+
+Still missing:
+
+- proposal generation from provenance and evidence, not only sessions
+- basic dedupe and merge behavior
+- operator workflow to promote or reject a proposal
+- clear governance contract for promotion into the curated corpus
+
+Acceptance criteria:
+
+- derived memory does not enter the corpus automatically
+- proposals have explainability and traceable sources
+- the operator or reviewer can promote or discard learnings
 
 ## M6 — Assistant Layer Base
 
-Entrega:
+**Current status:** not delivered
 
-- definição de `assistant-state` canônico do MAH
-- mapeamento explícito entre:
-  - expertise selecionada
-  - contexto recuperado
-  - sessão ativa
-  - provenance relevante
-- base para MCP/CLI futura
+Delivery:
 
-Critérios de aceite:
+- canonical MAH `assistant-state` definition
+- explicit mapping between:
+  - selected expertise
+  - retrieved context
+  - active session
+  - relevant provenance
+- foundation for a future MCP or CLI surface
 
-- o MAH consegue descrever o “estado de assistência” atual de forma estruturada
-- o design continua runtime-agnostic
+Already delivered:
 
-## Backlog Técnico (Workstreams)
+- conceptual relationship documented in plans and specs
 
-## W1 — Naming, Boundary e Product Spec
+Still missing:
 
-- documento de boundary entre `Expertise`, `Context Memory`, `Sessions`, `Evidence` e `Provenance`
-- definir naming oficial da feature
-- documentar `Obsidian optional, core-independent`
+- actual canonical `assistant-state` model
+- structured operator surface describing the current assistance state
+- runtime-agnostic implementation proving the model
 
-## W2 — Modelagem e Validação
+Acceptance criteria:
+
+- MAH can describe the current assistance state in structured form
+- the design remains runtime-agnostic
+
+## Technical Backlog (Workstreams)
+
+## W1 — Naming, Boundary, and Product Spec
+
+**Current status:** delivered
+
+- boundary document across `Expertise`, `Context Memory`, `Sessions`, `Evidence`, and `Provenance`
+- official feature naming
+- document `Obsidian optional, core-independent`
+
+## W2 — Modeling and Validation
+
+**Current status:** delivered
 
 - `types/context-memory-types.mjs`
 - `scripts/context-memory-schema.mjs`
 - `scripts/context-memory-validate.mjs`
-- fixtures válidas/inválidas
+- valid and invalid fixtures
 
-## W3 — Parsing e Indexação
+## W3 — Parsing and Indexing
 
-- parser de frontmatter
-- extração de headings/snippets
-- índice canônico em `.mah/context/index/operational-context.index.json`
-- cache por hash/mtime
+**Current status:** delivered
+
+- frontmatter parser
+- heading and snippet extraction
+- canonical index at `.mah/context/index/operational-context.index.json`
+- hash and mtime cache support
 
 ## W4 — Retrieval Engine
+
+**Current status:** delivered
 
 - lexical scoring
 - metadata-aware ranking
 - capability-aware filtering
-- compatibilidade com tools/MCP disponíveis
+- compatibility with available tools and MCP servers
 - explain payload
 
 ## W5 — Runtime Integration
 
-- integração em `scripts/runtime-core-integrations.mjs`
-- enrichment de `agentCtx`
-- bootstrap query com bloco `Operational context for this task`
+**Current status:** partial
+
+- integration in `scripts/runtime-core-integrations.mjs`
+- `agentCtx` enrichment
+- bootstrap query with an `Operational context for this task` block
 - flags:
   - `MAH_CONTEXT_MEMORY=1`
   - `--with-context-memory`
   - `--context-limit`
   - `--context-mode=summary|snippets`
 
-## W6 — CLI e Operabilidade
+Gap:
+
+- no first-class operator surface yet shows the retrieved runtime context used during a run
+
+## W6 — CLI and Operability
+
+**Current status:** delivered
 
 - `mah context list`
 - `mah context show`
@@ -512,24 +653,37 @@ Critérios de aceite:
 - `mah context index`
 - `mah context validate`
 
-## W7 — Proposal Flow de Persistência
+## W7 — Persistent Proposal Flow
+
+**Current status:** partial
 
 - `scripts/context-memory-proposal.mjs`
-- geração de drafts por sessão/proveniência
-- dedupe e merge básico
-- promote/reject workflow
+- draft generation from sessions
+- basic file persistence
 
-## W8 — Testes e Segurança
+Gap:
+
+- dedupe and merge basics
+- promote and reject workflow
+- provenance and evidence sources
+
+## W8 — Tests and Safety
+
+**Current status:** partial
 
 - contract tests
 - integration tests
-- non-regression com `mah run`, `mah sessions`, `mah expertise`
-- limites de traversal, file-count e snippet-size
-- bloqueios contra uso de corpus não curado como truth de policy
+- non-regression against `mah run`, `mah sessions`, and `mah expertise`
+- traversal, file-count, and snippet-size limits
+- blocks against using uncurated corpus as policy truth
 
-## Contrato funcional mínimo
+Gap:
 
-## CLI
+- close remaining coverage around runtime visibility, proposal governance, and assistant-state
+
+## Minimum Functional Contract
+
+### CLI
 
 ```bash
 mah context index
@@ -541,7 +695,7 @@ mah context explain --agent planning-lead --task "transform spec into backlog wi
 mah context propose --from-session hermes:dev:abc123
 ```
 
-## Retrieval Request
+### Retrieval Request
 
 ```json
 {
@@ -555,7 +709,7 @@ mah context propose --from-session hermes:dev:abc123
 }
 ```
 
-## Retrieval Result
+### Retrieval Result
 
 ```json
 {
@@ -582,152 +736,196 @@ mah context propose --from-session hermes:dev:abc123
 }
 ```
 
-## Algoritmo de Retrieval (MVP)
+## Retrieval Algorithm (MVP)
 
 ```text
 Input: task, crew, agent, capability_hint, available_tools, available_mcp, runtime
 
-1) Filtrar por crew
-2) Filtrar por agent
-3) Boost por capability_hint
-4) Boost por systems/tools disponíveis no runtime
-5) Match lexical por task_patterns/tags/headings
-6) Penalizar docs longos/baixamente revisados/instáveis
-7) Ordenar e retornar top-N
-8) Gerar explain payload e summary blocks bounded
+1) Filter by crew
+2) Filter by agent
+3) Boost by capability_hint
+4) Boost by systems/tools available in the runtime
+5) Lexical match by task_patterns/tags/headings
+6) Penalize long, stale, or unstable documents
+7) Sort and return top-N
+8) Generate explain payload and bounded summary blocks
 ```
 
-## Integração com Runtime
+## Runtime Integration
 
-## Hermes (primeiro alvo)
+### Hermes (first target)
 
-Ponto de integração:
+Integration point:
 
-- enriquecer `agentCtx` antes de `buildHermesBootstrapQuery()`
-- adicionar bloco extra no bootstrap:
+- enrich `agentCtx` before `buildHermesBootstrapQuery()`
+- add an extra bootstrap block:
   - `Operational context for this task`
   - `Relevant tools/systems`
   - `Relevant docs`
   - `Bounded summary`
 
-## Outros runtimes
+### Other runtimes
 
-- Claude/OpenCode/PI podem absorver isso em seus próprios pontos de `prepareRunContext`
-- o contrato deve ser comum, com a projeção final respeitando a semântica do runtime
+- Claude, OpenCode, and PI can absorb the same contract at their own `prepareRunContext` points
+- the contract should stay common while the final projection respects the target runtime semantics
 
-## Governança
+## Governance
 
-## Regras de escrita do corpus
+### Corpus Writing Rules
 
-- não armazenar transcript bruto
-- não armazenar logs/copied output como corpus operacional
-- manter documentos curtos, específicos e reusáveis
-- separar contexto curado de propostas derivadas
-- toda promoção de memória derivada exige revisão
+- do not store raw transcripts
+- do not store copied logs or command output as operational corpus
+- keep documents short, specific, and reusable
+- separate curated context from derived proposals
+- every promotion of derived memory requires review
 
-## Obsidian
+### Obsidian
 
-- uso opcional como editor local
-- sem dependência do core
-- `.obsidian/` não faz parte do contrato funcional do MAH
+- optional as a local editor
+- no dependency in the core
+- `.obsidian/` is not part of the MAH functional contract
 
-## Métricas de Sucesso do Release
+## Release Success Metrics
 
-1. Eficiência operacional
-- redução de rederivação manual de contexto em tarefas repetidas
-- menor tempo até ação útil após roteamento
+1. operational efficiency
+   - reduced manual re-derivation of context in repeated tasks
+   - less time to useful action after routing
 
-2. Qualidade de execução
-- aumento de consistência no uso correto de tools/MCPs por capability
-- menor divergência entre agentes para tarefas parecidas
+2. execution quality
+   - more consistent use of correct tools and MCP servers by capability
+   - lower divergence between agents on similar tasks
 
-3. Persistência útil
-- memória operacional reaproveitada entre sessões e runtimes
-- proposals derivadas de sessões com taxa útil de promoção
+3. useful persistence
+   - operational memory reused across sessions and runtimes
+   - session-derived proposals with a meaningful promotion rate
 
-4. Produto
-- avanço do MAH em direção a uma assistant layer de alto nível, sem perder runtime agnosticism
+4. product
+   - MAH advances toward a higher-level assistant layer without losing runtime agnosticism
 
-## Riscos e Mitigações
+## Risks and Mitigations
 
-1. Corpus virar dumping ground
-- Mitigação: schema rígido, proposal flow e revisão obrigatória
+1. corpus becoming a dumping ground
+   - mitigation: strict schema, proposal flow, and mandatory review
 
-2. Prompt inflation
-- Mitigação: top-N, snippet caps, summary-only por default
+2. prompt inflation
+   - mitigation: top-N, snippet caps, summary-only by default
 
-3. Retrieval opaco
-- Mitigação: explain payload obrigatório
+3. opaque retrieval
+   - mitigation: explain payload is mandatory
 
-4. Acoplamento a Obsidian
-- Mitigação: parser só depende de arquivos + frontmatter
+4. coupling to Obsidian
+   - mitigation: parser depends only on files and frontmatter
 
-5. Mistura indevida com `Expertise`
-- Mitigação: boundaries explícitos e superfícies CLI separadas
+5. improper overlap with `Expertise`
+   - mitigation: explicit boundaries and separate CLI surfaces
 
-6. Risco de custo/performance por indexação ampla
-- Mitigação: limits, cache, incremental rebuild e guardrails de traversal
+6. cost or performance issues from broad indexing
+   - mitigation: limits, cache, incremental rebuild, and traversal guardrails
 
-## Dependências e Decisões Abertas
+## Dependencies and Open Decisions
 
-1. Naming final:
-- `Context Memory`
-- `Operational Context Memory`
-- `Assistant Memory`
+1. final naming:
+   - `Context Memory`
+   - `Operational Context Memory`
+   - `Assistant Memory`
 
-2. Forma de indexação inicial:
-- lexical + metadata only
-- ou híbrido com embeddings opcionais em release futuro
+2. initial indexing mode:
+   - lexical plus metadata only
+   - or hybrid with optional embeddings in a future release
 
-3. Onde expor explainability:
-- `mah context explain`
-- `mah explain run`
-- ambos
+3. where to expose explainability:
+   - `mah context explain`
+   - `mah explain run`
+   - both
 
-4. Política de proposal flow:
-- somente leads/orchestrator
-- ou worker também pode propor com reviewer obrigatório
+4. proposal flow policy:
+   - leads and orchestrator only
+   - or workers may also propose with mandatory reviewer assignment
 
-## PR Slices sugeridos
+## Suggested PR Slices
 
 ### PR1 — Schema + validate + storage layout
 
-- tipos
+**Status:** delivered
+
+- types
 - schema
 - fixtures
-- docs de boundary
+- boundary docs
+
+Reference:
+
+- [`plan/slices/context-memory-finalization-slices.md`](./slices/context-memory-finalization-slices.md)
 
 ### PR2 — Index + retrieval MVP
+
+**Status:** delivered
 
 - index builder
 - retrieval engine
 - CLI `index/find/explain`
 
+Implementation landed directly in code:
+
+- `scripts/context-memory-schema.mjs`
+- `scripts/meta-agents-harness.mjs`
+- `tests/context-memory.test.mjs`
+
 ### PR3 — Hermes/runtime bootstrap integration
 
-- enrichment de `agentCtx`
-- injection bounded
-- tests de bootstrap
+**Status:** partial
 
-### PR4 — Proposal flow de persistência
+- `agentCtx` enrichment
+- bounded injection
+- bootstrap tests
 
-- drafts a partir de sessions/provenance
-- governança
-- docs e testes
+Remainder is now tracked in:
+
+- [`plan/slices/context-memory-finalization-slices.md`](./slices/context-memory-finalization-slices.md)
+
+### PR4 — Persistent proposal flow
+
+**Status:** partial
+
+- draft generation from sessions
+- governance
+- docs and tests
+
+Remainder is now tracked in:
+
+- [`plan/slices/context-memory-finalization-slices.md`](./slices/context-memory-finalization-slices.md)
 
 ### PR5 — Product docs + assistant-layer framing
 
-- documentação do release
-- relação com expertise/sessions/provenance
-- roadmap futuro
+**Status:** partial
+
+- release documentation
+- relation to expertise, sessions, and provenance
+- future roadmap
+
+Remainder is now tracked in:
+
+- [`plan/slices/context-memory-finalization-slices.md`](./slices/context-memory-finalization-slices.md)
+
+## Next Executable Slices
+
+The remaining work for the original `v0.8.0` plan is consolidated in:
+
+- [`plan/slices/context-memory-finalization-slices.md`](./slices/context-memory-finalization-slices.md)
+
+That unified slice document contains:
+
+1. runtime visibility and explainability for injected context
+2. operator-facing proposal governance and bounded promotion workflow
+3. the assistant-state base
 
 ## Definition of Done
 
-1. `mah expertise` permanece semanticamente intacto no roteamento.
-2. `mah context` existe como namespace separado e operável.
-3. O sistema suporta `.md` e `.qmd` como corpus operacional.
-4. O smoke doc de backlog-planning usa ClickUp MCP diretamente e existe hoje como `.md`.
-5. O retrieval é bounded, explainable e respeita ferramentas disponíveis.
-6. O bootstrap do runtime pode consumir contexto operacional sem depender de prompt fixo.
-7. Existe proposal flow para persistência de memória derivada.
-8. O design fortalece o MAH como camada de assistência de alto nível sem capturar a identidade do produto por um runtime específico.
+1. `mah expertise` remains semantically intact for routing.
+2. `mah context` exists as a separate, operable namespace.
+3. The system supports `.md` and `.qmd` as operational corpus formats.
+4. The backlog-planning smoke doc uses ClickUp MCP directly and exists today as `.md`.
+5. Retrieval is bounded, explainable, and respects available tools.
+6. Runtime bootstrap can consume operational context without depending on a fixed prompt.
+7. A proposal flow exists for persistence of derived memory.
+8. The design strengthens MAH as a higher-level assistance layer without collapsing product identity into a specific runtime.
