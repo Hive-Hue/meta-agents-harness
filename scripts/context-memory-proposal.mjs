@@ -254,7 +254,7 @@ export function writeProposal(repoRoot, proposal) {
   lines.push("")
   lines.push("```yaml")
   lines.push("id: " + (fm.id || "unknown"))
-  lines.push("Kind: " + (fm.kind || "operational-memory"))
+  lines.push("kind: " + (fm.kind || "operational-memory"))
   lines.push("crew: " + (fm.crew || "dev"))
   lines.push("agent: " + (fm.agent || "agent"))
   lines.push("capabilities:")
@@ -650,9 +650,9 @@ export async function promoteProposal(repoRoot, proposalId, stability = "curated
     return { ok: false, error: "proposal validation failed: " + vr.errors.join("; ") }
   }
 
-  // Path traversal check
+  // Path traversal check — reject .., \, and \0 but allow / as naming convention
   const docId = fm.proposed_document_id || ""
-  if (!docId || /[.]{2}|\/|\\|\0/.test(docId)) {
+  if (!docId || /[.]{2}|\\|\0/.test(docId)) {
     return { ok: false, error: "invalid proposed_document_id (path traversal or empty)" }
   }
 

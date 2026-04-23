@@ -19,6 +19,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Fixed
 
+- Path traversal regex in `promoteProposal` (`context-memory-proposal.mjs`) incorrectly rejected valid document IDs containing `/` (e.g., `dev/agent/implement/...`); regex changed from `/[.]{2}|[/\\]|\0/` to `/[.]{2}|\\|\0/`
+- Proposal generation used `Kind:` instead of `kind:` in YAML preview block, causing schema validation to fail during promotion
 - `mah run --headless` completely overhauled for correct non-interactive execution across all runtimes
 - PI headless now uses native `-p` flag instead of incorrect `run` subcommand
 - Claude headless now uses native `-p` flag instead of `--print --no-session-persistence`
