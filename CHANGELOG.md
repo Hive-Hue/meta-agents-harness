@@ -45,6 +45,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `process.exit()` replaces `return` in headless path to prevent event loop hang
 - Path guardrails now fail closed when approval is required but no interactive TUI is available
 - Domain enforcement now applies to all agent runtimes (`worker`, `lead`, and `orchestrator`), fixing a bypass where leads could operate outside declared YAML domain profiles
+- Expertise evidence `task_description` is now sanitized before persistence to strip `CAVEMAN_CREW` blocks, ANSI escapes, and orchestrator routing boilerplate, preserving only useful task intent
 
 ## [0.9.0] - 2026-04-23
 

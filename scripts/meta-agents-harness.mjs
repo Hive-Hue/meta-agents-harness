@@ -14,6 +14,7 @@ import { resolveMahHome } from "./mah-home.mjs"
 import { resolveWorkspaceRoot } from "./workspace-root.mjs"
 import { buildContextMemoryExplainPayload } from "./context-memory-integration.mjs"
 import { buildAssistantStatePayload } from "./assistant-state.mjs"
+import { sanitizeTaskDescription } from "./task-description.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -2656,9 +2657,10 @@ async function recordDelegationEvidence({ crew, expertiseId, taskDescription, ou
   try {
     const { recordEvidence } = await import("./expertise-evidence-store.mjs")
     const { randomUUID } = await import("node:crypto")
+    const sanitizedTaskDescription = sanitizeTaskDescription(taskDescription)
 
     // Map task description to task type via simple keyword detection
-    const taskLower = (taskDescription || "").toLowerCase()
+    const taskLower = sanitizedTaskDescription.toLowerCase()
     /** @type {string} */
     let taskType = "general"
     if (taskLower.includes("implement") || taskLower.includes("build") || taskLower.includes("write") || taskLower.includes("code")) {
@@ -2678,7 +2680,7 @@ async function recordDelegationEvidence({ crew, expertiseId, taskDescription, ou
       expertise_id: `${crew}:${expertiseId}`,
       outcome,
       task_type: taskType,
-      task_description: taskDescription,
+      task_description: sanitizedTaskDescription,
       duration_ms: durationMs,
       quality_signals: {
         review_pass: outcome === "success" && isExecuted ? true : undefined,

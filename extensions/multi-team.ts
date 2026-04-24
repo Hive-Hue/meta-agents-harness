@@ -259,6 +259,37 @@ function shortTextChars(value: string, limit = 180): string {
 	return normalized.length > limit ? normalized.slice(0, Math.max(0, limit - 3)) + "..." : normalized;
 }
 
+function sanitizeTaskDescription(value: string, limit = 200): string {
+	const ansiEscapeRe = /\u001b\[[0-9;]*m/g;
+	const cavemanBlockRe = /\[CAVEMAN_CREW\][\s\S]*?\[\/CAVEMAN_CREW\]/g;
+	const routingBlockRe = /\n*Routing note from orchestrator:\n(?:- .*\n?)*/gi;
+	const cleanLine = (line: string) => line
+		.replace(/^#+\s*/, "")
+		.replace(/^[-*]\s*/, "")
+		.replace(/\s+/g, " ")
+		.trim();
+	const isBoilerplate = (line: string) =>
+		/^routing note from orchestrator:?$/i.test(line)
+		|| /^requested worker target/i.test(line)
+		|| /^requested worker targets/i.test(line)
+		|| /^team:/i.test(line)
+		|| /^delegate internally only/i.test(line)
+		|| /^\[\/?caveman_crew\]/i.test(line);
+
+	const stripped = (value || "")
+		.replace(ansiEscapeRe, "")
+		.replace(cavemanBlockRe, "")
+		.replace(routingBlockRe, "\n");
+	const collapsed = stripped
+		.split("\n")
+		.map(cleanLine)
+		.filter((line) => line && !isBoilerplate(line))
+		.join(" ")
+		.replace(/\s+/g, " ")
+		.trim();
+	return shortText(collapsed, limit);
+}
+
 /**
  * Derive task type from task description keywords.
  * @param {string} task
@@ -3344,7 +3375,7 @@ export default function (pi: ExtensionAPI) {
 						expertise_id: `${crew}:${effectiveTarget}`,
 						outcome: result.exitCode === 0 ? "success" : "failure",
 						task_type: deriveTaskType(effectiveTask),
-						task_description: shortText(effectiveTask, 200),
+						task_description: sanitizeTaskDescription(effectiveTask, 200),
 						duration_ms: Math.round(result.elapsed),
 						source_agent: runtime!.agent.name,
 						source_session: currentSessionId() || "unknown",
@@ -3624,7 +3655,7 @@ export default function (pi: ExtensionAPI) {
 								expertise_id: `${crew}:${result.target}`,
 								outcome: result.exitCode === 0 ? "success" : "failure",
 								task_type: deriveTaskType(task),
-								task_description: shortText(task, 200),
+								task_description: sanitizeTaskDescription(task, 200),
 								duration_ms: Math.round(result.elapsed),
 								source_agent: runtime!.agent.name,
 								source_session: currentSessionId() || "unknown",
