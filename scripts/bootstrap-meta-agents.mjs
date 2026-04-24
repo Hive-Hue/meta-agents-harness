@@ -152,10 +152,29 @@ function ensureDefaults(doc) {
   // bundled runtime plugins and plugin.json (plugins) — those are code, not config.
   // Preserve existing YAML runtimes entries only if they contain user-specific config.
   // Bundled/installed plugin entries should not be duplicated in YAML.
-  next.runtimes = next.runtimes || {}
+  const allowedRuntimeOverrideKeys = new Set([
+    "model_overrides",
+    "permission",
+    "ccr",
+    "multi_team",
+    "headless",
+    "env",
+    "args",
+    "notes"
+  ])
+  const sanitizedRuntimes = {}
+  const inputRuntimes = next.runtimes && typeof next.runtimes === "object" ? next.runtimes : {}
   for (const runtime of ["pi", "claude", "opencode", "openclaude", "hermes", "kilo", "codex"]) {
-    next.runtimes[runtime] = next.runtimes[runtime] || {}
+    const rawRuntime = inputRuntimes[runtime]
+    const cleanedRuntime = {}
+    if (rawRuntime && typeof rawRuntime === "object" && !Array.isArray(rawRuntime)) {
+      for (const [key, value] of Object.entries(rawRuntime)) {
+        if (allowedRuntimeOverrideKeys.has(key)) cleanedRuntime[key] = value
+      }
+    }
+    sanitizedRuntimes[runtime] = cleanedRuntime
   }
+  next.runtimes = sanitizedRuntimes
 
   next.catalog = next.catalog || {}
   next.catalog.models = {
@@ -401,10 +420,18 @@ CRITICAL OUTPUT REQUIREMENTS:
 2. Start directly with: version: 1
 3. The output must be valid, parseable YAML
 4. MUST include all required sections:
-   - runtimes (pi, claude, kilo, opencode, hermes with wrapper/config_root/config_pattern)
-   - catalog (models, domain_profiles)
+   - runtimes (pi, claude, kilo, opencode, hermes, openclaude, codex as override maps only)
+   - catalog (models)
    - domain_profiles (at minimum: read_only_repo)
    - crews (id, display_name, mission, topology, agents)
+5. Do NOT emit legacy runtime wiring fields such as:
+   - wrapper
+   - config_root
+   - extension_root
+   - config_pattern
+   - route_map
+   - task_policy
+   - default_extensions
 5. Do NOT include runtime_detection; MAH applies runtime detection defaults internally
 6. Do NOT include a per-runtime skills path matrix; skill paths are resolved internally by convention
 7. Do NOT include an adapters block; MAH applies adapter mappings internally

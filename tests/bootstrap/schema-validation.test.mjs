@@ -104,6 +104,10 @@ test.describe("Schema Validation - Generated Structure", () => {
       assert.ok(config.runtimes.claude)
       assert.ok(config.runtimes.opencode)
       assert.ok(config.runtimes.hermes)
+      assert.equal(config.runtimes.pi.wrapper, undefined)
+      assert.equal(config.runtimes.pi.config_root, undefined)
+      assert.equal(config.runtimes.opencode.wrapper, undefined)
+      assert.equal(config.runtimes.opencode.task_policy, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }

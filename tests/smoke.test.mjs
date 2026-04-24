@@ -293,6 +293,13 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
     assert.equal(parsed.catalog?.domain_profiles, undefined, "domain_profiles should not be nested under catalog")
     assert.ok(parsed.runtimes?.openclaude, "bootstrap should emit modern runtime entries")
     assert.ok(parsed.runtimes?.codex, "bootstrap should emit codex runtime entry")
+    assert.equal(parsed.runtimes?.pi?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.pi?.config_root, undefined)
+    assert.equal(parsed.runtimes?.pi?.default_extensions, undefined)
+    assert.equal(parsed.runtimes?.claude?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.claude?.ccr?.route_map, undefined)
+    assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.opencode?.task_policy, undefined)
     assert.ok(parsed.crews[0].topology?.leads?.engineering, "bootstrap should emit full default crew topology")
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
@@ -347,6 +354,10 @@ test("mah init invokes bootstrap and creates meta-agents.yaml", () => {
     assert.match(result.stdout, /mah init completed/)
     const configPath = path.join(tempDir, "meta-agents.yaml")
     assert.equal(existsSync(configPath), true)
+    const parsed = YAML.parse(readFileSync(configPath, "utf-8"))
+    assert.equal(parsed.runtimes?.pi?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.claude?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
