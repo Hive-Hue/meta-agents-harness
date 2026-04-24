@@ -187,6 +187,21 @@ test("multi-team extension registers the thinking slash command", () => {
   assert.match(source, /handleThinkingCommand\(commandText\)/)
 })
 
+test("multi-team extension registers domain approval commands", () => {
+  const source = readFileSync(path.join(repoRoot, "extensions", "multi-team.ts"), "utf-8")
+  assert.match(source, /pi\.registerCommand\("domain-approvals"/)
+  assert.match(source, /pi\.registerCommand\("approve-domain"/)
+  assert.match(source, /pi\.registerCommand\("deny-domain"/)
+})
+
+test("multi-team domain rules support explicit approval metadata", () => {
+  const source = readFileSync(path.join(repoRoot, "extensions", "multi-team.ts"), "utf-8")
+  assert.match(source, /approval_required\?: boolean/)
+  assert.match(source, /approval_mode\?: "explicit_tui"/)
+  assert.match(source, /grant_scope\?: "single_path" \| "subtree" \| "single_op"/)
+  assert.match(source, /PI_MULTI_HEADLESS !== "1"/)
+})
+
 test("forced runtime works when flag appears before command", () => {
   const result = run(["--runtime", "opencode", "detect"])
   assert.equal(result.status, 0, result.stderr)

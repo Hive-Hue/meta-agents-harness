@@ -30,7 +30,11 @@ const domainRuleSchema = z.object({
   path: z.string(),
   read: z.boolean().optional(),
   edit: z.boolean().optional(),
-  bash: z.boolean().optional()
+  bash: z.boolean().optional(),
+  recursive: z.boolean().optional(),
+  approval_required: z.boolean().optional(),
+  approval_mode: z.enum(["explicit_tui"]).optional(),
+  grant_scope: z.enum(["single_path", "subtree", "single_op"]).optional(),
 }).passthrough()
 
 const sprintModeSchema = z.object({

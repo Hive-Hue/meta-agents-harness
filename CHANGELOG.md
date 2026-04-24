@@ -11,11 +11,23 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 - `mah run` and `mah delegate` now record canonical lifecycle events (`queued → routed → running → completed/failed`) to `.mah/sessions/lifecycle-events/`
 - `LifecycleEvent` type defined with structured fields for routing summary, context count, and result reason
+- Explicit TUI-only domain approval flow for worker guardrails in `multi-team.ts`:
+  - `approval_required`, `approval_mode`, and `grant_scope` on domain rules
+  - `/domain-approvals`, `/approve-domain`, and `/deny-domain` commands
+  - temporary session-scoped grants for approved out-of-domain access
+- `tests/quasi-root-e2e.test.mjs` covering:
+  - request → approve → grant flow
+  - fail-closed behavior in headless mode
+- `specs/quasi-root-domain-approval-spec.md` documenting the bounded `quasi_root` / explicit approval model
 
 ### Changed
 
 - Evidence store now defaults to workspace-local `.mah/expertise/evidence/` instead of `~/.mah/expertise/evidence/` (env var `MAH_EXPERTISE_EVIDENCE_ROOT` still works for cross-workspace shared evidence)
 - Session provenance expanded with lifecycle event recording as a separate event stream
+- `validate:config` schema now explicitly accepts domain approval rule metadata:
+  - `approval_required`
+  - `approval_mode: explicit_tui`
+  - `grant_scope: single_path | subtree | single_op`
 
 ### Fixed
 
@@ -30,6 +42,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `--` end-of-options separator stripped from passthrough to prevent runtime confusion
 - PI headless adapter now loads default extensions (was missing entirely)
 - `process.exit()` replaces `return` in headless path to prevent event loop hang
+- Worker path guardrails now fail closed when approval is required but no interactive TUI is available
 
 ## [0.9.0] - 2026-04-23
 

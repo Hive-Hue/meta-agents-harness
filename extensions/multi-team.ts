@@ -41,6 +41,9 @@ interface DomainRule {
 	upsert?: boolean;
 	delete?: boolean;
 	recursive?: boolean;
+	approval_required?: boolean;
+	approval_mode?: "explicit_tui";
+	grant_scope?: "single_path" | "subtree" | "single_op";
 }
 
 interface NormalizedDomainRule {
@@ -50,7 +53,32 @@ interface NormalizedDomainRule {
 	upsert: boolean;
 	delete: boolean;
 	recursive: boolean;
+	approval_required: boolean;
+	approval_mode?: "explicit_tui";
+	grant_scope: "single_path" | "subtree" | "single_op";
 	index: number;
+}
+
+interface DomainApprovalGrant {
+	id: string;
+	agentName: string;
+	absolutePath: string;
+	operation: "read" | "upsert" | "delete";
+	scope: "single_path" | "subtree" | "single_op";
+	grantedAt: string;
+	rulePath: string;
+}
+
+interface PendingDomainApproval {
+	id: string;
+	agentName: string;
+	toolName: string;
+	absolutePath: string;
+	relativePath: string;
+	operation: "read" | "upsert" | "delete";
+	scope: "single_path" | "subtree" | "single_op";
+	requestedAt: string;
+	rulePath: string;
 }
 
 interface ExpertiseEntry {
@@ -182,6 +210,9 @@ const EXPERTISE_NOTE_MAX_CHARS = 2000;
 const EXPERTISE_IDEAL_NOTE_CHARS = 160;
 const EXPERTISE_DECAY_AFTER_DAYS = 14;
 const EXPERTISE_SIMILARITY_THRESHOLD = 0.55;
+const pendingDomainApprovals: PendingDomainApproval[] = [];
+const domainApprovalGrants: DomainApprovalGrant[] = [];
+let domainApprovalSequence = 0;
 
 interface ParsedYamlLine {
 	indent: number;
@@ -1056,6 +1087,9 @@ function expandDomainRules(repoRoot: string, rules: DomainRule[]): NormalizedDom
 					upsert: !!rule.upsert,
 					delete: !!rule.delete,
 					recursive: false,
+					approval_required: !!rule.approval_required,
+					approval_mode: rule.approval_mode,
+					grant_scope: rule.grant_scope || "single_path",
 					index: syntheticIndex++,
 				});
 			}
@@ -1068,6 +1102,9 @@ function expandDomainRules(repoRoot: string, rules: DomainRule[]): NormalizedDom
 				upsert: !!rule.upsert,
 				delete: !!rule.delete,
 				recursive: true,
+				approval_required: !!rule.approval_required,
+				approval_mode: rule.approval_mode,
+				grant_scope: rule.grant_scope || "subtree",
 				index: syntheticIndex++,
 			});
 			continue;
@@ -1081,6 +1118,9 @@ function expandDomainRules(repoRoot: string, rules: DomainRule[]): NormalizedDom
 			upsert: !!rule.upsert,
 			delete: !!rule.delete,
 			recursive: isRecursive,
+			approval_required: !!rule.approval_required,
+			approval_mode: rule.approval_mode,
+			grant_scope: rule.grant_scope || (isRecursive ? "subtree" : "single_path"),
 			index: syntheticIndex++,
 		});
 	}
@@ -1157,6 +1197,50 @@ function ruleAllows(targetPath: string, rules: NormalizedDomainRule[], permissio
 	return rule ? !!rule[permission] : false;
 }
 
+function isInteractiveApprovalAvailable(): boolean {
+	return process.env.PI_MULTI_HEADLESS !== "1" && !!process.stdin.isTTY && !!process.stdout.isTTY;
+}
+
+function matchingGrant(agentName: string, targetPath: string, permission: "read" | "upsert" | "delete"): DomainApprovalGrant | null {
+	const matches = domainApprovalGrants.filter((grant) => {
+		if (grant.agentName !== agentName || grant.operation !== permission) return false;
+		if (grant.scope === "single_op" || grant.scope === "single_path") {
+			return grant.absolutePath === targetPath;
+		}
+		const relToGrant = relative(grant.absolutePath, targetPath);
+		return !relToGrant.startsWith("..") && relToGrant !== targetPath;
+	});
+	if (matches.length === 0) return null;
+	return matches[matches.length - 1] || null;
+}
+
+function consumeGrantIfNeeded(grant: DomainApprovalGrant | null) {
+	if (!grant || grant.scope !== "single_op") return;
+	const index = domainApprovalGrants.findIndex((item) => item.id === grant.id);
+	if (index >= 0) domainApprovalGrants.splice(index, 1);
+}
+
+function evaluateDomainPermission(agentName: string, targetPath: string, rules: NormalizedDomainRule[], permission: "read" | "upsert" | "delete") {
+	const rule = matchingDomainRule(targetPath, rules);
+	if (!rule || !rule[permission]) {
+		return { allowed: false, reason: `${permission} access denied for ${targetPath}` };
+	}
+	if (!rule.approval_required) {
+		return { allowed: true, viaApproval: false as const, rule };
+	}
+	const grant = matchingGrant(agentName, targetPath, permission);
+	if (grant) {
+		consumeGrantIfNeeded(grant);
+		return { allowed: true, viaApproval: true as const, rule, grant };
+	}
+	return {
+		allowed: false,
+		reason: `${permission} requires explicit TUI approval for ${targetPath}`,
+		approvalRequired: true as const,
+		rule,
+	};
+}
+
 function domainRulesSummary(config: ResolvedConfig, domain: DomainConfig | DomainRule[] | undefined): string[] {
 	// Show the ORIGINAL rules (pre-expansion) to avoid blowing up the prompt
 	// with thousands of per-file entries from wildcard patterns.
@@ -1168,7 +1252,8 @@ function domainRulesSummary(config: ResolvedConfig, domain: DomainConfig | Domai
 	return rawRules.map((rule) => {
 		const hasGlob = rule.path.includes("*");
 		const label = hasGlob ? rule.path + "**" : rule.path;
-		return `${label} [read:${!!rule.read} upsert:${!!rule.upsert} delete:${!!rule.delete}]`;
+		const approval = rule.approval_required ? ` approval:${rule.approval_mode || "explicit_tui"}/${rule.grant_scope || "single_path"}` : "";
+		return `${label} [read:${!!rule.read} upsert:${!!rule.upsert} delete:${!!rule.delete}${approval}]`;
 	});
 }
 
@@ -1599,6 +1684,60 @@ export default function (pi: ExtensionAPI) {
 		mutateSessionIndex((index) => {
 			index.counts.blocked_tools = (index.counts.blocked_tools || 0) + 1;
 		});
+	}
+
+	function pendingApprovalKey(agentName: string, absolutePath: string, operation: "read" | "upsert" | "delete") {
+		return `${agentName}::${operation}::${absolutePath}`;
+	}
+
+	function findPendingDomainApproval(agentName: string, absolutePath: string, operation: "read" | "upsert" | "delete") {
+		return pendingDomainApprovals.find((item) => pendingApprovalKey(item.agentName, item.absolutePath, item.operation) === pendingApprovalKey(agentName, absolutePath, operation)) || null;
+	}
+
+	function requestDomainApproval(args: {
+		agentName: string;
+		toolName: string;
+		absolutePath: string;
+		relativePath: string;
+		operation: "read" | "upsert" | "delete";
+		rule: NormalizedDomainRule;
+	}) {
+		const existing = findPendingDomainApproval(args.agentName, args.absolutePath, args.operation);
+		if (existing) return existing;
+		const pending: PendingDomainApproval = {
+			id: `approval-${process.pid}-${Date.now()}-${++domainApprovalSequence}`,
+			agentName: args.agentName,
+			toolName: args.toolName,
+			absolutePath: args.absolutePath,
+			relativePath: args.relativePath,
+			operation: args.operation,
+			scope: args.rule.grant_scope || "single_path",
+			requestedAt: new Date().toISOString(),
+			rulePath: args.rule.path,
+		};
+		pendingDomainApprovals.push(pending);
+		appendEvent("domain_approval_requested", {
+			approval_id: pending.id,
+			target_agent: pending.agentName,
+			path: pending.relativePath,
+			operation: pending.operation,
+			scope: pending.scope,
+			tool: pending.toolName,
+			rule_path: pending.rulePath,
+		});
+		return pending;
+	}
+
+	function formatPendingDomainApproval(pending: PendingDomainApproval) {
+		return `#${pending.id} agent=${pending.agentName} op=${pending.operation} scope=${pending.scope} path=${pending.relativePath}`;
+	}
+
+	function findPendingApprovalBySelector(selector: string) {
+		const trimmed = selector.trim();
+		if (!trimmed || trimmed === "latest") {
+			return pendingDomainApprovals[pendingDomainApprovals.length - 1] || null;
+		}
+		return pendingDomainApprovals.find((item) => item.id === trimmed || item.relativePath === trimmed || item.agentName === trimmed) || null;
 	}
 
 	function completePendingToolCall(event: any) {
@@ -2996,6 +3135,30 @@ export default function (pi: ExtensionAPI) {
 
 		const domain = effectiveDomain(config, runtime.agent);
 		const domainRules = normalizeDomainRules(config, domain);
+		const approvalBlock = (absolutePath: string, operation: "read" | "upsert" | "delete", toolName: string, rule: NormalizedDomainRule) => {
+			const relativePath = toConfigRelative(config, absolutePath);
+			if (!isInteractiveApprovalAvailable()) {
+				return block(`explicit TUI approval required for ${operation} access to ${relativePath}, but this session is headless/non-interactive`);
+			}
+			const approval = requestDomainApproval({
+				agentName: runtime.agent.name,
+				toolName,
+				absolutePath,
+				relativePath,
+				operation,
+				rule,
+			});
+			ctx.ui.notify(
+				[
+					"Domain approval required",
+					formatPendingDomainApproval(approval),
+					`Approve in this TUI with: /approve-domain ${approval.id}`,
+					`Or deny with: /deny-domain ${approval.id}`,
+				].join("\n"),
+				"warning",
+			);
+			return block(`approval required for ${operation} access to ${relativePath}; approve with /approve-domain ${approval.id}`);
+		};
 
 		const block = (reason: string) => {
 			appendEvent("tool_blocked", {
@@ -3013,14 +3176,22 @@ export default function (pi: ExtensionAPI) {
 
 		if (isToolCallEventType("read", event) || isToolCallEventType("grep", event) || isToolCallEventType("find", event) || isToolCallEventType("ls", event)) {
 			const inputPath = event.input.path ? resolve(config.repoRoot, event.input.path) : config.repoRoot;
-			if (!ruleAllows(inputPath, domainRules, "read")) {
+			const evaluation = evaluateDomainPermission(runtime.agent.name, inputPath, domainRules, "read");
+			if (!evaluation.allowed && evaluation.approvalRequired && evaluation.rule) {
+				return approvalBlock(inputPath, "read", event.toolName, evaluation.rule);
+			}
+			if (!evaluation.allowed) {
 				return block(`read access denied for ${event.input.path || "."}`);
 			}
 		}
 
 		if (isToolCallEventType("write", event) || isToolCallEventType("edit", event)) {
 			const inputPath = resolve(config.repoRoot, event.input.path || ".");
-			if (!ruleAllows(inputPath, domainRules, "upsert")) {
+			const evaluation = evaluateDomainPermission(runtime.agent.name, inputPath, domainRules, "upsert");
+			if (!evaluation.allowed && evaluation.approvalRequired && evaluation.rule) {
+				return approvalBlock(inputPath, "upsert", event.toolName, evaluation.rule);
+			}
+			if (!evaluation.allowed) {
 				return block(`upsert access denied for ${event.input.path || "."}`);
 			}
 		}
@@ -3032,14 +3203,22 @@ export default function (pi: ExtensionAPI) {
 			}
 			const pathTokens = extractPathLikeTokens(command).map((token) => resolve(config.repoRoot, token));
 			for (const token of pathTokens) {
-				if (!ruleAllows(token, domainRules, "read")) {
+				const evaluation = evaluateDomainPermission(runtime.agent.name, token, domainRules, "read");
+				if (!evaluation.allowed && evaluation.approvalRequired && evaluation.rule) {
+					return approvalBlock(token, "read", event.toolName, evaluation.rule);
+				}
+				if (!evaluation.allowed) {
 					return block(`bash references path outside read scope: ${token}`);
 				}
 			}
 			if (isMutatingBash(command)) {
 				const permission: "upsert" | "delete" = isDeleteBash(command) ? "delete" : "upsert";
 				for (const token of pathTokens) {
-					if (!ruleAllows(token, domainRules, permission)) {
+					const evaluation = evaluateDomainPermission(runtime.agent.name, token, domainRules, permission);
+					if (!evaluation.allowed && evaluation.approvalRequired && evaluation.rule) {
+						return approvalBlock(token, permission, event.toolName, evaluation.rule);
+					}
+					if (!evaluation.allowed) {
 						return block(`bash ${permission} access denied for ${token}`);
 					}
 				}
@@ -3691,6 +3870,75 @@ export default function (pi: ExtensionAPI) {
 			if (result.response) {
 				ctx.ui.notify(result.response, "info");
 			}
+		},
+	});
+
+	pi.registerCommand("domain-approvals", {
+		description: "List pending domain approval requests and active temporary grants.",
+		handler: async (_args, ctx) => {
+			const pendingLines = pendingDomainApprovals.length > 0
+				? pendingDomainApprovals.map((item) => `  pending ${formatPendingDomainApproval(item)}`)
+				: ["  pending none"];
+			const grantLines = domainApprovalGrants.length > 0
+				? domainApprovalGrants.map((item) => `  grant #${item.id} agent=${item.agentName} op=${item.operation} scope=${item.scope} path=${item.absolutePath}`)
+				: ["  grant none"];
+			ctx.ui.notify(["Domain approvals", ...pendingLines, ...grantLines].join("\n"), "info");
+		},
+	});
+
+	pi.registerCommand("approve-domain", {
+		description: "Approve a pending domain request: /approve-domain [approval-id|latest]",
+		handler: async (args, ctx) => {
+			if (!isInteractiveApprovalAvailable()) {
+				ctx.ui.notify("Domain approval is unavailable in headless/non-interactive mode.", "warning");
+				return;
+			}
+			const pending = findPendingApprovalBySelector(args || "latest");
+			if (!pending) {
+				ctx.ui.notify("No matching pending domain approval request.", "warning");
+				return;
+			}
+			const grant: DomainApprovalGrant = {
+				id: pending.id,
+				agentName: pending.agentName,
+				absolutePath: pending.absolutePath,
+				operation: pending.operation,
+				scope: pending.scope,
+				grantedAt: new Date().toISOString(),
+				rulePath: pending.rulePath,
+			};
+			domainApprovalGrants.push(grant);
+			const index = pendingDomainApprovals.findIndex((item) => item.id === pending.id);
+			if (index >= 0) pendingDomainApprovals.splice(index, 1);
+			appendEvent("domain_approval_granted", {
+				approval_id: pending.id,
+				target_agent: pending.agentName,
+				path: pending.relativePath,
+				operation: pending.operation,
+				scope: pending.scope,
+			});
+			ctx.ui.notify(`Approved ${formatPendingDomainApproval(pending)}`, "info");
+		},
+	});
+
+	pi.registerCommand("deny-domain", {
+		description: "Deny and clear a pending domain request: /deny-domain [approval-id|latest]",
+		handler: async (args, ctx) => {
+			const pending = findPendingApprovalBySelector(args || "latest");
+			if (!pending) {
+				ctx.ui.notify("No matching pending domain approval request.", "warning");
+				return;
+			}
+			const index = pendingDomainApprovals.findIndex((item) => item.id === pending.id);
+			if (index >= 0) pendingDomainApprovals.splice(index, 1);
+			appendEvent("domain_approval_denied", {
+				approval_id: pending.id,
+				target_agent: pending.agentName,
+				path: pending.relativePath,
+				operation: pending.operation,
+				scope: pending.scope,
+			});
+			ctx.ui.notify(`Denied ${formatPendingDomainApproval(pending)}`, "info");
 		},
 	});
 
