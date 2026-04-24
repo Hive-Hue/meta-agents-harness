@@ -11,13 +11,14 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 - `mah run` and `mah delegate` now record canonical lifecycle events (`queued → routed → running → completed/failed`) to `.mah/sessions/lifecycle-events/`
 - `LifecycleEvent` type defined with structured fields for routing summary, context count, and result reason
-- Explicit TUI-only domain approval flow for worker guardrails in `multi-team.ts`:
+- Explicit TUI-only domain approval flow for domain guardrails in `multi-team.ts`:
   - `approval_required`, `approval_mode`, and `grant_scope` on domain rules
   - `/domain-approvals`, `/approve-domain`, and `/deny-domain` commands
   - temporary session-scoped grants for approved out-of-domain access
 - `tests/quasi-root-e2e.test.mjs` covering:
   - request → approve → grant flow
   - fail-closed behavior in headless mode
+  - lead-level out-of-domain destructive bash enforcement
 - `specs/quasi-root-domain-approval-spec.md` documenting the bounded `quasi_root` / explicit approval model
 
 ### Changed
@@ -42,7 +43,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `--` end-of-options separator stripped from passthrough to prevent runtime confusion
 - PI headless adapter now loads default extensions (was missing entirely)
 - `process.exit()` replaces `return` in headless path to prevent event loop hang
-- Worker path guardrails now fail closed when approval is required but no interactive TUI is available
+- Path guardrails now fail closed when approval is required but no interactive TUI is available
+- Domain enforcement now applies to all agent runtimes (`worker`, `lead`, and `orchestrator`), fixing a bypass where leads could operate outside declared YAML domain profiles
 
 ## [0.9.0] - 2026-04-23
 

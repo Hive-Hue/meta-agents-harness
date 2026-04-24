@@ -3131,7 +3131,6 @@ export default function (pi: ExtensionAPI) {
 
 	function protectWorkerPaths(event: any, ctx: any, pending: PendingToolCall | null) {
 		if (!config || !runtime) return { block: false };
-		if (runtime.role !== "worker") return { block: false };
 
 		const domain = effectiveDomain(config, runtime.agent);
 		const domainRules = normalizeDomainRules(config, domain);
