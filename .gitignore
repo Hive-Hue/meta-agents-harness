@@ -47,6 +47,8 @@ tmp/
 .env.stitch
 
 .openclaude-profile.json
+.openclaude/.mah-agent-routing.json
+.openclaude/settings.local.json
 .claude-profile.json
 .pi-profile.json
 .hermes-profile.json
