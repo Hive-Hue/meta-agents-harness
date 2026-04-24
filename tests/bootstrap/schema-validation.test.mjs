@@ -150,6 +150,9 @@ test.describe("Schema Validation - Generated Structure", () => {
       assert.ok(config.domain_profiles)
       assert.ok(config.domain_profiles.read_only_cwd)
       assert.ok(config.domain_profiles.write_user_home_with_approval)
+      assert.equal(config.domain_profiles.bootstrap_generation, undefined)
+      assert.equal(config.domain_profiles.runtime_assets_sync, undefined)
+      assert.equal(config.domain_profiles.docs_authoring, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }

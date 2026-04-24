@@ -170,7 +170,15 @@ function ensureDefaults(doc) {
     const cleanedRuntime = {}
     if (rawRuntime && typeof rawRuntime === "object" && !Array.isArray(rawRuntime)) {
       for (const [key, value] of Object.entries(rawRuntime)) {
-        if (allowedRuntimeOverrideKeys.has(key)) cleanedRuntime[key] = value
+        if (!allowedRuntimeOverrideKeys.has(key)) continue
+        if (key === "ccr" && value && typeof value === "object" && !Array.isArray(value)) {
+          const cleanedCcr = {}
+          if ("policy" in value) cleanedCcr.policy = value.policy
+          if ("team_routes" in value) cleanedCcr.team_routes = value.team_routes
+          if (Object.keys(cleanedCcr).length > 0) cleanedRuntime[key] = cleanedCcr
+          continue
+        }
+        cleanedRuntime[key] = value
       }
     }
     sanitizedRuntimes[runtime] = cleanedRuntime
@@ -215,35 +223,6 @@ function ensureDefaults(doc) {
         approval_mode: "explicit_tui",
         grant_scope: "subtree"
       }
-    ],
-    bootstrap_generation: [
-      { path: ".", read: true },
-      { path: "meta-agents.yaml", read: true, edit: true },
-      { path: "scripts/*", read: true, edit: true, bash: true },
-      { path: "bin/*", read: true, edit: true, bash: true },
-      { path: "types/*", read: true, edit: true },
-      { path: "specs/*", read: true, edit: true },
-      { path: "docs/*", read: true, edit: true },
-      { path: "examples/*", read: true, edit: true },
-      { path: "tests/*", read: true, edit: true, bash: true }
-    ],
-    runtime_assets_sync: [
-      { path: ".claude/*", read: true, edit: true },
-      { path: ".opencode/*", read: true, edit: true },
-      { path: ".openclaude/*", read: true, edit: true },
-      { path: ".pi/*", read: true, edit: true },
-      { path: ".hermes/*", read: true, edit: true },
-      { path: "extensions/*", read: true, edit: true, bash: true },
-      { path: ".mcp.example.json", read: true, edit: true },
-      { path: "meta-agents.yaml", read: true, edit: true }
-    ],
-    docs_authoring: [
-      { path: ".", read: true },
-      { path: "docs/*", read: true, edit: true },
-      { path: "README.md", read: true, edit: true },
-      { path: "CHANGELOG.md", read: true, edit: true },
-      { path: "examples/*", read: true, edit: true },
-      { path: "assets/*", read: true, edit: true }
     ]
   }
 
