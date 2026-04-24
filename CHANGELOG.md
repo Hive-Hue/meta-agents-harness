@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
 
-## [Unreleased]
+## [Unreleased] (target: v0.9.0)
 
 ### Added
 
@@ -27,37 +27,6 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
   - fail-closed behavior in headless mode
   - lead-level out-of-domain destructive bash enforcement
 - `specs/quasi-root-domain-approval-spec.md` documenting the bounded `quasi_root` / explicit approval model
-
-### Changed
-
-- Evidence store now defaults to workspace-local `.mah/expertise/evidence/` instead of `~/.mah/expertise/evidence/` (env var `MAH_EXPERTISE_EVIDENCE_ROOT` still works for cross-workspace shared evidence)
-- Session provenance expanded with lifecycle event recording as a separate event stream
-- `validate:config` schema now explicitly accepts domain approval rule metadata:
-  - `approval_required`
-  - `approval_mode: explicit_tui`
-  - `grant_scope: single_path | subtree | single_op`
-
-### Fixed
-
-- Path traversal regex in `promoteProposal` (`context-memory-proposal.mjs`) incorrectly rejected valid document IDs containing `/` (e.g., `dev/agent/implement/...`); regex changed from `/[.]{2}|[/\\]|\0/` to `/[.]{2}|\\|\0/`
-- Proposal generation used `Kind:` instead of `kind:` in YAML preview block, causing schema validation to fail during promotion
-- `mah run --headless` completely overhauled for correct non-interactive execution across all runtimes
-- PI headless now uses native `-p` flag instead of incorrect `run` subcommand
-- Claude headless now uses native `-p` flag instead of `--print --no-session-persistence`
-- Kilo headless now uses native `run` subcommand instead of incorrect `--no-interactive` flag
-- Hermes headless splash output automatically stripped for clean response
-- `dispatchHeadless` now correctly passes `task` to adapter `prepareHeadlessRunContext`
-- `--` end-of-options separator stripped from passthrough to prevent runtime confusion
-- PI headless adapter now loads default extensions (was missing entirely)
-- `process.exit()` replaces `return` in headless path to prevent event loop hang
-- Path guardrails now fail closed when approval is required but no interactive TUI is available
-- Domain enforcement now applies to all agent runtimes (`worker`, `lead`, and `orchestrator`), fixing a bypass where leads could operate outside declared YAML domain profiles
-- Expertise evidence `task_description` is now sanitized before persistence to strip `CAVEMAN_CREW` blocks, ANSI escapes, and orchestrator routing boilerplate, preserving only useful task intent
-
-## [0.9.0] - 2026-04-23
-
-### Added
-
 - `mah expertise recommend --task "..."` and `mah expertise explain --task "..."` produce concise ≤5-line output by default; `--verbose` preserves full trace (S1)
 - `mah expertise seed` populates an empty catalog so routing commands work on first use (S1)
 - "Context Manager" adopted as public subsystem name; `mah context` CLI namespace unchanged (S2)
@@ -75,18 +44,44 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Changed
 
+- Evidence store now defaults to workspace-local `.mah/expertise/evidence/` instead of `~/.mah/expertise/evidence/` (env var `MAH_EXPERTISE_EVIDENCE_ROOT` still works for cross-workspace shared evidence)
+- Session provenance expanded with lifecycle event recording as a separate event stream
+- `validate:config` schema now explicitly accepts domain approval rule metadata:
+  - `approval_required`
+  - `approval_mode: explicit_tui`
+  - `grant_scope: single_path | subtree | single_op`
 - `mah expertise sync` help text now mentions compounding and routing strengthening
 - `mah context propose` help text now mentions governed curation and review requirement
 - README.md "Why this exists" section rewritten with v0.9 product narrative
 - README.md CLI examples expanded with expertise, context, and sessions commands
+- `mah init --yes` bootstrap now emits minimal default domain profiles:
+  - `read_only_cwd`
+  - `write_user_home_with_approval`
+- default bootstrap agents now use `read_only_cwd`
+- default `source_configs` and `session` paths are now implicit and omitted from generated YAML unless explicitly customized
 
 ### Fixed
 
+- Path traversal regex in `promoteProposal` (`context-memory-proposal.mjs`) incorrectly rejected valid document IDs containing `/` (e.g., `dev/agent/implement/...`); regex changed from `/[.]{2}|[/\\]|\0/` to `/[.]{2}|\\|\0/`
+- Proposal generation used `Kind:` instead of `kind:` in YAML preview block, causing schema validation to fail during promotion
+- `mah run --headless` completely overhauled for correct non-interactive execution across all runtimes
+- PI headless now uses native `-p` flag instead of incorrect `run` subcommand
+- Claude headless now uses native `-p` flag instead of `--print --no-session-persistence`
+- Kilo headless now uses native `run` subcommand instead of incorrect `--no-interactive` flag
+- Hermes headless splash output automatically stripped for clean response
+- `dispatchHeadless` now correctly passes `task` to adapter `prepareHeadlessRunContext`
+- `--` end-of-options separator stripped from passthrough to prevent runtime confusion
+- PI headless adapter now loads default extensions (was missing entirely)
+- `process.exit()` replaces `return` in headless path to prevent event loop hang
+- Path guardrails now fail closed when approval is required but no interactive TUI is available
+- Domain enforcement now applies to all agent runtimes (`worker`, `lead`, and `orchestrator`), fixing a bypass where leads could operate outside declared YAML domain profiles
+- Expertise evidence `task_description` is now sanitized before persistence to strip `CAVEMAN_CREW` blocks, ANSI escapes, and orchestrator routing boilerplate, preserving only useful task intent
 - Empty expertise catalog blocked routing commands — `mah expertise seed` now required before first use
 
 ### Note
 
-- S8 (Bounded Governance Add-ons) excluded from v0.9.0; deferred to v0.9.x
+- All `v0.9.0` work remains unreleased.
+- S8 (Bounded Governance Add-ons) excluded from `v0.9.0`; deferred to `v0.9.x`
 
 ## [0.8.0] - 2026-04-21
 

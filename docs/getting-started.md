@@ -183,7 +183,7 @@ mah init --yes --ai \
 3. **Infers sensible defaults** — chooses appropriate crews, agents, and profiles
 4. **Falls back gracefully** — if AI fails, uses logical mode automatically
 
-With v0.9, AI-assisted bootstrap can also:
+With the upcoming `v0.9.0` release, AI-assisted bootstrap can also:
 5. **Configure expertise-aware routing** — agents matched by skill, not just order
 6. **Set up Context Manager** — operational memory fetched per task at runtime
 7. **Enable visible execution** — lifecycle events, session status, and trace on demand

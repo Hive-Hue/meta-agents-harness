@@ -148,7 +148,8 @@ test.describe("Schema Validation - Generated Structure", () => {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
       assert.ok(config.domain_profiles)
-      assert.ok(config.domain_profiles.read_only_repo)
+      assert.ok(config.domain_profiles.read_only_cwd)
+      assert.ok(config.domain_profiles.write_user_home_with_approval)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -314,7 +315,19 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-004: Model refs use catalog", () => {
+  test("OF-004: Source configs and session paths are implicit defaults", () => {
+    const tempDir = tmpDir()
+    try {
+      bootstrap(["--non-interactive"], tempDir)
+      const config = readConfig(tempDir)
+      assert.equal(config.crews[0].source_configs, undefined)
+      assert.equal(config.crews[0].session, undefined)
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  test("OF-005: Model refs use catalog", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -331,7 +344,7 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-005: Skills refs use canonical skill paths", () => {
+  test("OF-006: Skills refs use canonical skill paths", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -354,7 +367,7 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-006: Domain profile refs valid", () => {
+  test("OF-007: Domain profile refs valid", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -415,7 +428,7 @@ test.describe("Data Type Validation", () => {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
       // Check boolean fields in domain profiles
-      const profile = config.domain_profiles.read_only_repo[0]
+      const profile = config.domain_profiles.read_only_cwd[0]
       if (profile.read !== undefined) assert.equal(typeof profile.read, "boolean")
       if (profile.edit !== undefined) assert.equal(typeof profile.edit, "boolean")
       if (profile.bash !== undefined) assert.equal(typeof profile.bash, "boolean")

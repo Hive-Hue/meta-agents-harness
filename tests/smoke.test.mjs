@@ -300,6 +300,8 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
     assert.equal(parsed.runtimes?.claude?.ccr?.route_map, undefined)
     assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
     assert.equal(parsed.runtimes?.opencode?.task_policy, undefined)
+    assert.equal(parsed.crews?.[0]?.source_configs, undefined)
+    assert.equal(parsed.crews?.[0]?.session, undefined)
     assert.ok(parsed.crews[0].topology?.leads?.engineering, "bootstrap should emit full default crew topology")
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
@@ -358,6 +360,8 @@ test("mah init invokes bootstrap and creates meta-agents.yaml", () => {
     assert.equal(parsed.runtimes?.pi?.wrapper, undefined)
     assert.equal(parsed.runtimes?.claude?.wrapper, undefined)
     assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
+    assert.equal(parsed.crews?.[0]?.source_configs, undefined)
+    assert.equal(parsed.crews?.[0]?.session, undefined)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
