@@ -569,7 +569,17 @@ async function main() {
   doc.description = inputs.description
   doc.crews = [buildDefaultCrew(inputs.crewId, inputs.mission)]
 
-  const out = `${YAML.stringify(doc, { indent: 2 })}`.replaceAll("use_when", "use-when").replaceAll("max_lines", "max-lines")
+  const orderedDoc = {
+    version: doc.version,
+    name: doc.name,
+    description: doc.description,
+    runtimes: doc.runtimes,
+    catalog: doc.catalog,
+    domain_profiles: doc.domain_profiles,
+    crews: doc.crews
+  }
+
+  const out = `${YAML.stringify(orderedDoc, { indent: 2 })}`.replaceAll("use_when", "use-when").replaceAll("max_lines", "max-lines")
   mkdirSync(path.dirname(targetPath), { recursive: true })
   writeFileSync(targetPath, out)
   console.log(`bootstrap: created ${path.relative(cwd, targetPath)}`)
