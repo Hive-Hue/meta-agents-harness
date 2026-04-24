@@ -4,11 +4,13 @@ import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { z } from "zod"
 import { resolveMahHome } from "./mah-home.mjs"
+import { resolveWorkspaceRoot } from "./workspace-root.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
-const configPath = path.join(repoRoot, "meta-agents.yaml")
+const workspaceRoot = resolveWorkspaceRoot(process.cwd())
+const configPath = path.join(workspaceRoot, "meta-agents.yaml")
 const defaultSharedSkills = ["context_memory"]
 
 const runtimeDetectionSchema = z.object({

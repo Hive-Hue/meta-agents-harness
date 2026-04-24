@@ -143,8 +143,8 @@ test.describe("Schema Validation - Generated Structure", () => {
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(config.catalog.domain_profiles)
-      assert.ok(config.catalog.domain_profiles.read_only_repo)
+      assert.ok(config.domain_profiles)
+      assert.ok(config.domain_profiles.read_only_repo)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -292,7 +292,7 @@ test.describe("Optional Fields Default Values", () => {
     try {
       bootstrap(["--non-interactive", "--crew", "dev"], tempDir)
       const config = readConfig(tempDir)
-      assert.equal(config.crews[0].display_name, "Dev Crew")
+      assert.equal(config.crews[0].display_name, "Development Crew")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -358,7 +358,7 @@ test.describe("Optional Fields Default Values", () => {
       for (const crew of config.crews) {
         for (const agent of crew.agents) {
           if (agent.domain_profile) {
-            assert.ok(config.catalog.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} must exist in catalog`)
+            assert.ok(config.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} must exist in domain_profiles`)
           }
         }
       }
@@ -411,7 +411,7 @@ test.describe("Data Type Validation", () => {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
       // Check boolean fields in domain profiles
-      const profile = config.catalog.domain_profiles.read_only_repo[0]
+      const profile = config.domain_profiles.read_only_repo[0]
       if (profile.read !== undefined) assert.equal(typeof profile.read, "boolean")
       if (profile.edit !== undefined) assert.equal(typeof profile.edit, "boolean")
       if (profile.bash !== undefined) assert.equal(typeof profile.bash, "boolean")
@@ -487,7 +487,7 @@ test.describe("Reference Integrity", () => {
     }
   })
 
-  test("RI-003: Domain profile refs resolve to catalog", () => {
+  test("RI-003: Domain profile refs resolve to domain_profiles", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -495,7 +495,7 @@ test.describe("Reference Integrity", () => {
       for (const crew of config.crews) {
         for (const agent of crew.agents) {
           if (agent.domain_profile) {
-            assert.ok(config.catalog.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} not found`)
+            assert.ok(config.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} not found`)
           }
         }
       }

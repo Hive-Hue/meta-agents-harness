@@ -274,6 +274,11 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
     assert.equal(parsed.version, 1)
     assert.ok(Array.isArray(parsed.crews) && parsed.crews.length >= 1)
     assert.equal(parsed.runtime_detection, undefined)
+    assert.ok(parsed.domain_profiles, "bootstrap should emit top-level domain_profiles")
+    assert.equal(parsed.catalog?.domain_profiles, undefined, "domain_profiles should not be nested under catalog")
+    assert.ok(parsed.runtimes?.openclaude, "bootstrap should emit modern runtime entries")
+    assert.ok(parsed.runtimes?.codex, "bootstrap should emit codex runtime entry")
+    assert.ok(parsed.crews[0].topology?.leads?.engineering, "bootstrap should emit full default crew topology")
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
@@ -327,6 +332,20 @@ test("mah init invokes bootstrap and creates meta-agents.yaml", () => {
     assert.match(result.stdout, /mah init completed/)
     const configPath = path.join(tempDir, "meta-agents.yaml")
     assert.equal(existsSync(configPath), true)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("mah validate:config resolves meta-agents.yaml from the caller workspace", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-validate-workspace-"))
+  try {
+    const initResult = runAt(tempDir, ["init", "--yes"])
+    assert.equal(initResult.status, 0, initResult.stderr)
+
+    const validateResult = runAt(tempDir, ["validate:config"])
+    assert.equal(validateResult.status, 0, validateResult.stderr)
+    assert.match(validateResult.stdout, /validate:config passed/)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }

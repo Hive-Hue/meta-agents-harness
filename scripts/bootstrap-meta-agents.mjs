@@ -137,7 +137,6 @@ function discoverInstalledPlugins() {
 
 function ensureDefaults(doc) {
   const next = { ...(doc || {}) }
-  delete next.domain_profiles
   delete next.runtime_detection
   delete next.catalog?.skills
   delete next.catalog?.shared_skills
@@ -154,48 +153,191 @@ function ensureDefaults(doc) {
   // Preserve existing YAML runtimes entries only if they contain user-specific config.
   // Bundled/installed plugin entries should not be duplicated in YAML.
   next.runtimes = next.runtimes || {}
+  for (const runtime of ["pi", "claude", "opencode", "openclaude", "hermes", "kilo", "codex"]) {
+    next.runtimes[runtime] = next.runtimes[runtime] || {}
+  }
 
   next.catalog = next.catalog || {}
   next.catalog.models = {
-    orchestrator_default: "zai/glm-4.7",
-    lead_default: "zai/glm-4.7",
-    worker_default: "zai/glm-5-turbo",
+    orchestrator_default: "minimax-coding-plan/MiniMax-M2.7",
+    lead_default: "minimax-coding-plan/MiniMax-M2.7",
+    worker_default: "openai-codex/gpt-5.3-codex",
+    qa_default: "openai-codex/gpt-5.4-mini",
     ...(next.catalog.models || {})
   }
-  next.catalog.domain_profiles = next.catalog.domain_profiles || {}
-  next.catalog.domain_profiles.read_only_repo = next.catalog.domain_profiles.read_only_repo || [{ path: ".", read: true, edit: false, bash: false }]
+  next.catalog.model_fallbacks = next.catalog.model_fallbacks || {
+    orchestrator_default: [
+      "nvidia/nemotron-3-super-120b-a12b:free",
+      "zai/glm-5",
+      "minimax/minimax-m2.7",
+      "openai/gpt-5.4-mini"
+    ],
+    lead_default: [
+      "minimax/minimax-m2.7",
+      "nvidia/nemotron-3-super-120b-a12b:free"
+    ],
+    worker_default: [
+      "zai/glm-5",
+      "minimax/minimax-m2.7",
+      "nvidia/nemotron-3-super-120b-a12b:free"
+    ]
+  }
+  next.domain_profiles = next.domain_profiles || {
+    read_only_repo: [{ path: ".", read: true }],
+    planning_delivery: [
+      { path: ".", read: true },
+      { path: "meta-agents.yaml", read: true, edit: true },
+      { path: "plan/*", read: true, edit: true, bash: true },
+      { path: "plan/progress/*", read: true, edit: true, bash: true },
+      { path: "plan/done/*", read: true, edit: true, bash: true },
+      { path: "plan/slices/*", read: true, edit: true, bash: true },
+      { path: "specs/*", read: true, edit: true },
+      { path: "docs/*", read: true, edit: true, bash: true },
+      { path: "scripts/*", read: true, edit: true, bash: true },
+      { path: "types/*", read: true, edit: true },
+      { path: "tests/*", read: true },
+      { path: "examples/*", read: true, edit: true, bash: true },
+      { path: "README.md", read: true, edit: true },
+      { path: "CHANGELOG.md", read: true, edit: true },
+      { path: ".mah/context/*", read: true, edit: true, bash: true }
+    ],
+    cli_operator_surface: [
+      { path: ".", read: true },
+      { path: "README.md", read: true, edit: true },
+      { path: "CHANGELOG.md", read: true, edit: true },
+      { path: "docs/*", read: true, edit: true },
+      { path: "examples/*", read: true, edit: true },
+      { path: "assets/*", read: true, edit: true },
+      { path: "bin/*", read: true, edit: true, bash: true },
+      { path: "scripts/*", read: true, edit: true, bash: true }
+    ],
+    runtime_impl: [
+      { path: ".", read: true },
+      { path: "meta-agents.yaml", read: true, edit: true },
+      { path: "package.json", read: true, edit: true },
+      { path: "package-lock.json", read: true, edit: true },
+      { path: "bin/*", read: true, edit: true, bash: true },
+      { path: "scripts/*", read: true, edit: true, bash: true },
+      { path: "types/*", read: true, edit: true },
+      { path: "tests/*", read: true, edit: true, bash: true },
+      { path: "extensions/*", read: true, edit: true, bash: true },
+      { path: "plugins/*", read: true, edit: true, bash: true },
+      { path: ".claude/*", read: true, edit: true, bash: true },
+      { path: ".opencode/*", read: true, edit: true, bash: true },
+      { path: ".openclaude/*", read: true, edit: true, bash: true },
+      { path: ".pi/*", read: true, edit: true, bash: true },
+      { path: ".codex/*", read: true, edit: true, bash: true },
+      { path: ".kilo/*", read: true, edit: true, bash: true },
+      { path: ".hermes/*", read: true, edit: true, bash: true },
+      { path: "skills/*", read: true, edit: true, bash: true },
+      { path: ".mcp.example.json", read: true, edit: true },
+      { path: ".env.sample", read: true, edit: true },
+      { path: ".mah/expertise/*", read: true, edit: true, bash: true },
+      { path: ".mah/context/*", read: true, edit: true, bash: true }
+    ],
+    validation_runtime: [
+      { path: ".", read: true, bash: true },
+      { path: "meta-agents.yaml", read: true },
+      { path: "scripts/*", read: true, edit: true, bash: true },
+      { path: "types/*", read: true, edit: true },
+      { path: "tests/*", read: true, edit: true, bash: true },
+      { path: ".mah/expertise/*", read: true, edit: true, bash: true },
+      { path: ".mah/context/*", read: true, edit: true, bash: true },
+      { path: ".codex/*", read: true, edit: true, bash: true },
+      { path: ".kilo/*", read: true, edit: true, bash: true },
+      { path: ".pi/*", read: true, edit: true, bash: true },
+      { path: ".hermes/*", read: true, edit: true, bash: true },
+      { path: ".claude/*", read: true, edit: true, bash: true },
+      { path: ".opencode/*", read: true, edit: true, bash: true },
+      { path: ".openclaude/*", read: true, edit: true, bash: true },
+      { path: ".github/workflows/*", read: true, edit: true, bash: true },
+      { path: "docs/*", read: true, edit: true },
+      { path: "specs/*", read: true, edit: true },
+      { path: "plan/progress/*", read: true, edit: true },
+      { path: "plan/slices/*", read: true, edit: true }
+    ],
+    bootstrap_generation: [
+      { path: ".", read: true },
+      { path: "meta-agents.yaml", read: true, edit: true },
+      { path: "scripts/*", read: true, edit: true, bash: true },
+      { path: "bin/*", read: true, edit: true, bash: true },
+      { path: "types/*", read: true, edit: true },
+      { path: "specs/*", read: true, edit: true },
+      { path: "docs/*", read: true, edit: true },
+      { path: "examples/*", read: true, edit: true },
+      { path: "tests/*", read: true, edit: true, bash: true }
+    ],
+    runtime_assets_sync: [
+      { path: ".claude/*", read: true, edit: true },
+      { path: ".opencode/*", read: true, edit: true },
+      { path: ".openclaude/*", read: true, edit: true },
+      { path: ".pi/*", read: true, edit: true },
+      { path: ".hermes/*", read: true, edit: true },
+      { path: "extensions/*", read: true, edit: true, bash: true },
+      { path: ".mcp.example.json", read: true, edit: true },
+      { path: "meta-agents.yaml", read: true, edit: true }
+    ],
+    docs_authoring: [
+      { path: ".", read: true },
+      { path: "docs/*", read: true, edit: true },
+      { path: "README.md", read: true, edit: true },
+      { path: "CHANGELOG.md", read: true, edit: true },
+      { path: "examples/*", read: true, edit: true },
+      { path: "assets/*", read: true, edit: true }
+    ]
+  }
 
   return next
 }
 
-function buildMinimalCrew(crewId, mission) {
+function buildDefaultCrew(crewId, mission) {
+  const displayName = crewId === "dev"
+    ? "Development Crew"
+    : `${crewId.split(/[-_\s]+/).filter(Boolean).map((part) => part[0].toUpperCase() + part.slice(1)).join(" ")} Crew`
   return {
     id: crewId,
-    display_name: `${crewId[0].toUpperCase()}${crewId.slice(1)} Crew`,
+    display_name: displayName,
     mission,
     source_configs: {
       pi: `.pi/crew/${crewId}/multi-team.yaml`,
       claude: `.claude/crew/${crewId}/multi-team.yaml`,
       codex: `.codex/crew/${crewId}/multi-team.yaml`,
       kilo: `.kilo/crew/${crewId}/multi-team.yaml`,
-      opencode: `.opencode/crew/${crewId}/multi-team.yaml`
+      opencode: `.opencode/multi-team.yaml`,
+      openclaude: `.openclaude/crew/${crewId}/multi-team.yaml`,
+      hermes: `.hermes/crew/${crewId}/config.yaml`
     },
     session: {
       pi_root: `.pi/crew/${crewId}/sessions`,
       claude_mirror_root: `.claude/crew/${crewId}/sessions`,
       codex_root: `.codex/crew/${crewId}/sessions`,
       kilo_root: `.kilo/crew/${crewId}/sessions`,
-      hermes_root: `.hermes/crew/${crewId}/sessions`
+      openclaude_root: `.openclaude/crew/${crewId}/sessions`
     },
     topology: {
       orchestrator: "orchestrator",
-      leads: { planning: "planning-lead" },
-      workers: { planning: ["repo-analyst"] }
+      leads: {
+        planning: "planning-lead",
+        engineering: "engineering-lead",
+        validation: "validation-lead"
+      },
+      workers: {
+        planning: ["repo-analyst", "solution-architect"],
+        engineering: ["frontend-dev", "backend-dev"],
+        validation: ["qa-reviewer", "security-reviewer"]
+      }
     },
     agents: [
       { id: "orchestrator", role: "orchestrator", team: "orchestration", model_ref: "orchestrator_default", expertise: "orchestrator-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "read_only_repo" },
-      { id: "planning-lead", role: "lead", team: "planning", model_ref: "lead_default", expertise: "planning-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "read_only_repo" },
-      { id: "repo-analyst", role: "worker", team: "planning", model_ref: "worker_default", expertise: "repo-analyst-expertise-model", skills: ["expertise_model"], domain_profile: "read_only_repo" }
+      { id: "planning-lead", role: "lead", team: "planning", model_ref: "lead_default", expertise: "planning-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "planning_delivery" },
+      { id: "engineering-lead", role: "lead", team: "engineering", model_ref: "lead_default", expertise: "engineering-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "runtime_impl" },
+      { id: "validation-lead", role: "lead", team: "validation", model_ref: "qa_default", expertise: "validation-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "validation_runtime" },
+      { id: "repo-analyst", role: "worker", team: "planning", model_ref: "worker_default", expertise: "repo-analyst-expertise-model", skills: ["expertise_model"], domain_profile: "planning_delivery" },
+      { id: "solution-architect", role: "worker", team: "planning", model_ref: "worker_default", expertise: "solution-architect-expertise-model", skills: ["expertise_model"], domain_profile: "planning_delivery" },
+      { id: "frontend-dev", role: "worker", team: "engineering", model_ref: "worker_default", expertise: "frontend-dev-expertise-model", skills: ["expertise_model"], domain_profile: "runtime_impl" },
+      { id: "backend-dev", role: "worker", team: "engineering", model_ref: "worker_default", expertise: "backend-dev-expertise-model", skills: ["expertise_model"], domain_profile: "runtime_impl" },
+      { id: "qa-reviewer", role: "worker", team: "validation", model_ref: "qa_default", expertise: "qa-reviewer-expertise-model", skills: ["expertise_model"], domain_profile: "validation_runtime" },
+      { id: "security-reviewer", role: "worker", team: "validation", model_ref: "qa_default", expertise: "security-reviewer-expertise-model", skills: ["expertise_model"], domain_profile: "validation_runtime" }
     ]
   }
 }
@@ -494,7 +636,7 @@ async function main() {
   const doc = ensureDefaults(template)
   doc.name = inputs.projectName
   doc.description = inputs.description
-  doc.crews = [buildMinimalCrew(inputs.crewId, inputs.mission)]
+  doc.crews = [buildDefaultCrew(inputs.crewId, inputs.mission)]
 
   const out = `${YAML.stringify(doc, { indent: 2 })}`.replaceAll("use_when", "use-when").replaceAll("max_lines", "max-lines")
   mkdirSync(path.dirname(targetPath), { recursive: true })
