@@ -9,6 +9,13 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Added
 
+- `types/agent-execution-result.mjs` — canonical `AgentExecutionResult` type + `normalizeExecutionResult()` helper for runtime-agnostic execution results
+- `scripts/evidence-pipeline.mjs` — shared `recordDelegationEvidence()` used by both CLI and PI runtime (deduplicates `deriveTaskType` + evidence recording)
+- `tests/agent-execution-result.test.mjs` — 8 tests for normalization shape and field coercion
+- `tests/agent-execution-result.e2e.test.mjs` — 5 e2e tests covering required field preservation, sanitized task, and PI pipeline integration
+- Phase 1+2 of `specs/runtime-agnostic-execution-contract-spec.md` implemented: `mah delegate` and `mah run` produce canonical `AgentExecutionResult` regardless of runtime target
+- Phase 3 Slice 1: PI multi-team (`delegate_agent` + `delegate_agents_parallel`) now use shared `evidence-pipeline.mjs` instead of calling `recordEvidence` directly; `execution_result` field present in all PI evidence
+- Phase 3 Slice 2 (PI lifecycle events) — deferred to v0.9.x
 - `mah run` and `mah delegate` now record canonical lifecycle events (`queued → routed → running → completed/failed`) to `.mah/sessions/lifecycle-events/`
 - `LifecycleEvent` type defined with structured fields for routing summary, context count, and result reason
 - Explicit TUI-only domain approval flow for domain guardrails in `multi-team.ts`:

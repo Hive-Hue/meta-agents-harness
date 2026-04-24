@@ -199,6 +199,10 @@ export async function recordEvidence(evidence, options = {}) {
       recorded_at: ts,
     }
 
+    if (evidence.execution_result) {
+      normalized.execution_result = evidence.execution_result
+    }
+
     writeFileSync(filePath, JSON.stringify(normalized, null, 2), 'utf-8')
     return { ok: true, path: filePath }
   } catch (err) {

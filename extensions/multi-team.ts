@@ -3369,16 +3369,19 @@ export default function (pi: ExtensionAPI) {
 			// Record evidence (best-effort — never block delegation result)
 			;(async () => {
 				try {
-					const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+					const { recordDelegationEvidence } = await import("../scripts/evidence-pipeline.mjs");
 					const crew = process.env.MAH_ACTIVE_CREW || "dev";
-					await recordEvidence({
-						expertise_id: `${crew}:${effectiveTarget}`,
+					await recordDelegationEvidence({
+						crew,
+						expertiseId: effectiveTarget,
+						taskDescription: effectiveTask,
 						outcome: result.exitCode === 0 ? "success" : "failure",
-						task_type: deriveTaskType(effectiveTask),
-						task_description: sanitizeTaskDescription(effectiveTask, 200),
-						duration_ms: Math.round(result.elapsed),
-						source_agent: runtime!.agent.name,
-						source_session: currentSessionId() || "unknown",
+						durationMs: Math.round(result.elapsed),
+						sourceAgent: runtime!.agent.name,
+						sessionId: currentSessionId() || "unknown",
+						runtime: "pi",
+						output: result.output,
+						isExecuted: true,
 					});
 				} catch {
 					// best-effort
@@ -3647,18 +3650,21 @@ export default function (pi: ExtensionAPI) {
 			// Record evidence for each target (best-effort — never block result)
 			;(async () => {
 				try {
-					const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+					const { recordDelegationEvidence } = await import("../scripts/evidence-pipeline.mjs");
 					const crew = process.env.MAH_ACTIVE_CREW || "dev";
 					for (const result of results) {
 						try {
-							await recordEvidence({
-								expertise_id: `${crew}:${result.target}`,
+							await recordDelegationEvidence({
+								crew,
+								expertiseId: result.target,
+								taskDescription: task,
 								outcome: result.exitCode === 0 ? "success" : "failure",
-								task_type: deriveTaskType(task),
-								task_description: sanitizeTaskDescription(task, 200),
-								duration_ms: Math.round(result.elapsed),
-								source_agent: runtime!.agent.name,
-								source_session: currentSessionId() || "unknown",
+								durationMs: Math.round(result.elapsed),
+								sourceAgent: runtime!.agent.name,
+								sessionId: currentSessionId() || "unknown",
+								runtime: "pi",
+								output: result.output,
+								isExecuted: true,
 							});
 						} catch {
 							// best-effort per-target

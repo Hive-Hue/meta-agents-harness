@@ -1,6 +1,0 @@
-{
-  "name": "fake",
-  "version": "0.0.1",
-  "mahVersion": "^0.8.0",
-  "entry": "index.mjs"
-}

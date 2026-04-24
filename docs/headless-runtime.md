@@ -123,3 +123,50 @@ node --test tests/headless-*.test.mjs
 **Wrong prompt injected**: Ensure the task is passed after `--` separator. MAH strips `--` before forwarding to the runtime.
 
 **Empty output**: Some runtimes write to stderr in headless mode. Use `--output=json` to capture both stdout and stderr separately.
+
+## Runtime-Agnostic Execution Contract
+
+MAH's headless pipeline normalizes all execution results to a canonical `AgentExecutionResult` shape regardless of which runtime executes the task.
+
+### Canonical fields
+
+| Field | Type | Description |
+|---|---|---|
+| `runtime` | string | Runtime identifier (e.g. `pi`, `codex`) |
+| `crew` | string | Crew name |
+| `agent` | string | Target agent id |
+| `task` | string | Sanitized task description (no CAVEMAN blocks, ANSI, or routing boilerplate) |
+| `output` | string | Execution output |
+| `exitCode` | number | Process exit code |
+| `elapsedMs` | number | Execution time in ms |
+| `sessionId` | string\|null | Session identifier |
+| `artifactPath` | string\|null | Optional artifact path |
+| `metadata` | object | Optional additional metadata |
+
+### Normalization
+
+`normalizeExecutionResult(raw, options)` in `types/agent-execution-result.mjs` handles:
+- Missing `output` → falls back to `raw.stdout`
+- Missing `exitCode` → falls back to `raw.status`
+- All required fields get safe defaults; result is frozen
+
+### Task sanitization
+
+Before evidence is recorded, `task` is passed through `sanitizeTaskDescription()` which strips:
+- `[CAVEMAN_CREW]...[/CAVEMAN_CREW]` blocks
+- ANSI escape sequences
+- `Routing note from orchestrator:` lines
+- Delegate-only scaffolding (`Delegate internally ONLY...`)
+
+### Evidence pipeline
+
+`scripts/evidence-pipeline.mjs` exports `recordDelegationEvidence()` used by both CLI (`mah delegate`, `mah run`) and PI (`delegate_agent`, `delegate_agents_parallel`). The pipeline:
+1. Sanitizes task description
+2. Derives task type from keywords (8-category superset)
+3. Constructs `AgentExecutionResult` via `normalizeExecutionResult`
+4. Attaches `execution_result` to evidence record
+5. Calls `recordEvidence` — best-effort, never blocks
+
+### Adding a new runtime
+
+A new runtime adapter satisfies the MAH execution contract by returning a normalized `AgentExecutionResult` from its headless execution path. No new evidence logic is needed in the adapter — the MAH control plane handles lifecycle, provenance, and expertise persistence from the canonical result.

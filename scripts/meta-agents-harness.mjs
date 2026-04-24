@@ -14,7 +14,8 @@ import { resolveMahHome } from "./mah-home.mjs"
 import { resolveWorkspaceRoot } from "./workspace-root.mjs"
 import { buildContextMemoryExplainPayload } from "./context-memory-integration.mjs"
 import { buildAssistantStatePayload } from "./assistant-state.mjs"
-import { sanitizeTaskDescription } from "./task-description.mjs"
+import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
+import { recordDelegationEvidence } from "./evidence-pipeline.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -2151,6 +2152,17 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
     result_reason: result.status === 0 ? "headless-execution-success" : (result.error || "headless-execution-failed")
   })
 
+  const executionResult = normalizeExecutionResult({
+    runtime,
+    crew: headlessPlan.crew || 'unknown',
+    agent: 'unknown',
+    task: headlessPlan.task || normalized.args.join(' '),
+    output: result.stdout || '',
+    exitCode: result.status,
+    elapsedMs: headlessPlan.execution_time_ms || 0,
+    sessionId: headlessPlan.session_id || headlessSessionId
+  })
+
   // Format output based on output mode
   if (outputMode === "json") {
     const envelope = {
@@ -2162,7 +2174,8 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
       crew: headlessPlan.crew || "",
       session_id: headlessPlan.session_id || "",
       execution_time_ms: headlessPlan.execution_time_ms || 0,
-      sessionId: headlessSessionId
+      sessionId: headlessSessionId,
+      execution_result: executionResult
     }
     return envelope
   }
@@ -2177,7 +2190,7 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
     result.stderr = stripHermesSplash(result.stderr)
   }
   process.stdout.write(result.stdout || "")
-  return { ...result, sessionId: headlessSessionId }
+  return { ...result, sessionId: headlessSessionId, execution_result: executionResult }
 }
 
 function isSyncLikeCommand(command) {
@@ -2630,6 +2643,7 @@ async function runDelegate(passthrough, options = {}) {
       outcome: exitCode === 0 ? "success" : "failure",
       durationMs: Date.now() - startTimeMs,
       sourceAgent,
+      sessionId: delegateSessionId || process.env.MAH_SESSION_ID || null,
       isExecuted: true
     })
     return exitCode
@@ -2643,59 +2657,11 @@ async function runDelegate(passthrough, options = {}) {
     outcome: "success",
     durationMs: 0,
     sourceAgent,
+    sessionId: delegateSessionId || process.env.MAH_SESSION_ID || null,
     isExecuted: false
   })
 
   return 0
-}
-
-/**
- * Record delegation evidence to the evidence store.
- * @param {Object} params
- */
-async function recordDelegationEvidence({ crew, expertiseId, taskDescription, outcome, durationMs, sourceAgent, isExecuted }) {
-  try {
-    const { recordEvidence } = await import("./expertise-evidence-store.mjs")
-    const { randomUUID } = await import("node:crypto")
-    const sanitizedTaskDescription = sanitizeTaskDescription(taskDescription)
-
-    // Map task description to task type via simple keyword detection
-    const taskLower = sanitizedTaskDescription.toLowerCase()
-    /** @type {string} */
-    let taskType = "general"
-    if (taskLower.includes("implement") || taskLower.includes("build") || taskLower.includes("write") || taskLower.includes("code")) {
-      taskType = "code-generation"
-    } else if (taskLower.includes("test") || taskLower.includes("verify")) {
-      taskType = "testing"
-    } else if (taskLower.includes("review") || taskLower.includes("audit")) {
-      taskType = "review"
-    } else if (taskLower.includes("plan") || taskLower.includes("design") || taskLower.includes("architecture")) {
-      taskType = "planning"
-    } else if (taskLower.includes("deploy") || taskLower.includes("release")) {
-      taskType = "deployment"
-    }
-
-    const evidence = {
-      id: `ev-${Date.now()}-${randomUUID().slice(0, 8)}`,
-      expertise_id: `${crew}:${expertiseId}`,
-      outcome,
-      task_type: taskType,
-      task_description: sanitizedTaskDescription,
-      duration_ms: durationMs,
-      quality_signals: {
-        review_pass: outcome === "success" && isExecuted ? true : undefined,
-        rejection_count: outcome === "failure" ? 1 : 0
-      },
-      source_agent: sourceAgent,
-      source_session: process.env.MAH_SESSION_ID || "cli",
-      recorded_at: new Date().toISOString()
-    }
-
-    await recordEvidence(evidence)
-  } catch (err) {
-    // Evidence recording is best-effort — never block delegation output
-    console.error(`[expertise-evidence] failed to record evidence: ${err.message}`)
-  }
 }
 
 // ---------------------------------------------------------------------------
