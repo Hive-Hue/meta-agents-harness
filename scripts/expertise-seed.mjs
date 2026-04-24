@@ -239,6 +239,20 @@ export async function seedExpertiseCatalog(configPath, options = {}) {
         }
       }
 
+      // Even under --force, preserve entries that have been validated
+      if (force && existsSync(filePath)) {
+        try {
+          const existingContent = readFileSync(filePath, 'utf-8')
+          const existing = parseYaml(existingContent)
+          if (existing?.validation_status === 'validated') {
+            skipped++
+            continue
+          }
+        } catch {
+          // If we can't parse it, we'll overwrite
+        }
+      }
+
       // Generate new entry
       const expertise = generateExpertiseEntry(agent, crewId)
 
