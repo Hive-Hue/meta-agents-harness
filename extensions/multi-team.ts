@@ -219,8 +219,13 @@ function shortText(value: string, limit = 180): string {
 	const normalized = value.replace(/\s+/g, " ").trim();
 	if (limit <= 0) return "";
 	if (visibleWidth(normalized) <= limit) return normalized;
-	if (limit <= 3) return truncateToWidth(normalized, limit);
-	return truncateToWidth(normalized, limit - 3) + "...";
+	return truncateToWidth(normalized, limit);
+}
+
+function shortTextChars(value: string, limit = 180): string {
+	const normalized = value.replace(/\s+/g, " ").trim();
+	if (limit <= 0) return "";
+	return normalized.length > limit ? normalized.slice(0, Math.max(0, limit - 3)) + "..." : normalized;
 }
 
 /**
@@ -3084,7 +3089,7 @@ export default function (pi: ExtensionAPI) {
 		},
 		renderCall(args, theme) {
 			const category = (args as any).category ? `[${(args as any).category}] ` : "";
-			const note = shortText((args as any).note || "", 60);
+			const note = shortTextChars((args as any).note || "", 60);
 			return new Text(
 				theme.fg("toolTitle", theme.bold("update_expertise_model ")) +
 				theme.fg("accent", category) +
@@ -3187,7 +3192,7 @@ export default function (pi: ExtensionAPI) {
 		},
 		renderCall(args, theme) {
 			const target = (args as any).target || "?";
-			const task = shortText((args as any).task || "", 60);
+			const task = shortTextChars((args as any).task || "", 60);
 			return new Text(
 				theme.fg("toolTitle", theme.bold("delegate_agent ")) +
 				theme.fg("accent", target) +
@@ -3500,7 +3505,7 @@ export default function (pi: ExtensionAPI) {
 
 		renderCall(args, theme) {
 			const targets = Array.isArray((args as any).targets) ? (args as any).targets : [];
-			const task = shortText((args as any).task || "", 60);
+			const task = shortTextChars((args as any).task || "", 60);
 			return new Text(
 				theme.fg("toolTitle", theme.bold("delegate_agents_parallel ")) +
 				theme.fg("accent", `${targets.length || 0} targets`) +
