@@ -41,6 +41,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - README.md rewritten with v0.9 value story: expertise-aware routing, context memory, session visibility, compounding loop (S7)
 - Bootstrap success output reframed as "expertise-aware topology generated" with next-step guidance (S7)
 - `scripts/bootstrap-meta-agents.mjs` AI-assisted and logical success messages updated (S7)
+- Interactive AI provider picker for `mah init --ai` / bootstrap (`↑/↓ + Enter`) with presets for `Z.ai`, `OpenRouter`, `Codex (OAuth)`, and `MiniMax`
 
 ### Changed
 
@@ -56,8 +57,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - README.md CLI examples expanded with expertise, context, and sessions commands
 - `mah init --yes` bootstrap now emits minimal default domain profiles:
   - `read_only_cwd`
+  - `write_cwd`
   - `write_user_home_with_approval`
-- default bootstrap agents now use `read_only_cwd`
+- default bootstrap planning agents stay on `read_only_cwd`
+- default bootstrap executive workers (`engineering` and `validation` teams) now use `write_cwd` (`read/edit/bash` on `.` with `recursive: true`)
 - default `source_configs` and `session` paths are now implicit and omitted from generated YAML unless explicitly customized
 
 ### Fixed

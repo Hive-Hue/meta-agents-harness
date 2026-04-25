@@ -225,7 +225,7 @@ crews:
         model_ref: worker_default
         skills:
           - expertise_model
-        domain_profile: read_only_repo
+        domain_profile: read_only_cwd
 ```
 
 To stack multiple domain profiles (merge their rules):
@@ -238,15 +238,22 @@ To stack multiple domain profiles (merge their rules):
         skills:
           - expertise_model
         domain_profile:
-          - read_only_repo
+          - read_only_cwd
           - shared_output
 
 ## AI-Assisted Mode
 
-When selecting mode `2` during interactive bootstrap, MAH can prompts for a project brief
+When selecting mode `2` during interactive bootstrap, MAH prompts for a provider preset and credentials.
 
 ```
-AI-assisted brief (one paragraph about your project goals): My project is a multi-agent orchestration platform for automating development workflows and handling complex multi-step tasks across distributed agent teams.
+Select AI provider (↑/↓, Enter):
+> Z.ai  glm-5.1
+  OpenRouter  z-ai/glm-5.1
+  Codex (OAuth)  gpt-5.4
+  MiniMax  MiniMax-M2.5
+OpenRouter API key (paste and press Enter, leave empty for env/runtime fallback): sk-or-...
+AI model (default: z-ai/glm-5.1):
+Project brief (describe your project goals and context): My project is a multi-agent orchestration platform for automating development workflows and handling complex multi-step tasks across distributed agent teams.
 ```
 
 MAH uses this brief to generate
@@ -259,9 +266,10 @@ MAH uses this brief to generate
 ```bash
 mah init
 # Select option 2
-# Enter brief
+# Pick provider and paste API key/token
 Bootstrap mode [1=logical, 2=ai-assisted] (default 1): 2
-AI-assisted brief: My project is a multi-agent orchestration platform...
+Select AI provider (↑/↓, Enter):
+Project brief: My project is a multi-agent orchestration platform...
 ```
 
 Result

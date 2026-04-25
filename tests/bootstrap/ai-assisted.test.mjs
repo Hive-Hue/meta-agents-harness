@@ -29,6 +29,51 @@ function readConfig(dir) {
 }
 
 test.describe("AI-Assisted Mode - Valid API Key Acceptance", () => {
+  test("AI-000: direct HTTP mode generates config without installed runtime", () => {
+    const tempDir = tmpDir("mah-ai-direct000-")
+    try {
+      const aiResponse = `version: 1
+name: direct-http-success
+description: Generated through direct HTTP
+crews:
+  - id: dev
+    display_name: Dev Crew
+    mission: Direct HTTP bootstrap
+`
+      const result = runBootstrap([
+        "--ai",
+        "--non-interactive",
+        "--api-key", "test-key",
+        "--model", "test-model"
+      ], tempDir, { PATH: "/nonexistent", MAH_TEST_AI_HTTP_RESPONSE: aiResponse })
+
+      assert.equal(result.status, 0, result.stderr)
+      assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created")
+      const config = readConfig(tempDir)
+      assert.equal(config.name, "direct-http-success")
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  test("AI-000B: direct HTTP failure falls back to logical mode", () => {
+    const tempDir = tmpDir("mah-ai-direct-fallback000-")
+    try {
+      const result = runBootstrap([
+        "--ai",
+        "--non-interactive",
+        "--api-key", "bad-key",
+        "--model", "test-model"
+      ], tempDir, { PATH: "/nonexistent", MAH_TEST_AI_HTTP_STATUS: "401" })
+
+      assert.equal(result.status, 0, result.stderr)
+      assert.ok(existsSync(path.join(tempDir, "meta-agents.yaml")), "Config should be created")
+      assert.notEqual(readConfig(tempDir).name, "direct-http-success")
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
   test("AI-001: AI mode with valid runtime attempts AI generation", () => {
     const tempDir = tmpDir("mah-ai-valid001-")
     try {

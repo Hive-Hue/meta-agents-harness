@@ -196,7 +196,7 @@ function printHelp() {
   console.log("  expertise [list|show|seed|sync|recommend|explain|evidence|export|propose|apply-proposal|lifecycle|import]  Expertise catalog management")
   console.log("  context [find|explain|list|show|validate|index|propose|proposals]  Context Manager — operational context retrieval")
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
-  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]  Generate config (add --ai for expertise-aware topology)")
+  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>] [--provider <id>] [--model <id>] [--api-key <key>] [--base-url <url>]  Generate config (add --ai for expertise-aware topology)")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
@@ -944,6 +944,10 @@ function runInit(argv) {
   const projectName = parseValueArg(argv, "--name")
   const projectDescription = parseValueArg(argv, "--description")
   const projectBrief = parseValueArg(argv, "--brief")
+  const aiProvider = parseValueArg(argv, "--provider") || parseValueArg(argv, "--ai-provider")
+  const aiModel = parseValueArg(argv, "--model") || parseValueArg(argv, "--ai-model")
+  const aiApiKey = parseValueArg(argv, "--api-key") || parseValueArg(argv, "--ai-api-key")
+  const aiBaseUrl = parseValueArg(argv, "--base-url") || parseValueArg(argv, "--ai-base-url")
   const yesFlag = argv.includes("--yes")
   const forceFlag = argv.includes("--force")
   const created = []
@@ -970,6 +974,18 @@ function runInit(argv) {
   }
   if (projectBrief) {
     bootstrapArgs.push("--brief", projectBrief)
+  }
+  if (aiProvider) {
+    bootstrapArgs.push("--provider", aiProvider)
+  }
+  if (aiModel) {
+    bootstrapArgs.push("--model", aiModel)
+  }
+  if (aiApiKey) {
+    bootstrapArgs.push("--api-key", aiApiKey)
+  }
+  if (aiBaseUrl) {
+    bootstrapArgs.push("--base-url", aiBaseUrl)
   }
 
   const bootstrapResult = spawnSync("node", bootstrapArgs, {

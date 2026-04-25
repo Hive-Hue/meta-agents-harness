@@ -151,12 +151,11 @@ mah init --yes
 
 ## AI-Assisted Bootstrap
 
-AI-assisted mode is an **optional acceleration** that uses an available AI runtime to generate a tailored configuration. Logical mode produces a fully valid config without any runtime or API key.
+AI-assisted mode is an **optional acceleration** that uses direct provider HTTP calls to generate a tailored configuration. Logical mode produces a fully valid config without any runtime or API key.
 
 ### Requirements
 
-- **Runtime CLI**: `pi` or `opencode` installed and available in PATH
-- **API Key**: Configured in the runtime CLI (not passed to MAH directly)
+- **API Key/Token** for your selected provider
 - **Skill File**: `bootstrap` skill available
 
 ### Usage
@@ -165,23 +164,29 @@ AI-assisted mode is an **optional acceleration** that uses an available AI runti
 # Interactive AI-assisted mode
 mah init
 # Select option 2 when prompted
+# Use arrows + Enter to choose provider
 
 # Non-interactive AI-assisted mode
-mah init --yes --ai --brief "E-commerce platform with microservices"
+mah init --yes --ai \
+  --provider openrouter \
+  --api-key "$OPENROUTER_API_KEY" \
+  --brief "E-commerce platform with microservices"
 
 # With project details
 mah init --yes --ai \
   --name "my-project" \
   --description "AI-powered code review tool" \
+  --provider minimax \
+  --api-key "$MINIMAX_API_KEY" \
   --brief "Automated code review with multi-agent analysis"
 ```
 
 ### What AI-Assisted Mode Does
 
-1. **Analyzes repository context** — reads README, detects runtime markers
+1. **Collects repository context** — reads README and runtime markers
 2. **Generates tailored configuration** — creates topology matching project needs
 3. **Infers sensible defaults** — chooses appropriate crews, agents, and profiles
-4. **Falls back gracefully** — if AI fails, uses logical mode automatically
+4. **Falls back gracefully** — if HTTP AI fails, uses logical mode automatically
 
 With the upcoming `v0.9.0` release, AI-assisted bootstrap can also:
 5. **Configure expertise-aware routing** — agents matched by skill, not just order
@@ -197,9 +202,8 @@ bootstrap: bootstrap skill not found, falling back to logical mode
 bootstrap: created meta-agents.yaml
 ```
 
-> **Note:** AI-assisted bootstrap runs the AI runtime in headless/non-interactive mode.
-> For `pi`, this uses the `-p` flag (`pi --skill <path> -p "<prompt>"`) which prints
-> the response and exits without launching a TUI session.
+> **Note:** AI-assisted bootstrap first tries direct provider HTTP. If key/token or model is missing,
+> MAH can still fall back to installed runtime CLIs in headless/non-interactive mode.
 
 ---
 
@@ -220,7 +224,9 @@ runtimes:                           # Runtime configurations (runtime detection 
   hermes: { ... }
 catalog:                            # Shared resources
   models: { ... }
-  domain_profiles: { ... }
+domain_profiles:                    # Domain access profiles
+  read_only_cwd: [ ... ]
+  write_cwd: [ ... ]
 crews:                              # Team definitions
   - id: "dev"
     topology: { ... }
@@ -252,7 +258,7 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
-        domain_profile: read_only_repo
+        domain_profile: read_only_cwd
       - id: planning-lead
         role: lead
         team: planning
@@ -263,15 +269,15 @@ crews:
           - expertise_model
         # Stack multiple profiles to merge domain rules
         domain_profile:
-          - read_only_repo
-          - planning_delivery
+          - read_only_cwd
+          - write_user_home_with_approval
       - id: repo-analyst
         role: worker
         team: planning
         model_ref: worker_default
         skills:
           - expertise_model
-        domain_profile: read_only_repo
+        domain_profile: read_only_cwd
 ```
 
 ---
