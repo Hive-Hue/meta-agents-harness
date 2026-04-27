@@ -1,0 +1,533 @@
+/* ===== Crews Topology ===== */
+
+.crews-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  background: #fff;
+  overflow: hidden;
+  min-height: 0;
+  height: 100%;
+}
+
+.crews-header {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  margin-top: -8px;
+  gap: 8px;
+  border-bottom: 1px solid #E0E0E0;
+  padding: 10px 32px;
+}
+
+.crews-header__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.crews-header__view-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  overflow: hidden;
+  background: #fff;
+}
+
+.crews-header__view-btn {
+  border: 0;
+  background: transparent;
+  color: #444748;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.crews-header__view-btn--active {
+  background: #eefcff;
+  color: #006876;
+}
+
+.crews-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #1c1b1b;
+}
+
+.crews-header__subtitle {
+  margin: 2px 0 0;
+  color: #444748;
+  font-size: 13px;
+}
+
+.crews-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.crews-filter {
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #1c1b1b;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+}
+
+.crews-filter:focus {
+  border-color: #00BCD4;
+  outline: none;
+}
+
+.crews-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* Team Lanes */
+.team-lane {
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+.team-lane--orchestration { border-left: 3px solid #1c1b1b; }
+.team-lane--planning { border-left: 3px solid #00BCD4; }
+.team-lane--engineering { border-left: 3px solid #4CAF50; }
+.team-lane--validation { border-left: 3px solid #F59E0B; }
+
+.team-lane__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 16px;
+  background: #f1edec;
+}
+
+.team-lane__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.team-lane__name {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1c1b1b;
+}
+
+.team-lane__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: #94a3b8;
+  font-size: 14px;
+  transition: transform 120ms ease;
+}
+
+.team-lane__chevron--collapsed {
+  transform: rotate(-90deg);
+}
+
+.team-lane__count {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.team-lane__agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+}
+
+/* Flowchart */
+.flowchart {
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  background: #fff;
+  padding: 20px;
+}
+
+.flowchart__root {
+  display: flex;
+  justify-content: center;
+}
+
+.flowchart__trunk {
+  width: 2px;
+  height: 24px;
+  margin: 8px auto 14px;
+  background: #E0E0E0;
+}
+
+.flowchart__teams {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.flow-team {
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  padding: 10px;
+}
+
+.flow-team--planning { border-top: 3px solid #00BCD4; }
+.flow-team--engineering { border-top: 3px solid #4CAF50; }
+.flow-team--validation { border-top: 3px solid #F59E0B; }
+
+.flow-team__title {
+  margin-bottom: 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #444748;
+}
+
+.flow-team__branch {
+  width: 2px;
+  height: 12px;
+  margin: 6px auto;
+  background: #E0E0E0;
+}
+
+.flow-team__workers {
+  display: grid;
+  gap: 8px;
+}
+
+.flow-node {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  background: #fff;
+  padding: 8px;
+  text-align: left;
+}
+
+.flow-node--orchestrator {
+  width: min(360px, 100%);
+  border-color: #1c1b1b;
+}
+
+.flow-node--lead {
+  border-left: 3px solid #00BCD4;
+}
+
+.flow-node--worker {
+  border-left: 3px solid #E0E0E0;
+}
+
+.flow-node--selected {
+  background: #eefcff;
+  border-color: #00BCD4;
+}
+
+.flow-node__id {
+  color: #1c1b1b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.flow-node__meta {
+  color: #444748;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+/* Agent Cards */
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  margin-top: -10px;
+  gap: 4px;
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  background: #fff;
+  padding: 8px;
+  min-width: 200px;
+  max-width: 260px;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.agent-card:hover { border-color: #94a3b8; }
+
+.agent-card--selected {
+  border-color: #00BCD4;
+  background: #eefcff;
+}
+
+.agent-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.agent-card__name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1c1b1b;
+}
+
+.agent-card__role {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.agent-card__role--orchestrator {
+  background: #1c1b1b;
+  color: #fff;
+}
+
+.agent-card__role--lead {
+  background: #E0F7FA;
+  color: #00838F;
+}
+
+.agent-card__role--worker {
+  background: #f1edec;
+  color: #444748;
+}
+
+.agent-card__model {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #444748;
+}
+
+.agent-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.agent-card__skills-count {
+  font-weight: 600;
+}
+
+.agent-card__domain {
+  font-weight: 600;
+  color: #444748;
+}
+
+.agent-card__confidence {
+  height: 4px;
+  border-radius: 2px;
+  background: #E0E0E0;
+  overflow: hidden;
+}
+
+.agent-card__confidence-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 200ms ease;
+}
+
+.agent-card__confidence-fill--high { background: #4CAF50; }
+.agent-card__confidence-fill--mid { background: #00BCD4; }
+.agent-card__confidence-fill--low { background: #F59E0B; }
+
+.agent-card__expertise {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.agent-card__expertise--validated {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.agent-card__expertise--experimental {
+  background: #FFF8E1;
+  color: #F57F17;
+}
+
+.agent-card__expertise--restricted {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
+/* Crews Inspector */
+.crews-inspector__command { margin-bottom: 20px; }
+
+.crews-inspector__section-title {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #444748;
+}
+
+.crews-inspector__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 20px;
+}
+
+.crews-inspector__field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.crews-inspector__field dt {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.crews-inspector__field dd {
+  margin: 0;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #1c1b1b;
+  font-weight: 600;
+}
+
+.crews-inspector__skills {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.crews-inspector__skill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: #E0E0E0;
+  color: #444748;
+}
+
+.crews-inspector__warnings {
+  margin-bottom: 16px;
+}
+
+.crews-inspector__warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  color: #F57F17;
+  margin-bottom: 4px;
+}
+
+.crews-inspector__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 980px) {
+  .flowchart__teams {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .crews-header__top {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .crews-header__view-toggle {
+    width: fit-content;
+  }
+
+  .team-lane__header {
+    padding: 6px 10px;
+  }
+
+  .team-lane__agents {
+    padding: 10px;
+  }
+
+  .agent-card {
+    max-width: none;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+.crews-inspector__action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  background: #fff;
+  color: #444748;
+  padding: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.crews-inspector__action-btn:hover { border-color: #94a3b8; }
+
+.crews-inspector__action-btn--primary {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+  color: #fff;
+}
+
+.crews-inspector__action-btn--primary:hover { background: #333; }
+
+@media (max-width: 1100px) {
+  .inspector.crews-inspector {
+    display: none;
+  }
+}

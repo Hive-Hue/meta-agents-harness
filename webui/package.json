@@ -1,0 +1,26 @@
+{
+  "name": "@meta-agents-harness/webui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.2.3",
+    "js-yaml": "^4.1.0",
+    "react-dom": "^19.2.3",
+    "react-router": "^7.14.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "@types/react": "^19.2.14",
+    "@types/js-yaml": "^4.0.9",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.2",
+    "vite": "^7.3.0"
+  }
+}

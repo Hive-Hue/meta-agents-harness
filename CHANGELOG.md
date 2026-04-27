@@ -9,6 +9,14 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Added
 
+- WebUI live data layer: Config Editor, Overview Dashboard, Skills Management, and Settings all consume real data from `meta-agents.yaml`, `mah` CLI, and workspace state
+- `webui/useConfigStore.tsx` — shared ConfigProvider + useConfig hook for reading/writing meta-agents.yaml
+- `webui/useWorkspaceData.ts` — workspace data hook with 3 parallel fetches (workspace, config, sessions)
+- Vite dev API: `GET/PUT /api/mah/config`, `GET /api/mah/workspace`, expanded `/api/mah/exec` allowlist to `skills` + `sessions`
+- Config Editor (`/config`): editable Domain Profiles, model dropdown per role, real runtimes/catalog/agents from YAML
+- Overview Dashboard (`/`): real workspace name, git status, crew/agent/skill counts, sessions from `mah sessions list --json`
+- Skills Management (`/skills`): real skill list from `mah skills list --json` (19 skills), agent selector for add/remove actions
+- Settings (`/settings`): collapsible sections, Models submenu, Skills submenu, editable Workspace Path with folder picker
 - `types/agent-execution-result.mjs` — canonical `AgentExecutionResult` type + `normalizeExecutionResult()` helper for runtime-agnostic execution results
 - `scripts/evidence-pipeline.mjs` — shared `recordDelegationEvidence()` used by both CLI and PI runtime (deduplicates `deriveTaskType` + evidence recording)
 - `tests/agent-execution-result.test.mjs` — 8 tests for normalization shape and field coercion
@@ -45,6 +53,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Changed
 
+- WebUI Vite middleware uses `next()` pattern to intercept API routes before SPA fallback
+- Settings sections are now collapsible with expand/collapse toggle
+- Workspace Path field supports both typing and OS folder picker
 - Evidence store now defaults to workspace-local `.mah/expertise/evidence/` instead of `~/.mah/expertise/evidence/` (env var `MAH_EXPERTISE_EVIDENCE_ROOT` still works for cross-workspace shared evidence)
 - Session provenance expanded with lifecycle event recording as a separate event stream
 - `validate:config` schema now explicitly accepts domain approval rule metadata:
