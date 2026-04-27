@@ -194,6 +194,7 @@ function printHelp() {
   console.log("  detect")
   console.log("  doctor")
   console.log("  expertise [list|show|seed|sync|recommend|explain|evidence|export|propose|apply-proposal|lifecycle|import]  Expertise catalog management")
+  console.log("  skills [list|inspect|explain|add|remove]  Skills catalog and assignment management")
   console.log("  context [find|explain|list|show|validate|index|propose|proposals]  Context Manager — operational context retrieval")
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
   console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>] [--provider <id>] [--model <id>] [--api-key <key>] [--base-url <url>]  Generate config (add --ai for expertise-aware topology)")
@@ -4635,6 +4636,11 @@ async function main() {
     ;(async () => {
       process.exitCode = await runContext(argv.slice(1), jsonMode)
     })()
+    return
+  }
+
+  if (first === "skills") {
+    process.exitCode = runLocalScript(path.join("scripts", "skills-cli.mjs"), argv.slice(1))
     return
   }
 

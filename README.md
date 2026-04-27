@@ -190,6 +190,9 @@ mah clear
 mah run
 mah expertise recommend --task "fix auth middleware"  # route by capability
 mah expertise sync                                    # strengthen routing from session outcomes
+mah skills list                                       # list skills and assignments
+mah skills inspect stitch-react-handoff               # inspect skill metadata
+mah skills add stitch-react-handoff --agent frontend-dev
 mah context find --agent worker-1 --task "fix auth"   # fetch operational memory
 mah context propose --from-session pi:dev:abc123      # governed learning
 mah sessions status                                   # see what's running
@@ -706,6 +709,13 @@ Optional manual installation is still available if you want the same server outs
 
 ```bash
 codex mcp add mah -- /home/alysson/.nvm/versions/node/v22.19.0/bin/node /home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs
+```
+
+If you want Codex to load a shared `.env` before it starts, use the repo wrapper:
+
+```bash
+MAH_CODEX_ENV_FILE=/home/alysson/Github/meta-agents-harness/.env \
+  /home/alysson/Github/meta-agents-harness/scripts/codex-with-env.sh
 ```
 
 ### `mah` command not available
