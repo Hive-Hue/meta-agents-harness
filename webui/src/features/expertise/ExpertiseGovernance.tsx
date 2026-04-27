@@ -24,6 +24,7 @@ export function ExpertiseGovernance() {
   const [step, setStep] = useState<WorkflowStep>("seed");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<"catalog"|"evidence"|"proposals"|"lifecycle">("catalog");
+  const [showSyncPreview, setShowSyncPreview] = useState(false);
   const [syncResults, setSyncResults] = useState<SyncChange[]>([]);
   const [proposals, setProposals] = useState<ProposalInfo[]>([]);
   const [pLoading, setPLoading] = useState(false);
@@ -135,41 +136,10 @@ export function ExpertiseGovernance() {
               <div className="workflow-panel__icon"><Icon name="sync" size={40} /></div>
               <h3>2. Sync from Evidence</h3>
               <p>Dry-run shows changes. Execute to apply.</p>
-              {!syncResults.length && !syncLoading && (
-                <button className="workflow-action-btn workflow-action-btn--primary" onClick={handleSyncDryRun}>
-                  <Icon name="search" size={14} />Preview (Dry-Run)
-                </button>
-              )}
-              {syncLoading && <div className="loading-state">Running...</div>}
-              {syncResults.length > 0 && !syncLoading && (
-                <>
-                  <p>{syncResults.filter(r => !r.skipped && r.changed).length} changed | {syncResults.filter(r => r.skipped).length} skipped</p>
-                  <div className="sync-preview-table">
-                    <table>
-                      <thead><tr><th>Agent</th><th>Changes</th><th>Details</th></tr></thead>
-                      <tbody>
-                        {syncResults.map(r => (
-                          <tr key={r.agent} className={r.skipped ? "row-skipped" : r.changed ? "row-changed" : ""}>
-                            <td className="agent-name-cell">{r.agent}</td>
-                            <td>
-                              {r.skipped ? <span style={{color:"#94a3b8"}}>skipped</span> :
-                               r.changed ? r.changes?.map(c => <span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>) :
-                               <span style={{color:"#94a3b8"}}>no change</span>}
-                            </td>
-                            <td style={{fontSize:11,color:"#666"}}>
-                              {r.changes?.map(c => c.type === "confidence" ? `${Math.round((c.from?.score||0)*100)}%→${Math.round((c.to?.score||0)*100)}% (${c.to?.invocations} inv)` : `+${c.added?.join(", ")}`).join(" | ")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div style={{display:"flex",gap:8,marginTop:16}}>
-                    <button className="workflow-action-btn workflow-action-btn--primary" onClick={handleSyncExec}><Icon name="check" size={14} />Execute Sync</button>
-                    <button className="workflow-action-btn" onClick={handleSyncDryRun}><Icon name="refresh" size={14} />Refresh</button>
-                  </div>
-                </>
-              )}
+              <div className="workflow-panel__cmd"><code>mah expertise sync --crew {crew} --dry-run --json</code></div>
+              <button type="button" className="workflow-action-btn workflow-action-btn--primary" onClick={async () => { await handleSyncDryRun(); setShowSyncPreview(true); }}>
+                <Icon name="search" size={14} />Preview Changes
+              </button>
             </div>
           )}
 
@@ -285,6 +255,13 @@ export function ExpertiseGovernance() {
       <aside className="inspector">
         <ExpertiseInspector entry={entries.find(e=>e.id===selectedId)||null} onClose={()=>setSelectedId(null)} />
       </aside>
+      {showSyncPreview && syncResults.length > 0 && (
+        <SyncPreviewModal
+          results={syncResults}
+          onClose={() => setShowSyncPreview(false)}
+          onExecute={handleSyncExec}
+        />
+      )}
     </>
   );
 }
@@ -450,3 +427,50 @@ function ExpertiseInspector({ entry, onClose }: { entry: ExpertiseEntry|null; on
     </>
   );
 }
+
+function SyncPreviewModal({ results, onClose, onExecute }: { results: SyncChange[]; onClose: () => void; onExecute: () => void }) {
+  const changed = results.filter(r => !r.skipped && r.changed);
+  const skipped = results.filter(r => r.skipped);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Sync Preview — {changed.length} changed, {skipped.length} skipped</h3>
+          <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={16}/></button>
+        </div>
+        <div className="sync-preview-table" style={{maxHeight: "360px", overflowY: "auto", border: "1px solid #eee", borderRadius: "6px", margin: "16px 0"}}>
+          <table style={{width: "100%", fontSize: "12px"}}>
+            <thead>
+              <tr>
+                <th style={{textAlign:"left",padding:"8px 12px",background:"#fafafa",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8",position:"sticky",top:0}}>Agent</th>
+                <th style={{textAlign:"left",padding:"8px 12px",background:"#fafafa",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8",position:"sticky",top:0}}>Changes</th>
+                <th style={{textAlign:"left",padding:"8px 12px",background:"#fafafa",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8",position:"sticky",top:0}}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map(r => (
+                <tr key={r.agent} className={r.skipped ? "row-skipped" : r.changed ? "row-changed" : ""} style={r.skipped ? {opacity:0.5} : {}}>
+                  <td style={{padding:"8px 12px",borderTop:"1px solid #f0f0f0"}} className="agent-name-cell">{r.agent}</td>
+                  <td style={{padding:"8px 12px",borderTop:"1px solid #f0f0f0"}}>
+                    {r.skipped ? <span style={{color:"#94a3b8"}}>skipped</span> :
+                     r.changed ? r.changes?.map(c => <span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>) :
+                     <span style={{color:"#94a3b8"}}>no change</span>}
+                  </td>
+                  <td style={{padding:"8px 12px",borderTop:"1px solid #f0f0f0",fontSize:"11px",color:"#666"}}>
+                    {r.changes?.map(c => c.type === "confidence" ? `${Math.round((c.from?.score||0)*100)}%→${Math.round((c.to?.score||0)*100)}% (${c.to?.invocations} inv)` : `+${c.added?.join(", ")}`).join(" | ")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"8px"}}>
+          <button type="button" className="workflow-action-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="workflow-action-btn workflow-action-btn--primary" onClick={() => { onExecute(); onClose(); }}><Icon name="check" size={14}/>Execute Sync</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export { ExpertiseInspector, CatalogTab, EvidenceTab, ProposalsTab, LifecycleTab, SyncPreviewModal }
