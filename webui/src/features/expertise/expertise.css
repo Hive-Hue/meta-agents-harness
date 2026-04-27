@@ -1,4 +1,10 @@
-.expertise-main { display: flex; flex-direction: column; height: 100%; }
+.expertise-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  background: var(--color-surface);
+}
 .expertise-main__content { flex: 1; overflow: auto; }
 .expertise-toolbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; border-bottom: 1px solid var(--color-border-subtle); background: #fff; }
 .expertise-tabs { display: flex; gap: 0; }
@@ -23,7 +29,7 @@
 .cap-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .cap-chip { font-size: 11px; background: #f0f0f0; padding: 2px 6px; border-radius: 3px; color: #333; }
 .cap-chip--more { background: #e0e0e0; color: #666; }
-.sync-preview-banner { margin: 12px 24px 0; padding: 10px 14px; background: #fff; border: 1px solid #0a0a0a; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.sync-preview-banner { margin: 12px 0 0; padding: 10px 14px; background: #fff; border: 1px solid #0a0a0a; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .sync-preview-banner button { background: #0a0a0a; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
 .sync-preview-banner button:hover { background: #333; }
 .loading-state, .error-state, .empty-state { padding: 40px; text-align: center; color: #666; font-size: 13px; }
