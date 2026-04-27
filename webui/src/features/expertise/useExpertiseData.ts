@@ -46,6 +46,7 @@ export type SyncChange = {
   changed?: boolean;
   skipped?: boolean;
   reason?: string;
+  changes?: Array<{ type: string; from: any; to: any; added?: string[]; invocations?: number }>;
 };
 
 export type Metrics = {
