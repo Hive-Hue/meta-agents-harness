@@ -43,10 +43,10 @@ export function TaskComposer({
             : <option value="dev">dev</option>}
         </select>
         <select className="run-composer__select" value={runtime} onChange={(e) => onRuntimeChange(e.target.value)} disabled={isRunning}>
-          <option value=".pi">.pi/</option>
-          <option value=".claude">.claude/</option>
-          <option value=".opencode">.opencode/</option>
-          <option value=".hermes">.hermes/</option>
+          <option value="pi">pi</option>
+          <option value="claude">claude</option>
+          <option value="opencode">opencode</option>
+          <option value="hermes">hermes</option>
         </select>
         <button className="run-action-btn" type="button" onClick={onShowRouting} disabled={isRunning || !taskText}>
           <Icon name="route" size={14} />Preview Routing

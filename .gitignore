@@ -28,6 +28,7 @@ __pycache__/
 .kilo/agents/
 .codex/agents/
 .pi/crew/*/sessions/
+.claude/crew/*
 .claude/crew/*/sessions/
 .openclaude/crew/*/sessions/
 .opencode/crew/*/sessions/
