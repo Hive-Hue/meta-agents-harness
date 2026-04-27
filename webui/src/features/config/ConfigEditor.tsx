@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useLocation } from "react-router";
 import { Icon } from "../../components/ui/Icon";
 import { ConfigProvider, useConfig } from "./useConfigStore";
 import { ConfigInspector } from "./ConfigInspector";
@@ -20,6 +21,18 @@ function ConfigEditorInner() {
   const [saving, setSaving] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ViewMode>("structured");
+  const location = useLocation();
+
+  useEffect(() => {
+    const state = location.state as { teamName?: string } | null;
+    const teamName = state?.teamName;
+    if (teamName) {
+      setTimeout(() => {
+        const el = document.querySelector(`[data-team-section="${teamName}"]`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
+    }
+  }, [location.state]);
 
   const displayError = localError ?? error;
 

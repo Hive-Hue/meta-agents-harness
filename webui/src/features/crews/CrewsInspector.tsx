@@ -103,7 +103,7 @@ export function CrewsInspector({ agent }: CrewsInspectorProps) {
             <Icon name="history" size={14} />
             View Sessions
           </button>
-          <button className="crews-inspector__action-btn" type="button" onClick={() => navigate("/config")}>
+          <button className="crews-inspector__action-btn" type="button" onClick={() => navigate("/config", { state: { teamName: agent?.team, crewId: "dev" } })}>
             <Icon name="tune" size={14} />
             Edit Config
           </button>

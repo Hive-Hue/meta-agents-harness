@@ -146,7 +146,7 @@ export function AgentTree() {
             {expandedCrews.has(crew.id) && (
               <div className="config-crew__teams">
                 {teams.map((team) => (
-                  <div className="config-team" key={team.name}>
+                  <div className="config-team" key={team.name} data-team-section={team.name}>
                     <button className="config-team__header" type="button" onClick={() => toggleTeam(crew.id, team.name)}>
                       <Icon name={expandedTeams.has(`${crew.id}:${team.name}`) ? "expand_less" : "expand_more"} size={18} />
                       <span className="config-team__name">{team.name}</span>

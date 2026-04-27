@@ -182,15 +182,19 @@
 }
 
 .flowchart__teams {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 14px;
+  justify-content: center;
+  width: 100%;
 }
 
 .flow-team {
   border: 1px solid #E0E0E0;
   border-radius: 0.375rem;
   padding: 10px;
+  max-width: 220px;
+  flex: 1;
 }
 
 .flow-team__title {
