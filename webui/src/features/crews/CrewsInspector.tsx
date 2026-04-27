@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router";
 import { CommandPreview } from "../../components/ui/CommandPreview";
 import { Icon } from "../../components/ui/Icon";
 import type { Agent } from "./AgentCard";
@@ -7,6 +8,8 @@ type CrewsInspectorProps = {
 };
 
 export function CrewsInspector({ agent }: CrewsInspectorProps) {
+  const navigate = useNavigate();
+
   if (!agent) {
     return (
       <>
@@ -96,17 +99,13 @@ export function CrewsInspector({ agent }: CrewsInspectorProps) {
         )}
 
         <div className="crews-inspector__actions">
-          <button className="crews-inspector__action-btn crews-inspector__action-btn--primary" type="button">
+          <button className="crews-inspector__action-btn crews-inspector__action-btn--primary" type="button" onClick={() => navigate("/sessions")}>
             <Icon name="history" size={14} />
             View Sessions
           </button>
-          <button className="crews-inspector__action-btn" type="button">
+          <button className="crews-inspector__action-btn" type="button" onClick={() => navigate("/config")}>
             <Icon name="tune" size={14} />
             Edit Config
-          </button>
-          <button className="crews-inspector__action-btn" type="button">
-            <Icon name="compare" size={14} />
-            Compare
           </button>
         </div>
       </section>

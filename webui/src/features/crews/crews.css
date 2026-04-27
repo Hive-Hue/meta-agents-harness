@@ -531,3 +531,10 @@
     display: none;
   }
 }
+
+.crews-header__crew-select-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}

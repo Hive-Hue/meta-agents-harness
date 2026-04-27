@@ -1,132 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TeamLane } from "./TeamLane";
 import { TopologyFilters } from "./TopologyFilters";
 import { CrewsInspector } from "./CrewsInspector";
 import { FlowchartView } from "./FlowchartView";
+import { useConfig } from "../config/useConfigStore";
 import type { Agent } from "./AgentCard";
 import "./crews.css";
 
-const allAgents: Agent[] = [
-  {
-    id: "orchestrator",
-    role: "orchestrator",
-    model: "minimax-coding-plan/MiniMax-M2.7",
-    modelRef: "orchestrator_default",
-    skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "expertise_governance", "caveman", "caveman-crew", "caveman-commit", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["read_only_repo"],
-    expertise: "validated",
-    confidence: 0.92,
-    team: "Orchestration",
-  },
-  {
-    id: "planning-lead",
-    role: "lead",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "lead_default",
-    skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "caveman", "caveman-crew", "caveman-commit", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["planning_delivery"],
-    expertise: "validated",
-    confidence: 0.85,
-    team: "Planning",
-  },
-  {
-    id: "repo-analyst",
-    role: "worker",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "worker_default",
-    skills: ["expertise_model", "caveman", "caveman-crew", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["read_only_repo"],
-    expertise: "validated",
-    confidence: 0.78,
-    team: "Planning",
-  },
-  {
-    id: "solution-architect",
-    role: "worker",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "lead_default",
-    skills: ["expertise_model", "caveman", "caveman-crew", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["planning_delivery"],
-    expertise: "validated",
-    confidence: 0.81,
-    team: "Planning",
-  },
-  {
-    id: "engineering-lead",
-    role: "lead",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "lead_default",
-    skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "caveman", "caveman-crew", "caveman-commit", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["runtime_impl"],
-    expertise: "validated",
-    confidence: 0.88,
-    team: "Engineering",
-  },
-  {
-    id: "frontend-dev",
-    role: "worker",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "worker_default",
-    skills: ["expertise_model", "caveman", "caveman-crew", "caveman-commit", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["cli_operator_surface", "runtime_impl"],
-    expertise: "validated",
-    confidence: 0.75,
-    team: "Engineering",
-  },
-  {
-    id: "backend-dev",
-    role: "worker",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "worker_default",
-    skills: ["expertise_model", "caveman", "caveman-crew", "caveman-commit", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["cli_operator_surface", "runtime_impl"],
-    expertise: "validated",
-    confidence: 0.72,
-    team: "Engineering",
-  },
-  {
-    id: "validation-lead",
-    role: "lead",
-    model: "zai-coding-plan/glm-5",
-    modelRef: "lead_default",
-    skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "caveman", "caveman-crew", "caveman-commit", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["validation_runtime"],
-    expertise: "validated",
-    confidence: 0.86,
-    team: "Validation",
-  },
-  {
-    id: "qa-reviewer",
-    role: "worker",
-    model: "openai-codex/gpt-5.4-mini",
-    modelRef: "qa_default",
-    skills: ["expertise_model", "caveman", "caveman-crew", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["validation_runtime"],
-    expertise: "validated",
-    confidence: 0.79,
-    team: "Validation",
-  },
-  {
-    id: "security-reviewer",
-    role: "worker",
-    model: "openai-codex/gpt-5.4-mini",
-    modelRef: "qa_default",
-    skills: ["expertise_model", "caveman", "caveman-crew", "caveman-compress", "caveman-help", "caveman-review"],
-    domain: ["validation_runtime"],
-    expertise: "validated",
-    confidence: 0.82,
-    team: "Validation",
-  },
-];
-
-const teams = [
-  { name: "Orchestration", color: "orchestration" },
-  { name: "Planning", color: "planning" },
-  { name: "Engineering", color: "engineering" },
-  { name: "Validation", color: "validation" },
-];
-
 export function CrewsTopology() {
+  const { config } = useConfig();
+  const crews = config?.crews ?? [];
+  const [selectedCrewId, setSelectedCrewId] = useState<string>("");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState("");
   const [capabilityFilter, setCapabilityFilter] = useState("");
@@ -135,7 +19,42 @@ export function CrewsTopology() {
   const [viewMode, setViewMode] = useState<"cards" | "flowchart">("cards");
   const [collapsedTeams, setCollapsedTeams] = useState<Record<string, boolean>>({});
 
-  const filtered = allAgents.filter((a) => {
+  // Auto-select first crew
+  useEffect(() => {
+    if (!selectedCrewId && crews.length > 0) {
+      setSelectedCrewId(crews[0].id);
+    }
+  }, [crews, selectedCrewId]);
+
+  const selectedCrew = crews.find((c) => c.id === selectedCrewId) ?? crews[0];
+
+  // Derive agents from selected crew
+  const crewAgents: Agent[] = (selectedCrew?.agents ?? []).map((a) => ({
+    id: a.id,
+    role: a.role as Agent["role"],
+    model: config?.catalog?.models?.[a.model_ref] ?? a.model_ref,
+    modelRef: a.model_ref,
+    skills: a.skills ?? [],
+    domain: Array.isArray(a.domain_profile) ? a.domain_profile : a.domain_profile ? [a.domain_profile] : [],
+    expertise: "validated" as const,
+    confidence: 0.85,
+    team: a.team.charAt(0).toUpperCase() + a.team.slice(1),
+  }));
+
+  // Derive teams from selected crew
+  const teamMap = new Map<string, Agent[]>();
+  for (const a of crewAgents) {
+    const arr = teamMap.get(a.team) ?? [];
+    arr.push(a);
+    teamMap.set(a.team, arr);
+  }
+  const teams = Array.from(teamMap.entries()).map(([name, agents]) => ({
+    name,
+    color: name.toLowerCase(),
+    agents,
+  }));
+
+  const filtered = crewAgents.filter((a) => {
     if (roleFilter && a.role !== roleFilter) return false;
     if (capabilityFilter && !a.skills.some((s) => s.toLowerCase().includes(capabilityFilter.toLowerCase()))) return false;
     if (modelFilter && a.modelRef !== modelFilter) return false;
@@ -143,10 +62,13 @@ export function CrewsTopology() {
     return true;
   });
 
-  const selectedAgent = allAgents.find((a) => a.id === selectedAgentId) ?? null;
+  const selectedAgent = crewAgents.find((a) => a.id === selectedAgentId) ?? null;
   const toggleTeamCollapse = (teamName: string) => {
     setCollapsedTeams((prev) => ({ ...prev, [teamName]: !prev[teamName] }));
   };
+
+  const modelRefs = Object.keys(config?.catalog?.models ?? {});
+  const domainProfiles = Object.keys(config?.domain_profiles ?? {});
 
   return (
     <>
@@ -155,9 +77,20 @@ export function CrewsTopology() {
           <div className="crews-header__top">
             <div>
               <h2>Crews Topology</h2>
-              <p className="crews-header__subtitle">
-                Agent hierarchy for crew <strong>dev</strong> — 4 teams, 10 agents
-              </p>
+              <div className="crews-header__crew-select-row">
+                <select
+                  className="crews-filter"
+                  value={selectedCrewId}
+                  onChange={(e) => { setSelectedCrewId(e.target.value); setSelectedAgentId(null); }}
+                >
+                  {crews.map((c) => (
+                    <option key={c.id} value={c.id}>{c.display_name || c.id}</option>
+                  ))}
+                </select>
+                <span className="crews-header__subtitle">
+                  {teams.length} teams, {crewAgents.length} agents
+                </span>
+              </div>
             </div>
             <div className="crews-header__view-toggle" role="group" aria-label="Topology view mode">
               <button
@@ -185,6 +118,8 @@ export function CrewsTopology() {
             onModelChange={setModelFilter}
             domain={domainFilter}
             onDomainChange={setDomainFilter}
+            modelRefs={modelRefs}
+            domainProfiles={domainProfiles}
           />
         </section>
         <section className="crews-content">

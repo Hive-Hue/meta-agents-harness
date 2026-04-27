@@ -7,6 +7,8 @@ type TopologyFiltersProps = {
   onModelChange: (val: string) => void;
   domain: string;
   onDomainChange: (val: string) => void;
+  modelRefs: string[];
+  domainProfiles: string[];
 };
 
 export function TopologyFilters({
@@ -18,6 +20,8 @@ export function TopologyFilters({
   onModelChange,
   domain,
   onDomainChange,
+  modelRefs,
+  domainProfiles,
 }: TopologyFiltersProps) {
   return (
     <div className="crews-filters">
@@ -36,18 +40,15 @@ export function TopologyFilters({
       />
       <select className="crews-filter" value={model} onChange={(e) => onModelChange(e.target.value)}>
         <option value="">All Models</option>
-        <option value="orchestrator_default">orchestrator_default</option>
-        <option value="lead_default">lead_default</option>
-        <option value="worker_default">worker_default</option>
-        <option value="qa_default">qa_default</option>
+        {modelRefs.map((ref) => (
+          <option key={ref} value={ref}>{ref}</option>
+        ))}
       </select>
       <select className="crews-filter" value={domain} onChange={(e) => onDomainChange(e.target.value)}>
         <option value="">All Domains</option>
-        <option value="read_only_repo">read_only_repo</option>
-        <option value="planning_delivery">planning_delivery</option>
-        <option value="cli_operator_surface">cli_operator_surface</option>
-        <option value="runtime_impl">runtime_impl</option>
-        <option value="validation_runtime">validation_runtime</option>
+        {domainProfiles.map((p) => (
+          <option key={p} value={p}>{p}</option>
+        ))}
       </select>
     </div>
   );

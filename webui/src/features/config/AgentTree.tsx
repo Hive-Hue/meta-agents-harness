@@ -73,87 +73,124 @@ function ProfilePills({ agent, profileNames, onUpdate }: {
 
 export function AgentTree() {
   const { config, updateConfig } = useConfig();
+  const [expandedCrews, setExpandedCrews] = useState<Set<string>>(new Set());
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
 
-  const agents = config?.crews?.flatMap((c) => c.agents ?? []) ?? [];
+  const crews = config?.crews ?? [];
   const modelRefs = Object.keys(config?.catalog?.models ?? {});
   const profileNames = Object.keys(config?.domain_profiles ?? {});
 
-  const teamMap = new Map<string, typeof agents>();
-  for (const a of agents) {
-    const arr = teamMap.get(a.team) ?? [];
-    arr.push(a);
-    teamMap.set(a.team, arr);
-  }
-  const teams = Array.from(teamMap.entries()).map(([name, tAgents]) => ({
-    name: name.charAt(0).toUpperCase() + name.slice(1),
-    agents: tAgents,
-  }));
+  // Auto-expand first crew
+  useEffect(() => {
+    if (crews.length > 0 && expandedCrews.size === 0) {
+      setExpandedCrews(new Set([crews[0].id]));
+    }
+  }, [crews]);
 
-  const toggleTeam = (name: string) => {
-    setExpandedTeams((prev) => {
+  const toggleCrew = (id: string) => {
+    setExpandedCrews((prev) => {
       const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const updateAgentProfiles = (agentId: string, profiles: string[]) => {
-    const crews = config?.crews?.map((c) => ({
-      ...c,
-      agents: c.agents?.map((a) =>
-        a.id === agentId
-          ? { ...a, domain_profile: profiles.length === 0 ? undefined : profiles.length === 1 ? profiles[0] : profiles }
-          : a
-      ),
-    }));
+  const toggleTeam = (crewId: string, teamName: string) => {
+    const key = `${crewId}:${teamName}`;
+    setExpandedTeams((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const updateAgentProfiles = (crewId: string, agentId: string, profiles: string[]) => {
+    const crews = config?.crews?.map((c) => {
+      if (c.id !== crewId) return c;
+      return {
+        ...c,
+        agents: c.agents?.map((a) =>
+          a.id === agentId
+            ? { ...a, domain_profile: profiles.length === 0 ? undefined : profiles.length === 1 ? profiles[0] : profiles }
+            : a
+        ),
+      };
+    });
     if (crews) updateConfig({ crews });
   };
 
   return (
     <div className="config-agent-tree">
-      {teams.map((team) => (
-        <div className="config-team" key={team.name}>
-          <button className="config-team__header" type="button" onClick={() => toggleTeam(team.name)}>
-            <Icon name={expandedTeams.has(team.name) ? "expand_less" : "expand_more"} size={18} />
-            <span className="config-team__name">{team.name}</span>
-            <span className="config-team__count">{team.agents.length} agents</span>
-          </button>
-          {expandedTeams.has(team.name) && (
-            <div className="config-team__agents">
-              {team.agents.map((agent) => (
-                <div className="config-agent" key={agent.id}>
-                  <span className={"config-agent__role config-agent__role--" + agent.role}>
-                    {agent.role}
-                  </span>
-                  <span className="config-agent__id">{agent.id}</span>
-                  <div className="config-agent__meta">
-                    <select defaultValue={agent.model_ref}>
-                      {modelRefs.map((ref) => (
-                        <option key={ref} value={ref}>{ref}</option>
-                      ))}
-                    </select>
+      {crews.map((crew) => {
+        const agents = crew.agents ?? [];
+        const teamMap = new Map<string, typeof agents>();
+        for (const a of agents) {
+          const arr = teamMap.get(a.team) ?? [];
+          arr.push(a);
+          teamMap.set(a.team, arr);
+        }
+        const teams = Array.from(teamMap.entries()).map(([name, tAgents]) => ({
+          name: name.charAt(0).toUpperCase() + name.slice(1),
+          agents: tAgents,
+        }));
+
+        return (
+          <div className="config-crew" key={crew.id}>
+            <button className="config-crew__header" type="button" onClick={() => toggleCrew(crew.id)}>
+              <Icon name={expandedCrews.has(crew.id) ? "expand_less" : "expand_more"} size={18} />
+              <span className="config-crew__name">{crew.display_name || crew.id}</span>
+              <span className="config-crew__count">{agents.length} agents</span>
+            </button>
+            {expandedCrews.has(crew.id) && (
+              <div className="config-crew__teams">
+                {teams.map((team) => (
+                  <div className="config-team" key={team.name}>
+                    <button className="config-team__header" type="button" onClick={() => toggleTeam(crew.id, team.name)}>
+                      <Icon name={expandedTeams.has(`${crew.id}:${team.name}`) ? "expand_less" : "expand_more"} size={18} />
+                      <span className="config-team__name">{team.name}</span>
+                      <span className="config-team__count">{team.agents.length} agents</span>
+                    </button>
+                    {expandedTeams.has(`${crew.id}:${team.name}`) && (
+                      <div className="config-team__agents">
+                        {team.agents.map((agent) => (
+                          <div className="config-agent" key={`${crew.id}:${agent.id}`}>
+                            <span className={"config-agent__role config-agent__role--" + agent.role}>
+                              {agent.role}
+                            </span>
+                            <span className="config-agent__id">{agent.id}</span>
+                            <div className="config-agent__meta">
+                              <select defaultValue={agent.model_ref}>
+                                {modelRefs.map((ref) => (
+                                  <option key={ref} value={ref}>{ref}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <ProfilePills
+                              agent={agent}
+                              profileNames={profileNames}
+                              onUpdate={(profiles) => updateAgentProfiles(crew.id, agent.id, profiles)}
+                            />
+                            <div className="config-agent__skills">
+                              {agent.skills?.map((s) => (
+                                <span className="config-agent__skill" key={s}>{s}</span>
+                              ))}
+                            </div>
+                            <button className="config-agent__remove" type="button" aria-label="Remove agent">
+                              <Icon name="close" size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <ProfilePills
-                    agent={agent}
-                    profileNames={profileNames}
-                    onUpdate={(profiles) => updateAgentProfiles(agent.id, profiles)}
-                  />
-                  <div className="config-agent__skills">
-                    {agent.skills?.map((s) => (
-                      <span className="config-agent__skill" key={s}>{s}</span>
-                    ))}
-                  </div>
-                  <button className="config-agent__remove" type="button" aria-label="Remove agent">
-                    <Icon name="close" size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
