@@ -1,155 +1,341 @@
-import { CommandPreview } from "../../components/ui/CommandPreview";
+import { useState } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
+import {
+  useContextDocuments,
+  useContextFind,
+  useContextValidate,
+  useContextProposals,
+  type ContextDoc,
+  type FindResult,
+  type ContextProposal,
+} from "./useContextData";
 import "./context.css";
 
-const documents = [
-  { id: "ctx_001", name: "runtime-bootstrap-playbook.md", source: "operational", stability: "stable", capabilities: ["bootstrap", "cli", "runtime"], agent: "engineering-lead", status: "indexed", selected: true },
-  { id: "ctx_002", name: "context-memory-retrieval.md", source: "operational", stability: "stable", capabilities: ["retrieval", "index", "context-memory"], agent: "engineering-lead", status: "indexed", selected: false },
-  { id: "ctx_003", name: "delegate-bounded-workflow.md", source: "operational", stability: "stable", capabilities: ["delegation", "task", "bounded"], agent: "engineering-lead", status: "indexed", selected: false },
-  { id: "ctx_004", name: "clickup-backlog-integration.md", source: "proposal", stability: "draft", capabilities: ["clickup", "mcp", "backlog"], agent: "planning-lead", status: "pending", selected: false },
-  { id: "ctx_005", name: "session-recovery-playbook.md", source: "proposal", stability: "draft", capabilities: ["session", "recovery", "retry"], agent: "orchestrator", status: "pending", selected: false },
-  { id: "ctx_006", name: "smoke-test-patterns.md", source: "operational", stability: "stable", capabilities: ["testing", "smoke", "node:test"], agent: "qa-reviewer", status: "indexed", selected: false },
-];
+type Tab = "documents" | "find" | "validate" | "proposals";
 
 export function ContextManager() {
+  const [tab, setTab] = useState<Tab>("documents");
+  const [selectedDoc, setSelectedDoc] = useState<ContextDoc | null>(null);
+  const [findAgent, setFindAgent] = useState("");
+  const [findTask, setFindTask] = useState("");
+  const [findCap, setFindCap] = useState("");
+  const [strictMode, setStrictMode] = useState(false);
+
+  const { docs, loading: docsLoading, error: docsError, reload: reloadDocs } = useContextDocuments();
+  const { results: findResults, loading: findLoading, error: findError, find } = useContextFind();
+  const { results: validateResults, loading: validateLoading, error: validateError, summary: validateSummary, validate } = useContextValidate();
+  const { proposals, loading: proposalsLoading, error: proposalsError, reload: reloadProposals } = useContextProposals();
+
   return (
-    <>
-      <main className="context-main">
-        <section className="screen-header">
-          <div>
-            <h2>Context Manager</h2>
-            <div className="screen-header__meta">
-              <span className="screen-header__clusters">24 documents · 6 operational · 18 proposed</span>
-            </div>
+    <div className="context-layout">
+      <div className="context-main">
+        {/* Toolbar */}
+        <div className="context-toolbar">
+          <div className="context-tabs">
+            {(["documents", "find", "validate", "proposals"] as Tab[]).map(t => (
+              <button
+                key={t}
+                className={`context-tab ${tab === t ? "context-tab--active" : ""}`}
+                onClick={() => setTab(t)}
+              >
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </button>
+            ))}
           </div>
-          <CommandPreview context="dev-crew" command="mah context list --verbose" />
-        </section>
+        </div>
 
-        <section className="context-main__content">
-          <div className="context-table">
-            <table>
-              <thead>
-                <tr>
-                  <th aria-label="Selected document" />
-                  <th>Document</th>
-                  <th>Source</th>
-                  <th>Stability</th>
-                  <th>Capabilities</th>
-                  <th>Agent</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {documents.map((doc) => (
-                  <tr className={doc.selected ? "is-selected" : ""} key={doc.id}>
-                    <td>
-                      <Icon
-                        name={doc.selected ? "radio_button_checked" : "radio_button_unchecked"}
-                        className={doc.selected ? "selection-icon selection-icon--active" : "selection-icon"}
-                        size={18}
-                        filled={doc.selected}
-                      />
-                    </td>
-                    <td className="doc-name-cell">{doc.name}</td>
-                    <td>
-                      <span className={`lifecycle-badge lifecycle-badge--${doc.source === "operational" ? "validated" : "proposal"}`}>
-                        {doc.source}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`lifecycle-badge lifecycle-badge--${doc.stability === "stable" ? "validated" : "draft"}`}>
-                        {doc.stability}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="cap-chips">
-                        {doc.capabilities.map((cap) => (
-                          <span className="cap-chip" key={cap}>{cap}</span>
-                        ))}
-                      </div>
-                    </td>
-                    <td>
-                      <span className="agent-cell-inline">
-                        <Icon name="smart_toy" size={14} />
-                        {doc.agent}
-                      </span>
-                    </td>
-                    <td>
-                      <StatusBadge
-                        tone={doc.status === "indexed" ? "completed" : "running"}
-                        label={doc.status}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div className="context-content">
+          {/* DOCUMENTS TAB */}
+          {tab === "documents" && (
+            <div className="context-panel">
+              <div className="context-panel__header">
+                <h3>Documents</h3>
+                <button className="context-action-btn" onClick={reloadDocs}>
+                  <Icon name="refresh" size={14} />Refresh
+                </button>
+              </div>
+              {docsLoading ? (
+                <div className="loading-state">Loading...</div>
+              ) : docsError ? (
+                <div className="error-state">{docsError}</div>
+              ) : docs.length === 0 ? (
+                <div className="empty-state">No documents found.</div>
+              ) : (
+                <div className="context-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Agent</th>
+                        <th>Source</th>
+                        <th>Stability</th>
+                        <th>Capabilities</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docs.map(doc => (
+                        <tr
+                          key={doc.id}
+                          className={selectedDoc?.id === doc.id ? "is-selected" : ""}
+                          onClick={() => setSelectedDoc(doc)}
+                        >
+                          <td className="doc-name-cell">{doc.name}</td>
+                          <td><span className="agent-chip">{doc.agent}</span></td>
+                          <td><span className={`source-tag source-tag--${doc.source}`}>{doc.source}</span></td>
+                          <td>{doc.stability}</td>
+                          <td>
+                            <div className="cap-chips">
+                              {doc.capabilities.slice(0, 3).map(c => (
+                                <span key={c} className="cap-chip">{c}</span>
+                              ))}
+                              {doc.capabilities.length > 3 && (
+                                <span className="cap-chip cap-chip--more">+{doc.capabilities.length - 3}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td><StatusBadge tone={doc.status === "active" ? "completed" : "running"} label={doc.status} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* FIND TAB */}
+          {tab === "find" && (
+            <div className="context-panel">
+              <div className="context-panel__header">
+                <h3>Find Context</h3>
+              </div>
+              <div className="find-form">
+                <div className="find-form__row">
+                  <label>
+                    <span>Agent</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. backend-dev"
+                      value={findAgent}
+                      onChange={e => setFindAgent(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    <span>Capability (optional)</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. typescript"
+                      value={findCap}
+                      onChange={e => setFindCap(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="find-form__full">
+                  <span>Task</span>
+                  <input
+                    type="text"
+                    placeholder="Describe the task..."
+                    value={findTask}
+                    onChange={e => setFindTask(e.target.value)}
+                  />
+                </label>
+                <button
+                  className="context-action-btn context-action-btn--primary"
+                  onClick={() => find(findAgent, findTask, findCap || undefined)}
+                  disabled={findLoading || !findAgent.trim() || !findTask.trim()}
+                >
+                  <Icon name="search" size={14} />{findLoading ? "Searching..." : "Find"}
+                </button>
+              </div>
+
+              {findError && <div className="error-state" style={{ marginTop: 12 }}>{findError}</div>}
+
+              {findResults.length > 0 && (
+                <div className="context-table" style={{ marginTop: 20 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Document</th>
+                        <th>Score</th>
+                        <th>Matched On</th>
+                        <th>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {findResults.map((r, i) => (
+                        <tr key={i}>
+                          <td className="doc-name-cell">{r.doc_id}</td>
+                          <td><span className="score-badge">{Math.round(r.score * 100)}%</span></td>
+                          <td>{r.matched_on.map(m => <span key={m} className="cap-chip">{m}</span>)}</td>
+                          <td style={{ fontSize: 12, color: "#666" }}>{r.reason}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* VALIDATE TAB */}
+          {tab === "validate" && (
+            <div className="context-panel">
+              <div className="context-panel__header">
+                <h3>Validate Schema</h3>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer" }}>
+                    <input type="checkbox" checked={strictMode} onChange={e => setStrictMode(e.target.checked)} />
+                    Strict
+                  </label>
+                  <button className="context-action-btn context-action-btn--primary" onClick={() => validate(strictMode)} disabled={validateLoading}>
+                    <Icon name="check" size={14} />{validateLoading ? "Validating..." : "Validate"}
+                  </button>
+                </div>
+              </div>
+
+              {validateSummary && (
+                <div className="validate-summary">
+                  <div className="validate-card validate-card--total">
+                    <span className="validate-card__num">{validateSummary.total}</span>
+                    <span className="validate-card__label">Total</span>
+                  </div>
+                  <div className="validate-card validate-card--valid">
+                    <span className="validate-card__num">{validateSummary.valid}</span>
+                    <span className="validate-card__label">Valid</span>
+                  </div>
+                  <div className="validate-card validate-card--invalid">
+                    <span className="validate-card__num">{validateSummary.invalid}</span>
+                    <span className="validate-card__label">Invalid</span>
+                  </div>
+                </div>
+              )}
+
+              {validateError && <div className="error-state" style={{ marginTop: 12 }}>{validateError}</div>}
+
+              {validateResults.length > 0 && (
+                <div className="context-table" style={{ marginTop: 16 }}>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>File</th>
+                        <th>Valid</th>
+                        <th>Errors</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {validateResults.map((r, i) => (
+                        <tr key={i} className={r.valid ? "" : "row-invalid"}>
+                          <td className="doc-name-cell" style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>{r.file}</td>
+                          <td>{r.valid ? <span style={{color:"#4caf50"}}><Icon name="check" size={14} /></span> : <span style={{color:"#dc2626"}}><Icon name="close" size={14} /></span>}</td>
+                          <td style={{ fontSize: 11, color: "#dc2626" }}>{r.errors?.join(", ") || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* PROPOSALS TAB */}
+          {tab === "proposals" && (
+            <div className="context-panel">
+              <div className="context-panel__header">
+                <h3>Proposals</h3>
+                <button className="context-action-btn" onClick={reloadProposals}>
+                  <Icon name="refresh" size={14} />Refresh
+                </button>
+              </div>
+              {proposalsLoading ? (
+                <div className="loading-state">Loading...</div>
+              ) : proposalsError ? (
+                <div className="error-state">{proposalsError}</div>
+              ) : proposals.length === 0 ? (
+                <div className="empty-state">No proposals.</div>
+              ) : (
+                <div className="context-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Agent</th>
+                        <th>Stability</th>
+                        <th>Status</th>
+                        <th>Summary</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {proposals.map(p => (
+                        <tr key={p.id}>
+                          <td className="doc-name-cell" style={{ fontFamily: "var(--font-mono)", fontSize: 11 }}>{p.id}</td>
+                          <td><span className="agent-chip">{p.agent}</span></td>
+                          <td>{p.stability}</td>
+                          <td><StatusBadge tone={p.status === "approved" || p.status === "promoted" ? "completed" : p.status === "rejected" ? "failed" : "running"} label={p.status} /></td>
+                          <td style={{ fontSize: 12, maxWidth: 200 }}>{p.summary}</td>
+                          <td>
+                            {p.status === "pending" && (
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button className="context-action-btn" style={{ padding: "4px 8px", fontSize: 11 }} onClick={async () => {
+                                  await fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ args: ["context", "proposals", "promote", p.id, "--json"] }) });
+                                  reloadProposals();
+                                }}>
+                                  <Icon name="check" size={12} />Promote
+                                </button>
+                                <button className="context-action-btn" style={{ padding: "4px 8px", fontSize: 11 }} onClick={async () => {
+                                  await fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ args: ["context", "proposals", "reject", p.id, "--json"] }) });
+                                  reloadProposals();
+                                }}>
+                                  <Icon name="close" size={12} />Reject
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Inspector */}
+      <aside className="context-inspector">
+        {selectedDoc ? (
+          <>
+            <div className="inspector-header">
+              <h3>{selectedDoc.name}</h3>
+              <button className="icon-button" onClick={() => setSelectedDoc(null)}>
+                <Icon name="close" size={16} />
+              </button>
+            </div>
+            <div className="inspector-stats">
+              <div><span>Agent</span><strong>{selectedDoc.agent}</strong></div>
+              <div><span>Source</span><strong>{selectedDoc.source}</strong></div>
+              <div><span>Stability</span><strong>{selectedDoc.stability}</strong></div>
+              <div><span>Status</span><strong><StatusBadge tone={selectedDoc.status === "active" ? "completed" : "running"} label={selectedDoc.status} /></strong></div>
+            </div>
+            {selectedDoc.capabilities.length > 0 && (
+              <div style={{ padding: "12px 16px" }}>
+                <p className="inspector-section-label">Capabilities</p>
+                <div className="cap-chips">
+                  {selectedDoc.capabilities.map(c => <span key={c} className="cap-chip">{c}</span>)}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="inspector-empty">
+            <Icon name="info" size={32} />
+            <p>Select a document</p>
           </div>
-        </section>
-      </main>
-
-      <aside className="inspector" aria-label="Document detail inspector">
-        <section className="inspector__header">
-          <div className="inspector__title-row">
-            <div>
-              <h3>Document Detail</h3>
-              <p>runtime-bootstrap-playbook.md</p>
-            </div>
-            <button className="icon-button" type="button" aria-label="Close inspector">
-              <Icon name="close" />
-            </button>
-          </div>
-        </section>
-
-        <section className="inspector__body">
-          <div className="inspector-stats">
-            <div>
-              <span>Source</span>
-              <strong>operational</strong>
-            </div>
-            <div>
-              <span>Agent</span>
-              <strong>engineering-lead</strong>
-            </div>
-            <div>
-              <span>Stability</span>
-              <strong>stable</strong>
-            </div>
-            <div>
-              <span>Index</span>
-              <strong>active</strong>
-            </div>
-          </div>
-
-          <h4 className="inspector-section-title">Frontmatter</h4>
-          <pre className="context-frontmatter">
-            <code>{`---
-agent: engineering-lead
-capability: bootstrap
-stability: stable
-source: operational
-indexed: true
----`}</code>
-          </pre>
-
-          <h4 className="inspector-section-title">Retrieval Scores</h4>
-          <div className="retrieval-scores">
-            <div className="retrieval-row">
-              <span className="retrieval-row__key">capability:bootstrap</span>
-              <span className="retrieval-row__value">0.94</span>
-            </div>
-            <div className="retrieval-row">
-              <span className="retrieval-row__key">agent:engineering-lead</span>
-              <span className="retrieval-row__value">0.88</span>
-            </div>
-            <div className="retrieval-row">
-              <span className="retrieval-row__key">task:bootstrap+cli</span>
-              <span className="retrieval-row__value">0.91</span>
-            </div>
-          </div>
-        </section>
+        )}
       </aside>
-    </>
+    </div>
   );
 }
