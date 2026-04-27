@@ -10,6 +10,13 @@ interface DiffLine {
   lineModified?: number;
 }
 
+interface DiffHunk {
+  header: string;
+  lines: DiffLine[];
+}
+
+const CONTEXT_LINES = 3;
+
 function computeDiff(original: string[], modified: string[]): DiffLine[] {
   const result: DiffLine[] = [];
   let oi = 0;
@@ -49,14 +56,61 @@ function computeDiff(original: string[], modified: string[]): DiffLine[] {
   return result;
 }
 
+function computeHunks(diffLines: DiffLine[], contextSize: number): DiffHunk[] {
+  const changeIndices = diffLines
+    .map((l, i) => (l.type !== "unchanged" ? i : -1))
+    .filter((i) => i >= 0);
+
+  if (changeIndices.length === 0) return [];
+
+  const hunks: DiffHunk[] = [];
+  let currentStart = Math.max(0, changeIndices[0] - contextSize);
+  let currentEnd = Math.min(diffLines.length - 1, changeIndices[0] + contextSize);
+
+  for (let i = 1; i < changeIndices.length; i++) {
+    const ci = changeIndices[i];
+    if (ci - contextSize <= currentEnd + 1) {
+      currentEnd = Math.min(diffLines.length - 1, ci + contextSize);
+    } else {
+      hunks.push({
+        header: "",
+        lines: diffLines.slice(currentStart, currentEnd + 1),
+      });
+      currentStart = Math.max(0, ci - contextSize);
+      currentEnd = Math.min(diffLines.length - 1, ci + contextSize);
+    }
+  }
+  hunks.push({
+    header: "",
+    lines: diffLines.slice(currentStart, currentEnd + 1),
+  });
+
+  for (const hunk of hunks) {
+    const firstOrig = hunk.lines.find((l) => l.lineOriginal != null);
+    const firstMod = hunk.lines.find((l) => l.lineModified != null);
+    const origStart = firstOrig?.lineOriginal ?? 0;
+    const modStart = firstMod?.lineModified ?? 0;
+    const origCount = hunk.lines.filter((l) => l.type !== "added").length;
+    const modCount = hunk.lines.filter((l) => l.type !== "removed").length;
+    hunk.header = `@@ -${origStart},${origCount} +${modStart},${modCount} @@`;
+  }
+
+  return hunks;
+}
+
 export function DiffView() {
   const { config, serverConfig, isDirty } = useConfig();
 
-  const diffLines = useMemo(() => {
+  const { hunks, addedCount, removedCount } = useMemo(() => {
     const dumpOpts = { lineWidth: -1, quotingType: "'" } as const;
     const originalLines = (serverConfig ? yaml.dump(serverConfig, dumpOpts) : "").split("\n");
     const modifiedLines = (config ? yaml.dump(config, dumpOpts) : "").split("\n");
-    return computeDiff(originalLines, modifiedLines);
+    const lines = computeDiff(originalLines, modifiedLines);
+    return {
+      hunks: computeHunks(lines, CONTEXT_LINES),
+      addedCount: lines.filter((l) => l.type === "added").length,
+      removedCount: lines.filter((l) => l.type === "removed").length,
+    };
   }, [config, serverConfig]);
 
   if (!isDirty) {
@@ -91,34 +145,31 @@ export function DiffView() {
           Modified
         </div>
       </div>
-      <div className="diff-view__content">
-        <div className="diff-view__column">
-          {diffLines
-            .filter((l) => l.type !== "added")
-            .map((line, i) => (
-              <div className={"diff-line diff-line--" + line.type} key={i}>
+      <div className="diff-view__stats">
+        <span className="diff-view__stat--removed">-{removedCount} lines</span>
+        <span className="diff-view__stat--added">+{addedCount} lines</span>
+      </div>
+      <div className="diff-view__unified">
+        {hunks.map((hunk, hi) => (
+          <div className="diff-hunk" key={hi}>
+            <div className="diff-hunk__header">{hunk.header}</div>
+            {hunk.lines.map((line, li) => (
+              <div className={"diff-line diff-line--" + line.type} key={li}>
                 <span className="diff-line__num">{line.lineOriginal ?? ""}</span>
-                <span className="diff-line__prefix">{line.type === "removed" ? "-" : " "}</span>
+                <span className="diff-line__num--right">{line.lineModified ?? ""}</span>
+                <span className="diff-line__prefix">
+                  {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
+                </span>
                 <span className="diff-line__content">{line.content}</span>
               </div>
             ))}
-        </div>
-        <div className="diff-view__column">
-          {diffLines
-            .filter((l) => l.type !== "removed")
-            .map((line, i) => (
-              <div className={"diff-line diff-line--" + line.type} key={i}>
-                <span className="diff-line__num">{line.lineModified ?? ""}</span>
-                <span className="diff-line__prefix">{line.type === "added" ? "+" : " "}</span>
-                <span className="diff-line__content">{line.content}</span>
-              </div>
-            ))}
-        </div>
+          </div>
+        ))}
       </div>
       <div className="diff-view__legend">
         <span className="diff-view__legend-item diff-view__legend-item--added">Added</span>
         <span className="diff-view__legend-item diff-view__legend-item--removed">Removed</span>
-        <span className="diff-view__legend-item diff-view__legend-item--unchanged">Unchanged</span>
+        <span className="diff-view__legend-item diff-view__legend-item--unchanged">Context</span>
       </div>
     </div>
   );
