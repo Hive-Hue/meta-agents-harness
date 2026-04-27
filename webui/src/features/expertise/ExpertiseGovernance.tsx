@@ -289,26 +289,47 @@ export function ExpertiseGovernance() {
 
 function CatalogTab({ entries, selectedId, onSelect, qualifying, syncResults }: { entries: ExpertiseEntry[]; selectedId: string|null; onSelect: (id:string)=>void; qualifying: string[]; syncResults: SyncChange[] }) {
   const syncMap = Object.fromEntries(syncResults.map(r=>[r.agent,r]));
+
+  // Group entries by crew prefix
+  const groups: Record<string, ExpertiseEntry[]> = {};
+  for (const e of entries) {
+    const parts = e.id.includes(":") ? e.id.split(":") : ["", e.id];
+    const crew = parts[0] || "default";
+    if (!groups[crew]) groups[crew] = [];
+    groups[crew].push(e);
+  }
+
   return (
     <div className="expertise-table">
       <table>
         <thead><tr><th aria-label="Selected"/><th>Agent</th><th>Confidence</th><th>Band</th><th>Lifecycle</th><th>Evidence</th><th>Qualifies</th><th>Sync</th></tr></thead>
         <tbody>
-          {entries.map(e => {
-            const sync = syncMap[e.id];
-            return (
-              <tr key={e.id} className={selectedId===e.id?"is-selected":""} onClick={()=>onSelect(e.id)}>
-                <td><Icon name={selectedId===e.id?"radio_button_checked":"radio_button_unchecked"} size={18} filled={selectedId===e.id}/></td>
-                <td className="agent-name-cell">{e.id.includes(":")?e.id.split(":")[1]:e.id}</td>
-                <td><div style={{display:"flex",alignItems:"center",gap:8,minWidth:80}}><div style={{flex:1,height:4,background:"#eee",borderRadius:2}}><div style={{width:`${Math.round((e.confidence?.score||0)*100)}%`,height:"100%",background:"#0a0a0a",borderRadius:2}}/></div><span style={{fontSize:11,fontFamily:"var(--font-mono)",minWidth:32}}>{Math.round((e.confidence?.score||0)*100)}%</span></div></td>
-                <td><span style={{fontSize:12}}>{e.confidence?.band?.charAt(0).toUpperCase()+e.confidence?.band?.slice(1)||"—"}</span></td>
-                <td><StatusBadge tone={e.lifecycle==="active"?"completed":e.lifecycle==="experimental"?"running":e.lifecycle==="restricted"?"running":"failed"} label={e.lifecycle||"experimental"}/></td>
-                <td><span style={{fontFamily:"var(--font-mono)",fontSize:12}}>{e.confidence?.evidence_count??0}</span></td>
-                <td>{qualifying.includes(e.id)?<span className="qualifies-badge qualifies-badge--yes"><Icon name="check_circle" size={12}/>qualifies</span>:<span className="qualifies-badge qualifies-badge--no">—</span>}</td>
-                <td>{sync?.changed?<div style={{display:"flex",gap:3}}>{sync.changes?.map(c=><span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>)}</div>:<span style={{fontSize:11,color:"#94a3b8"}}>—</span>}</td>
-              </tr>
-            );
-          })}
+          {Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).map(([crew, crewEntries]) => [
+            <tr key={`header-${crew}`} className="crew-group-header">
+              <td colSpan={8}>
+                <div className="crew-group-label">
+                  <Icon name="group" size={14} />
+                  {crew}
+                  <span className="crew-group-count">{crewEntries.length} agent{crewEntries.length !== 1 ? "s" : ""}</span>
+                </div>
+              </td>
+            </tr>,
+            ...crewEntries.map(e => {
+              const sync = syncMap[e.id];
+              return (
+                <tr key={e.id} className={selectedId===e.id?"is-selected":""} onClick={()=>onSelect(e.id)}>
+                  <td><Icon name={selectedId===e.id?"radio_button_checked":"radio_button_unchecked"} size={18} filled={selectedId===e.id}/></td>
+                  <td className="agent-name-cell">{e.id.includes(":")?e.id.split(":")[1]:e.id}</td>
+                  <td><div style={{display:"flex",alignItems:"center",gap:8,minWidth:80}}><div style={{flex:1,height:4,background:"#eee",borderRadius:2}}><div style={{width:`${Math.round((e.confidence?.score||0)*100)}%`,height:"100%",background:"#0a0a0a",borderRadius:2}}/></div><span style={{fontSize:11,fontFamily:"var(--font-mono)",minWidth:32}}>{Math.round((e.confidence?.score||0)*100)}%</span></div></td>
+                  <td><span style={{fontSize:12}}>{e.confidence?.band?.charAt(0).toUpperCase()+e.confidence?.band?.slice(1)||"—"}</span></td>
+                  <td><StatusBadge tone={e.lifecycle==="active"?"completed":e.lifecycle==="experimental"?"running":e.lifecycle==="restricted"?"running":"failed"} label={e.lifecycle||"experimental"}/></td>
+                  <td><span style={{fontFamily:"var(--font-mono)",fontSize:12}}>{e.confidence?.evidence_count??0}</span></td>
+                  <td>{qualifying.includes(e.id)?<span className="qualifies-badge qualifies-badge--yes"><Icon name="check_circle" size={12}/>qualifies</span>:<span className="qualifies-badge qualifies-badge--no">—</span>}</td>
+                  <td>{sync?.changed?<div style={{display:"flex",gap:3}}>{sync.changes?.map(c=><span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>)}</div>:<span style={{fontSize:11,color:"#94a3b8"}}>—</span>}</td>
+                </tr>
+              );
+            })
+          ])}
         </tbody>
       </table>
     </div>
