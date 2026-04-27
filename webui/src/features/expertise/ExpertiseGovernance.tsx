@@ -124,9 +124,8 @@ export function ExpertiseGovernance() {
                   <Icon name="database" size={28} />
                   <h3>1. Seed Catalog</h3>
                 </div>
-                <div className="workflow-panel__cmd">
-                  <span className="cmd-dollar">$</span>
-                  <span className="cmd-text"> mah expertise seed --crew {crew} --force</span>
+                <div className="command-preview__command">
+                  <code>$ mah expertise seed --crew {crew} --force</code>
                 </div>
               </div>
               <p className="workflow-panel__desc">Populate expertise catalog from meta-agents.yaml.</p>
@@ -147,9 +146,8 @@ export function ExpertiseGovernance() {
                   <Icon name="sync" size={28} />
                   <h3>2. Sync from Evidence</h3>
                 </div>
-                <div className="workflow-panel__cmd">
-                  <span className="cmd-dollar">$</span>
-                  <span className="cmd-text"> mah expertise sync --crew {crew} --dry-run --json</span>
+                <div className="command-preview__command">
+                  <code>$ mah expertise sync --crew {crew} --dry-run --json</code>
                 </div>
               </div>
               <p className="workflow-panel__desc">Dry-run shows changes. Execute to apply.</p>
@@ -167,9 +165,8 @@ export function ExpertiseGovernance() {
                   <Icon name="description" size={28} />
                   <h3>3. Generate Proposals</h3>
                 </div>
-                <div className="workflow-panel__cmd">
-                  <span className="cmd-dollar">$</span>
-                  <span className="cmd-text"> mah expertise propose --from-evidence</span>
+                <div className="command-preview__command">
+                  <code>$ mah expertise propose --from-evidence</code>
                 </div>
               </div>
               <p className="workflow-panel__desc">Create governance proposals for agents with ≥5 evidence events.</p>
@@ -221,9 +218,8 @@ export function ExpertiseGovernance() {
                   <Icon name="rate_review" size={28} />
                   <h3>4. Human Review</h3>
                 </div>
-                <div className="workflow-panel__cmd">
-                  <span className="cmd-dollar">$</span>
-                  <span className="cmd-text"> mah expertise apply-proposal &lt;path&gt;</span>
+                <div className="command-preview__command">
+                  <code>$ mah expertise apply-proposal &lt;path&gt;</code>
                 </div>
               </div>
               <p className="workflow-panel__desc">Review proposals. Check rationale and proposed changes.</p>
@@ -257,9 +253,8 @@ export function ExpertiseGovernance() {
                   <Icon name="verified" size={28} />
                   <h3>5. Apply Proposals</h3>
                 </div>
-                <div className="workflow-panel__cmd">
-                  <span className="cmd-dollar">$</span>
-                  <span className="cmd-text"> mah expertise apply-proposal &lt;path&gt;</span>
+                <div className="command-preview__command">
+                  <code>$ mah expertise apply-proposal &lt;path&gt;</code>
                 </div>
               </div>
               <p className="workflow-panel__desc">Apply approved proposals. Registry rebuilt automatically.</p>
