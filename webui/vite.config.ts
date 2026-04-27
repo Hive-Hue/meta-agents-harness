@@ -82,10 +82,10 @@ function handleExecApi(req: import("http").IncomingMessage, res: import("http").
       const body = JSON.parse(raw) as { args?: string[] };
       const args = Array.isArray(body?.args) ? body.args.filter((item) => typeof item === "string" && item.trim()) : [];
 
-      const ALLOWED_COMMANDS = ["skills", "sessions"];
+      const ALLOWED_COMMANDS = ["skills", "sessions", "expertise", "context"];
       if (args.length === 0 || !ALLOWED_COMMANDS.includes(args[0])) {
         res.statusCode = 400;
-        res.end(JSON.stringify({ ok: false, error: "only 'mah skills/sessions ...' commands are allowed" }));
+        res.end(JSON.stringify({ ok: false, error: "only 'mah skills/sessions/expertise/context ...' commands are allowed" }));
         return;
       }
 
