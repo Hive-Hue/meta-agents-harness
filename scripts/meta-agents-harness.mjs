@@ -2127,6 +2127,7 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
   const normalizedPassthrough = stripHeadlessArgs(passthrough)
   const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
   const envOverrides = { ...normalized.envOverrides }
+  const crew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
   const { recordLifecycleEvent } = await import("./m3-ops.mjs")
   const headlessSessionId = `${runtime}:mah:headless-${Date.now()}`
   recordLifecycleEvent(repoRoot, headlessSessionId, {
@@ -2139,7 +2140,7 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
     repoRoot,
     runtime,
     adapter,
-    crew: normalizedPassthrough,
+    crew,
     task: normalized.args.join(" "),
     argv: normalized.args,
     envOverrides
@@ -5150,6 +5151,7 @@ async function main() {
           repoRoot,
           runtime: runtimeResult.runtime,
           adapter,
+          crew,
           task: normalized.args.join(" "),
           argv: normalized.args,
           envOverrides

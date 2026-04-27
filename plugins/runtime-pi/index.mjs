@@ -245,7 +245,7 @@ export const runtimePlugin = {
       }
     },
 
-    prepareHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+    prepareHeadlessRunContext({ repoRoot, crew, task = "", argv = [], envOverrides = {} }) {
       if (!task && (!argv || argv.length === 0)) {
         return {
           ok: false,
@@ -270,8 +270,10 @@ export const runtimePlugin = {
         passthrough: task ? [task] : extensionParse.remaining,
         envOverrides: {
           ...envOverrides,
-          PI_MULTI_HEADLESS: "1"
+          PI_MULTI_HEADLESS: "1",
+          PI_CREW: crew || ""
         },
+        crew,
         warnings: [],
         internal: {
           mode: "headless",
