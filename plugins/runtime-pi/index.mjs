@@ -263,6 +263,11 @@ export const runtimePlugin = {
         return { ok: false, error: `PI extension not found: ${rel(repoRoot, missingExtension)}` }
       }
 
+      // Activate crew so PI has crew context
+      if (crew) {
+        this.activateCrew({ repoRoot, crewId: crew })
+      }
+
       return {
         ok: true,
         exec: "pi",
@@ -271,7 +276,8 @@ export const runtimePlugin = {
         envOverrides: {
           ...envOverrides,
           PI_MULTI_HEADLESS: "1",
-          PI_CREW: crew || ""
+          PI_CREW: crew || "",
+          MAH_ACTIVE_CREW: crew || ""
         },
         crew,
         warnings: [],
