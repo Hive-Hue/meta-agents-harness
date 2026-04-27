@@ -12,7 +12,7 @@ export function Icon({ name, className = "", size, filled = false }: IconProps) 
   };
 
   return (
-    <span className={`material-symbols-outlined ${className}`} style={style} aria-hidden="true">
+    <span className={`material-symbols-outlined ${className}`} style={{ ...style, display: 'flex' }} aria-hidden="true">
       {name}
     </span>
   );

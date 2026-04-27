@@ -680,3 +680,12 @@
   font-weight: 400;
   text-transform: none;
 }
+
+.expertise-main .command-preview__command,
+.workflow-panel .command-preview__command {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: var(--radius);
+  padding: 8px 12px;
+  flex: none;
+}
