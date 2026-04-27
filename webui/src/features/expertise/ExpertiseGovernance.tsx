@@ -103,7 +103,9 @@ export function ExpertiseGovernance() {
             return (
               <div key={s.id} className={`workflow-step ${done?"workflow-step--done":""} ${active?"workflow-step--active":""} ${future?"workflow-step--future":""}`}>
                 <button className="workflow-step__btn" disabled={future} onClick={() => {}}>
-                  <span className="workflow-step__num">{done ? <Icon name="check" size={12} /> : i+1}</span>
+                  <span className="workflow-step__num">
+                    {done ? <Icon name="check" size={11} /> : i+1}
+                  </span>
                   <span className="workflow-step__label">{s.label}</span>
                 </button>
                 {i < WORKFLOW_STEPS.length - 1 && <span className="workflow-step__arrow">→</span>}

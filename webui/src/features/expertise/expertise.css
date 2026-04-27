@@ -9,7 +9,7 @@
 .workflow-step__btn:disabled { cursor: default; }
 .workflow-step--active .workflow-step__btn { background: #0a0a0a; color: #fff; }
 .workflow-step--done .workflow-step__btn { color: #4caf50; }
-.workflow-step__num { width: 18px; height: 18px; border-radius: 50%; background: currentColor; color: #fff; display: grid; place-items: center; font-size: 10px; font-weight: 800; flex-shrink: 0; }
+.workflow-step__num { width: 18px; height: 18px; border-radius: 50%; background: currentColor; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0; }
 .workflow-step--active .workflow-step__num { background: #fff; color: #0a0a0a; }
 .workflow-step--done .workflow-step__num { background: #4caf50; }
 .workflow-step__arrow { margin: 0 4px; color: #ccc; font-size: 12px; }
