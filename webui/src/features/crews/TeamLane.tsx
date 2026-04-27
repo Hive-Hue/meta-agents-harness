@@ -19,10 +19,10 @@ export function TeamLane({
   collapsed,
   onToggleCollapsed,
 }: TeamLaneProps) {
-  const laneClass = "team-lane team-lane--" + color;
+  const laneClass = "team-lane";
 
   return (
-    <div className={laneClass}>
+    <div className={laneClass} style={{ borderLeftColor: color, borderLeftWidth: 3, borderLeftStyle: "solid" as const }}>
       <div className="team-lane__header">
         <button
           className="team-lane__toggle"

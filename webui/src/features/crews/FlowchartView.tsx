@@ -42,7 +42,7 @@ export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }:
           const workers = teamAgents.filter((agent) => agent.role !== "lead");
 
           return (
-            <article key={team.name} className={"flow-team flow-team--" + team.color}>
+            <article key={team.name} className="flow-team" style={{ borderTopColor: team.color, borderTopWidth: 3, borderTopStyle: "solid" as const }}>
               <div className="flow-team__title">{team.name}</div>
               {leads.map(lead => (
                 <button
@@ -50,6 +50,7 @@ export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }:
                   className={"flow-node flow-node--lead" + (selectedAgentId === lead.id ? " flow-node--selected" : "")}
                   type="button"
                   onClick={() => onSelectAgent(lead.id)}
+                  style={{ borderTopColor: team.color }}
                 >
                   <span className="flow-node__id">{lead.id}</span>
                   <span className="flow-node__meta">{lead.model}</span>

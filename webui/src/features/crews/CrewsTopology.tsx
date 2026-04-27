@@ -15,6 +15,26 @@ export function CrewsTopology() {
   );
 }
 
+const TEAM_COLORS: Record<string, string> = {
+  orchestration: "#7C3AED",
+  planning: "#00BCD4",
+  engineering: "#4CAF50",
+  validation: "#F59E0B",
+};
+
+function hashColor(str: string): string {
+  const palette = ["#6366F1", "#EC4899", "#F59E0B", "#10B981", "#8B5CF6", "#EF4444", "#06B6D4"];
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return palette[Math.abs(hash) % palette.length];
+}
+
+function resolveTeamColor(name: string): string {
+  return TEAM_COLORS[name.toLowerCase()] ?? hashColor(name);
+}
+
 function CrewsTopologyInner() {
   const { config } = useConfig();
   const crews = config?.crews ?? [];
@@ -58,7 +78,7 @@ function CrewsTopologyInner() {
   }
   const teams = Array.from(teamMap.entries()).map(([name, agents]) => ({
     name,
-    color: name.toLowerCase(),
+    color: resolveTeamColor(name),
     agents,
   }));
 

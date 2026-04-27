@@ -106,11 +106,6 @@
   overflow: hidden;
 }
 
-.team-lane--orchestration { border-left: 3px solid #1c1b1b; }
-.team-lane--planning { border-left: 3px solid #00BCD4; }
-.team-lane--engineering { border-left: 3px solid #4CAF50; }
-.team-lane--validation { border-left: 3px solid #F59E0B; }
-
 .team-lane__header {
   display: flex;
   align-items: center;
@@ -197,11 +192,6 @@
   border-radius: 0.375rem;
   padding: 10px;
 }
-
-.flow-team--planning { border-top: 3px solid #00BCD4; }
-.flow-team--engineering { border-top: 3px solid #4CAF50; }
-.flow-team--validation { border-top: 3px solid #F59E0B; }
-.flow-team--orchestration { border-top: 3px solid #7C3AED; }
 
 .flow-team__title {
   margin-bottom: 8px;
