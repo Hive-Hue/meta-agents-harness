@@ -38,34 +38,39 @@ export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }:
           const teamAgents = agents.filter((agent) => agent.team === team.name);
           if (teamAgents.length === 0) return null;
 
-          const lead = teamAgents.find((agent) => agent.role === "lead") ?? teamAgents[0];
-          const workers = teamAgents.filter((agent) => agent.id !== lead.id);
+          const leads = teamAgents.filter((agent) => agent.role === "lead");
+          const workers = teamAgents.filter((agent) => agent.role !== "lead");
 
           return (
             <article key={team.name} className={"flow-team flow-team--" + team.color}>
               <div className="flow-team__title">{team.name}</div>
-              <button
-                className={"flow-node flow-node--lead" + (selectedAgentId === lead.id ? " flow-node--selected" : "")}
-                type="button"
-                onClick={() => onSelectAgent(lead.id)}
-              >
-                <span className="flow-node__id">{lead.id}</span>
-                <span className="flow-node__meta">{lead.model}</span>
-              </button>
-              {workers.length > 0 && <div className="flow-team__branch" aria-hidden="true" />}
-              <div className="flow-team__workers">
-                {workers.map((worker) => (
-                  <button
-                    key={worker.id}
-                    className={"flow-node flow-node--worker" + (selectedAgentId === worker.id ? " flow-node--selected" : "")}
-                    type="button"
-                    onClick={() => onSelectAgent(worker.id)}
-                  >
-                    <span className="flow-node__id">{worker.id}</span>
-                    <span className="flow-node__meta">{worker.model}</span>
-                  </button>
-                ))}
-              </div>
+              {leads.map(lead => (
+                <button
+                  key={lead.id}
+                  className={"flow-node flow-node--lead" + (selectedAgentId === lead.id ? " flow-node--selected" : "")}
+                  type="button"
+                  onClick={() => onSelectAgent(lead.id)}
+                >
+                  <span className="flow-node__id">{lead.id}</span>
+                  <span className="flow-node__meta">{lead.model}</span>
+                </button>
+              ))}
+              {leads.length > 0 && workers.length > 0 && <div className="flow-team__branch" aria-hidden="true" />}
+              {workers.length > 0 && (
+                <div className="flow-team__workers">
+                  {workers.map(worker => (
+                    <button
+                      key={worker.id}
+                      className={"flow-node flow-node--worker" + (selectedAgentId === worker.id ? " flow-node--selected" : "")}
+                      type="button"
+                      onClick={() => onSelectAgent(worker.id)}
+                    >
+                      <span className="flow-node__id">{worker.id}</span>
+                      <span className="flow-node__meta">{worker.model}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </article>
           );
         })}
