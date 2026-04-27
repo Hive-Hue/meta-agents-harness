@@ -13,6 +13,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
+import yaml from "yaml"
 
 function variantPathExists(candidatePath) {
   if (!candidatePath || typeof candidatePath !== "string") return false
@@ -245,7 +246,7 @@ export const runtimePlugin = {
       }
     },
 
-    prepareHeadlessRunContext({ repoRoot, crew, task = "", argv = [], envOverrides = {} }) {
+    async prepareHeadlessRunContext({ repoRoot, crew, task = "", argv = [], envOverrides = {} }) {
       if (!task && (!argv || argv.length === 0)) {
         return {
           ok: false,
@@ -268,11 +269,28 @@ export const runtimePlugin = {
         this.activateCrew({ repoRoot, crewId: crew })
       }
 
+      // Read orchestrator model from multi-team.yaml
+      let modelArg = []
+      try {
+        const configPath = path.join(repoRoot, ".pi", "crew", crew, "multi-team.yaml")
+        if (existsSync(configPath)) {
+          const raw = readFileSync(configPath, "utf-8")
+          const config = yaml.parse(raw) || {}
+          const agents = config?.agents || []
+          const orchestrator = agents.find((a) => a.role === "orchestrator" || a.id === "orchestrator")
+          if (orchestrator?.model) {
+            modelArg = ["--model", orchestrator.model]
+          }
+        }
+      } catch {
+        // ignore - model will use PI default
+      }
+
       return {
         ok: true,
         exec: "pi",
         args: [...extensionPaths.flatMap((item) => ["-e", item]), "-p"],
-        passthrough: task ? [task] : extensionParse.remaining,
+        passthrough: modelArg.length > 0 ? [...modelArg, task] : [task],
         envOverrides: {
           ...envOverrides,
           PI_MULTI_HEADLESS: "1",

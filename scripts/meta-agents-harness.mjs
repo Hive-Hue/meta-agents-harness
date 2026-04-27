@@ -2137,7 +2137,7 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
   })
 
   // Get headless execution plan from adapter
-  const headlessPlan = adapter.prepareHeadlessRunContext({
+  const headlessPlan = await adapter.prepareHeadlessRunContext({
     repoRoot,
     runtime,
     adapter,
@@ -2511,7 +2511,7 @@ async function runDelegate(passthrough, options = {}) {
         console.error(`ERROR: runtime '${result.context.targetRuntime}' does not support headless execution`)
         return 1
       }
-      headlessPlan = adapter.prepareHeadlessRunContext({
+      headlessPlan = await adapter.prepareHeadlessRunContext({
         repoRoot,
         runtime: result.context.targetRuntime,
         adapter,
@@ -5148,7 +5148,7 @@ async function main() {
         const envOverrides = { ...normalized.envOverrides }
 
         // Get headless execution plan from adapter
-        const headlessPlan = adapter.prepareHeadlessRunContext({
+        const headlessPlan = await adapter.prepareHeadlessRunContext({
           repoRoot,
           runtime: runtimeResult.runtime,
           adapter,
