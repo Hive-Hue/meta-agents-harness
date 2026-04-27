@@ -119,8 +119,10 @@ export function ExpertiseGovernance() {
           {/* STEP 1: Seed */}
           {step === "seed" && (
             <div className="workflow-panel">
-              <div className="workflow-panel__icon"><Icon name="database" size={40} /></div>
-              <h3>1. Seed Catalog</h3>
+              <div className="workflow-panel__header">
+                <div className="workflow-panel__icon"><Icon name="database" size={36} /></div>
+                <h3>1. Seed Catalog</h3>
+              </div>
               <p>Populate expertise catalog from meta-agents.yaml.</p>
               <div className="workflow-panel__cmd"><code>mah expertise seed --crew {crew} --force</code></div>
               <button className="workflow-action-btn workflow-action-btn--primary" onClick={handleSeed} disabled={syncLoading}>
@@ -133,8 +135,10 @@ export function ExpertiseGovernance() {
           {/* STEP 2: Sync */}
           {step === "sync" && (
             <div className="workflow-panel">
-              <div className="workflow-panel__icon"><Icon name="sync" size={40} /></div>
-              <h3>2. Sync from Evidence</h3>
+              <div className="workflow-panel__header">
+                <div className="workflow-panel__icon"><Icon name="sync" size={36} /></div>
+                <h3>2. Sync from Evidence</h3>
+              </div>
               <p>Dry-run shows changes. Execute to apply.</p>
               <div className="workflow-panel__cmd"><code>mah expertise sync --crew {crew} --dry-run --json</code></div>
               <button type="button" className="workflow-action-btn workflow-action-btn--primary" onClick={async () => { await handleSyncDryRun(); setShowSyncPreview(true); }}>
@@ -146,8 +150,10 @@ export function ExpertiseGovernance() {
           {/* STEP 3: Propose */}
           {step === "propose" && (
             <div className="workflow-panel">
-              <div className="workflow-panel__icon"><Icon name="description" size={40} /></div>
-              <h3>3. Generate Proposals</h3>
+              <div className="workflow-panel__header">
+                <div className="workflow-panel__icon"><Icon name="description" size={36} /></div>
+                <h3>3. Generate Proposals</h3>
+              </div>
               <p>Create governance proposals for agents with ≥5 evidence events.</p>
               {qualifying.length > 0 && (
                 <div className="qualifying-list">
@@ -192,8 +198,10 @@ export function ExpertiseGovernance() {
           {/* STEP 4: Review */}
           {step === "review" && (
             <div className="workflow-panel">
-              <div className="workflow-panel__icon"><Icon name="rate_review" size={40} /></div>
-              <h3>4. Human Review</h3>
+              <div className="workflow-panel__header">
+                <div className="workflow-panel__icon"><Icon name="rate_review" size={36} /></div>
+                <h3>4. Human Review</h3>
+              </div>
               <p>Review proposals. Check rationale and proposed changes.</p>
               {proposals.length === 0 ? <div className="empty-state">No proposals.</div> : (
                 <div className="review-list">
@@ -220,8 +228,10 @@ export function ExpertiseGovernance() {
           {/* STEP 5: Apply */}
           {step === "apply" && (
             <div className="workflow-panel">
-              <div className="workflow-panel__icon"><Icon name="verified" size={40} /></div>
-              <h3>5. Apply Proposals</h3>
+              <div className="workflow-panel__header">
+                <div className="workflow-panel__icon"><Icon name="verified" size={36} /></div>
+                <h3>5. Apply Proposals</h3>
+              </div>
               <p>Apply approved proposals. Registry rebuilt automatically.</p>
               {proposals.filter(p=>p.status!=="applied").length === 0 ? <div className="empty-state">All applied.</div> : (
                 <div className="apply-list">
