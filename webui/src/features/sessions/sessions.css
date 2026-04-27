@@ -1,0 +1,9 @@
+.loading-state, .error-state, .empty-state { padding: 40px; text-align: center; color: #666; }
+.session-id { font-family: monospace; font-size: 12px; }
+.runtime-cell { display: flex; flex-direction: column; gap: 2px; }
+.runtime-cell span { font-size: 10px; color: #94a3b8; }
+.time-cell { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: #666; }
+.is-selected { background: #f0f0f0; }
+.screen-header__meta { display: flex; align-items: center; gap: 12px; color: #444748; font-size: 13px; }
+.screen-header__separator { width: 1px; height: 14px; background: #ccc; }
+.sessions-runtime-select { margin-left: 12px; }
