@@ -30,7 +30,7 @@ function RunConsoleInner() {
   const [runState, setRunState] = useState<RunState>("idle");
   const [taskText, setTaskText] = useState("");
   const [crew, setCrew] = useState(crews[0]?.id ?? "dev");
-  const [runtime, setRuntime] = useState(".pi/");
+  const [runtime, setRuntime] = useState(".pi");
   const [showRouting, setShowRouting] = useState(false);
   const [events, setEvents] = useState<LifecycleEvent[]>(idleEvents);
   const [logLines, setLogLines] = useState<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }[]>([]);
