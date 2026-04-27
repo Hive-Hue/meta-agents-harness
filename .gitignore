@@ -1,4 +1,6 @@
 node_modules/
+dist/
+*.tsbuildinfo
 __pycache__/
 *.pyc
 .DS_Store
@@ -60,3 +62,6 @@ meta-agents.yaml
 meta-agents.backup.yaml
 # Local MAH sync artifacts
 .claude/crew/dev/multi-team.yaml
+
+# Playwright artifacts
+.playwright-mcp/
