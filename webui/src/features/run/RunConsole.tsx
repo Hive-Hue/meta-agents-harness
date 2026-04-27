@@ -86,7 +86,8 @@ function RunConsoleInner() {
           if (status.status === "running") {
             pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
           } else {
-            setRunState(status.status === "completed" ? "completed" : "failed");
+            const hasErrors = (status.logs ?? []).some((l: { level: string }) => l.level === "ERROR");
+            setRunState(status.status === "completed" && !hasErrors ? "completed" : "failed");
           }
         } catch (err) {
           if ((err as Error).name !== "AbortError") setRunState("failed");
