@@ -46,7 +46,7 @@ function CrewsTopologyInner() {
     domain: Array.isArray(a.domain_profile) ? a.domain_profile : a.domain_profile ? [a.domain_profile] : [],
     expertise: "validated" as const,
     confidence: 0.85,
-    team: a.team.charAt(0).toUpperCase() + a.team.slice(1),
+    team: a.team ? a.team.charAt(0).toUpperCase() + a.team.slice(1) : "Unknown",
   }));
 
   // Derive teams from selected crew

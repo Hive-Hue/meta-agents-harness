@@ -188,7 +188,7 @@
 
 .flowchart__teams {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
 }
 
@@ -201,6 +201,7 @@
 .flow-team--planning { border-top: 3px solid #00BCD4; }
 .flow-team--engineering { border-top: 3px solid #4CAF50; }
 .flow-team--validation { border-top: 3px solid #F59E0B; }
+.flow-team--orchestration { border-top: 3px solid #7C3AED; }
 
 .flow-team__title {
   margin-bottom: 8px;
