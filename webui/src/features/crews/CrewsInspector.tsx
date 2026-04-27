@@ -5,9 +5,10 @@ import type { Agent } from "./AgentCard";
 
 type CrewsInspectorProps = {
   agent: Agent | null;
+  crewId?: string;
 };
 
-export function CrewsInspector({ agent }: CrewsInspectorProps) {
+export function CrewsInspector({ agent, crewId }: CrewsInspectorProps) {
   const navigate = useNavigate();
 
   if (!agent) {
@@ -103,7 +104,7 @@ export function CrewsInspector({ agent }: CrewsInspectorProps) {
             <Icon name="history" size={14} />
             View Sessions
           </button>
-          <button className="crews-inspector__action-btn" type="button" onClick={() => navigate("/config", { state: { teamName: agent?.team, crewId: "dev" } })}>
+          <button className="crews-inspector__action-btn" type="button" onClick={() => navigate("/config", { state: { teamName: agent?.team, crewId } })}>
             <Icon name="tune" size={14} />
             Edit Config
           </button>

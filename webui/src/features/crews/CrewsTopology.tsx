@@ -179,7 +179,7 @@ function CrewsTopologyInner() {
         </section>
       </main>
       <aside className="inspector crews-inspector" aria-label="Agent inspector">
-        <CrewsInspector agent={selectedAgent} />
+        <CrewsInspector agent={selectedAgent} crewId={selectedCrewId} />
       </aside>
     </>
   );
