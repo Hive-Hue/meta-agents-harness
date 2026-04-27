@@ -111,6 +111,14 @@ function RunConsoleInner() {
     setEvents(prev => [...prev.map(e => ({ ...e, active: false })), { time: tp(), state: "failed" as const, label: "Aborted", desc: "Stopped by operator", active: false }]);
   }, []);
 
+  const resetRun = useCallback(() => {
+    setTaskText("");
+    setEvents(idleEvents);
+    setLogLines([]);
+    setRunState("idle");
+    setShowRouting(false);
+  }, []);
+
   const stateToBadge: Record<RunState, { tone: "running" | "completed" | "failed"; label: string }> = {
     idle: { tone: "completed", label: "Idle" },
     queued: { tone: "running", label: "Queued" },
@@ -134,9 +142,11 @@ function RunConsoleInner() {
             <div className="run-header__actions">
               <StatusBadge tone={badge.tone} label={badge.label} />
               {runState === "idle" || runState === "completed" || runState === "failed" ? (
-                <button className="run-action-btn run-action-btn--primary" type="button" onClick={startRun} disabled={!taskText}>
-                  <Icon name="play_arrow" size={14} />Start New Run
-                </button>
+                <>
+                  <button className="run-action-btn run-action-btn--primary" type="button" onClick={startRun} disabled={!taskText}>
+                    <Icon name="play_arrow" size={14} />Start
+                  </button>
+                </>
               ) : (
                 <button className="run-action-btn run-action-btn--danger" type="button" onClick={stopRun}>
                   <Icon name="stop" size={14} />Stop
@@ -166,7 +176,14 @@ function RunConsoleInner() {
         </div>
       </main>
       <aside className="inspector run-inspector" aria-label="Run inspector">
-        <RunInspector runState={runState} taskText={taskText} crew={crew} runtime={runtime} />
+        <RunInspector
+          runState={runState}
+          taskText={taskText}
+          crew={crew}
+          runtime={runtime}
+          onRetry={startRun}
+          onReset={resetRun}
+        />
       </aside>
     </>
   );
