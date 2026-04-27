@@ -167,6 +167,7 @@ function RunConsoleInner() {
               onRuntimeChange={setRuntime}
               showRouting={showRouting}
               onShowRouting={() => setShowRouting(true)}
+              onHideRouting={() => setShowRouting(false)}
               onStartRun={startRun}
               onStopRun={stopRun}
               runState={runState}

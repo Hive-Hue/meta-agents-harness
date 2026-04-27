@@ -39,9 +39,10 @@
 
 .skills-main__content {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: hidden;
   padding: 20px 32px 32px;
   min-height: 0;
+
 }
 
 .skills-table {

@@ -41,40 +41,55 @@ export function useSessionsData(runtime?: string) {
           }
         }
         const detailed = await Promise.all(rows.map(async (row: any) => {
+          // Get status and timestamps from sessions status
+          let status: SessionInfo["status"] = "available";
+          let createdAt = "";
+          let updatedAt = "";
+          let finalAgent: string | undefined;
+          let task = "";
           try {
-            const idxResp = await fetch("/api/mah/exec", {
+            const statusResp = await fetch("/api/mah/exec", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ args: ["sessions", "status", row.id, "--json"] }),
             });
-            const idxData = await idxResp.json();
-            if (idxData.ok) {
-              try {
-                const idx = JSON.parse(idxData.stdout || "{}");
-                return {
-                  id: row.id,
-                  sessionId: row.session_id || row.id.split(":")[2] || "",
-                  crew: row.crew || "",
-                  runtime: row.runtime || runtime || "",
-                  status: idx.status || row.status || "available",
-                  createdAt: idx.createdAt || row.started_at || "",
-                  updatedAt: idx.updatedAt || row.last_active_at || "",
-                  counts: idx.counts || { conversation: 0, tool_calls: 0, artifacts: 0, delegations: 0 },
-                  finalAgent: idx.finalAgent,
-                  task: idxData.stdout || "",
-                } as SessionInfo;
-              } catch { /* fall through */ }
+            const statusData = await statusResp.json();
+            if (statusData.ok) {
+              const st = JSON.parse(statusData.stdout || "{}");
+              status = st.status || "available";
+              createdAt = st.createdAt || "";
+              updatedAt = st.updatedAt || "";
+              finalAgent = st.finalAgent;
+              task = statusData.stdout || "";
             }
-          } catch { /* skip detail */ }
+          } catch { /* skip */ }
+
+          // Get counts from sessions counts
+          let counts = { conversation: 0, tool_calls: 0, artifacts: 0, delegations: 0 };
+          try {
+            const countsResp = await fetch("/api/mah/exec", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ args: ["sessions", "counts", row.id] }),
+            });
+            const countsData = await countsResp.json();
+            if (countsData.ok) {
+              const ct = JSON.parse(countsData.stdout || "{}");
+              if (ct.counts) counts = ct.counts;
+            }
+          } catch { /* skip */ }
+
           return {
             id: row.id,
             sessionId: row.session_id || row.id.split(":")[2] || "",
             crew: row.crew || "",
             runtime: row.runtime || runtime || "",
-            status: (row.status as SessionInfo["status"]) || "available",
-            createdAt: row.started_at || "",
-            updatedAt: row.last_active_at || "",
-            counts: { conversation: 0, tool_calls: 0, artifacts: 0, delegations: 0 },
+            status,
+            createdAt: createdAt || row.started_at || "",
+            updatedAt: updatedAt || row.last_active_at || "",
+            counts,
+            finalAgent,
+            task,
           } as SessionInfo;
         }));
         setSessions(detailed);

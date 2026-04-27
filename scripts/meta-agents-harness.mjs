@@ -1135,6 +1135,52 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     return runSessionsStatus(sessionId, jsonMode)
   }
 
+  if (subcommand === "counts") {
+    const sessionId = argv[1]
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions counts <id>' requires a session ID")
+      return 1
+    }
+    const { collectSessions } = await import('./m3-ops.mjs')
+    const allRt = await getAllRuntimes()
+    const allSes = collectSessions(repoRoot, {}, allRt)
+    const found = allSes.find(s => s.id === sessionId || s.id.endsWith(sessionId) || s.id.includes(sessionId))
+    if (!found) {
+      console.error(`ERROR: session not found: ${sessionId}`)
+      return 1
+    }
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const sessionRoot = found.source_path
+    let conversation = 0, tool_calls = 0, artifacts = 0, delegations = 0
+    try {
+      const convPath = path.join(sessionRoot, "conversation.jsonl")
+      if (fs.existsSync(convPath)) {
+        const content = fs.readFileSync(convPath, "utf-8")
+        conversation = content.trim().split("\n").filter(l => l.trim()).length
+      }
+      const tcPath = path.join(sessionRoot, "tool_calls.jsonl")
+      if (fs.existsSync(tcPath)) {
+        const content = fs.readFileSync(tcPath, "utf-8")
+        tool_calls = content.trim().split("\n").filter(l => l.trim()).length
+      }
+      const artPath = path.join(sessionRoot, "artifacts")
+      if (fs.existsSync(artPath)) {
+        artifacts = fs.readdirSync(artPath).filter(f => !f.startsWith(".")).length
+      }
+      const idxPath = path.join(sessionRoot, "session_index.json")
+      if (fs.existsSync(idxPath)) {
+        try {
+          const idx = JSON.parse(fs.readFileSync(idxPath, "utf-8"))
+          const procs = idx.processes || []
+          delegations = procs.filter((p) => p.parentAgent !== null).length
+        } catch { /* ignore */ }
+      }
+    } catch { /* counts may not exist */ }
+    console.log(JSON.stringify({ session_id: sessionId, counts: { conversation, tool_calls, artifacts, delegations } }, null, 2))
+    return 0
+  }
+
   if (subcommand === "list") {
     const rows = collectSessions(repoRoot, { runtime: effectiveRuntime, crew: filters.crew }, allRuntimes)
     if (filters.json) {
