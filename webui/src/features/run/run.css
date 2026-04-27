@@ -561,3 +561,40 @@
   color: #666;
 }
 .routing-preview__actions button:hover { background: #eee; color: #333; }
+.routing-preview__agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.routing-preview__agent-name { font-weight: 700; }
+.routing-preview__confidence { color: #666; font-size: 12px; }
+.routing-preview__caps {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.routing-preview__cap {
+  background: #e8f0fe;
+  color: #1a73e8;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
+.routing-preview__fallbacks {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 6px;
+}
+.routing-preview__command {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
