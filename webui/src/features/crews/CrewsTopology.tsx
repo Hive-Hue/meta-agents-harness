@@ -3,11 +3,19 @@ import { TeamLane } from "./TeamLane";
 import { TopologyFilters } from "./TopologyFilters";
 import { CrewsInspector } from "./CrewsInspector";
 import { FlowchartView } from "./FlowchartView";
-import { useConfig } from "../config/useConfigStore";
+import { useConfig, ConfigProvider } from "../config/useConfigStore";
 import type { Agent } from "./AgentCard";
 import "./crews.css";
 
 export function CrewsTopology() {
+  return (
+    <ConfigProvider>
+      <CrewsTopologyInner />
+    </ConfigProvider>
+  );
+}
+
+function CrewsTopologyInner() {
   const { config } = useConfig();
   const crews = config?.crews ?? [];
   const [selectedCrewId, setSelectedCrewId] = useState<string>("");
