@@ -10,6 +10,12 @@ import "./run.css";
 
 type RunState = "idle" | "queued" | "routed" | "running" | "completed" | "failed";
 
+const idleEvents: LifecycleEvent[] = [
+  { time: "—", state: "queued" as const, label: "No active run", desc: "Compose a task and start a run to begin" },
+];
+
+const POLL_INTERVAL = 500;
+
 export function RunConsole() {
   return (
     <ConfigProvider>
@@ -17,10 +23,6 @@ export function RunConsole() {
     </ConfigProvider>
   );
 }
-
-const idleEvents: LifecycleEvent[] = [
-  { time: "—", state: "queued" as const, label: "No active run", desc: "Compose a task and start a run to begin" },
-];
 
 function RunConsoleInner() {
   const { config } = useConfig();
@@ -33,106 +35,79 @@ function RunConsoleInner() {
   const [events, setEvents] = useState<LifecycleEvent[]>(idleEvents);
   const [logLines, setLogLines] = useState<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const timePrefix = () => new Date().toLocaleTimeString([], { hour12: false });
+  const tp = () => new Date().toLocaleTimeString([], { hour12: false });
 
   const startRun = useCallback(async () => {
     if (!taskText.trim()) return;
 
     abortControllerRef.current = new AbortController();
     setShowRouting(false);
-    setRunState("queued");
     setLogLines([]);
-    setEvents([{ time: timePrefix(), state: "queued" as const, label: "Queued", desc: "Task received, connecting to runtime" }]);
+    setRunState("queued");
+    setEvents([{ time: tp(), state: "queued" as const, label: "Queued", desc: "Task received, starting run" }]);
 
     try {
-      const response = await fetch("/api/mah/run-stream", {
+      const resp = await fetch("/api/mah/run-start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task: taskText, crew, runtime }),
         signal: abortControllerRef.current.signal,
       });
+      const result = await resp.json();
+      if (!result.ok) throw new Error(result.error || "Failed to start run");
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
+      const { sessionId } = result;
       setRunState("running");
-      setEvents(prev => [...prev, { time: timePrefix(), state: "running" as const, label: "Running", desc: "Execution in progress", active: true }]);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const poll = async () => {
+        if (abortControllerRef.current?.signal.aborted) return;
+        try {
+          const statusRes = await fetch(`/api/mah/run-status/${sessionId}`, { signal: abortControllerRef.current!.signal });
+          const status = await statusRes.json();
+          if (!status.ok) return;
 
-        buffer += decoder.decode(value, { stream: true });
+          const lifecycleMap: Record<string, RunState> = { queued: "queued", running: "running", completed: "completed", failed: "failed" };
+          const lastEvent = status.events?.[status.events.length - 1];
+          setRunState(lifecycleMap[lastEvent?.event ?? "running"] ?? "running");
 
-        while (buffer.includes("\n\n")) {
-          const endIdx = buffer.indexOf("\n\n");
-          const rawEvent = buffer.slice(0, endIdx);
-          buffer = buffer.slice(endIdx + 2);
+          const mapped: LifecycleEvent[] = (status.events ?? []).map((e: { event: string; at: string; details?: { label?: string; desc?: string } }) => ({
+            time: new Date(e.at).toLocaleTimeString([], { hour12: false }),
+            state: (lifecycleMap[e.event] ?? "running") as LifecycleEvent["state"],
+            label: e.details?.label ?? e.event,
+            desc: e.details?.desc ?? "",
+            active: e.event === "running",
+          }));
+          setEvents(mapped.length ? mapped : [{ time: tp(), state: "running" as const, label: "Running", desc: "In progress", active: true }]);
 
-          const lines = rawEvent.split("\n");
-          let eventType = "";
-          let eventData = "";
+          setLogLines(status.logs ?? []);
 
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              eventType = line.slice("event: ".length).trim();
-            } else if (line.startsWith("data: ")) {
-              eventData = line.slice("data: ".length);
-            }
+          if (status.status === "running") {
+            pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
+          } else {
+            setRunState(status.status === "completed" ? "completed" : "failed");
           }
-
-          if (eventType === "stdout" && eventData.trim()) {
-            setLogLines(prev => [...prev, { time: timePrefix(), level: "INFO", msg: eventData }]);
-          } else if (eventType === "stderr" && eventData.trim()) {
-            setLogLines(prev => [...prev, { time: timePrefix(), level: "ERROR", msg: eventData }]);
-          } else if (eventType === "done") {
-            const code = parseInt(eventData) || 0;
-            setRunState(code === 0 ? "completed" : "failed");
-            setEvents(prev => {
-              const updated = prev.map(e => ({ ...e, active: false }));
-              return [...updated, { time: timePrefix(), state: code === 0 ? "completed" as const : "failed" as const, label: code === 0 ? "Completed" : "Failed", desc: "Exit code " + code, active: false }];
-            });
-          } else if (eventType === "error") {
-            setRunState("failed");
-            setEvents(prev => {
-              const updated = prev.map(e => ({ ...e, active: false }));
-              return [...updated, { time: timePrefix(), state: "failed" as const, label: "Error", desc: eventData, active: false }];
-            });
-            if (eventData.trim()) {
-              setLogLines(prev => [...prev, { time: timePrefix(), level: "ERROR", msg: eventData }]);
-            }
-          }
+        } catch (err) {
+          if ((err as Error).name !== "AbortError") setRunState("failed");
         }
-      }
+      };
+
+      pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
+
     } catch (err) {
       const err2 = err as Error;
-      if (err2.name === "AbortError") {
-        setRunState("failed");
-        setEvents(prev => {
-          const updated = prev.map(e => ({ ...e, active: false }));
-          return [...updated, { time: timePrefix(), state: "failed" as const, label: "Aborted", desc: "Stopped by operator", active: false }];
-        });
-      } else {
-        setRunState("failed");
-        setEvents(prev => {
-          const updated = prev.map(e => ({ ...e, active: false }));
-          return [...updated, { time: timePrefix(), state: "failed" as const, label: "Error", desc: err2.message, active: false }];
-        });
-      }
+      setRunState("failed");
+      setEvents(prev => [...prev.map(e => ({ ...e, active: false })), { time: tp(), state: "failed" as const, label: err2.name === "AbortError" ? "Aborted" : "Error", desc: err2.message, active: false }]);
+      if (err2.name !== "AbortError") setLogLines(prev => [...prev, { time: tp(), level: "ERROR", msg: err2.message }]);
     }
   }, [taskText, crew, runtime]);
 
   const stopRun = useCallback(() => {
     abortControllerRef.current?.abort();
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     setRunState("failed");
-    setEvents(prev => {
-      const updated = prev.map(e => ({ ...e, active: false }));
-      return [...updated, { time: timePrefix(), state: "failed" as const, label: "Aborted", desc: "Stopped by operator", active: false }];
-    });
+    setEvents(prev => [...prev.map(e => ({ ...e, active: false })), { time: tp(), state: "failed" as const, label: "Aborted", desc: "Stopped by operator", active: false }]);
   }, []);
 
   const stateToBadge: Record<RunState, { tone: "running" | "completed" | "failed"; label: string }> = {

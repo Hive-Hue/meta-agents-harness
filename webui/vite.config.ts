@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync, execSync } from "node:child_process";
+import { spawn, spawnSync, execSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import yaml from "js-yaml";
 
@@ -10,6 +10,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs");
+
+// In-memory store for run sessions
+const runSessions = new Map<string, {
+  events: Array<{ event: string; at: string; details?: Record<string, unknown> }>;
+  logs: Array<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }>;
+  status: "running" | "completed" | "failed";
+  process?: ReturnType<typeof spawn>;
+  createdAt: number;
+}>();
 
 function handleConfigApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   const configPath = path.join(repoRoot, "meta-agents.yaml");
@@ -131,6 +140,92 @@ function handleWorkspaceApi(_req: import("http").IncomingMessage, res: import("h
   res.end(JSON.stringify({ ok: true, workspace: result }));
 }
 
+function handleRunStart(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "POST") { res.statusCode = 405; res.end(JSON.stringify({ ok: false, error: "method not allowed" })); return; }
+
+  const chunks: Buffer[] = [];
+  req.on("data", (chunk: Buffer) => chunks.push(chunk));
+  req.on("end", async () => {
+    try {
+      const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
+      const { task = "", crew = "dev", runtime = ".pi/" } = JSON.parse(raw);
+      if (!task.trim()) { res.statusCode = 400; res.end(JSON.stringify({ ok: false, error: "no task" })); return; }
+
+      const sessionId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const tp = () => new Date().toLocaleTimeString([], { hour12: false });
+      runSessions.set(sessionId, {
+        events: [{ event: "queued", at: new Date().toISOString(), details: { label: "Queued", desc: "Task received" } }],
+        logs: [{ time: tp(), level: "INFO", msg: "Starting run..." }],
+        status: "running",
+        createdAt: Date.now(),
+      });
+
+      const child = spawn(process.execPath, [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtime, "--headless"], { cwd: repoRoot, env: { ...process.env } });
+
+      const session = runSessions.get(sessionId)!;
+      session.process = child;
+
+      child.stdout?.on("data", (d: Buffer) => {
+        const sess = runSessions.get(sessionId);
+        if (!sess) return;
+        const lines = d.toString("utf-8").split("\n").filter(Boolean);
+        for (const line of lines) {
+          if (line.includes("Lifecycle:") || line.startsWith("lifecycle")) {
+            sess.events = sess.events.map(e => ({ ...e, event: e.event === "queued" ? "running" : e.event }));
+            sess.events.push({ event: "running", at: new Date().toISOString(), details: { label: "Running", desc: line.slice(0, 100) } });
+          }
+          sess.logs.push({ time: tp(), level: "INFO", msg: line.slice(0, 500) });
+        }
+        runSessions.set(sessionId, sess);
+      });
+
+      child.stderr?.on("data", (d: Buffer) => {
+        const sess = runSessions.get(sessionId);
+        if (!sess) return;
+        const lines = d.toString("utf-8").split("\n").filter(Boolean);
+        for (const line of lines) if (line.trim()) sess.logs.push({ time: tp(), level: "ERROR", msg: line.slice(0, 500) });
+        runSessions.set(sessionId, sess);
+      });
+
+      child.on("close", (code) => {
+        const sess = runSessions.get(sessionId);
+        if (!sess) return;
+        sess.status = code === 0 ? "completed" : "failed";
+        sess.events.push({ event: code === 0 ? "completed" : "failed", at: new Date().toISOString(), details: { label: code === 0 ? "Completed" : "Failed", desc: `Exit ${code}` } });
+        runSessions.set(sessionId, sess);
+      });
+
+      child.on("error", (e) => {
+        const sess = runSessions.get(sessionId);
+        if (!sess) return;
+        sess.status = "failed";
+        sess.events.push({ event: "failed", at: new Date().toISOString(), details: { label: "Error", desc: e.message } });
+        sess.logs.push({ time: tp(), level: "ERROR", msg: e.message });
+        runSessions.set(sessionId, sess);
+      });
+
+      setTimeout(() => { runSessions.delete(sessionId); }, 10 * 60 * 1000);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, sessionId, status: "running" }));
+    } catch (e) { res.statusCode = 500; res.end(JSON.stringify({ ok: false, error: e instanceof Error ? e.message : String(e) })); }
+  });
+}
+
+function handleRunStatus(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "GET") { res.statusCode = 405; res.end(JSON.stringify({ ok: false, error: "method not allowed" })); return; }
+
+  const match = (req.url ?? "").match(/^\/api\/mah\/run-status\/([^?]+)/);
+  if (!match) { res.statusCode = 400; res.end(JSON.stringify({ ok: false, error: "missing sessionId" })); return; }
+
+  const session = runSessions.get(match[1]);
+  if (!session) { res.statusCode = 404; res.end(JSON.stringify({ ok: false, error: "session not found" })); return; }
+
+  res.statusCode = 200;
+  res.end(JSON.stringify({ ok: true, sessionId: match[1], status: session.status, events: session.events, logs: session.logs, elapsedMs: Date.now() - session.createdAt }));
+}
+
 function mahApiMiddleware() {
   return {
     name: "mah-api-middleware",
@@ -153,73 +248,8 @@ function mahApiMiddleware() {
           return;
         }
 
-        if (url === "/api/mah/run-stream") {
-          const chunks: Buffer[] = [];
-          req.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
-          req.on("end", async () => {
-            res.setHeader("Content-Type", "text/event-stream");
-            res.setHeader("Cache-Control", "no-cache");
-            res.setHeader("Connection", "keep-alive");
-            res.setHeader("Access-Control-Allow-Origin", "*");
-
-            if (req.method !== "POST") {
-              res.statusCode = 405;
-              res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
-              return;
-            }
-
-            try {
-              const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
-              const body = JSON.parse(raw) as { task?: string; crew?: string; runtime?: string };
-              const { task = "", crew = "dev", runtime = ".pi/" } = body;
-
-              if (!task.trim()) {
-                res.write("event: error\ndata: No task provided\n\n");
-                res.end();
-                return;
-              }
-
-              const { spawn } = await import("node:child_process");
-              const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs");
-              const args = ["run", "--task", `"${task.replace(/"/g, '\\"')}"`, "--crew", crew, "--runtime", runtime, "--headless"];
-
-              const child = spawn(process.execPath, [cliPath, ...args], { cwd: repoRoot, env: { ...process.env } });
-
-              let closed = false;
-              const cleanup = () => { if (!closed) { closed = true; if (!child.killed) child.kill(); } };
-
-              child.stdout?.on("data", (data: Buffer) => {
-                const lines = data.toString("utf-8").split("\n").filter(Boolean);
-                for (const line of lines) res.write(`event: stdout\ndata: ${line}\n\n`);
-              });
-
-              child.stderr?.on("data", (data: Buffer) => {
-                const lines = data.toString("utf-8").split("\n").filter(Boolean);
-                for (const line of lines) res.write(`event: stderr\ndata: ${line}\n\n`);
-              });
-
-              child.on("close", (code) => {
-                res.write(`event: done\ndata: ${code ?? 0}\n\n`);
-                cleanup(); res.end();
-              });
-
-              child.on("error", (err) => {
-                res.write(`event: error\ndata: ${err.message}\n\n`);
-                cleanup(); res.end();
-              });
-
-              setTimeout(() => {
-                res.write("event: error\ndata: Run timed out after 5 minutes\n\n");
-                cleanup(); res.end();
-              }, 300_000);
-
-            } catch (error) {
-              res.write(`event: error\ndata: ${error instanceof Error ? error.message : String(error)}\n\n`);
-              res.end();
-            }
-          });
-          return;
-        }
+        if (url === "/api/mah/run-start") { handleRunStart(req, res); return; }
+        if (url.startsWith("/api/mah/run-status/")) { handleRunStatus(req, res); return; }
 
         next();
       });
