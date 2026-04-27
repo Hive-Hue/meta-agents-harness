@@ -1,9 +1,10 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useRef } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TaskComposer } from "./TaskComposer";
 import { ExecutionMonitor } from "./ExecutionMonitor";
 import { RunInspector } from "./RunInspector";
+import { useConfig } from "../config/useConfigStore";
 import type { LifecycleEvent } from "./LifecycleTimeline";
 import "./run.css";
 
@@ -14,58 +15,108 @@ const idleEvents: LifecycleEvent[] = [
 ];
 
 export function RunConsole() {
+  const { config } = useConfig();
+  const crews = config?.crews ?? [];
   const [runState, setRunState] = useState<RunState>("idle");
   const [taskText, setTaskText] = useState("");
-  const [crew, setCrew] = useState("dev");
+  const [crew, setCrew] = useState(crews[0]?.id ?? "dev");
   const [runtime, setRuntime] = useState(".pi/");
   const [showRouting, setShowRouting] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(true);
   const [events, setEvents] = useState<LifecycleEvent[]>(idleEvents);
+  const [logLines, setLogLines] = useState<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }[]>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const startRun = useCallback(() => {
+  const timePrefix = () => new Date().toLocaleTimeString([], { hour12: false });
+
+  const startRun = useCallback(async () => {
+    if (!taskText.trim()) return;
+
+    abortControllerRef.current = new AbortController();
     setShowRouting(false);
-    const baseEvents: LifecycleEvent[] = [
-      { time: "10:42:01", state: "queued", label: "Queued", desc: "Task received, waiting for routing" },
-    ];
-    setEvents(baseEvents);
     setRunState("queued");
+    setLogLines([]);
+    setEvents([{ time: timePrefix(), state: "queued" as const, label: "Queued", desc: "Task received, connecting to runtime" }]);
 
-    setTimeout(() => {
-      setEvents((prev) => [
-        ...prev,
-        { time: "10:42:03", state: "routed", label: "Routed", desc: "engineering-lead selected (confidence 0.87)" },
-      ]);
-      setRunState("routed");
-    }, 800);
+    try {
+      const response = await fetch("/api/mah/run-stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task: taskText, crew, runtime }),
+        signal: abortControllerRef.current.signal,
+      });
 
-    setTimeout(() => {
-      setEvents((prev) => [
-        ...prev,
-        { time: "10:42:05", state: "running", label: "Context Loaded", desc: "3 documents injected (2.4KB)" },
-      ]);
-    }, 1500);
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
 
-    setTimeout(() => {
-      setEvents((prev) => [
-        ...prev,
-        { time: "10:42:06", state: "running", label: "Running", desc: "Delegation in progress", active: true },
-      ]);
+      const decoder = new TextDecoder();
+      let buffer = "";
+
       setRunState("running");
-    }, 2000);
+      setEvents(prev => [...prev, { time: timePrefix(), state: "running" as const, label: "Running", desc: "Execution in progress", active: true }]);
 
-    setTimeout(() => {
-      setEvents((prev) => prev.map((e) => ({ ...e, active: false })).concat([
-        { time: "10:42:15", state: "completed", label: "Completed", desc: "3 artifacts, 2.4KB context recorded", active: false },
-      ]));
-      setRunState("completed");
-    }, 5000);
-  }, []);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const rawLine of lines) {
+          if (rawLine.startsWith("event: stdout")) {
+            const data = rawLine.slice("event: stdout\ndata: ".length);
+            if (data.trim()) {
+              setLogLines(prev => [...prev, { time: timePrefix(), level: "INFO", msg: data }]);
+            }
+          } else if (rawLine.startsWith("event: stderr")) {
+            const data = rawLine.slice("event: stderr\ndata: ".length);
+            if (data.trim()) {
+              setLogLines(prev => [...prev, { time: timePrefix(), level: "ERROR", msg: data }]);
+            }
+          } else if (rawLine.startsWith("event: done")) {
+            const data = rawLine.slice("event: done\ndata: ".length);
+            const code = parseInt(data) || 0;
+            setRunState(code === 0 ? "completed" : "failed");
+            setEvents(prev => {
+              const updated = prev.map(e => ({ ...e, active: false }));
+              return [...updated, { time: timePrefix(), state: code === 0 ? "completed" as const : "failed" as const, label: code === 0 ? "Completed" : "Failed", desc: "Exit code " + code, active: false }];
+            });
+          } else if (rawLine.startsWith("event: error")) {
+            const data = rawLine.slice("event: error\ndata: ".length);
+            setRunState("failed");
+            setEvents(prev => {
+              const updated = prev.map(e => ({ ...e, active: false }));
+              return [...updated, { time: timePrefix(), state: "failed" as const, label: "Error", desc: data, active: false }];
+            });
+            setLogLines(prev => [...prev, { time: timePrefix(), level: "ERROR", msg: data }]);
+          }
+        }
+      }
+    } catch (err) {
+      const err2 = err as Error;
+      if (err2.name === "AbortError") {
+        setRunState("failed");
+        setEvents(prev => {
+          const updated = prev.map(e => ({ ...e, active: false }));
+          return [...updated, { time: timePrefix(), state: "failed" as const, label: "Aborted", desc: "Stopped by operator", active: false }];
+        });
+      } else {
+        setRunState("failed");
+        setEvents(prev => {
+          const updated = prev.map(e => ({ ...e, active: false }));
+          return [...updated, { time: timePrefix(), state: "failed" as const, label: "Error", desc: err2.message, active: false }];
+        });
+      }
+    }
+  }, [taskText, crew, runtime]);
 
   const stopRun = useCallback(() => {
+    abortControllerRef.current?.abort();
     setRunState("failed");
-    setEvents((prev) => prev.map((e) => ({ ...e, active: false })).concat([
-      { time: "10:42:08", state: "failed", label: "Aborted", desc: "Stopped by operator", active: false },
-    ]));
+    setEvents(prev => {
+      const updated = prev.map(e => ({ ...e, active: false }));
+      return [...updated, { time: timePrefix(), state: "failed" as const, label: "Aborted", desc: "Stopped by operator", active: false }];
+    });
   }, []);
 
   const stateToBadge: Record<RunState, { tone: "running" | "completed" | "failed"; label: string }> = {
@@ -86,40 +137,29 @@ export function RunConsole() {
           <div className="run-header__top">
             <div>
               <h2>Run Console</h2>
-              <p className="run-header__subtitle">
-                Compose tasks, preview routing, and monitor execution
-              </p>
+              <p className="run-header__subtitle">Compose tasks, preview routing, and monitor execution</p>
             </div>
             <div className="run-header__actions">
               <StatusBadge tone={badge.tone} label={badge.label} />
               {runState === "idle" || runState === "completed" || runState === "failed" ? (
                 <button className="run-action-btn run-action-btn--primary" type="button" onClick={startRun} disabled={!taskText}>
-                  <Icon name="play_arrow" size={14} />
-                  Start New Run
+                  <Icon name="play_arrow" size={14} />Start New Run
                 </button>
               ) : (
                 <button className="run-action-btn run-action-btn--danger" type="button" onClick={stopRun}>
-                  <Icon name="stop" size={14} />
-                  Stop
+                  <Icon name="stop" size={14} />Stop
                 </button>
               )}
             </div>
           </div>
         </section>
         <div className="run-body">
-          <button
-            className={"run-inspector-toggle" + (inspectorOpen ? "" : " run-inspector-toggle--closed")}
-            type="button"
-            onClick={() => setInspectorOpen(!inspectorOpen)}
-            aria-label={inspectorOpen ? "Collapse inspector" : "Expand inspector"}
-          >
-            <Icon name={inspectorOpen ? "chevron_left" : "chevron_right"} size={16} />
-          </button>
           <div className="run-content">
             <TaskComposer
               taskText={taskText}
               onTaskTextChange={setTaskText}
               crew={crew}
+              crews={crews}
               onCrewChange={setCrew}
               runtime={runtime}
               onRuntimeChange={setRuntime}
@@ -129,14 +169,11 @@ export function RunConsole() {
               onStopRun={stopRun}
               runState={runState}
             />
-            <ExecutionMonitor events={events} />
+            <ExecutionMonitor events={events} logLines={logLines} />
           </div>
         </div>
       </main>
-      <aside
-        className={"inspector run-inspector" + (inspectorOpen ? "" : " run-inspector--collapsed")}
-        aria-label="Run inspector"
-      >
+      <aside className="inspector run-inspector" aria-label="Run inspector">
         <RunInspector runState={runState} taskText={taskText} crew={crew} runtime={runtime} />
       </aside>
     </>

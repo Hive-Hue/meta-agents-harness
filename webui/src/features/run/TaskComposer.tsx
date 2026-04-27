@@ -5,6 +5,7 @@ type TaskComposerProps = {
   taskText: string;
   onTaskTextChange: (val: string) => void;
   crew: string;
+  crews: Array<{ id: string; display_name?: string }>;
   onCrewChange: (val: string) => void;
   runtime: string;
   onRuntimeChange: (val: string) => void;
@@ -16,16 +17,11 @@ type TaskComposerProps = {
 };
 
 export function TaskComposer({
-  taskText,
-  onTaskTextChange,
-  crew,
-  onCrewChange,
-  runtime,
-  onRuntimeChange,
-  showRouting,
-  onShowRouting,
-  onStartRun,
-  onStopRun,
+  taskText, onTaskTextChange,
+  crew, crews, onCrewChange,
+  runtime, onRuntimeChange,
+  showRouting, onShowRouting,
+  onStartRun, onStopRun,
   runState,
 }: TaskComposerProps) {
   const isRunning = runState === "running" || runState === "queued" || runState === "routed";
@@ -42,9 +38,9 @@ export function TaskComposer({
       />
       <div className="run-composer__row">
         <select className="run-composer__select" value={crew} onChange={(e) => onCrewChange(e.target.value)} disabled={isRunning}>
-          <option value="dev">dev</option>
-          <option value="staging">staging</option>
-          <option value="prod">prod</option>
+          {crews.length > 0
+            ? crews.map(c => <option key={c.id} value={c.id}>{c.display_name || c.id}</option>)
+            : <option value="dev">dev</option>}
         </select>
         <select className="run-composer__select" value={runtime} onChange={(e) => onRuntimeChange(e.target.value)} disabled={isRunning}>
           <option value=".pi/">.pi/</option>
@@ -53,18 +49,15 @@ export function TaskComposer({
           <option value=".hermes/">.hermes/</option>
         </select>
         <button className="run-action-btn" type="button" onClick={onShowRouting} disabled={isRunning || !taskText}>
-          <Icon name="route" size={14} />
-          Preview Routing
+          <Icon name="route" size={14} />Preview Routing
         </button>
         {!isRunning ? (
           <button className="run-action-btn run-action-btn--primary" type="button" onClick={onStartRun} disabled={!taskText}>
-            <Icon name="play_arrow" size={14} />
-            Start Run
+            <Icon name="play_arrow" size={14} />Start Run
           </button>
         ) : (
           <button className="run-action-btn run-action-btn--danger" type="button" onClick={onStopRun}>
-            <Icon name="stop" size={14} />
-            Stop
+            <Icon name="stop" size={14} />Stop
           </button>
         )}
       </div>

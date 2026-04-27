@@ -153,6 +153,74 @@ function mahApiMiddleware() {
           return;
         }
 
+        if (url === "/api/mah/run-stream") {
+          const chunks: Buffer[] = [];
+          req.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
+          req.on("end", async () => {
+            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Cache-Control", "no-cache");
+            res.setHeader("Connection", "keep-alive");
+            res.setHeader("Access-Control-Allow-Origin", "*");
+
+            if (req.method !== "POST") {
+              res.statusCode = 405;
+              res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+              return;
+            }
+
+            try {
+              const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
+              const body = JSON.parse(raw) as { task?: string; crew?: string; runtime?: string };
+              const { task = "", crew = "dev", runtime = ".pi/" } = body;
+
+              if (!task.trim()) {
+                res.write("event: error\ndata: No task provided\n\n");
+                res.end();
+                return;
+              }
+
+              const { spawn } = await import("node:child_process");
+              const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs");
+              const args = ["run", "--task", `"${task.replace(/"/g, '\\"')}"`, "--crew", crew, "--runtime", runtime, "--headless"];
+
+              const child = spawn(process.execPath, [cliPath, ...args], { cwd: repoRoot, env: { ...process.env } });
+
+              let closed = false;
+              const cleanup = () => { if (!closed) { closed = true; if (!child.killed) child.kill(); } };
+
+              child.stdout?.on("data", (data: Buffer) => {
+                const lines = data.toString("utf-8").split("\n").filter(Boolean);
+                for (const line of lines) res.write(`event: stdout\ndata: ${line}\n\n`);
+              });
+
+              child.stderr?.on("data", (data: Buffer) => {
+                const lines = data.toString("utf-8").split("\n").filter(Boolean);
+                for (const line of lines) res.write(`event: stderr\ndata: ${line}\n\n`);
+              });
+
+              child.on("close", (code) => {
+                res.write(`event: done\ndata: ${code ?? 0}\n\n`);
+                cleanup(); res.end();
+              });
+
+              child.on("error", (err) => {
+                res.write(`event: error\ndata: ${err.message}\n\n`);
+                cleanup(); res.end();
+              });
+
+              setTimeout(() => {
+                res.write("event: error\ndata: Run timed out after 5 minutes\n\n");
+                cleanup(); res.end();
+              }, 300_000);
+
+            } catch (error) {
+              res.write(`event: error\ndata: ${error instanceof Error ? error.message : String(error)}\n\n`);
+              res.end();
+            }
+          });
+          return;
+        }
+
         next();
       });
     },
