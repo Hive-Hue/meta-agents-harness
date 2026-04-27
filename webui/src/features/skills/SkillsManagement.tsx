@@ -19,6 +19,7 @@ type InspectData = {
   file_path: string;
   title: string;
   summary: string;
+  description?: string;
   sections: string[];
   assignments: Array<{ crew: string; agent: string; ref: string }>;
   assignment_count: number;
@@ -369,7 +370,6 @@ export function SkillsManagement() {
                   <th>Attached To</th>
                   <th>Status</th>
                   <th>Assignments</th>
-                  <th>Path</th>
                 </tr>
               </thead>
               <tbody>
@@ -385,7 +385,6 @@ export function SkillsManagement() {
                       <td><span className="skill-agent"><Icon name="smart_toy" size={14} />{skill.attachedTo}</span></td>
                       <td><StatusBadge tone={badge.tone} label={badge.label} /></td>
                       <td className="skill-usage">{skill.assignedCount}</td>
-                      <td className="config-table__mono" style={{ fontSize: 11, maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{skill.filePath.split("/").slice(-2).join("/")}</td>
                     </tr>
                   );
                 })}
@@ -402,7 +401,6 @@ export function SkillsManagement() {
               <h3>Skill Detail</h3>
               <p>{inspectData?.title ?? selectedSkill?.name ?? "No skill selected"}</p>
             </div>
-            <button className="icon-button" type="button" aria-label="Close inspector"><Icon name="close" /></button>
           </div>
         </section>
         <section className="inspector__body">
@@ -417,7 +415,7 @@ export function SkillsManagement() {
               {inspectData ? (
                 <>
                   <h4 className="skills-inspector__title">Summary</h4>
-                  <p className="skills-inspector__summary">{inspectData.summary || "No summary available."}</p>
+                  <p className="skills-inspector__summary">{inspectData?.description || inspectData?.summary || "No description available."}</p>
                   <h4 className="skills-inspector__title">Assigned Agents</h4>
                   <ul className="skills-inspector__refs">
                     {inspectData.assignments.map((a, i) => (
@@ -442,7 +440,6 @@ export function SkillsManagement() {
                 <button type="button" onClick={() => openActionPopup("add")}><Icon name="add_circle" size={16} />Add to Agent</button>
                 <button type="button" className="skills-inspector__remove" onClick={() => openActionPopup("remove")}><Icon name="remove_circle" size={16} />Remove from Agent</button>
               </div>
-              <p className="skills-inspector__prepared">Prepared command: <code>{preparedCommand}</code></p>
             </>
           ) : (
             <p className="skills-inspector__empty">No skill matches the current filters.</p>
