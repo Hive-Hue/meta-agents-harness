@@ -126,9 +126,9 @@ export function SessionsOverview() {
         {selected ? (
           <SessionInspector session={selected} onClose={() => setSelected(null)} />
         ) : (
-          <section className="inspector__header">
-            <h3>Session Inspector</h3>
-            <p style={{ color: "#94a3b8", fontSize: 13 }}>Select a session to view details</p>
+          <section className="inspector__body" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}>
+            <Icon name="info" size={32} />
+            <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>Select a session to view details</p>
           </section>
         )}
       </aside>
@@ -140,18 +140,24 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
   const [terminating, setTerminating] = useState(false);
 
   const handleResume = async () => {
-    await fetch("/api/mah/exec", {
+    const resp = await fetch("/api/mah/exec", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ args: ["sessions", "resume", session.id] }),
     });
+    const data = await resp.json();
+    if (data.ok) {
+      alert(`Session ${session.id} resumed in terminal.`);
+    } else {
+      alert(`Error: ${data.stderr}`);
+    }
   };
 
   const handleExport = async () => {
     const resp = await fetch("/api/mah/exec", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ args: ["sessions", "export", session.id, "--json"] }),
+      body: JSON.stringify({ args: ["sessions", "export", session.id] }),
     });
     const data = await resp.json();
     if (data.ok) {
@@ -159,18 +165,19 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a"); a.href = url; a.download = `${session.id}.json`; a.click();
       URL.revokeObjectURL(url);
+    } else {
+      alert(`Export failed: ${data.stderr}`);
     }
   };
 
   const handleTerminate = async () => {
-    if (!confirm(`Terminate session ${session.id}?`)) return;
+    if (!confirm(`Terminate session ${session.id}? This cannot be undone.`)) return;
     setTerminating(true);
     await fetch("/api/mah/exec", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ args: ["sessions", "delete", session.id] }),
     });
-    setTerminating(false);
     onClose();
   };
 
@@ -182,29 +189,31 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
   return (
     <>
       <section className="inspector__header">
-        <div>
-          <h3>Session Inspector</h3>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 12, margin: "4px 0 0" }}>{session.id}</p>
+        <div className="inspector__title-row">
+          <div>
+            <h3>Session Inspector</h3>
+            <p>{session.id}</p>
+          </div>
+          <button type="button" onClick={onClose} className="icon-button" aria-label="Close inspector">
+            <Icon name="close" size={16} />
+          </button>
         </div>
-        <button type="button" onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer" }}>
-          <Icon name="close" size={16} />
-        </button>
       </section>
       <section className="inspector__body">
-        <dl className="inspector__fields">
-          <div className="inspector__field"><dt>Status</dt><dd><StatusBadge tone={toneMap[session.status] || "failed"} label={session.status} /></dd></div>
-          <div className="inspector__field"><dt>Runtime</dt><dd>{session.runtime}</dd></div>
-          <div className="inspector__field"><dt>Crew</dt><dd>{session.crew}</dd></div>
-          <div className="inspector__field"><dt>Conversations</dt><dd>{session.counts.conversation}</dd></div>
-          <div className="inspector__field"><dt>Tool Calls</dt><dd>{session.counts.tool_calls}</dd></div>
-          <div className="inspector__field"><dt>Artifacts</dt><dd>{session.counts.artifacts}</dd></div>
-          <div className="inspector__field"><dt>Delegations</dt><dd>{session.counts.delegations}</dd></div>
-        </dl>
+        <div className="inspector-stats">
+          <div><span>Status</span><strong><StatusBadge tone={toneMap[session.status] || "failed"} label={session.status} /></strong></div>
+          <div><span>Runtime</span><strong>{session.runtime}</strong></div>
+          <div><span>Crew</span><strong>{session.crew}</strong></div>
+          <div><span>Conversations</span><strong>{session.counts.conversation}</strong></div>
+          <div><span>Tool Calls</span><strong>{session.counts.tool_calls}</strong></div>
+          <div><span>Artifacts</span><strong>{session.counts.artifacts}</strong></div>
+          <div><span>Delegations</span><strong>{session.counts.delegations}</strong></div>
+        </div>
         <div className="inspector__actions">
-          <button className="inspector__action-btn inspector__action-btn--primary" type="button" onClick={handleResume}>
+          <button type="button" onClick={handleResume}>
             <Icon name="play_arrow" size={14} />Resume
           </button>
-          <button className="inspector__action-btn" type="button" onClick={handleExport}>
+          <button type="button" onClick={handleExport}>
             <Icon name="ios_share" size={14} />Export
           </button>
         </div>
