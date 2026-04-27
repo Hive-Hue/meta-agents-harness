@@ -11,6 +11,7 @@ type TaskComposerProps = {
   onRuntimeChange: (val: string) => void;
   showRouting: boolean;
   onShowRouting: () => void;
+  onHideRouting: () => void;
   onStartRun: () => void;
   onStopRun: () => void;
   runState: string;
@@ -20,7 +21,7 @@ export function TaskComposer({
   taskText, onTaskTextChange,
   crew, crews, onCrewChange,
   runtime, onRuntimeChange,
-  showRouting, onShowRouting,
+  showRouting, onShowRouting, onHideRouting,
   onStartRun, onStopRun,
   runState,
 }: TaskComposerProps) {
@@ -61,7 +62,15 @@ export function TaskComposer({
           </button>
         )}
       </div>
-      {showRouting && <RoutingPreview />}
+      {showRouting && (
+        <RoutingPreview
+          crew={crew}
+          runtime={runtime}
+          taskText={taskText}
+          onClose={onHideRouting}
+          onRefresh={() => {/* TODO: call expertise routing */}}
+        />
+      )}
     </div>
   );
 }

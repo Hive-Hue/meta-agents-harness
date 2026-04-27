@@ -539,3 +539,25 @@
     display: none;
   }
 }
+
+.routing-preview__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.routing-preview__actions {
+  display: flex;
+  gap: 4px;
+}
+.routing-preview__actions button {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  color: #666;
+}
+.routing-preview__actions button:hover { background: #eee; color: #333; }
