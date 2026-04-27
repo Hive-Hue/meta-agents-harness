@@ -4,17 +4,25 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TaskComposer } from "./TaskComposer";
 import { ExecutionMonitor } from "./ExecutionMonitor";
 import { RunInspector } from "./RunInspector";
-import { useConfig } from "../config/useConfigStore";
+import { useConfig, ConfigProvider } from "../config/useConfigStore";
 import type { LifecycleEvent } from "./LifecycleTimeline";
 import "./run.css";
 
 type RunState = "idle" | "queued" | "routed" | "running" | "completed" | "failed";
 
+export function RunConsole() {
+  return (
+    <ConfigProvider>
+      <RunConsoleInner />
+    </ConfigProvider>
+  );
+}
+
 const idleEvents: LifecycleEvent[] = [
   { time: "—", state: "queued" as const, label: "No active run", desc: "Compose a task and start a run to begin" },
 ];
 
-export function RunConsole() {
+function RunConsoleInner() {
   const { config } = useConfig();
   const crews = config?.crews ?? [];
   const [runState, setRunState] = useState<RunState>("idle");
