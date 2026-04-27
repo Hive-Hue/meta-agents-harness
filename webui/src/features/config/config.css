@@ -270,9 +270,9 @@
 }
 
 .config-agent {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto auto;
-  gap: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   align-items: center;
   border: 1px solid #E0E0E0;
   border-radius: 0.375rem;
@@ -887,6 +887,99 @@
 }
 
 .domain-profile__add-cancel:hover {
+  background: #f1edec;
+}
+
+/* Profile Pills */
+.config-agent__profiles {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.config-agent__profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 2px;
+  background: #E0F7FA;
+  color: #00838F;
+  white-space: nowrap;
+}
+
+.config-agent__profile-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: #00838F;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  opacity: 0.6;
+}
+
+.config-agent__profile-remove:hover {
+  opacity: 1;
+}
+
+.config-agent__profile-add-wrapper {
+  position: relative;
+}
+
+.config-agent__profile-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #E0E0E0;
+  border-radius: 2px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+}
+
+.config-agent__profile-add:hover {
+  border-color: #00BCD4;
+  color: #00BCD4;
+}
+
+.config-agent__profile-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  min-width: 180px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #E0E0E0;
+  border-radius: 0.375rem;
+  background: #fff;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 12%);
+  margin-top: 4px;
+}
+
+.config-agent__profile-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  cursor: pointer;
+  color: #1c1b1b;
+}
+
+.config-agent__profile-option:hover {
   background: #f1edec;
 }
 
