@@ -6,6 +6,7 @@ import { RuntimesPanel } from "./RuntimesPanel";
 import { CrewsPanel } from "./CrewsPanel";
 import { ExpertisePanel } from "./ExpertisePanel";
 import { ContextPanel } from "./ContextPanel";
+import { SyncReview } from "./SyncReview";
 import { SecretsPanel } from "./SecretsPanel";
 import { PreferencesPanel } from "./PreferencesPanel";
 import { ModelsPanel } from "./ModelsPanel";
@@ -24,6 +25,7 @@ export function SettingsPage() {
       case "models": return <ModelsPanel />;
       case "skills": return <SkillsSettingsPanel />;
       case "context": return <ContextPanel />;
+      case "sync": return <SyncReview />;
       case "secrets": return <SecretsPanel />;
       case "preferences": return <PreferencesPanel />;
     }

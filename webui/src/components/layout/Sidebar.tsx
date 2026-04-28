@@ -11,7 +11,6 @@ const navItems = [
   { label: "Expertise", icon: "psychology", path: "/expertise" },
   { label: "Skills", icon: "extension", path: "/skills" },
   { label: "Context", icon: "database", path: "/context" },
-  { label: "Sync", icon: "sync", path: "/sync" },
   { label: "Settings", icon: "settings", path: "/settings", pinned: true },
 ];
 

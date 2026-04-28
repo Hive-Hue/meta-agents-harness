@@ -1,6 +1,6 @@
 import { Icon } from "../../components/ui/Icon";
 
-export type SettingsTab = "workspace" | "runtimes" | "crews" | "models" | "skills" | "expertise" | "context" | "secrets" | "preferences";
+export type SettingsTab = "workspace" | "runtimes" | "crews" | "models" | "skills" | "expertise" | "context" | "secrets" | "preferences" | "sync";
 
 const tabs: { id: SettingsTab; icon: string; label: string }[] = [
   { id: "workspace", icon: "folder", label: "Workspace" },
@@ -10,6 +10,7 @@ const tabs: { id: SettingsTab; icon: string; label: string }[] = [
   { id: "skills", icon: "build", label: "Skills" },
   { id: "expertise", icon: "psychology", label: "Expertise" },
   { id: "context", icon: "database", label: "Context Memory" },
+  { id: "sync", icon: "sync", label: "Sync & Artifacts" },
   { id: "secrets", icon: "key", label: "Secrets" },
   { id: "preferences", icon: "tune", label: "Preferences" },
 ];

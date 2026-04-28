@@ -9,7 +9,6 @@ import { CrewsTopology } from "./features/crews/CrewsTopology";
 import { SettingsPage } from "./features/settings/SettingsPage";
 import { ExpertiseGovernance } from "./features/expertise/ExpertiseGovernance";
 import { ContextManager } from "./features/context/ContextManager";
-import { SyncReview } from "./features/sync/SyncReview";
 import { SkillsManagement } from "./features/skills/SkillsManagement";
 
 export function App() {
@@ -25,7 +24,6 @@ export function App() {
         <Route path="settings" element={<SettingsPage />} />
         <Route path="expertise" element={<ExpertiseGovernance />} />
         <Route path="context" element={<ContextManager />} />
-        <Route path="sync" element={<SyncReview />} />
         <Route path="skills" element={<SkillsManagement />} />
       </Route>
     </Routes>
