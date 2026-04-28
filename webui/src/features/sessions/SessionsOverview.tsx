@@ -136,6 +136,10 @@ export function SessionsOverview() {
 
 function SessionInspector({ session, onClose }: { session: SessionInfo; onClose: () => void }) {
   const [terminating, setTerminating] = useState(false);
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [proposalSummary, setProposalSummary] = useState("");
+  const [proposalStability, setProposalStability] = useState("draft");
+  const [proposalAgent, setProposalAgent] = useState("");
   const [creatingProposal, setCreatingProposal] = useState(false);
 
   const handleResume = async () => {
@@ -166,20 +170,6 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
       URL.revokeObjectURL(url);
     } else {
       alert(`Export failed: ${data.stderr}`);
-    }
-  };
-
-  const handleCreateProposal = async () => {
-    const sessionRef = `${session.runtime}:${session.crew}:${session.id}`;
-    if (!confirm(`Create a context proposal from this session?\n\nSession: ${sessionRef}`)) return;
-    setCreatingProposal(true);
-    const resp = await fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ args: ["context", "propose", "--from-session", sessionRef, "--json"] }) });
-    const data = await resp.json();
-    setCreatingProposal(false);
-    if (data.ok) {
-      alert("Context proposal created.\nReview it in /context → Proposals tab.");
-    } else {
-      alert(`Error: ${data.stderr || data.error || "failed"}`);
     }
   };
 
@@ -229,8 +219,8 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
           <button type="button" onClick={handleExport}>
             <Icon name="ios_share" size={14} />Export
           </button>
-          <button type="button" onClick={handleCreateProposal} disabled={creatingProposal}>
-            <Icon name="add_circle" size={14} />{creatingProposal ? "Creating..." : "Create Proposal"}
+          <button type="button" onClick={() => setShowProposalModal(true)}>
+            <Icon name="add_circle" size={14} />Create Proposal
           </button>
         </div>
         <div className="sessions-danger-zone">
@@ -243,6 +233,45 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
           </button>
         </div>
       </section>
+      {showProposalModal && (
+        <div className="proposal-modal-overlay" onClick={() => setShowProposalModal(false)}>
+          <div className="proposal-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="proposal-modal-header">
+              <h3>Create Context Proposal</h3>
+              <button type="button" className="icon-button" onClick={() => setShowProposalModal(false)}><Icon name="close" size={16}/></button>
+            </div>
+            <p style={{fontSize:12,color:"#666",margin:"0 0 16px"}}>Session: <code style={{fontFamily:"var(--font-mono)",fontSize:11}}>{session.runtime}:{session.crew}:{session.id}</code></p>
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <label style={{display:"flex",flexDirection:"column",gap:4}}>
+                <span style={{fontSize:11,fontWeight:700,color:"#666"}}>Target Agent</span>
+                <input type="text" value={proposalAgent} onChange={e=>setProposalAgent(e.target.value)} placeholder="e.g. backend-dev" style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12}} />
+              </label>
+              <label style={{display:"flex",flexDirection:"column",gap:4}}>
+                <span style={{fontSize:11,fontWeight:700,color:"#666"}}>Stability</span>
+                <select value={proposalStability} onChange={e=>setProposalStability(e.target.value)} style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12}}>
+                  <option value="draft">draft</option><option value="stable">stable</option><option value="curated">curated</option>
+                </select>
+              </label>
+              <label style={{display:"flex",flexDirection:"column",gap:4}}>
+                <span style={{fontSize:11,fontWeight:700,color:"#666"}}>Summary</span>
+                <input type="text" value={proposalSummary} onChange={e=>setProposalSummary(e.target.value)} placeholder="Brief description" style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12}} />
+              </label>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:20}}>
+              <button type="button" className="sessions-inspector__action-btn" onClick={() => setShowProposalModal(false)}>Cancel</button>
+              <button type="button" className="sessions-inspector__action-btn sessions-inspector__action-btn--primary" disabled={!proposalAgent.trim() || !proposalSummary.trim() || creatingProposal} onClick={async () => {
+                const sessionRef = `${session.runtime}:${session.crew}:${session.id}`;
+                setCreatingProposal(true);
+                const resp = await fetch("/api/mah/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({args:["context","propose","--from-session",sessionRef,"--agent",proposalAgent,"--stability",proposalStability,"--summary",proposalSummary,"--json"]})});
+                const data = await resp.json();
+                setCreatingProposal(false);
+                if (data.ok) { setShowProposalModal(false); setProposalSummary(""); setProposalAgent(""); alert("Context proposal created.\nReview it in /context → Proposals tab."); }
+                else { alert(`Error: ${data.stderr || data.error || "failed"}`); }
+              }}>{creatingProposal ? "Creating..." : "Create Proposal"}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
