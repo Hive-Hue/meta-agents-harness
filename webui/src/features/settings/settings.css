@@ -638,3 +638,32 @@
   padding: 4px 8px;
   background: #fff;
 }
+
+/* MCP Servers table extras */
+.settings-table__tag {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.settings-table__mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #666;
+}
+
+.settings-table__action {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.settings-table__action:hover {
+  border-color: #94a3b8;
+}

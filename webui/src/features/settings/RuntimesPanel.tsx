@@ -106,6 +106,24 @@ export function RuntimesPanel() {
           </table>
         </div>
       </SettingsSection>
+      <SettingsSection title="MCP Servers" badge="1">
+        <div className="settings-section__scroll">
+          <table className="settings-table">
+            <thead>
+              <tr><th>Server</th><th>Type</th><th>Command</th><th>Status</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{fontWeight:600}}>Playwright MCP</td>
+                <td><span className="settings-table__tag">Browser Automation</span></td>
+                <td className="settings-table__mono">npx @playwright/mcp-server</td>
+                <td><span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:"#94a3b8"}}><Icon name="info" size={14} />Not connected</span></td>
+                <td><button className="settings-table__action" type="button" onClick={() => alert("To connect Playwright MCP:\n1. Install: npm install -g @playwright/mcp-server\n2. Or use: npx @playwright/mcp-server\n3. Add to meta-agents.yaml under runtimes[].mcp_servers\n\nDocs: https://playwright.dev/docs/mcp")}>Connect</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </SettingsSection>
     </>
   );
 }
