@@ -2,7 +2,7 @@
 import { spawnSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { ensureMahHomeLayout, resolveMahHome } from "../scripts/mah-home.mjs"
+import { ensureMahHomeLayout, resolveMahHome } from "../scripts/core/mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
