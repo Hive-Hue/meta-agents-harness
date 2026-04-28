@@ -1,5 +1,10 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+const { sanitizeTaskDescription } = require("./task-description.mjs");
 import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
-import { sanitizeTaskDescription } from "./task-description.mjs"
 
 /**
  * Derive task type from task description keywords.
