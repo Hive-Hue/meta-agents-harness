@@ -5,8 +5,8 @@ import {
   SPAWN_MODES,
   isValidSpawnMode,
   validateChildAgentAdapter
-} from "../scripts/child-agent-adapter-contract.mjs"
-import { resolveDelegationTarget } from "../scripts/delegation-resolution.mjs"
+} from "../scripts/runtime/child-agent-adapter-contract.mjs"
+import { resolveDelegationTarget } from "../scripts/runtime/delegation-resolution.mjs"
 import {
   buildSpawnContext,
   clearAdapters,
@@ -14,9 +14,9 @@ import {
   getRegisteredAdapters,
   prepareChildSpawn,
   registerChildAgentAdapter
-} from "../scripts/child-agent-spawn.mjs"
-import { codexSidecarAdapter } from "../scripts/child-agent-codex-sidecar.mjs"
-import { nativeRuntimeAdapter } from "../scripts/child-agent-native-runtime.mjs"
+} from "../scripts/runtime/child-agent-spawn.mjs"
+import { codexSidecarAdapter } from "../scripts/runtime/child-agent-codex-sidecar.mjs"
+import { nativeRuntimeAdapter } from "../scripts/runtime/child-agent-native-runtime.mjs"
 
 const repoRoot = process.cwd()
 

@@ -181,9 +181,9 @@ prepareHeadlessRunContext(context): {
 
 ### Arquivos principais
 
-- `scripts/runtime-adapter-contract.mjs`
+- `scripts/runtime/runtime-adapter-contract.mjs`
 - `scripts/meta-agents-harness.mjs`
-- `scripts/runtime-core-integrations.mjs`
+- `scripts/runtime/runtime-core-integrations.mjs`
 - `plugins/runtime-codex/index.mjs`
 - `plugins/runtime-claude/index.mjs`
 - `plugins/runtime-opencode/index.mjs`

@@ -120,7 +120,7 @@ test("validateRuntimeAdapterContract passes for all built-in adapters", () => {
 
 // Test 10: Plugin adapters declare headless capabilities
 test("plugin adapters that support headless have prepareHeadlessRunContext", async () => {
-  const { getAllRuntimes } = await import("../scripts/plugin-loader.mjs")
+  const { getAllRuntimes } = await import("../scripts/runtime/plugin-loader.mjs")
   const plugins = await getAllRuntimes()
   for (const [name, adapter] of Object.entries(plugins)) {
     if (adapter.capabilities?.headless?.supported === true) {
@@ -138,9 +138,9 @@ test("plugin adapters that support headless have prepareHeadlessRunContext", asy
 
 ### Dependencies
 
-- `RUNTIME_ADAPTERS` from `scripts/runtime-adapters.mjs`
-- `validateRuntimeAdapterContract` from `scripts/runtime-adapter-contract.mjs`
-- `getAllRuntimes` from `scripts/plugin-loader.mjs`
+- `RUNTIME_ADAPTERS` from `scripts/runtime/runtime-adapters.mjs`
+- `validateRuntimeAdapterContract` from `scripts/runtime/runtime-adapter-contract.mjs`
+- `getAllRuntimes` from `scripts/runtime/plugin-loader.mjs`
 
 ---
 

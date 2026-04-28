@@ -231,6 +231,29 @@ interface PendingToolCall {
 	startedAt: string;
 }
 
+let evidencePipelineModulePromise: Promise<{ recordDelegationEvidence: (params: {
+	crew: string;
+	expertiseId: string;
+	taskDescription: string;
+	outcome: string;
+	durationMs: number;
+	sourceAgent: string;
+	sessionId?: string | null;
+	isExecuted?: boolean;
+	runtime?: string;
+	output?: string;
+}) => Promise<void> }> | null = null;
+
+async function loadEvidencePipeline(config: ResolvedConfig) {
+	if (!evidencePipelineModulePromise) {
+		const modulePath = resolveArtifact(config.repoRoot, "scripts/expertise/evidence/evidence-pipeline.mjs");
+		const normalizedPath = modulePath.replace(/\\/g, "/");
+		const moduleUrl = new URL(`file://${normalizedPath}`).href;
+		evidencePipelineModulePromise = import(moduleUrl);
+	}
+	return evidencePipelineModulePromise;
+}
+
 function displayName(name: string): string {
 	return name
 		.split(/[-_]/g)
@@ -3369,7 +3392,7 @@ export default function (pi: ExtensionAPI) {
 			// Record evidence (best-effort — never block delegation result)
 			;(async () => {
 				try {
-					const { recordDelegationEvidence } = await import("../scripts/evidence-pipeline.mjs");
+					const { recordDelegationEvidence } = await loadEvidencePipeline(config!);
 					const crew = process.env.MAH_ACTIVE_CREW || "dev";
 					await recordDelegationEvidence({
 						crew,
@@ -3650,7 +3673,7 @@ export default function (pi: ExtensionAPI) {
 			// Record evidence for each target (best-effort — never block result)
 			;(async () => {
 				try {
-					const { recordDelegationEvidence } = await import("../scripts/evidence-pipeline.mjs");
+					const { recordDelegationEvidence } = await loadEvidencePipeline(config!);
 					const crew = process.env.MAH_ACTIVE_CREW || "dev";
 					for (const result of results) {
 						try {

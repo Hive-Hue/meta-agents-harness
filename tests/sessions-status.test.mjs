@@ -5,7 +5,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 
-import { recordLifecycleEvent, getLifecycleEvents } from "../scripts/m3-ops.mjs"
+import { recordLifecycleEvent, getLifecycleEvents } from "../scripts/session/m3-ops.mjs"
 import { getCurrentState } from "../types/lifecycle-event-types.mjs"
 
 const __filename = fileURLToPath(import.meta.url)

@@ -10,7 +10,7 @@ import YAML from "yaml"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..", "..")
-const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+const bootstrapPath = path.join(repoRoot, "scripts", "../../scripts/bootstrap/bootstrap-meta-agents.mjs")
 
 function runBootstrap(args, tempDir) {
   return spawnSync(process.execPath, [bootstrapPath, ...args], {

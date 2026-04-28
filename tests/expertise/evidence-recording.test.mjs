@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { recordEvidence } from '../../scripts/expertise-evidence-store.mjs'
+import { recordEvidence } from '../../scripts/expertise/evidence/expertise-evidence-store.mjs'
 
 function sampleEvidence(overrides = {}) {
   return {

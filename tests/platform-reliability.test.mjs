@@ -5,7 +5,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { mkdtempSync, readFileSync } from "node:fs"
 import os from "node:os"
-import { appendProvenance } from "../scripts/m3-ops.mjs"
+import { appendProvenance } from "../scripts/session/m3-ops.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -108,7 +108,7 @@ test("graph --mermaid detailed can render capabilities with legend and colors", 
 })
 
 test("sync projects crew mission and sprint metadata into runtime artifacts", () => {
-  const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "sync-meta-agents.mjs")], {
+  const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "../scripts/sync/sync-meta-agents.mjs")], {
     cwd: repoRoot,
     env: process.env,
     encoding: "utf-8"

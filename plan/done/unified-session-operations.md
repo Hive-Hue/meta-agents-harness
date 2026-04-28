@@ -66,7 +66,7 @@ mah sessions status [id]             # Show detailed status of a session (option
 
 ## 6. Adapter Contract Implications
 
-The runtime adapter contract (defined in `scripts/runtime-adapters.mjs`) must be extended with the following fields and methods:
+The runtime adapter contract (defined in `scripts/runtime/runtime-adapters.mjs`) must be extended with the following fields and methods:
 
 ### New Capability Fields
 
@@ -144,7 +144,7 @@ The following are explicitly **out of scope** for v0.4.0:
 
 ### Steps
 
-1. **Extend the adapter contract** in `scripts/runtime-adapters.mjs`:
+1. **Extend the adapter contract** in `scripts/runtime/runtime-adapters.mjs`:
    - Add `supportsSessions: boolean` (default `false`)
    - Add `sessionListCommand: [exec, args] | null`
    - Add `listSessions(): Promise<Session[]>` method stub on `createAdapter`

@@ -48,8 +48,8 @@ Delivered baseline:
 Implementation reference:
 
 - `types/context-memory-types.mjs`
-- `scripts/context-memory-schema.mjs`
-- `scripts/context-memory-validate.mjs`
+- `scripts/context/context-memory-schema.mjs`
+- `scripts/context/context-memory-validate.mjs`
 - `docs/context-memory.md`
 
 ### B2 — PR2 Retrieval Slice
@@ -67,7 +67,7 @@ Delivered baseline:
 
 Implementation reference:
 
-- `scripts/context-memory-schema.mjs`
+- `scripts/context/context-memory-schema.mjs`
 - `scripts/meta-agents-harness.mjs`
 - `tests/context-memory.test.mjs`
 
@@ -174,8 +174,8 @@ Out of scope:
 
 ### Likely Files
 
-- `scripts/context-memory-integration.mjs`
-- `scripts/runtime-core-integrations.mjs`
+- `scripts/context/context-memory-integration.mjs`
+- `scripts/runtime/runtime-core-integrations.mjs`
 - `scripts/meta-agents-harness.mjs`
 - `tests/runtime-core-integration.test.mjs`
 - `tests/context-memory.test.mjs`
@@ -282,9 +282,9 @@ Out of scope:
 
 ### Likely Files
 
-- `scripts/context-memory-proposal.mjs`
-- `scripts/context-memory-validate.mjs`
-- `scripts/context-memory-schema.mjs`
+- `scripts/context/context-memory-proposal.mjs`
+- `scripts/context/context-memory-validate.mjs`
+- `scripts/context/context-memory-schema.mjs`
 - `scripts/meta-agents-harness.mjs`
 - `docs/context-memory.md`
 - `tests/context-memory.test.mjs`
@@ -400,8 +400,8 @@ Out of scope:
 ### Likely Files
 
 - `scripts/meta-agents-harness.mjs`
-- a new helper such as `scripts/assistant-state.mjs`
-- `scripts/context-memory-integration.mjs`
+- a new helper such as `scripts/runtime/assistant-state.mjs`
+- `scripts/context/context-memory-integration.mjs`
 - session and explain helpers already used by MAH
 - `docs/context-memory.md`
 - explain docs

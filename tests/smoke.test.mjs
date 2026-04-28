@@ -282,7 +282,7 @@ test("claude dry-run works with wrapped instruction blocks in crew config", () =
 test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-"))
   try {
-    const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+    const bootstrapPath = path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs")
     const result = spawnSync(process.execPath, [bootstrapPath, "--non-interactive"], {
       cwd: tempDir,
       env: process.env,
@@ -320,7 +320,7 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
 test("bootstrap script respects --crew flag in non-interactive mode", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-crew-"))
   try {
-    const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+    const bootstrapPath = path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs")
     const result = spawnSync(process.execPath, [bootstrapPath, "--non-interactive", "--crew", "custom-crew"], {
       cwd: tempDir,
       env: process.env,
@@ -338,7 +338,7 @@ test("bootstrap script respects --crew flag in non-interactive mode", () => {
 test("bootstrap script skips when file exists without --force", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-force-"))
   try {
-    const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+    const bootstrapPath = path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs")
     writeFileSync(path.join(tempDir, "meta-agents.yaml"), "version: 1\n")
     const result = spawnSync(process.execPath, [bootstrapPath, "--non-interactive"], {
       cwd: tempDir,

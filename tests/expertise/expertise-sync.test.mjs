@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { extractCapabilitiesFromSystemA, syncExpertiseEntry } from '../../scripts/expertise-sync.mjs'
+import { extractCapabilitiesFromSystemA, syncExpertiseEntry } from '../../scripts/expertise/expertise-sync.mjs'
 
 const repoRoot = process.cwd()
 

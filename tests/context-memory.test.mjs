@@ -4,8 +4,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
-import { buildContextMemoryBlock } from "../scripts/context-memory-integration.mjs"
-import { buildIndexFromDirs, buildOperationalIndex, retrieveDocuments } from "../scripts/context-memory-schema.mjs"
+import { buildContextMemoryBlock } from "../scripts/context/context-memory-integration.mjs"
+import { buildIndexFromDirs, buildOperationalIndex, retrieveDocuments } from "../scripts/context/context-memory-schema.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

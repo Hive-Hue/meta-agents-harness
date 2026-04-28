@@ -23,19 +23,19 @@ The runtime where the child agent will actually execute.
 
 ### Components
 
-1. **ChildAgentAdapter Contract** (`scripts/child-agent-adapter-contract.mjs`)
+1. **ChildAgentAdapter Contract** (`scripts/runtime/child-agent-adapter-contract.mjs`)
    - Defines the adapter contract and the available spawn modes
    - Exports `SPAWN_MODES`, `validateChildAgentAdapter()`, and `isValidSpawnMode()`
 
-2. **DelegationResolution** (`scripts/delegation-resolution.mjs`)
+2. **DelegationResolution** (`scripts/runtime/delegation-resolution.mjs`)
    - Shared service for resolving logical targets against crew topology
    - Enforces crew authorization rules before any spawn planning
 
-3. **Child Agent Spawn** (`scripts/child-agent-spawn.mjs`)
+3. **Child Agent Spawn** (`scripts/runtime/child-agent-spawn.mjs`)
    - Strategy layer combining delegation resolution with spawn planning
    - Provides adapter registration, mode selection, and spawn context building
 
-4. **Codex Sidecar** (`scripts/child-agent-codex-sidecar.mjs`)
+4. **Codex Sidecar** (`scripts/runtime/child-agent-codex-sidecar.mjs`)
    - First cross-runtime sidecar implementation
    - Produces a Codex execution plan with non-interactive environment overrides
 
@@ -159,10 +159,10 @@ interface SpawnPlanResult {
 
 ## Reference Files
 
-- `scripts/child-agent-adapter-contract.mjs`
-- `scripts/delegation-resolution.mjs`
-- `scripts/child-agent-spawn.mjs`
-- `scripts/child-agent-codex-sidecar.mjs`
+- `scripts/runtime/child-agent-adapter-contract.mjs`
+- `scripts/runtime/delegation-resolution.mjs`
+- `scripts/runtime/child-agent-spawn.mjs`
+- `scripts/runtime/child-agent-codex-sidecar.mjs`
 - `scripts/meta-agents-harness.mjs`
 
 ## Notes

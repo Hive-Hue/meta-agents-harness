@@ -62,7 +62,7 @@ describe("Session Types", () => {
 
 describe("Session Adapter Contract", () => {
   it("should export REQUIRED_SESSION_ADAPTER_FIELDS", async () => {
-    const { REQUIRED_SESSION_ADAPTER_FIELDS } = await import("../scripts/session-adapter-contract.mjs")
+    const { REQUIRED_SESSION_ADAPTER_FIELDS } = await import("../scripts/session/session-adapter-contract.mjs")
     assert.ok(Array.isArray(REQUIRED_SESSION_ADAPTER_FIELDS))
     assert.ok(REQUIRED_SESSION_ADAPTER_FIELDS.includes("runtime"))
     assert.ok(REQUIRED_SESSION_ADAPTER_FIELDS.includes("listSessions"))
@@ -71,7 +71,7 @@ describe("Session Adapter Contract", () => {
   })
 
   it("should validate session adapters with all required fields", async () => {
-    const { validateSessionAdapterContract } = await import("../scripts/session-adapter-contract.mjs")
+    const { validateSessionAdapterContract } = await import("../scripts/session/session-adapter-contract.mjs")
     
     const validAdapter = {
       runtime: "pi",
@@ -88,7 +88,7 @@ describe("Session Adapter Contract", () => {
   })
 
   it("should reject adapters missing required fields", async () => {
-    const { validateSessionAdapterContract } = await import("../scripts/session-adapter-contract.mjs")
+    const { validateSessionAdapterContract } = await import("../scripts/session/session-adapter-contract.mjs")
     
     const invalidAdapter = {
       runtime: "pi"
@@ -102,7 +102,7 @@ describe("Session Adapter Contract", () => {
 
   it("should select fidelity level correctly", async () => {
     const { DEFAULT_FIDELITY_LEVEL } = await import("../types/session-types.mjs")
-    const { selectFidelityLevel } = await import("../scripts/session-adapter-contract.mjs")
+    const { selectFidelityLevel } = await import("../scripts/session/session-adapter-contract.mjs")
     
     // Default to contextual when no request
     assert.strictEqual(selectFidelityLevel(null, {}), DEFAULT_FIDELITY_LEVEL)
@@ -117,12 +117,12 @@ describe("Session Adapter Contract", () => {
 
 describe("Session Export", () => {
   it("should export buildMahSessionEnvelope function", async () => {
-    const { buildMahSessionEnvelope } = await import("../scripts/session-export.mjs")
+    const { buildMahSessionEnvelope } = await import("../scripts/session/session-export.mjs")
     assert.strictEqual(typeof buildMahSessionEnvelope, "function")
   })
 
   it("should export all format functions", async () => {
-    const mod = await import("../scripts/session-export.mjs")
+    const mod = await import("../scripts/session/session-export.mjs")
     assert.strictEqual(typeof mod.exportSession, "function")
     assert.strictEqual(typeof mod.exportSessionMahJson, "function")
     assert.strictEqual(typeof mod.exportSessionSummaryMd, "function")
@@ -132,7 +132,7 @@ describe("Session Export", () => {
 
 describe("Session Injection", () => {
   it("should export injection functions", async () => {
-    const mod = await import("../scripts/session-injection.mjs")
+    const mod = await import("../scripts/session/session-injection.mjs")
     assert.strictEqual(typeof mod.determineInjectionStrategy, "function")
     assert.strictEqual(typeof mod.buildContextBlocks, "function")
     assert.strictEqual(typeof mod.buildInjectionPayload, "function")
@@ -140,7 +140,7 @@ describe("Session Injection", () => {
   })
 
   it("should determine strategy based on fidelity level", async () => {
-    const { determineInjectionStrategy } = await import("../scripts/session-injection.mjs")
+    const { determineInjectionStrategy } = await import("../scripts/session/session-injection.mjs")
     
     // Contextual defaults to context-injection
     const result1 = determineInjectionStrategy("contextual", "pi", {})
@@ -152,7 +152,7 @@ describe("Session Injection", () => {
   })
 
   it("should build context blocks for different fidelity levels", async () => {
-    const { buildContextBlocks } = await import("../scripts/session-injection.mjs")
+    const { buildContextBlocks } = await import("../scripts/session/session-injection.mjs")
     
     const session = createMockMahSession()
     
@@ -168,19 +168,19 @@ describe("Session Injection", () => {
 
 describe("Session Bridge", () => {
   it("should export bridgeSession function", async () => {
-    const { bridgeSession } = await import("../scripts/session-bridge.mjs")
+    const { bridgeSession } = await import("../scripts/session/session-bridge.mjs")
     assert.strictEqual(typeof bridgeSession, "function")
   })
 })
 
 describe("Non-regression: Existing m3-ops", () => {
   it("should still export parseSessionId", async () => {
-    const { parseSessionId } = await import("../scripts/m3-ops.mjs")
+    const { parseSessionId } = await import("../scripts/session/m3-ops.mjs")
     assert.strictEqual(typeof parseSessionId, "function")
   })
 
   it("should parse valid session IDs correctly", async () => {
-    const { parseSessionId } = await import("../scripts/m3-ops.mjs")
+    const { parseSessionId } = await import("../scripts/session/m3-ops.mjs")
     
     const result = parseSessionId("pi:dev:abc123")
     assert.deepStrictEqual(result, {
@@ -191,7 +191,7 @@ describe("Non-regression: Existing m3-ops", () => {
   })
 
   it("should reject invalid session ID formats", async () => {
-    const { parseSessionId } = await import("../scripts/m3-ops.mjs")
+    const { parseSessionId } = await import("../scripts/session/m3-ops.mjs")
     
     assert.strictEqual(parseSessionId("invalid"), null)
     assert.strictEqual(parseSessionId("only:two"), null)

@@ -106,7 +106,7 @@ mah init --yes \
 npm run bootstrap:meta
 
 # With flags
-node scripts/bootstrap-meta-agents.mjs --yes --crew dev
+node scripts/bootstrap/bootstrap-meta-agents.mjs --yes --crew dev
 ```
 
 ---

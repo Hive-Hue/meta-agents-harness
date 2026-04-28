@@ -5,17 +5,17 @@ import { spawnSync } from "node:child_process"
 import os from "node:os"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
-import { RUNTIME_ORDER } from "./runtime-adapters.mjs"
-import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
-import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./m3-ops.mjs"
-import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./plugin-loader.mjs"
-import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
-import { resolveMahHome } from "./mah-home.mjs"
-import { resolveWorkspaceRoot } from "./workspace-root.mjs"
-import { buildContextMemoryExplainPayload } from "./context-memory-integration.mjs"
-import { buildAssistantStatePayload } from "./assistant-state.mjs"
+import { RUNTIME_ORDER } from "./runtime/runtime-adapters.mjs"
+import { validateRuntimeAdapterContract } from "./runtime/runtime-adapter-contract.mjs"
+import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./session/m3-ops.mjs"
+import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./runtime/plugin-loader.mjs"
+import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime/runtime-core-ops.mjs"
+import { resolveMahHome } from "./core/mah-home.mjs"
+import { resolveWorkspaceRoot } from "./core/workspace-root.mjs"
+import { buildContextMemoryExplainPayload } from "./context/context-memory-integration.mjs"
+import { buildAssistantStatePayload } from "./runtime/assistant-state.mjs"
 import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
-import { recordDelegationEvidence } from "./evidence-pipeline.mjs"
+import { recordDelegationEvidence } from "./expertise/evidence/evidence-pipeline.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -954,7 +954,7 @@ function runInit(argv) {
   const created = []
   const skipped = []
 
-  const bootstrapArgs = [path.join(packageRoot, "scripts", "bootstrap-meta-agents.mjs")]
+  const bootstrapArgs = [path.join(packageRoot, "scripts", "./bootstrap/bootstrap-meta-agents.mjs")]
   if (!process.stdin.isTTY || yesFlag) {
     bootstrapArgs.push("--non-interactive")
   }
@@ -1069,7 +1069,7 @@ function printSessionsHelp() {
 }
 
 async function runSessionsStatus(sessionId, jsonMode = false) {
-  const { getLifecycleEvents, collectSessions } = await import('./m3-ops.mjs')
+  const { getLifecycleEvents, collectSessions } = await import('./session/m3-ops.mjs')
   const { getCurrentState } = await import('../types/lifecycle-event-types.mjs')
 
   if (!sessionId) {
@@ -1141,7 +1141,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error("ERROR: 'mah sessions counts <id>' requires a session ID")
       return 1
     }
-    const { collectSessions } = await import('./m3-ops.mjs')
+    const { collectSessions } = await import('./session/m3-ops.mjs')
     const allRt = await getAllRuntimes()
     const allSes = collectSessions(repoRoot, {}, allRt)
     const found = allSes.find(s => s.id === sessionId || s.id.endsWith(sessionId) || s.id.includes(sessionId))
@@ -1290,7 +1290,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error(`ERROR: unknown format '${format}'. Use: mah-json, summary-md, runtime-raw`)
       return 1
     }
-    const { exportSession } = await import("./session-export.mjs")
+    const { exportSession } = await import("./session/session-export.mjs")
     const exportResult = await exportSession(repoRoot, sessionId, format, allRuntimes)
     if (!exportResult.ok) {
       console.error(`ERROR: ${exportResult.error}`)
@@ -1323,9 +1323,9 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
 
     // Import and use session-injection
-    const { injectSessionContext } = await import("./session-injection.mjs")
-    const { parseSessionId } = await import("./m3-ops.mjs")
-    const { collectSessions } = await import("./m3-ops.mjs")
+    const { injectSessionContext } = await import("./session/session-injection.mjs")
+    const { parseSessionId } = await import("./session/m3-ops.mjs")
+    const { collectSessions } = await import("./session/m3-ops.mjs")
 
     const parsed = parseSessionId(sessionId)
     if (!parsed) {
@@ -1341,7 +1341,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     }
 
     // Build envelope from session ref
-    const { buildMahSessionEnvelope } = await import("./session-export.mjs")
+    const { buildMahSessionEnvelope } = await import("./session/session-export.mjs")
     const envelope = buildMahSessionEnvelope(sessionRef)
 
     const result = await injectSessionContext(repoRoot, envelope, targetRuntime, fidelityLevel, {
@@ -1379,7 +1379,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const fidelityIdx = argv.indexOf("--fidelity")
     const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
 
-    const { bridgeSession } = await import("./session-bridge.mjs")
+    const { bridgeSession } = await import("./session/session-bridge.mjs")
     const result = await bridgeSession(repoRoot, sessionId, targetRuntime, {
       fidelityLevel,
       runtimeRegistry: allRuntimes
@@ -2175,7 +2175,7 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
   const envOverrides = { ...normalized.envOverrides }
   const crew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
   const task = parseValueArg(normalizedPassthrough, "--task") || normalized.args.join(" ")
-  const { recordLifecycleEvent } = await import("./m3-ops.mjs")
+  const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
   const headlessSessionId = `${runtime}:mah:headless-${Date.now()}`
   recordLifecycleEvent(repoRoot, headlessSessionId, {
     event: "running",
@@ -2274,7 +2274,7 @@ function isSyncLikeCommand(command) {
  */
 async function runDelegate(passthrough, options = {}) {
   const startTimeMs = Date.now()
-  const { recordLifecycleEvent } = await import("./m3-ops.mjs")
+  const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
   const execute = passthrough.includes("--execute") || passthrough.includes("-x")
   const headless = options.headless === true
   const verbose = passthrough.includes("--verbose")
@@ -2301,9 +2301,9 @@ async function runDelegate(passthrough, options = {}) {
   }
 
   // Dynamic imports — keeps the delegate surface lazy-loaded
-  const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./child-agent-spawn.mjs")
-  const { codexSidecarAdapter } = await import("./child-agent-codex-sidecar.mjs")
-  const { nativeRuntimeAdapter } = await import("./child-agent-native-runtime.mjs")
+  const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./runtime/child-agent-spawn.mjs")
+  const { codexSidecarAdapter } = await import("./runtime/child-agent-codex-sidecar.mjs")
+  const { nativeRuntimeAdapter } = await import("./runtime/child-agent-native-runtime.mjs")
 
   // Register adapters (fresh each invocation)
   clearAdapters()
@@ -2331,9 +2331,9 @@ async function runDelegate(passthrough, options = {}) {
   if (autoMode) {
     // Mode A: Auto-selection using expertise scoring
     try {
-      const { listDelegationTargets } = await import("./delegation-resolution.mjs")
-      const { scoreCandidates } = await import("./expertise-routing.mjs")
-      const { getRegistry } = await import("./expertise-registry.mjs")
+      const { listDelegationTargets } = await import("./runtime/delegation-resolution.mjs")
+      const { scoreCandidates } = await import("./expertise/expertise-routing.mjs")
+      const { getRegistry } = await import("./expertise/expertise-registry.mjs")
 
       // Get policy-allowed candidates
       const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
@@ -2388,7 +2388,7 @@ async function runDelegate(passthrough, options = {}) {
       console.error(`WARNING: expertise scoring failed: ${err.message}`)
       // Fall back to first allowed target if we have one
       try {
-        const { listDelegationTargets } = await import("./delegation-resolution.mjs")
+        const { listDelegationTargets } = await import("./runtime/delegation-resolution.mjs")
         const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
         if (listResult.ok && listResult.targets.length > 0) {
           effectiveTarget = listResult.targets[0]
@@ -2404,9 +2404,9 @@ async function runDelegate(passthrough, options = {}) {
     // Mode B: Explicit target with expertise review
     // First, verify the explicit target is policy-allowed via delegation-resolution
     try {
-      const { resolveDelegationTarget, listDelegationTargets } = await import("./delegation-resolution.mjs")
-      const { scoreCandidates } = await import("./expertise-routing.mjs")
-      const { getRegistry } = await import("./expertise-registry.mjs")
+      const { resolveDelegationTarget, listDelegationTargets } = await import("./runtime/delegation-resolution.mjs")
+      const { scoreCandidates } = await import("./expertise/expertise-routing.mjs")
+      const { getRegistry } = await import("./expertise/expertise-registry.mjs")
 
       // Resolve explicit target against policy
       const resolveResult = resolveDelegationTarget({
@@ -2685,7 +2685,7 @@ async function runDelegate(passthrough, options = {}) {
       error_detail: exitCode !== 0 ? { exitCode } : null
     })
     if (verbose && delegateSessionId) {
-      const { getLifecycleEvents } = await import("./m3-ops.mjs")
+      const { getLifecycleEvents } = await import("./session/m3-ops.mjs")
       const delegateEvents = getLifecycleEvents(repoRoot, delegateSessionId)
       if (delegateEvents.length > 0) {
         console.log("\nLifecycle timeline:")
@@ -2862,8 +2862,8 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
       ? path.resolve(repoRoot, subArgv[pathIdx + 1])
       : path.join(contextRoot, "operational")
 
-    const { parseContextFile } = await import("./context-memory-schema.mjs")
-    const { validateContextMemoryDocument } = await import("./context-memory-validate.mjs")
+    const { parseContextFile } = await import("./context/context-memory-schema.mjs")
+    const { validateContextMemoryDocument } = await import("./context/context-memory-validate.mjs")
     const { readdirSync } = await import("node:fs")
 
     const files = []
@@ -2918,7 +2918,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const capIdx = subArgv.indexOf("--capability")
     const capFilter = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
-    const { parseContextFile } = await import("./context-memory-schema.mjs")
+    const { parseContextFile } = await import("./context/context-memory-schema.mjs")
     const { readdirSync } = await import("node:fs")
 
     const searchDirs = [path.join(contextRoot, "operational")]
@@ -2964,7 +2964,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const docId = subArgv.find(a => !a.startsWith("--"))
     if (!docId) { console.error("ERROR: usage: mah context show <id>"); return 1 }
 
-    const { parseContextFile, deriveDocId } = await import("./context-memory-schema.mjs")
+    const { parseContextFile, deriveDocId } = await import("./context/context-memory-schema.mjs")
     const { readdirSync } = await import("node:fs")
 
     const searchDirs = [path.join(contextRoot, "operational")]
@@ -3012,7 +3012,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
   if (sub === "index") {
     const rebuild = subArgv.includes("--rebuild")
 
-    const { buildOperationalIndex, loadIndex } = await import("./context-memory-schema.mjs")
+    const { buildOperationalIndex, loadIndex } = await import("./context/context-memory-schema.mjs")
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
 
     const result = buildOperationalIndex(contextRoot, { rebuild })
@@ -3077,7 +3077,7 @@ Examples:
       return 1
     }
 
-    const { loadIndex, buildOperationalIndex, retrieveDocuments } = await import("./context-memory-schema.mjs")
+    const { loadIndex, buildOperationalIndex, retrieveDocuments } = await import("./context/context-memory-schema.mjs")
 
     // Try to load existing index first, build if needed
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
@@ -3171,7 +3171,7 @@ Examples:
       return 1
     }
 
-    const { loadIndex, buildOperationalIndex, retrieveDocuments, scoreDocument } = await import("./context-memory-schema.mjs")
+    const { loadIndex, buildOperationalIndex, retrieveDocuments, scoreDocument } = await import("./context/context-memory-schema.mjs")
 
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
     let index = loadIndex(indexPath)
@@ -3275,7 +3275,7 @@ Examples:
       return 1
     }
 
-    const { proposeFromSession, writeProposal, refineProposalWithAi } = await import("./context-memory-proposal.mjs")
+    const { proposeFromSession, writeProposal, refineProposalWithAi } = await import("./context/context-memory-proposal.mjs")
     const result = proposeFromSession(repoRoot, sessionRef)
 
     if (!result.ok) {
@@ -3302,7 +3302,9 @@ Examples:
         proposal = aiResult.proposal
         aiMeta = { provider: aiResult.provider, model: aiResult.model }
       } else {
-        console.log(`context propose: AI rewrite skipped (${aiResult.reason})`)
+        const aiError = aiResult?.error ? `: ${aiResult.error}` : ""
+        const aiDetails = aiResult?.details ? ` | ${String(aiResult.details).slice(0, 220)}` : ""
+        console.log(`context propose: AI rewrite skipped (${aiResult.reason}${aiError}${aiDetails})`)
       }
     }
 
@@ -3344,7 +3346,7 @@ Examples:
     const govArgv = subArgv.slice(1)
     const govJson = govArgv.includes("--json") || jsonMode
 
-    const { listProposalSummaries, showProposal, promoteProposal, rejectProposal } = await import("./context-memory-proposal.mjs")
+    const { listProposalSummaries, showProposal, promoteProposal, rejectProposal } = await import("./context/context-memory-proposal.mjs")
 
     if (!govAction || govAction === "list") {
       const summaries = listProposalSummaries(repoRoot)
@@ -3447,12 +3449,12 @@ async function runExpertise(argv, jsonMode = false) {
   const defaultCrew = process.env.MAH_ACTIVE_CREW || 'dev'
 
   // Load expertise modules lazily
-  const { getRegistry, buildRegistry } = await import('./expertise-registry.mjs')
-  const { seedExpertiseCatalog } = await import('./expertise-seed.mjs')
-  const { loadExpertiseById } = await import('./expertise-loader.mjs')
-  const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
-  const { computeConfidence, mergeConfidence } = await import('./expertise-confidence.mjs')
-  const { generateProposalById, generateProposalFromEvidenceById, writeProposalToFile, canGenerateProposal } = await import('./expertise-proposal.mjs')
+  const { getRegistry, buildRegistry } = await import('./expertise/expertise-registry.mjs')
+  const { seedExpertiseCatalog } = await import('./expertise/expertise-seed.mjs')
+  const { loadExpertiseById } = await import('./expertise/expertise-loader.mjs')
+  const { loadEvidenceFor, computeMetrics } = await import('./expertise/evidence/expertise-evidence-store.mjs')
+  const { computeConfidence, mergeConfidence } = await import('./expertise/expertise-confidence.mjs')
+  const { generateProposalById, generateProposalFromEvidenceById, writeProposalToFile, canGenerateProposal, refineExpertiseProposalWithAi } = await import('./expertise/expertise-proposal.mjs')
 
   const resolveExpertiseId = (targetId, crew = defaultCrew) => (
     targetId?.includes(':') ? targetId : `${crew}:${targetId}`
@@ -3546,13 +3548,13 @@ Examples:
     const crew = targetCrew || defaultCrew
 
     if (json || jsonMode) {
-      const { syncExpertise } = await import('./expertise-sync.mjs')
+      const { syncExpertise } = await import('./expertise/expertise-sync.mjs')
       const result = await syncExpertise({ crew, dryRun })
       console.log(JSON.stringify({ ok: true, ...result }))
       return 0
     }
 
-    const { syncExpertise } = await import('./expertise-sync.mjs')
+    const { syncExpertise } = await import('./expertise/expertise-sync.mjs')
     const result = await syncExpertise({ crew, dryRun })
 
     if (result.errors.length > 0) {
@@ -3761,8 +3763,8 @@ Examples:
     }
 
     const sourceAgent = process.env.MAH_AGENT || 'orchestrator'
-    const { listDelegationTargets } = await import('./delegation-resolution.mjs')
-    const { scoreCandidates } = await import('./expertise-routing.mjs')
+    const { listDelegationTargets } = await import('./runtime/delegation-resolution.mjs')
+    const { scoreCandidates } = await import('./expertise/expertise-routing.mjs')
 
     const listResult = listDelegationTargets({ crew: effectiveCrew, sourceAgent, repoRoot })
     if (!listResult.ok || listResult.targets.length === 0) {
@@ -3955,8 +3957,8 @@ Examples:
     }
 
     const sourceAgent = process.env.MAH_AGENT || 'orchestrator'
-    const { listDelegationTargets } = await import('./delegation-resolution.mjs')
-    const { scoreCandidates } = await import('./expertise-routing.mjs')
+    const { listDelegationTargets } = await import('./runtime/delegation-resolution.mjs')
+    const { scoreCandidates } = await import('./expertise/expertise-routing.mjs')
 
     const listResult = listDelegationTargets({ crew: effectiveCrew, sourceAgent, repoRoot })
     if (!listResult.ok) {
@@ -4113,7 +4115,7 @@ Examples:
       return 1
     }
 
-    const { exportExpertiseToFile } = await import('./expertise-export.mjs')
+    const { exportExpertiseToFile } = await import('./expertise/expertise-export.mjs')
 
     if (outputPath) {
       // SECURITY: v0.7.0-patch
@@ -4144,7 +4146,7 @@ Examples:
       return 1
     }
 
-    const { exportExpertise } = await import('./expertise-export.mjs')
+    const { exportExpertise } = await import('./expertise/expertise-export.mjs')
     const result = await exportExpertise(entry, { domain, skipPolicy: false, includeEvidence: withEvidence })
     if (!result.ok) {
       console.error(`ERROR: export blocked by policy: ${result.error}`)
@@ -4181,6 +4183,12 @@ Arguments:
   --evidence-refs <ids>  Comma-separated evidence IDs to include
   --reviewers <roles>    Comma-separated reviewer roles (default: validation-lead,security-reviewer)
   --output <path>        Write proposal YAML to file (required for apply-proposal)
+  --ai                   Rewrite summary/rationale/changes with AI before output
+  --provider <id>        AI provider (zai|openrouter|codex-oauth|minimax)
+  --model <id>           AI model ID (or MAH_AI_MODEL)
+  --api-key <key>        AI API key (or provider/env defaults)
+  --base-url <url>       Override provider base URL
+  --endpoint <path>      /chat/completions or /responses
   --json                 JSON output mode
 
 Workflow:
@@ -4208,11 +4216,17 @@ Examples:
     const evidenceRaw = parseValueArg(subArgv, '--evidence-refs') || ''
     const reviewersRaw = parseValueArg(subArgv, '--reviewers') || ''
     const fromEvidence = subArgv.includes('--from-evidence')
+    const aiEnabled = subArgv.includes('--ai')
+    const aiProvider = parseValueArg(subArgv, '--provider')
+    const aiModel = parseValueArg(subArgv, '--model')
+    const aiApiKey = parseValueArg(subArgv, '--api-key')
+    const aiBaseUrl = parseValueArg(subArgv, '--base-url')
+    const aiEndpoint = parseValueArg(subArgv, '--endpoint')
     const evidenceLimitRaw = parseValueArg(subArgv, '--evidence-limit') || '5'
     const evidenceLimit = Number.parseInt(evidenceLimitRaw, 10)
 
     if (!targetId) {
-      console.error("ERROR: usage: mah expertise propose <id> [--from-evidence] [--summary <text>] [--rationale <text>] [--changes '<json>'] [--output <path>]")
+      console.error("ERROR: usage: mah expertise propose <id> [--from-evidence] [--summary <text>] [--rationale <text>] [--changes '<json>'] [--ai] [--output <path>]")
       return 1
     }
 
@@ -4264,7 +4278,28 @@ Examples:
       return 1
     }
 
-    const proposal = result.proposal
+    let proposal = result.proposal
+    let aiMeta = null
+    if (aiEnabled) {
+      const aiResult = await refineExpertiseProposalWithAi(
+        repoRoot,
+        proposal,
+        {
+          provider: aiProvider,
+          model: aiModel,
+          apiKey: aiApiKey,
+          baseUrl: aiBaseUrl,
+          endpoint: aiEndpoint,
+        },
+        process.env
+      )
+      if (aiResult.ok) {
+        proposal = aiResult.proposal
+        aiMeta = { provider: aiResult.provider, model: aiResult.model }
+      } else {
+        console.log(`expertise propose: AI rewrite skipped (${aiResult.reason})`)
+      }
+    }
 
     if (outputPath) {
       const outputValidation = validateCliPath(outputPath, 'write')
@@ -4278,11 +4313,12 @@ Examples:
         return 1
       }
       if (jsonMode) {
-        console.log(JSON.stringify({ ok: true, output: writeResult.path, proposal }, null, 2))
+        console.log(JSON.stringify({ ok: true, output: writeResult.path, proposal, ...(aiMeta ? { ai: aiMeta } : {}) }, null, 2))
       } else {
         console.log(`✓ Proposal written to '${writeResult.path}'`)
         console.log(`  target: ${proposal.target_expertise_id}`)
         console.log(`  generated by: ${proposal.generated_by.actor} (${proposal.generated_by.role})`)
+        if (aiMeta) console.log(`  ai rewrite: ${aiMeta.provider}/${aiMeta.model}`)
       }
       return 0
     }
@@ -4294,6 +4330,7 @@ Examples:
       console.log(`Generated by: ${proposal.generated_by.actor} (${proposal.generated_by.role})`)
       console.log(`Summary: ${proposal.summary}`)
       if (proposal.rationale) console.log(`Rationale: ${proposal.rationale}`)
+      if (aiMeta) console.log(`AI rewrite: ${aiMeta.provider}/${aiMeta.model}`)
       console.log(`Target status: ${proposal.target_snapshot.validation_status} / ${proposal.target_snapshot.lifecycle}`)
       console.log(`Proposed changes: ${Object.keys(proposal.proposed_changes || {}).length ? JSON.stringify(proposal.proposed_changes) : 'none'}`)
       console.log(`Reviewers: ${(proposal.reviewers || []).join(', ') || 'validation-lead, security-reviewer'}`)
@@ -4344,7 +4381,7 @@ Examples:
     }
 
     const actor = process.env.MAH_AGENT || 'orchestrator'
-    const { applyProposalFromFile } = await import('./expertise-apply-proposal.mjs')
+    const { applyProposalFromFile } = await import('./expertise/expertise-apply-proposal.mjs')
 
     const pathValidation = validateCliPath(proposalPath, 'read')
     if (!pathValidation.ok) {
@@ -4426,7 +4463,7 @@ Examples:
       return 1
     }
 
-    const { transitionLifecycle } = await import('./expertise-lifecycle-cli.mjs')
+    const { transitionLifecycle } = await import('./expertise/expertise-lifecycle-cli.mjs')
     const result = await transitionLifecycle(targetId, targetState, { actor, reason })
 
     if (jsonMode) {
@@ -4491,7 +4528,7 @@ Examples:
       return 1
     }
 
-    const { loadImportFile, importExpertise } = await import('./expertise-export.mjs')
+    const { loadImportFile, importExpertise } = await import('./expertise/expertise-export.mjs')
 
     // SECURITY: v0.7.0-patch
     const fileValidation = validateCliPath(filePath, 'read')
@@ -4589,6 +4626,7 @@ Usage:
   mah expertise propose <id> --evidence-limit <n>  Number of recent evidence events to inspect
   mah expertise propose <id> --evidence-refs <id1,id2>  Optional evidence refs
   mah expertise propose <id> --output <path> Write proposal to file
+  mah expertise propose <id> --ai --provider <id> --model <id>  AI rewrite proposal text
 
   mah expertise import <file>               Import expertise from JSON file (strict by default)
   mah expertise import <file> --dry-run     Validate without writing
@@ -4607,6 +4645,7 @@ Examples:
   mah expertise export dev:backend-dev --output .mah/expertise/exported/backend-dev.json
   mah expertise propose dev:backend-dev --summary "Promote backend-dev after v0.7.0 evidence accumulation" --changes '{"validation_status":"validated"}'
   mah expertise propose dev:backend-dev --from-evidence --evidence-limit 10
+  mah expertise propose dev:backend-dev --from-evidence --ai --provider openrouter --model nvidia/nemotron-3-super-120b-a12b:free
   mah expertise import .mah/expertise/exported/backend-dev.json --dry-run
 `)
     return 0
@@ -4728,7 +4767,7 @@ async function main() {
   }
 
   if (first === "skills") {
-    process.exitCode = runLocalScript(path.join("scripts", "skills-cli.mjs"), argv.slice(1))
+    process.exitCode = runLocalScript(path.join("scripts", "./skills/skills-cli.mjs"), argv.slice(1))
     return
   }
 
@@ -4757,7 +4796,7 @@ async function main() {
       : [first === "plan" ? "--plan" : "--diff"]
     const allArgs = [...modeFlag, ...extraArgs]
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), [...allArgs, "--json"])
+      const captured = runLocalScriptCapture(path.join("scripts", "./sync/sync-meta-agents.mjs"), [...allArgs, "--json"])
       let report = {}
       try {
         report = JSON.parse(captured.stdout || "{}")
@@ -4772,13 +4811,13 @@ async function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), allArgs)
+    process.exitCode = runLocalScript(path.join("scripts", "./sync/sync-meta-agents.mjs"), allArgs)
     return
   }
 
   if (first === "validate:config") {
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      const captured = runLocalScriptCapture(path.join("scripts", "./validation/validate-meta-config.mjs"))
       printDiagnosticPayload(createDiagnosticPayload("validate:config", {
         status: captured.status,
         data: { stdout: captured.stdout.trim(), stderr: captured.stderr.trim() },
@@ -4787,7 +4826,7 @@ async function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    process.exitCode = runLocalScript(path.join("scripts", "./validation/validate-meta-config.mjs"))
     return
   }
 
@@ -4811,7 +4850,7 @@ async function main() {
 
   if (first === "validate:sync") {
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
+      const captured = runLocalScriptCapture(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check", "--json"])
       let report = {}
       try {
         report = JSON.parse(captured.stdout || "{}")
@@ -4826,7 +4865,7 @@ async function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    process.exitCode = runLocalScript(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check"])
     return
   }
 
@@ -4867,8 +4906,8 @@ async function main() {
 
   if (first === "validate:all") {
     if (jsonMode) {
-      const config = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
-      const sync = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
+      const config = runLocalScriptCapture(path.join("scripts", "./validation/validate-meta-config.mjs"))
+      const sync = runLocalScriptCapture(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check", "--json"])
       const runtime = runtimeResult.runtime
         ? dispatchCapture(runtimeResult.runtime, "check:runtime", [])
         : { status: 0, stdout: "", stderr: "skipped: no runtime detected" }
@@ -4895,12 +4934,12 @@ async function main() {
       process.exitCode = status
       return
     }
-    const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    const configStatus = runLocalScript(path.join("scripts", "./validation/validate-meta-config.mjs"))
     if (configStatus !== 0) {
       process.exitCode = configStatus
       return
     }
-    const syncStatus = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    const syncStatus = runLocalScript(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check"])
     if (syncStatus !== 0) {
       process.exitCode = syncStatus
       return
@@ -4978,7 +5017,7 @@ async function main() {
         reason: runtimeResult.reason,
         command: explainCommand,
         resolved_exec: process.execPath,
-        resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"],
+        resolved_args: [path.join("scripts", "./sync/sync-meta-agents.mjs"), "--check"],
         crewContext
       }
       if (jsonMode) {
@@ -5037,7 +5076,7 @@ async function main() {
         // Load delegation-resolution helpers (only listDelegationTargets and resolveDelegationTarget are exported)
         let listDelegationTargets
         try {
-          const dr = await import("./delegation-resolution.mjs")
+          const dr = await import("./runtime/delegation-resolution.mjs")
           listDelegationTargets = dr.listDelegationTargets
         } catch (err) {
           if (jsonMode) {
@@ -5118,7 +5157,7 @@ async function main() {
         // Load expertise-routing for scoreCandidates
         let scoreCandidates
         try {
-          const er = await import("./expertise-routing.mjs")
+          const er = await import("./expertise/expertise-routing.mjs")
           scoreCandidates = er.scoreCandidates
         } catch (err) {
           if (jsonMode) {
@@ -5129,7 +5168,7 @@ async function main() {
             }))
           } else {
             console.error("ERROR: expertise-routing.mjs not available — " + err.message)
-            console.error("       Run: node scripts/expertise-routing.mjs to verify the module exists.")
+            console.error("       Run: node scripts/expertise/expertise-routing.mjs to verify the module exists.")
           }
           process.exitCode = 1
           return
@@ -5348,7 +5387,7 @@ async function main() {
     const validateFilters = parseFilterArgs(normalizedArgv.slice(1))
     const crewContext = resolveCrewExecutionContext(validateFilters.crew)
     if (jsonMode) {
-      const configCaptured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      const configCaptured = runLocalScriptCapture(path.join("scripts", "./validation/validate-meta-config.mjs"))
       if (configCaptured.status !== 0) {
         printDiagnosticPayload(createDiagnosticPayload("validate", {
           status: configCaptured.status,
@@ -5387,7 +5426,7 @@ async function main() {
       process.exitCode = runtimeCaptured.status
       return
     } else {
-      const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+      const configStatus = runLocalScript(path.join("scripts", "./validation/validate-meta-config.mjs"))
       if (configStatus !== 0) {
         process.exitCode = configStatus
         return
@@ -5435,7 +5474,7 @@ async function main() {
       console.log(JSON.stringify(result, null, 2))
     }
     if (outputMode !== "json" && result.sessionId) {
-      const { getLifecycleEvents } = await import("./m3-ops.mjs")
+      const { getLifecycleEvents } = await import("./session/m3-ops.mjs")
       const events = getLifecycleEvents(repoRoot, result.sessionId)
       if (events.length > 0) {
         const timeline = events.map(e => e.event).join(" → ")

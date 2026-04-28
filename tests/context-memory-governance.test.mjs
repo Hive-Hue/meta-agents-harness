@@ -17,7 +17,7 @@ import {
   promoteProposal,
   rejectProposal,
   detectOverlaps
-} from '../scripts/context-memory-proposal.mjs'
+} from '../scripts/context/context-memory-proposal.mjs'
 
 // Helper: create a temp repo-like structure
 function createTempRepo () {

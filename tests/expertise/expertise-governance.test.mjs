@@ -26,7 +26,7 @@ test('apply-proposal with valid proposal → catalog updated', async () => {
   const p = join(tmp, 'proposal.json')
   writeFileSync(p, JSON.stringify(proposal))
 
-  const { applyProposalFromFile } = await import('../../scripts/expertise-apply-proposal.mjs')
+  const { applyProposalFromFile } = await import('../../scripts/expertise/expertise-apply-proposal.mjs')
   const result = await applyProposalFromFile(p, { force: true, actor: 'orchestrator' })
 
   assert.equal(result.ok, true)
@@ -55,7 +55,7 @@ test('apply-proposal with unauthorized actor → rejected', async () => {
   const p = join(tmp, 'proposal.json')
   writeFileSync(p, JSON.stringify(proposal))
 
-  const { applyProposalFromFile } = await import('../../scripts/expertise-apply-proposal.mjs')
+  const { applyProposalFromFile } = await import('../../scripts/expertise/expertise-apply-proposal.mjs')
   const result = await applyProposalFromFile(p, { actor: 'frontend-dev' })
 
   assert.equal(result.ok, false)
@@ -64,20 +64,20 @@ test('apply-proposal with unauthorized actor → rejected', async () => {
 })
 
 test('lifecycle invalid transition (active→validated) → blocked', async () => {
-  const { transitionLifecycle } = await import('../../scripts/expertise-lifecycle-cli.mjs')
+  const { transitionLifecycle } = await import('../../scripts/expertise/expertise-lifecycle-cli.mjs')
   const result = await transitionLifecycle('dev:backend-dev', 'validated', { actor: 'orchestrator' })
   assert.equal(result.ok, false)
 })
 
 test('lifecycle invalid transition (deprecated→active) style blocked for backend-dev', async () => {
-  const { transitionLifecycle } = await import('../../scripts/expertise-lifecycle-cli.mjs')
+  const { transitionLifecycle } = await import('../../scripts/expertise/expertise-lifecycle-cli.mjs')
   const result = await transitionLifecycle('dev:backend-dev', 'active', { actor: 'orchestrator' })
   assert.equal(result.ok, false)
 })
 
 test('export --with-evidence → payload includes evidence_summary', async () => {
-  const { exportExpertise } = await import('../../scripts/expertise-export.mjs')
-  const { loadExpertiseById } = await import('../../scripts/expertise-loader.mjs')
+  const { exportExpertise } = await import('../../scripts/expertise/expertise-export.mjs')
+  const { loadExpertiseById } = await import('../../scripts/expertise/expertise-loader.mjs')
 
   const entry = await loadExpertiseById('dev:backend-dev')
   assert.ok(entry)
@@ -89,8 +89,8 @@ test('export --with-evidence → payload includes evidence_summary', async () =>
 })
 
 test('export without flag → no evidence_summary (backward compat)', async () => {
-  const { exportExpertise } = await import('../../scripts/expertise-export.mjs')
-  const { loadExpertiseById } = await import('../../scripts/expertise-loader.mjs')
+  const { exportExpertise } = await import('../../scripts/expertise/expertise-export.mjs')
+  const { loadExpertiseById } = await import('../../scripts/expertise/expertise-loader.mjs')
 
   const entry = await loadExpertiseById('dev:backend-dev')
   const result = await exportExpertise(entry, { skipPolicy: true })

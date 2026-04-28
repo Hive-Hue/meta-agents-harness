@@ -290,10 +290,10 @@ This is governed learning, not a raw memory dump. No auto-promotion. No transcri
 
 \`\`\`
 types/context-memory-types.mjs
-scripts/context-memory-validate.mjs
-scripts/context-memory-schema.mjs
-scripts/context-memory-integration.mjs
-scripts/context-memory-proposal.mjs
+scripts/context/context-memory-validate.mjs
+scripts/context/context-memory-schema.mjs
+scripts/context/context-memory-integration.mjs
+scripts/context/context-memory-proposal.mjs
 CLI entry via scripts/meta-agents-harness.mjs
 \`\`\`
 

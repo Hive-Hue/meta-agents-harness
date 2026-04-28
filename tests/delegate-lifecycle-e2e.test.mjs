@@ -4,7 +4,7 @@ import { existsSync, rmSync, readFileSync, readdirSync } from "node:fs"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { recordLifecycleEvent, getLifecycleEvents } from "../scripts/m3-ops.mjs"
+import { recordLifecycleEvent, getLifecycleEvents } from "../scripts/session/m3-ops.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

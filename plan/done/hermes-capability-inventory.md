@@ -34,7 +34,7 @@ Source: `.hermes/scripts/hermesh.mjs`, `docs/hermes/runtime-support.md`
 
 ## 2. MAH `mah` CLI Surface — Hermes Coverage
 
-Source: `scripts/meta-agents-harness.mjs`, `scripts/runtime-adapters.mjs`
+Source: `scripts/meta-agents-harness.mjs`, `scripts/runtime/runtime-adapters.mjs`
 
 ### 2.1 MAH Commands with Hermes Mapping
 
@@ -211,7 +211,7 @@ Document is scope-compliant and approved for merge.
 
 ## Engineering Review
 
-**Reviewed against:** `scripts/runtime-adapter-contract.mjs`, `scripts/runtime-adapters.mjs`
+**Reviewed against:** `scripts/runtime/runtime-adapter-contract.mjs`, `scripts/runtime/runtime-adapters.mjs`
 **Adapter contract compliance:** Hermes adapter passes all `REQUIRED_RUNTIME_ADAPTER_FIELDS` and `REQUIRED_RUNTIME_COMMANDS` checks. All 8 required commands present and correctly routed.
 **Deferred list:** 9 items confirmed; all are correctly scoped to v0.5.0+ and do not conflict with the "no full Hermes parity" sprint directive.
 

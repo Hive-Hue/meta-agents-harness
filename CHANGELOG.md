@@ -18,7 +18,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Skills Management (`/skills`): real skill list from `mah skills list --json` (19 skills), agent selector for add/remove actions
 - Settings (`/settings`): collapsible sections, Models submenu, Skills submenu, editable Workspace Path with folder picker
 - `types/agent-execution-result.mjs` — canonical `AgentExecutionResult` type + `normalizeExecutionResult()` helper for runtime-agnostic execution results
-- `scripts/evidence-pipeline.mjs` — shared `recordDelegationEvidence()` used by both CLI and PI runtime (deduplicates `deriveTaskType` + evidence recording)
+- `scripts/expertise/evidence/evidence-pipeline.mjs` — shared `recordDelegationEvidence()` used by both CLI and PI runtime (deduplicates `deriveTaskType` + evidence recording)
 - `tests/agent-execution-result.test.mjs` — 8 tests for normalization shape and field coercion
 - `tests/agent-execution-result.e2e.test.mjs` — 5 e2e tests covering required field preservation, sanitized task, and PI pipeline integration
 - Phase 1+2 of `specs/runtime-agnostic-execution-contract-spec.md` implemented: `mah delegate` and `mah run` produce canonical `AgentExecutionResult` regardless of runtime target
@@ -48,7 +48,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `docs/context-manager.md` Proposal Flow reinforced with governed curation paragraph (S6)
 - README.md rewritten with v0.9 value story: expertise-aware routing, context memory, session visibility, compounding loop (S7)
 - Bootstrap success output reframed as "expertise-aware topology generated" with next-step guidance (S7)
-- `scripts/bootstrap-meta-agents.mjs` AI-assisted and logical success messages updated (S7)
+- `scripts/bootstrap/bootstrap-meta-agents.mjs` AI-assisted and logical success messages updated (S7)
 - Interactive AI provider picker for `mah init --ai` / bootstrap (`↑/↓ + Enter`) with presets for `Z.ai`, `OpenRouter`, `Codex (OAuth)`, and `MiniMax`
 
 ### Changed
@@ -104,7 +104,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `docs/headless-runtime.md` rewritten with accurate runtime-specific headless flags
 - `docs/plugin-api.md` headless capability section updated with implementation guidance
 - Runtime headless adapters: PI, Claude, Kilo, Hermes all use native non-interactive CLI flags
-- `plugins/runtime-*/index.mjs` and `scripts/runtime-core-integrations.mjs` headless args updated
+- `plugins/runtime-*/index.mjs` and `scripts/runtime/runtime-core-integrations.mjs` headless args updated
 - Headless `runCommand` uses `stdio: ["ignore", "pipe", "pipe"]` to prevent stdin blocking
 - `main()` made async to support headless await paths
 - `mah plugins install` now supports `--force` flag for reinstalling existing plugins
@@ -128,11 +128,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah expertise lifecycle <id> --to <state>` CLI command — governed lifecycle state transitions with authorization and evidence requirements
 - `mah expertise export <id> --with-evidence` — bundles evidence metrics (invocation count, success rate, latency) into export payload
 - Evidence recording in pi runtime — `delegate_agent` and `delegate_agents_parallel` in `multi-team.ts` now record delegation outcomes to the evidence store after each completion
-- `scripts/expertise-seed.mjs` — catalog seeding with capability/domain derivation from agent identity
-- `scripts/expertise-sync.mjs` — sync bridge reading evidence + System A learnings, computing confidence, discovering capabilities
-- `scripts/expertise-apply-proposal.mjs` — proposal application with stale detection and actor auth
-- `scripts/expertise-lifecycle-cli.mjs` — lifecycle transition CLI wrapping the state machine
-- `scripts/expertise-export.mjs` enhanced — optional `includeEvidence` for metrics bundling
+- `scripts/expertise/expertise-seed.mjs` — catalog seeding with capability/domain derivation from agent identity
+- `scripts/expertise/expertise-sync.mjs` — sync bridge reading evidence + System A learnings, computing confidence, discovering capabilities
+- `scripts/expertise/expertise-apply-proposal.mjs` — proposal application with stale detection and actor auth
+- `scripts/expertise/expertise-lifecycle-cli.mjs` — lifecycle transition CLI wrapping the state machine
+- `scripts/expertise/expertise-export.mjs` enhanced — optional `includeEvidence` for metrics bundling
 - `.claude/scripts/update-expertise-model-mcp.mjs` — MCP stdio server for opencode/claude-code runtimes exposing `update-expertise-model` tool
 - `tests/expertise/evidence-recording.test.mjs` — 3 tests for runtime evidence recording
 - `tests/expertise/expertise-sync.test.mjs` — 4 tests for sync bridge
@@ -187,8 +187,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Added
 - **Context Memory Engine (M4 — PR1+PR2+PR3+PR4)** — new canonical layer for operational context retrieval, separate from Expertise routing
 - `types/context-memory-types.mjs` — type definitions and constants for ContextMemoryDocument, ContextMemoryIndexEntry, ContextMemoryRetrievalRequest, ContextMemoryRetrievalResult, ContextMemoryProposal
-- `scripts/context-memory-validate.mjs` — pure validation functions returning `{ valid, errors, warnings }`
-- `scripts/context-memory-schema.mjs` — frontmatter parsing, ID derivation, file hashing, corpus walking, index building, and retrieval scoring utilities
+- `scripts/context/context-memory-validate.mjs` — pure validation functions returning `{ valid, errors, warnings }`
+- `scripts/context/context-memory-schema.mjs` — frontmatter parsing, ID derivation, file hashing, corpus walking, index building, and retrieval scoring utilities
 - `mah context` CLI namespace with `validate`, `list`, `show`, `index`, `find`, and `explain` subcommands
 - Canonical storage layout at `.mah/context/` with `operational/`, `index/`, `proposals/`, `cache/` subdirectories
 - 5 test fixtures in `tests/fixtures/context-memory/` covering valid, minimal, and invalid documents
@@ -196,12 +196,12 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah context find --agent <name> --task "<desc>"` — lexical + metadata retrieval with scoring algorithm (agent filter, capability boost, tool/system matching, task-pattern/tag/heading lexical match, stability adjustment)
 - `mah context explain --agent <name> --task "<desc>"` — explainable retrieval with step-by-step scoring breakdown and per-document reasoning
 - `mah context propose --from-session <ref>` — create draft memory proposal from session
-- `scripts/context-memory-integration.mjs` — runtime injection utilities (`isContextMemoryEnabled`, `parseContextMemoryOptions`, `buildContextMemoryBlock`)
+- `scripts/context/context-memory-integration.mjs` — runtime injection utilities (`isContextMemoryEnabled`, `parseContextMemoryOptions`, `buildContextMemoryBlock`)
 - Hermes bootstrap injection via `MAH_CONTEXT_MEMORY=1` or `--with-context-memory` flag
 - Supports `--context-limit <n>` (default 5, max 10) and `--context-mode=summary|snippets`
 - Graceful fallback when corpus is empty or Hermes is unavailable
 - `skills/context-memory/SKILL.md` and `.codex/skills/context-memory/SKILL.md` — specialized operator skill for retrieving and curating operational context
-- `scripts/context-memory-proposal.mjs` — proposal generator (`proposeFromSession`, `writeProposal`, `listProposals`, `findSession`)
+- `scripts/context/context-memory-proposal.mjs` — proposal generator (`proposeFromSession`, `writeProposal`, `listProposals`, `findSession`)
 - `mah context propose --from-session <ref>` — create memory proposal from session (status: draft, requires review)
 
 ### Constraints
@@ -263,7 +263,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ## [0.6.1] - 2026-04-16
 
 ### Added
-- Native runtime delegation adapter (`scripts/child-agent-native-runtime.mjs`) integrated into `mah delegate`
+- Native runtime delegation adapter (`scripts/runtime/child-agent-native-runtime.mjs`) integrated into `mah delegate`
 - Kilo headless adapter test suite (`tests/headless-kilo.test.mjs`)
 - Additional `mah sessions` regression coverage for:
   - `inject` and `bridge` argument parsing
@@ -319,10 +319,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Added (Session Interop)
 - Canonical session envelope `mah.session.v1` schema in `types/session-types.mjs`
 - `FIDELITY_LEVELS` constants: `full`, `contextual`, `summary-only` (default: `contextual`)
-- `SessionAdapter` contract in `scripts/session-adapter-contract.mjs`
-- Structured session export with `mah-json`, `summary-md`, and `runtime-raw` formats in `scripts/session-export.mjs`
-- Context projection and injection with fidelity-aware strategy selection in `scripts/session-injection.mjs`
-- High-level `bridgeSession()` operation combining export + inject in `scripts/session-bridge.mjs`
+- `SessionAdapter` contract in `scripts/session/session-adapter-contract.mjs`
+- Structured session export with `mah-json`, `summary-md`, and `runtime-raw` formats in `scripts/session/session-export.mjs`
+- Context projection and injection with fidelity-aware strategy selection in `scripts/session/session-injection.mjs`
+- High-level `bridgeSession()` operation combining export + inject in `scripts/session/session-bridge.mjs`
 - `mah sessions inject <id> --runtime <target> [--fidelity level]` CLI command
 - `mah sessions bridge <id> --to <runtime> [--fidelity level]` CLI command
 - `mah sessions export <id> --format mah-json|summary-md|runtime-raw` format flag
@@ -334,10 +334,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Default export format is now structured canonical envelope, not raw archive
 
 ### Added (Cross-Runtime Child Agents)
-- `scripts/child-agent-adapter-contract.mjs` — ChildAgentAdapter contract with `SPAWN_MODES` constants, `SpawnSupportContext`, `SpawnContext`, `SpawnPlanResult`, `SpawnExecutionResult` types
-- `scripts/delegation-resolution.mjs` — Shared `resolveDelegationTarget()` service enforcing crew topology authorization (orchestrator→leads, lead→own-team-workers, workers cannot delegate)
-- `scripts/child-agent-spawn.mjs` — Strategy layer with `buildSpawnContext()`, `prepareChildSpawn()`, adapter registry, `selectAdapter()`, `determineSpawnMode()`, and `explainChildSpawn()`
-- `scripts/child-agent-codex-sidecar.mjs` — First cross-runtime sidecar adapter using direct `codex exec --full-auto` for headless non-interactive execution
+- `scripts/runtime/child-agent-adapter-contract.mjs` — ChildAgentAdapter contract with `SPAWN_MODES` constants, `SpawnSupportContext`, `SpawnContext`, `SpawnPlanResult`, `SpawnExecutionResult` types
+- `scripts/runtime/delegation-resolution.mjs` — Shared `resolveDelegationTarget()` service enforcing crew topology authorization (orchestrator→leads, lead→own-team-workers, workers cannot delegate)
+- `scripts/runtime/child-agent-spawn.mjs` — Strategy layer with `buildSpawnContext()`, `prepareChildSpawn()`, adapter registry, `selectAdapter()`, `determineSpawnMode()`, and `explainChildSpawn()`
+- `scripts/runtime/child-agent-codex-sidecar.mjs` — First cross-runtime sidecar adapter using direct `codex exec --full-auto` for headless non-interactive execution
 - `tests/child-agent-spawn.test.mjs` — Unit test suite (8 tests) covering SPAWN_MODES, resolveDelegationTarget authorization, codexSidecarAdapter contract, adapter registry
 - `docs/cross-runtime-child-agents.md` — Feature documentation with architecture overview, policy rules, CLI usage
 - `mah delegate` CLI command with `--target`, `--task`, `--runtime`, `--crew` flags and plan-only output
@@ -361,7 +361,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Codex sessions can now expose bounded MAH operational tools through a local `mah` MCP server, enabling active-context inspection and graph-based delegation from inside the Codex runtime.
 
 ### Added
-- `scripts/plugin-loader.mjs` for plugin discovery, validation, registry merge, unload, and lifecycle hooks.
+- `scripts/runtime/plugin-loader.mjs` for plugin discovery, validation, registry merge, unload, and lifecycle hooks.
 - `mah plugins list|install|uninstall|validate` CLI commands.
 - Support for wrapper-based plugins and wrapperless core-integrated plugins.
 - `MAH_PLUGINS_ENABLED=0` opt-out for plugin discovery.
@@ -527,11 +527,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah expertise lifecycle <id> --to <state>` CLI command — governed lifecycle state transitions with authorization and evidence requirements
 - `mah expertise export <id> --with-evidence` — bundles evidence metrics (invocation count, success rate, latency) into export payload
 - Evidence recording in pi runtime — `delegate_agent` and `delegate_agents_parallel` in `multi-team.ts` now record delegation outcomes to the evidence store after each completion
-- `scripts/expertise-seed.mjs` — catalog seeding with capability/domain derivation from agent identity
-- `scripts/expertise-sync.mjs` — sync bridge reading evidence + System A learnings, computing confidence, discovering capabilities
-- `scripts/expertise-apply-proposal.mjs` — proposal application with stale detection and actor auth
-- `scripts/expertise-lifecycle-cli.mjs` — lifecycle transition CLI wrapping the state machine
-- `scripts/expertise-export.mjs` enhanced — optional `includeEvidence` for metrics bundling
+- `scripts/expertise/expertise-seed.mjs` — catalog seeding with capability/domain derivation from agent identity
+- `scripts/expertise/expertise-sync.mjs` — sync bridge reading evidence + System A learnings, computing confidence, discovering capabilities
+- `scripts/expertise/expertise-apply-proposal.mjs` — proposal application with stale detection and actor auth
+- `scripts/expertise/expertise-lifecycle-cli.mjs` — lifecycle transition CLI wrapping the state machine
+- `scripts/expertise/expertise-export.mjs` enhanced — optional `includeEvidence` for metrics bundling
 - `.claude/scripts/update-expertise-model-mcp.mjs` — MCP stdio server for opencode/claude-code runtimes exposing `update-expertise-model` tool
 - `tests/expertise/evidence-recording.test.mjs` — 3 tests for runtime evidence recording
 - `tests/expertise/expertise-sync.test.mjs` — 4 tests for sync bridge
@@ -586,8 +586,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Added
 - **Context Memory Engine (M4 — PR1+PR2+PR3+PR4)** — new canonical layer for operational context retrieval, separate from Expertise routing
 - `types/context-memory-types.mjs` — type definitions and constants for ContextMemoryDocument, ContextMemoryIndexEntry, ContextMemoryRetrievalRequest, ContextMemoryRetrievalResult, ContextMemoryProposal
-- `scripts/context-memory-validate.mjs` — pure validation functions returning `{ valid, errors, warnings }`
-- `scripts/context-memory-schema.mjs` — frontmatter parsing, ID derivation, file hashing, corpus walking, index building, and retrieval scoring utilities
+- `scripts/context/context-memory-validate.mjs` — pure validation functions returning `{ valid, errors, warnings }`
+- `scripts/context/context-memory-schema.mjs` — frontmatter parsing, ID derivation, file hashing, corpus walking, index building, and retrieval scoring utilities
 - `mah context` CLI namespace with `validate`, `list`, `show`, `index`, `find`, and `explain` subcommands
 - Canonical storage layout at `.mah/context/` with `operational/`, `index/`, `proposals/`, `cache/` subdirectories
 - 5 test fixtures in `tests/fixtures/context-memory/` covering valid, minimal, and invalid documents
@@ -595,12 +595,12 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `mah context find --agent <name> --task "<desc>"` — lexical + metadata retrieval with scoring algorithm (agent filter, capability boost, tool/system matching, task-pattern/tag/heading lexical match, stability adjustment)
 - `mah context explain --agent <name> --task "<desc>"` — explainable retrieval with step-by-step scoring breakdown and per-document reasoning
 - `mah context propose --from-session <ref>` — create draft memory proposal from session
-- `scripts/context-memory-integration.mjs` — runtime injection utilities (`isContextMemoryEnabled`, `parseContextMemoryOptions`, `buildContextMemoryBlock`)
+- `scripts/context/context-memory-integration.mjs` — runtime injection utilities (`isContextMemoryEnabled`, `parseContextMemoryOptions`, `buildContextMemoryBlock`)
 - Hermes bootstrap injection via `MAH_CONTEXT_MEMORY=1` or `--with-context-memory` flag
 - Supports `--context-limit <n>` (default 5, max 10) and `--context-mode=summary|snippets`
 - Graceful fallback when corpus is empty or Hermes is unavailable
 - `skills/context-memory/SKILL.md` and `.codex/skills/context-memory/SKILL.md` — specialized operator skill for retrieving and curating operational context
-- `scripts/context-memory-proposal.mjs` — proposal generator (`proposeFromSession`, `writeProposal`, `listProposals`, `findSession`)
+- `scripts/context/context-memory-proposal.mjs` — proposal generator (`proposeFromSession`, `writeProposal`, `listProposals`, `findSession`)
 - `mah context propose --from-session <ref>` — create memory proposal from session (status: draft, requires review)
 
 ### Constraints
@@ -662,7 +662,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ## [0.6.1] - 2026-04-16
 
 ### Added
-- Native runtime delegation adapter (`scripts/child-agent-native-runtime.mjs`) integrated into `mah delegate`
+- Native runtime delegation adapter (`scripts/runtime/child-agent-native-runtime.mjs`) integrated into `mah delegate`
 - Kilo headless adapter test suite (`tests/headless-kilo.test.mjs`)
 - Additional `mah sessions` regression coverage for:
   - `inject` and `bridge` argument parsing
@@ -718,10 +718,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 ### Added (Session Interop)
 - Canonical session envelope `mah.session.v1` schema in `types/session-types.mjs`
 - `FIDELITY_LEVELS` constants: `full`, `contextual`, `summary-only` (default: `contextual`)
-- `SessionAdapter` contract in `scripts/session-adapter-contract.mjs`
-- Structured session export with `mah-json`, `summary-md`, and `runtime-raw` formats in `scripts/session-export.mjs`
-- Context projection and injection with fidelity-aware strategy selection in `scripts/session-injection.mjs`
-- High-level `bridgeSession()` operation combining export + inject in `scripts/session-bridge.mjs`
+- `SessionAdapter` contract in `scripts/session/session-adapter-contract.mjs`
+- Structured session export with `mah-json`, `summary-md`, and `runtime-raw` formats in `scripts/session/session-export.mjs`
+- Context projection and injection with fidelity-aware strategy selection in `scripts/session/session-injection.mjs`
+- High-level `bridgeSession()` operation combining export + inject in `scripts/session/session-bridge.mjs`
 - `mah sessions inject <id> --runtime <target> [--fidelity level]` CLI command
 - `mah sessions bridge <id> --to <runtime> [--fidelity level]` CLI command
 - `mah sessions export <id> --format mah-json|summary-md|runtime-raw` format flag
@@ -733,10 +733,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Default export format is now structured canonical envelope, not raw archive
 
 ### Added (Cross-Runtime Child Agents)
-- `scripts/child-agent-adapter-contract.mjs` — ChildAgentAdapter contract with `SPAWN_MODES` constants, `SpawnSupportContext`, `SpawnContext`, `SpawnPlanResult`, `SpawnExecutionResult` types
-- `scripts/delegation-resolution.mjs` — Shared `resolveDelegationTarget()` service enforcing crew topology authorization (orchestrator→leads, lead→own-team-workers, workers cannot delegate)
-- `scripts/child-agent-spawn.mjs` — Strategy layer with `buildSpawnContext()`, `prepareChildSpawn()`, adapter registry, `selectAdapter()`, `determineSpawnMode()`, and `explainChildSpawn()`
-- `scripts/child-agent-codex-sidecar.mjs` — First cross-runtime sidecar adapter using direct `codex exec --full-auto` for headless non-interactive execution
+- `scripts/runtime/child-agent-adapter-contract.mjs` — ChildAgentAdapter contract with `SPAWN_MODES` constants, `SpawnSupportContext`, `SpawnContext`, `SpawnPlanResult`, `SpawnExecutionResult` types
+- `scripts/runtime/delegation-resolution.mjs` — Shared `resolveDelegationTarget()` service enforcing crew topology authorization (orchestrator→leads, lead→own-team-workers, workers cannot delegate)
+- `scripts/runtime/child-agent-spawn.mjs` — Strategy layer with `buildSpawnContext()`, `prepareChildSpawn()`, adapter registry, `selectAdapter()`, `determineSpawnMode()`, and `explainChildSpawn()`
+- `scripts/runtime/child-agent-codex-sidecar.mjs` — First cross-runtime sidecar adapter using direct `codex exec --full-auto` for headless non-interactive execution
 - `tests/child-agent-spawn.test.mjs` — Unit test suite (8 tests) covering SPAWN_MODES, resolveDelegationTarget authorization, codexSidecarAdapter contract, adapter registry
 - `docs/cross-runtime-child-agents.md` — Feature documentation with architecture overview, policy rules, CLI usage
 - `mah delegate` CLI command with `--target`, `--task`, `--runtime`, `--crew` flags and plan-only output
@@ -760,7 +760,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Codex sessions can now expose bounded MAH operational tools through a local `mah` MCP server, enabling active-context inspection and graph-based delegation from inside the Codex runtime.
 
 ### Added
-- `scripts/plugin-loader.mjs` for plugin discovery, validation, registry merge, unload, and lifecycle hooks.
+- `scripts/runtime/plugin-loader.mjs` for plugin discovery, validation, registry merge, unload, and lifecycle hooks.
 - `mah plugins list|install|uninstall|validate` CLI commands.
 - Support for wrapper-based plugins and wrapperless core-integrated plugins.
 - `MAH_PLUGINS_ENABLED=0` opt-out for plugin discovery.

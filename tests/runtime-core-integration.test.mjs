@@ -5,9 +5,9 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
-import { preparePiRunContext } from "../scripts/runtime-core-integrations.mjs"
-import { ensurePiGlobalSettings, findMahSkillFile, resolveMahAssetPath } from "../scripts/mah-home.mjs"
-import { resolveWorkspaceRoot } from "../scripts/workspace-root.mjs"
+import { preparePiRunContext } from "../scripts/runtime/runtime-core-integrations.mjs"
+import { ensurePiGlobalSettings, findMahSkillFile, resolveMahAssetPath } from "../scripts/core/mah-home.mjs"
+import { resolveWorkspaceRoot } from "../scripts/core/workspace-root.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -116,14 +116,14 @@ test("mah sync materializes workspace-local expertise catalog", () => {
   const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-expertise-home-"))
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-expertise-workspace-"))
   try {
-    const prepare = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "prepare-mah-home.mjs")], {
+    const prepare = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "../scripts/bootstrap/prepare-mah-home.mjs")], {
       cwd: repoRoot,
       env: { ...process.env, HOME: tempHome },
       encoding: "utf-8"
     })
     assert.equal(prepare.status, 0, prepare.stderr)
 
-    const initMeta = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs"), "--yes", "--force"], {
+    const initMeta = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs"), "--yes", "--force"], {
       cwd: tempWorkspace,
       env: { ...process.env, HOME: tempHome },
       encoding: "utf-8"
@@ -188,7 +188,7 @@ test("expertise list from a nested workspace directory resolves the workspace ro
     "",
   ].join("\n"), "utf-8")
   try {
-    const prepare = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "prepare-mah-home.mjs")], {
+    const prepare = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "../scripts/bootstrap/prepare-mah-home.mjs")], {
       cwd: repoRoot,
       env: { ...process.env, HOME: tempHome },
       encoding: "utf-8"

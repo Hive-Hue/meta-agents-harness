@@ -6,9 +6,9 @@ import { fileURLToPath } from "node:url"
 import os from "node:os"
 
 import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
-import { sanitizeTaskDescription } from "../scripts/task-description.mjs"
-import { recordEvidence, loadEvidenceFor } from "../scripts/expertise-evidence-store.mjs"
-import { recordDelegationEvidence, deriveTaskType } from "../scripts/evidence-pipeline.mjs"
+import { sanitizeTaskDescription } from "../scripts/core/task-description.mjs"
+import { recordEvidence, loadEvidenceFor } from "../scripts/expertise/evidence/expertise-evidence-store.mjs"
+import { recordDelegationEvidence, deriveTaskType } from "../scripts/expertise/evidence/evidence-pipeline.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

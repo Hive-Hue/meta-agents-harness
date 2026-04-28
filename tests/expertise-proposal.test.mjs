@@ -17,9 +17,9 @@ const {
   buildExpertiseProposal,
   writeProposalToFile,
   validateProposalPayload,
-} = await import('../scripts/expertise-proposal.mjs')
-const { loadExpertiseById } = await import('../scripts/expertise-loader.mjs')
-const { recordEvidence } = await import('../scripts/expertise-evidence-store.mjs')
+} = await import('../scripts/expertise/expertise-proposal.mjs')
+const { loadExpertiseById } = await import('../scripts/expertise/expertise-loader.mjs')
+const { recordEvidence } = await import('../scripts/expertise/evidence/expertise-evidence-store.mjs')
 
 const evidenceRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-proposal-evidence-'))
 const catalogRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-proposal-catalog-'))

@@ -160,7 +160,7 @@ Before evidence is recorded, `task` is passed through `sanitizeTaskDescription()
 
 ### Evidence pipeline
 
-`scripts/evidence-pipeline.mjs` exports `recordDelegationEvidence()` used by both CLI (`mah delegate`, `mah run`) and PI (`delegate_agent`, `delegate_agents_parallel`). The pipeline:
+`scripts/expertise/evidence/evidence-pipeline.mjs` exports `recordDelegationEvidence()` used by both CLI (`mah delegate`, `mah run`) and PI (`delegate_agent`, `delegate_agents_parallel`). The pipeline:
 1. Sanitizes task description
 2. Derives task type from keywords (8-category superset)
 3. Constructs `AgentExecutionResult` via `normalizeExecutionResult`

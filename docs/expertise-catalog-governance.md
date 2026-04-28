@@ -62,6 +62,15 @@ mah expertise propose <id> --from-evidence --evidence-limit 5
 
 This drafts conservative changes from recent evidence; approval flow stays manual.
 
+Optional AI rewrite mode:
+
+```bash
+mah expertise propose <id> --from-evidence --ai --provider openrouter --model nvidia/nemotron-3-super-120b-a12b:free
+```
+
+- `--ai` rewrites `summary`, `rationale`, and `proposed_changes` for reviewer clarity.
+- Falls back to deterministic proposal text when AI is not configured or fails.
+
 ## Update Rules
 
 - Do not write raw session logs into catalog.

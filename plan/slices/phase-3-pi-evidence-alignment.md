@@ -34,7 +34,7 @@ Extract a single shared function `recordDelegationEvidence` (renamed to avoid co
 
 | File | Action |
 |------|--------|
-| `scripts/evidence-pipeline.mjs` | **Create** — canonical `recordDelegationEvidence` extracted from CLI |
+| `scripts/expertise/evidence/evidence-pipeline.mjs` | **Create** — canonical `recordDelegationEvidence` extracted from CLI |
 | `extensions/multi-team.ts` | **Edit** — replace 2× direct `recordEvidence` with `recordDelegationEvidence` import |
 | `scripts/meta-agents-harness.mjs` | **Edit** — replace local `recordDelegationEvidence` with import from pipeline |
 | `types/agent-execution-result.mjs` | **No change** — already has `normalizeExecutionResult` |
@@ -42,10 +42,10 @@ Extract a single shared function `recordDelegationEvidence` (renamed to avoid co
 ### Design
 
 ```
-scripts/evidence-pipeline.mjs exports:
+scripts/expertise/evidence/evidence-pipeline.mjs exports:
   recordDelegationEvidence({ crew, expertiseId, taskDescription, outcome, durationMs, sourceAgent, sessionId, isExecuted })
     → calls normalizeExecutionResult from types/agent-execution-result.mjs
-    → calls recordEvidence from scripts/expertise-evidence-store.mjs
+    → calls recordEvidence from scripts/expertise/evidence/expertise-evidence-store.mjs
     → wraps in try/catch (best-effort, never blocks)
 ```
 
@@ -56,8 +56,8 @@ Key: `recordDelegationEvidence` in `evidence-pipeline.mjs` is a **superset** of 
 
 ### Deduplication
 
-- `deriveTaskType`: currently duplicated between `multi-team.ts:298` and CLI's inline version in `meta-agents-harness.mjs:2679-2692`. Move canonical version into `scripts/evidence-pipeline.mjs`. PI and CLI both use it.
-- `sanitizeTaskDescription`: PI has its own at `multi-team.ts:262`. CLI has inline version. Move canonical into `scripts/evidence-pipeline.mjs`.
+- `deriveTaskType`: currently duplicated between `multi-team.ts:298` and CLI's inline version in `meta-agents-harness.mjs:2679-2692`. Move canonical version into `scripts/expertise/evidence/evidence-pipeline.mjs`. PI and CLI both use it.
+- `sanitizeTaskDescription`: PI has its own at `multi-team.ts:262`. CLI has inline version. Move canonical into `scripts/expertise/evidence/evidence-pipeline.mjs`.
 
 ### PI Integration Points
 
@@ -65,11 +65,11 @@ Key: `recordDelegationEvidence` in `evidence-pipeline.mjs` is a **superset** of 
 
 ```typescript
 // BEFORE:
-const { recordEvidence } = await import("../scripts/expertise-evidence-store.mjs");
+const { recordEvidence } = await import("../scripts/expertise/evidence/expertise-evidence-store.mjs");
 await recordEvidence({ expertise_id: ..., outcome: ..., ... });
 
 // AFTER:
-const { recordDelegationEvidence } = await import("../scripts/evidence-pipeline.mjs");
+const { recordDelegationEvidence } = await import("../scripts/expertise/evidence/evidence-pipeline.mjs");
 await recordDelegationEvidence({
   crew: process.env.MAH_ACTIVE_CREW || "dev",
   expertiseId: effectiveTarget,
@@ -88,14 +88,14 @@ Same pattern, inside the per-target loop.
 
 ### TS↔mjs Boundary
 
-- PI (`.ts`) imports from `scripts/evidence-pipeline.mjs` via dynamic `await import()`.
-- `evidence-pipeline.mjs` imports from `types/agent-execution-result.mjs` (already ESM) and `scripts/expertise-evidence-store.mjs`.
+- PI (`.ts`) imports from `scripts/expertise/evidence/evidence-pipeline.mjs` via dynamic `await import()`.
+- `evidence-pipeline.mjs` imports from `types/agent-execution-result.mjs` (already ESM) and `scripts/expertise/evidence/expertise-evidence-store.mjs`.
 - No type annotations in the `.mjs` file — PI passes plain objects. TypeScript's dynamic import of `.mjs` returns `any`, which is fine for this best-effort fire-and-forget path.
-- **Risk:** If the TS compiler resolves `../scripts/evidence-pipeline.mjs` incorrectly at build time, the dynamic import will fail at runtime. Mitigate by keeping path relative and testing with a smoke test.
+- **Risk:** If the TS compiler resolves `../scripts/expertise/evidence/evidence-pipeline.mjs` incorrectly at build time, the dynamic import will fail at runtime. Mitigate by keeping path relative and testing with a smoke test.
 
 ### Acceptance Criteria
 
-- [ ] `scripts/evidence-pipeline.mjs` exists and exports `recordDelegationEvidence`
+- [ ] `scripts/expertise/evidence/evidence-pipeline.mjs` exists and exports `recordDelegationEvidence`
 - [ ] PI `delegate_agent` no longer calls `recordEvidence` directly — calls `recordDelegationEvidence`
 - [ ] PI `delegate_agents_parallel` no longer calls `recordEvidence` directly — calls `recordDelegationEvidence`
 - [ ] CLI `meta-agents-harness.mjs` imports `recordDelegationEvidence` from pipeline, local function removed
@@ -111,7 +111,7 @@ Same pattern, inside the per-target loop.
 
 | Risk | Likelihood | Mitigation |
 |------|-----------|------------|
-| TS↔mjs dynamic import path resolution fails | Medium | Use exact relative path `../scripts/evidence-pipeline.mjs`; test at runtime |
+| TS↔mjs dynamic import path resolution fails | Medium | Use exact relative path `../scripts/expertise/evidence/evidence-pipeline.mjs`; test at runtime |
 | `deriveTaskType` behavior differs between CLI and PI versions | Low | PI version has more categories (bugfix, refactoring, documentation, security). Use PI's richer version as canonical |
 | Evidence schema change breaks downstream consumers | Low | Fields are additive only — no removals |
 | `sanitizeTaskDescription` signature differs (PI has `limit` param) | Medium | Canonical version accepts optional `limit`, defaults to 200 |
@@ -140,7 +140,7 @@ PI already has `currentSessionId()` producing `<runtime>:<crew>:<session>` forma
 
 ```typescript
 // At delegate_agent start (before execution):
-const { recordLifecycleEvent } = await import("../scripts/m3-ops.mjs");
+const { recordLifecycleEvent } = await import("../scripts/session/m3-ops.mjs");
 recordLifecycleEvent(repoRoot, delegateLifecycleId, {
   event: "queued",
   details: { task: effectiveTask.substring(0, 100), sourceAgent: runtime!.agent.name }

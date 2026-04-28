@@ -70,19 +70,19 @@ import {
   validateExpertiseEvidence,
   validateExpertiseMetrics,
   validateExpertiseValidationState,
-} from '../scripts/expertise-schema.mjs'
+} from '../scripts/expertise/expertise-schema.mjs'
 
 import {
   loadExpertiseCatalog,
   loadExpertiseFile,
   normalizeLegacyExpertise,
   loadExpertiseById,
-} from '../scripts/expertise-loader.mjs'
+} from '../scripts/expertise/expertise-loader.mjs'
 
 import {
   buildRegistry,
   readRegistry,
-} from '../scripts/expertise-registry.mjs'
+} from '../scripts/expertise/expertise-registry.mjs'
 
 // ---------------------------------------------------------------------------
 // Test suite

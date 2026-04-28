@@ -51,10 +51,19 @@ Transform raw proposal text into concise, operationally useful writing for human
    - Observed Signals
    - Why This Memory Is Reusable
 3. `proposed_content`:
-   - What to do
-   - How to do it
+   - Task Breakdown
+   - Solution Summary (required): concise implementation recap with concrete code snippets, commands executed, and key technical decisions
    - Pitfalls / failure notes
    - Validation checklist
+
+## Reusability Requirement
+
+- In `proposed_content`, always include a `## Solution Summary` section in addition to `## Task Breakdown`.
+- `Solution Summary` must include:
+  - Relevant code excerpts or pseudo-snippets tied to the actual change.
+  - Practical commands used for implementation/validation.
+  - Key points/decisions needed to reproduce or extend the solution later.
+- Keep it factual and source-grounded; do not add details not present in session evidence.
 
 ## Non-Goals
 

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { RUNTIME_ADAPTERS } from "../scripts/runtime-adapters.mjs"
+import { RUNTIME_ADAPTERS } from "../scripts/runtime/runtime-adapters.mjs"
 
 test("all bundled runtime plugins declare capabilities.headless", () => {
   for (const [name, adapter] of Object.entries(RUNTIME_ADAPTERS)) {

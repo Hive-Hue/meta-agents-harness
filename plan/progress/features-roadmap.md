@@ -173,14 +173,14 @@ Esse modelo evita meta-config excessiva, mas também não deixa o YAML totalment
 - [done] documento de execução salvo em [`plan/context-memory-v0.8.0.md`](../context-memory-v0.8.0.md)
 - [done] naming final definido como `Context Memory`
 - [done] Context Memory slice planning consolidated in [`plan/slices/context-memory-finalization-slices.md`](../slices/context-memory-finalization-slices.md)
-- [done] schema e contratos em `types/context-memory-types.mjs`, `scripts/context-memory-validate.mjs`, `scripts/context-memory-schema.mjs`
+- [done] schema e contratos em `types/context-memory-types.mjs`, `scripts/context/context-memory-validate.mjs`, `scripts/context/context-memory-schema.mjs`
 - [done] storage canônico em `.mah/context/` com subdiretórios operational/, index/, proposals/, cache/
 - [done] `mah context validate`, `mah context list`, `mah context show` implementados
 - [done] `mah context index [--rebuild]` — deterministic index builder (operational + fixtures)
 - [done] `mah context find --agent <name> --task "<desc>"` — lexical + metadata retrieval
 - [done] `mah context explain --agent <name> --task "<desc>"` — explainable retrieval reasoning
 - [done] fixtures de teste em `tests/fixtures/context-memory/` (5 documentos: 4 válidos, 1 inválido)
-- [done] `scripts/context-memory-integration.mjs` — runtime injection logic
+- [done] `scripts/context/context-memory-integration.mjs` — runtime injection logic
 - [done] Hermes bootstrap injection via `MAH_CONTEXT_MEMORY=1` ou `--with-context-memory`
 - [done] Suporte a `--context-limit <n>` e `--context-mode=summary|snippets`
 - [done] proposal flow com `sessions`/`provenance` (PR4) — mah context propose --from-session <ref>

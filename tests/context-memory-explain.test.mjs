@@ -5,8 +5,8 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 
-import { buildOperationalIndex } from "../scripts/context-memory-schema.mjs"
-import { buildContextMemoryExplainPayload } from "../scripts/context-memory-integration.mjs"
+import { buildOperationalIndex } from "../scripts/context/context-memory-schema.mjs"
+import { buildContextMemoryExplainPayload } from "../scripts/context/context-memory-integration.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

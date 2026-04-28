@@ -11,7 +11,7 @@ const FIXTURE_PLUGIN = path.resolve(__dirname, "../plugins/runtime-fake")
 // Dynamically import plugin-loader to access internals
 // We use a helper to get a fresh module each time we need to reset state
 async function getPluginLoader() {
-  return import("../scripts/plugin-loader.mjs")
+  return import("../scripts/runtime/plugin-loader.mjs")
 }
 
 async function createTempPlugin(tempDir, name, pluginJson, indexContent) {
@@ -262,7 +262,7 @@ export const runtimePlugin = {
       const previousMahHome = process.env.MAH_HOME
       try {
         process.env.MAH_HOME = tempMahHome
-        const loader = await import(`../scripts/plugin-loader.mjs?home=${Date.now()}`)
+        const loader = await import(`../scripts/runtime/plugin-loader.mjs?home=${Date.now()}`)
         const runtimes = await loader.getAllRuntimes()
         assert.ok(runtimes.homefake, "should discover plugins installed in MAH_HOME/mah-plugins")
       } finally {

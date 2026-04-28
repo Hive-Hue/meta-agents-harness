@@ -11,7 +11,7 @@ Introduzir um mecanismo formal de plugins para runtimes externos, permitindo que
 ### Problema atual
 
 Adicionar um novo runtime hoje exige editar 2 arquivos do core do MAH:
-- `scripts/runtime-adapters.mjs` — adicionar `createAdapter({...})`
+- `scripts/runtime/runtime-adapters.mjs` — adicionar `createAdapter({...})`
 - `scripts/meta-agents-harness.mjs` — adicionar o runtime em `RUNTIME_ORDER`
 
 **Problemas:**
@@ -122,7 +122,7 @@ scripts/
 └── plugin-loader.mjs                 # [NOVO] descoberta e loading de plugins
 ```
 
-### `scripts/plugin-loader.mjs` — interface pública
+### `scripts/runtime/plugin-loader.mjs` — interface pública
 
 ```js
 // Carrega todos os plugins disponíveis
@@ -318,7 +318,7 @@ test("mah validate:all still works with no plugins installed")
 ## 10. Slice-by-slice execution
 
 ### Slice 0 — Plugin loader core
-**Arquivos:** `scripts/plugin-loader.mjs`
+**Arquivos:** `scripts/runtime/plugin-loader.mjs`
 **Entrega:** `loadPlugins()`, `getAllRuntimes()`, `validatePlugin()`, `unloadPlugin()`
 **Gate:** Todos os testes unitários passam
 
@@ -338,7 +338,7 @@ test("mah validate:all still works with no plugins installed")
 **Gate:** mah detect inclui/exclui o runtime de teste corretamente
 
 ### Slice 4 — Contract validation for plugins
-**Arquivos:** `scripts/plugin-loader.mjs` (atualizar), `tests/plugins-contract.test.mjs`
+**Arquivos:** `scripts/runtime/plugin-loader.mjs` (atualizar), `tests/plugins-contract.test.mjs`
 **Entrega:** Plugins passam por `validateAdapter()` antes de serem registrados
 **Gate:** Plugin com adapter incompleto é rejeitado com mensagem clara
 

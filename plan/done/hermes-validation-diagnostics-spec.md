@@ -318,12 +318,12 @@ Terminal: `runtime=hermes\nreason=forced`
 
 | File | Change |
 |------|--------|
-| `scripts/runtime-adapters.mjs` | RUNTIME_ORDER + hermes adapter |
+| `scripts/runtime/runtime-adapters.mjs` | RUNTIME_ORDER + hermes adapter |
 | `scripts/meta-agents-harness.mjs` | normalizeRunArgs hermes branch |
 | `meta-agents.yaml` | marker + cli + runtimes hermes entries |
 | `tests/smoke.test.mjs` | Detect regex update |
 | `tests/diagnostics-json.test.mjs` | Hermes diagnostic tests |
-| `scripts/sync-meta-agents.mjs` | Hermes sync (Option A/B) |
+| `scripts/sync/sync-meta-agents.mjs` | Hermes sync (Option A/B) |
 
 **No changes needed:** runtime-adapter-contract.mjs, validate-meta-config.mjs, runtime-contract.test.mjs, package.json
 

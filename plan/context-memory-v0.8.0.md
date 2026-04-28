@@ -408,8 +408,8 @@ Delivery:
 Already delivered:
 
 - `types/context-memory-types.mjs`
-- `scripts/context-memory-schema.mjs`
-- `scripts/context-memory-validate.mjs`
+- `scripts/context/context-memory-schema.mjs`
+- `scripts/context/context-memory-validate.mjs`
 - `.mah/context/operational/`, `.mah/context/index/`, `.mah/context/proposals/`, `.mah/context/cache/`
 - canonical smoke doc at `.mah/context/operational/dev/planning-lead/backlog-planning/clickup-backlog-triage.md`
 - boundary documentation in `docs/context-memory.md` and this plan
@@ -442,7 +442,7 @@ Already delivered:
 - `mah context index [--rebuild]`
 - `mah context find --agent <name> --task "<desc>"`
 - `mah context explain --agent <name> --task "<desc>"`
-- retrieval scoring in `scripts/context-memory-schema.mjs`
+- retrieval scoring in `scripts/context/context-memory-schema.mjs`
 - corpus-vs-fixture separation tests in `tests/context-memory.test.mjs`
 
 Still missing:
@@ -469,8 +469,8 @@ Delivery:
 
 Already delivered:
 
-- runtime integration in `scripts/runtime-core-integrations.mjs`
-- retrieval-to-bootstrap projection in `scripts/context-memory-integration.mjs`
+- runtime integration in `scripts/runtime/runtime-core-integrations.mjs`
+- retrieval-to-bootstrap projection in `scripts/context/context-memory-integration.mjs`
 - Hermes opt-in through `MAH_CONTEXT_MEMORY=1` or `--with-context-memory`
 - MAH-only flags `--context-limit` and `--context-mode`
 - tests proving these flags are consumed by MAH and stripped before Hermes launch
@@ -540,10 +540,10 @@ Delivery:
 
 Already delivered:
 
-- `scripts/context-memory-proposal.mjs`
+- `scripts/context/context-memory-proposal.mjs`
 - `mah context propose --from-session <session-ref>`
 - draft proposal writes to `.mah/context/proposals/`
-- proposal schema validation support in `scripts/context-memory-validate.mjs`
+- proposal schema validation support in `scripts/context/context-memory-validate.mjs`
 
 Still missing:
 
@@ -602,8 +602,8 @@ Acceptance criteria:
 **Current status:** delivered
 
 - `types/context-memory-types.mjs`
-- `scripts/context-memory-schema.mjs`
-- `scripts/context-memory-validate.mjs`
+- `scripts/context/context-memory-schema.mjs`
+- `scripts/context/context-memory-validate.mjs`
 - valid and invalid fixtures
 
 ## W3 — Parsing and Indexing
@@ -629,7 +629,7 @@ Acceptance criteria:
 
 **Current status:** partial
 
-- integration in `scripts/runtime-core-integrations.mjs`
+- integration in `scripts/runtime/runtime-core-integrations.mjs`
 - `agentCtx` enrichment
 - bootstrap query with an `Operational context for this task` block
 - flags:
@@ -657,7 +657,7 @@ Gap:
 
 **Current status:** partial
 
-- `scripts/context-memory-proposal.mjs`
+- `scripts/context/context-memory-proposal.mjs`
 - draft generation from sessions
 - basic file persistence
 
@@ -867,7 +867,7 @@ Reference:
 
 Implementation landed directly in code:
 
-- `scripts/context-memory-schema.mjs`
+- `scripts/context/context-memory-schema.mjs`
 - `scripts/meta-agents-harness.mjs`
 - `tests/context-memory.test.mjs`
 

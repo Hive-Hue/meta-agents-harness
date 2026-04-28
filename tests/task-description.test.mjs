@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sanitizeTaskDescription } from '../scripts/task-description.mjs'
+import { sanitizeTaskDescription } from '../scripts/core/task-description.mjs'
 
 test('sanitizeTaskDescription strips caveman blocks and routing boilerplate', () => {
   const raw = `

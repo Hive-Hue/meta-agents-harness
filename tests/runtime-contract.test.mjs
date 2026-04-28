@@ -4,8 +4,8 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { RUNTIME_ADAPTERS, RUNTIME_ORDER, createAdapter } from "../scripts/runtime-adapters.mjs"
-import { validateRuntimeAdapterContract, REQUIRED_RUNTIME_COMMANDS } from "../scripts/runtime-adapter-contract.mjs"
+import { RUNTIME_ADAPTERS, RUNTIME_ORDER, createAdapter } from "../scripts/runtime/runtime-adapters.mjs"
+import { validateRuntimeAdapterContract, REQUIRED_RUNTIME_COMMANDS } from "../scripts/runtime/runtime-adapter-contract.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

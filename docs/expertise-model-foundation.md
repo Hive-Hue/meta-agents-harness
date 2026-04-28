@@ -32,19 +32,19 @@ Expertise Model is structured object used to decide:
 Current implementation is spread across:
 
 - [`types/expertise-types.mjs`](../types/expertise-types.mjs)
-- [`scripts/expertise-schema.mjs`](../scripts/expertise-schema.mjs)
-- [`scripts/expertise-loader.mjs`](../scripts/expertise-loader.mjs)
-- [`scripts/expertise-registry.mjs`](../scripts/expertise-registry.mjs)
-- [`scripts/expertise-routing.mjs`](../scripts/expertise-routing.mjs)
-- [`scripts/expertise-evidence-store.mjs`](../scripts/expertise-evidence-store.mjs)
-- [`scripts/expertise-confidence.mjs`](../scripts/expertise-confidence.mjs)
-- [`scripts/expertise-lifecycle.mjs`](../scripts/expertise-lifecycle.mjs)
-- [`scripts/expertise-export.mjs`](../scripts/expertise-export.mjs)
-- [`scripts/expertise-validate.mjs`](../scripts/expertise-validate.mjs)
-- [`scripts/expertise-seed.mjs`](../scripts/expertise-seed.mjs)
-- [`scripts/expertise-sync.mjs`](../scripts/expertise-sync.mjs)
-- [`scripts/expertise-apply-proposal.mjs`](../scripts/expertise-apply-proposal.mjs)
-- [`scripts/expertise-lifecycle-cli.mjs`](../scripts/expertise-lifecycle-cli.mjs)
+- [`scripts/expertise/expertise-schema.mjs`](../scripts/expertise/expertise-schema.mjs)
+- [`scripts/expertise/expertise-loader.mjs`](../scripts/expertise/expertise-loader.mjs)
+- [`scripts/expertise/expertise-registry.mjs`](../scripts/expertise/expertise-registry.mjs)
+- [`scripts/expertise/expertise-routing.mjs`](../scripts/expertise/expertise-routing.mjs)
+- [`scripts/expertise/evidence/expertise-evidence-store.mjs`](../scripts/expertise/evidence/expertise-evidence-store.mjs)
+- [`scripts/expertise/expertise-confidence.mjs`](../scripts/expertise/expertise-confidence.mjs)
+- [`scripts/expertise/expertise-lifecycle.mjs`](../scripts/expertise/expertise-lifecycle.mjs)
+- [`scripts/expertise/expertise-export.mjs`](../scripts/expertise/expertise-export.mjs)
+- [`scripts/expertise/expertise-validate.mjs`](../scripts/expertise/expertise-validate.mjs)
+- [`scripts/expertise/expertise-seed.mjs`](../scripts/expertise/expertise-seed.mjs)
+- [`scripts/expertise/expertise-sync.mjs`](../scripts/expertise/expertise-sync.mjs)
+- [`scripts/expertise/expertise-apply-proposal.mjs`](../scripts/expertise/expertise-apply-proposal.mjs)
+- [`scripts/expertise/expertise-lifecycle-cli.mjs`](../scripts/expertise/expertise-lifecycle-cli.mjs)
 
 CLI entry points live under `mah expertise` and are wired through [`scripts/meta-agents-harness.mjs`](../scripts/meta-agents-harness.mjs).
 

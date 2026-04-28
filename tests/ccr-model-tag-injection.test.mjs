@@ -5,7 +5,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 
-import { mapModelToCcrRef } from "../scripts/ccr-model-helper.mjs"
+import { mapModelToCcrRef } from "../scripts/runtime/ccr-model-helper.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)

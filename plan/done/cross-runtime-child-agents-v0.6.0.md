@@ -368,14 +368,14 @@ Futuros:
 ### Core
 
 - `scripts/meta-agents-harness.mjs`
-- `scripts/runtime-core-integrations.mjs`
-- `scripts/runtime-adapter-contract.mjs`
+- `scripts/runtime/runtime-core-integrations.mjs`
+- `scripts/runtime/runtime-adapter-contract.mjs`
 
 ### Novos módulos prováveis
 
-- `scripts/delegation-resolution.mjs`
-- `scripts/child-agent-adapter-contract.mjs`
-- `scripts/child-agent-spawn.mjs`
+- `scripts/runtime/delegation-resolution.mjs`
+- `scripts/runtime/child-agent-adapter-contract.mjs`
+- `scripts/runtime/child-agent-spawn.mjs`
 
 ### Runtime-specific
 

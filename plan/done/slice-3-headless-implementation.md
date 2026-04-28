@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Slice 0 correctly identified that all runtimes were "unsupported" in their **plugin** form. However, the **built-in** adapters in `scripts/runtime-adapters.mjs` already have working `prepareHeadlessRunContext` implementations for all four classic runtimes (pi, claude, opencode, hermes). The v0.6.0 headless work for Slice 3 is therefore:
+Slice 0 correctly identified that all runtimes were "unsupported" in their **plugin** form. However, the **built-in** adapters in `scripts/runtime/runtime-adapters.mjs` already have working `prepareHeadlessRunContext` implementations for all four classic runtimes (pi, claude, opencode, hermes). The v0.6.0 headless work for Slice 3 is therefore:
 
 1. **Port the four working headless implementations from `runtime-core-integrations.mjs`** into each plugin's `prepareHeadlessRunContext` method
 2. **Add codex headless support** (most complex — uses MCP server config injection)
@@ -178,7 +178,7 @@ main()
 
 **No harness changes needed** for PI, Claude, OpenCode, Hermes. The harness is runtime-agnostic — it calls `adapter.prepareHeadlessRunContext()` and the adapter provides the execution plan.
 
-### 2. Adapter Contract (`scripts/runtime-adapter-contract.mjs`)
+### 2. Adapter Contract (`scripts/runtime/runtime-adapter-contract.mjs`)
 
 The contract already validates:
 - `capabilities.headless.supported === true` requires `prepareHeadlessRunContext` to be a function

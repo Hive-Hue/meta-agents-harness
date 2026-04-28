@@ -78,9 +78,9 @@ Makes the system self-improving.
 - `mah expertise apply-proposal <file>` — applies approved proposals to catalog (stale-detect, actor auth, registry rebuild)
 - `mah expertise lifecycle <id> --to <state>` — explicit lifecycle transitions with auth + requirements checks
 - `mah expertise export <id> --with-evidence` — bundles evidence metrics into export payload
-- `scripts/expertise-apply-proposal.mjs` (new)
-- `scripts/expertise-lifecycle-cli.mjs` (new)
-- `scripts/expertise-export.mjs` (modified)
+- `scripts/expertise/expertise-apply-proposal.mjs` (new)
+- `scripts/expertise/expertise-lifecycle-cli.mjs` (new)
+- `scripts/expertise/expertise-export.mjs` (modified)
 - `tests/expertise/expertise-governance.test.mjs` (new, 6/6 pass)
 
 ## What This Unlocks
@@ -98,10 +98,10 @@ Makes the system self-improving.
 
 | Phase | Status | Tests | Files |
 |---|---|---|---|
-| 1: Seed | ✅ Done | — | `scripts/expertise-seed.mjs` (new) |
+| 1: Seed | ✅ Done | — | `scripts/expertise/expertise-seed.mjs` (new) |
 | 2: Evidence | ✅ Done | 3/3 pass | `extensions/multi-team.ts`, `tests/expertise/evidence-recording.test.mjs` |
-| 3: Sync | ✅ Done | 4/4 pass | `scripts/expertise-sync.mjs`, `tests/expertise/expertise-sync.test.mjs` |
-| 4: Governance | ✅ Done | 6/6 pass | `scripts/expertise-apply-proposal.mjs`, `scripts/expertise-lifecycle-cli.mjs`, `scripts/expertise-export.mjs`, `tests/expertise/expertise-governance.test.mjs` |
+| 3: Sync | ✅ Done | 4/4 pass | `scripts/expertise/expertise-sync.mjs`, `tests/expertise/expertise-sync.test.mjs` |
+| 4: Governance | ✅ Done | 6/6 pass | `scripts/expertise/expertise-apply-proposal.mjs`, `scripts/expertise/expertise-lifecycle-cli.mjs`, `scripts/expertise/expertise-export.mjs`, `tests/expertise/expertise-governance.test.mjs` |
 
 Total: 13 tests, 0 failures. Evidence flowing for planning-lead (42), engineering-lead (22), validation-lead (3), backend-dev (1).
 

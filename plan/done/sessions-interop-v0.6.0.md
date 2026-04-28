@@ -184,16 +184,16 @@ Possível diretório:
 ### Arquivos principais
 
 - `scripts/meta-agents-harness.mjs`
-- `scripts/runtime-core-integrations.mjs`
-- `scripts/runtime-adapter-contract.mjs`
+- `scripts/runtime/runtime-core-integrations.mjs`
+- `scripts/runtime/runtime-adapter-contract.mjs`
 - novos adapters/suporte de sessão por runtime
 - `tests/sessions-operations.test.mjs`
 
 ### Arquivos novos prováveis
 
-- `scripts/session-adapter-contract.mjs`
-- `scripts/session-export.mjs`
-- `scripts/session-injection.mjs`
+- `scripts/session/session-adapter-contract.mjs`
+- `scripts/session/session-export.mjs`
+- `scripts/session/session-injection.mjs`
 - `tests/session-interop.test.mjs`
 - `docs/sessions-interop.md`
 

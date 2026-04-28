@@ -42,7 +42,7 @@ GOOGLE_CLOUD_PROJECT="old-project"
   const result = spawnSync(
     process.execPath,
     [
-      path.join("/home/alysson/Github/meta-agents-harness", "scripts", "generate-stitch-secrets.mjs"),
+      path.join("/home/alysson/Github/meta-agents-harness", "scripts", "../scripts/security/generate-stitch-secrets.mjs"),
       "--project-id",
       "814663988227",
       "--env-file",

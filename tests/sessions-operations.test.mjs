@@ -5,8 +5,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { collectSessions, parseSessionId, exportSession, deleteSession, resumeSession, startSession } from "../scripts/m3-ops.mjs"
-import { RUNTIME_ADAPTERS } from "../scripts/runtime-adapters.mjs"
+import { collectSessions, parseSessionId, exportSession, deleteSession, resumeSession, startSession } from "../scripts/session/m3-ops.mjs"
+import { RUNTIME_ADAPTERS } from "../scripts/runtime/runtime-adapters.mjs"
 import { runtimePlugin as kiloRuntimePlugin } from "../plugins/runtime-kilo/index.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
