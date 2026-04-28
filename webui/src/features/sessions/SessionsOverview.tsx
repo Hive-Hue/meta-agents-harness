@@ -136,6 +136,7 @@ export function SessionsOverview() {
 
 function SessionInspector({ session, onClose }: { session: SessionInfo; onClose: () => void }) {
   const [terminating, setTerminating] = useState(false);
+  const [creatingProposal, setCreatingProposal] = useState(false);
 
   const handleResume = async () => {
     const resp = await fetch("/api/mah/exec", {
@@ -165,6 +166,20 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
       URL.revokeObjectURL(url);
     } else {
       alert(`Export failed: ${data.stderr}`);
+    }
+  };
+
+  const handleCreateProposal = async () => {
+    const sessionRef = `${session.runtime}:${session.crew}:${session.id}`;
+    if (!confirm(`Create a context proposal from this session?\n\nSession: ${sessionRef}`)) return;
+    setCreatingProposal(true);
+    const resp = await fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ args: ["context", "propose", "--from-session", sessionRef, "--json"] }) });
+    const data = await resp.json();
+    setCreatingProposal(false);
+    if (data.ok) {
+      alert("Context proposal created.\nReview it in /context → Proposals tab.");
+    } else {
+      alert(`Error: ${data.stderr || data.error || "failed"}`);
     }
   };
 
@@ -213,6 +228,9 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
           </button>
           <button type="button" onClick={handleExport}>
             <Icon name="ios_share" size={14} />Export
+          </button>
+          <button type="button" onClick={handleCreateProposal} disabled={creatingProposal}>
+            <Icon name="add_circle" size={14} />{creatingProposal ? "Creating..." : "Create Proposal"}
           </button>
         </div>
         <div className="sessions-danger-zone">
