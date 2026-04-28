@@ -103,12 +103,12 @@
 
 .sync-diff pre {
   margin: 0;
-  border: 1px solid #1e293b;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
-  background: #0f172a;
-  color: #cbd5e1;
+  background: #f7f3f2;
+  color: var(--color-text);
   padding: 12px;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.6;
   font-family: var(--font-mono);
 }

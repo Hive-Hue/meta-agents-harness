@@ -2832,6 +2832,13 @@ Subcommands:
   find --agent <name> --task "<desc>"  Find relevant context for a task
   explain --agent <name> --task "<desc>" [--verbose] Explain retrieval reasoning
   propose --from-session <ref>         Create governed memory proposal from session (requires review before promotion)
+    Optional AI rewrite flags:
+      --ai
+      --provider <zai|openrouter|codex-oauth|minimax>
+      --model <id>
+      --api-key <key>
+      --base-url <url>
+      --endpoint </chat/completions|/responses>
   proposals list [--json]             List proposals with statuses
   proposals show <id> [--json]        Show proposal with overlap detection
   proposals promote <id> [--stability <level>] [--force] [--json]  Promote to operational
@@ -3254,6 +3261,12 @@ Examples:
   if (sub === "propose") {
     const sessionIdx = subArgv.indexOf("--from-session")
     const sessionRef = sessionIdx >= 0 ? subArgv[sessionIdx + 1] : null
+    const aiEnabled = subArgv.includes("--ai")
+    const aiProvider = parseValueArg(subArgv, "--provider")
+    const aiModel = parseValueArg(subArgv, "--model")
+    const aiApiKey = parseValueArg(subArgv, "--api-key")
+    const aiBaseUrl = parseValueArg(subArgv, "--base-url")
+    const aiEndpoint = parseValueArg(subArgv, "--endpoint")
 
     if (!sessionRef) {
       console.error("ERROR: usage: mah context propose --from-session <session-ref>")
@@ -3262,7 +3275,7 @@ Examples:
       return 1
     }
 
-    const { proposeFromSession, writeProposal } = await import("./context-memory-proposal.mjs")
+    const { proposeFromSession, writeProposal, refineProposalWithAi } = await import("./context-memory-proposal.mjs")
     const result = proposeFromSession(repoRoot, sessionRef)
 
     if (!result.ok) {
@@ -3270,18 +3283,45 @@ Examples:
       return 1
     }
 
-    const writeResult = writeProposal(repoRoot, result.proposal)
+    let proposal = result.proposal
+    let aiMeta = null
+    if (aiEnabled) {
+      const aiResult = await refineProposalWithAi(
+        repoRoot,
+        proposal,
+        {
+          provider: aiProvider,
+          model: aiModel,
+          apiKey: aiApiKey,
+          baseUrl: aiBaseUrl,
+          endpoint: aiEndpoint,
+        },
+        process.env
+      )
+      if (aiResult.ok) {
+        proposal = aiResult.proposal
+        aiMeta = { provider: aiResult.provider, model: aiResult.model }
+      } else {
+        console.log(`context propose: AI rewrite skipped (${aiResult.reason})`)
+      }
+    }
+
+    const writeResult = writeProposal(repoRoot, proposal)
     if (!writeResult.ok) {
       console.error("ERROR: " + writeResult.error)
       return 1
     }
 
-    const prop = result.proposal
+    const prop = proposal
     console.log("=== Context Manager Proposal Created ===")
     console.log("File:    " + writeResult.file_path)
     console.log("Status:  draft (requires review)")
     console.log("Source:  " + prop.source_type + " — " + prop.source_ref)
     console.log("Proposed ID: " + prop.proposed_document_id)
+    if (aiMeta) {
+      console.log("AI rewrite: enabled")
+      console.log("AI model:  " + aiMeta.provider + "/" + aiMeta.model)
+    }
     console.log("")
     console.log("Summary:")
     console.log("  " + prop.summary)

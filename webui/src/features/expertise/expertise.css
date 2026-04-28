@@ -14,6 +14,14 @@
   overflow: auto;
 }
 
+.expertise-tab-panel {
+  flex: 1;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .expertise-main__content {
   flex: 1;
   overflow: auto;
@@ -138,7 +146,7 @@
 }
 
 .workflow-panel__desc {
-  color: var(--color-text-secondary);
+  color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.6;
   margin: 0 0 20px;
@@ -433,6 +441,15 @@
 /* Table */
 .expertise-table {
   overflow: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.expertise-table--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .expertise-table table {
@@ -505,8 +522,8 @@
 .evidence-tab {
   display: grid;
   grid-template-columns: 160px 1fr;
-  height: calc(100vh - 280px);
-  min-height: 300px;
+  flex: 1;
+  min-height: 0;
 }
 
 .evidence-agent-list {
@@ -570,8 +587,8 @@
 .lifecycle-tab {
   display: grid;
   grid-template-columns: 160px 1fr;
-  height: calc(100vh - 280px);
-  min-height: 300px;
+  flex: 1;
+  min-height: 0;
 }
 
 .lifecycle-agent-list {
@@ -653,20 +670,22 @@
 
 /* Crew grouping */
 .crew-group-header td {
-  background: #0a0a0a !important;
+  background: #f1edec !important;
+  border-top: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--color-border-subtle);
   padding: 6px 16px !important;
   cursor: default !important;
 }
 
 .crew-group-header:hover td {
-  background: #0a0a0a !important;
+  background: #f1edec !important;
 }
 
 .crew-group-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #fff;
+  color: var(--color-text);
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
@@ -675,7 +694,7 @@
 
 .crew-group-count {
   margin-left: 8px;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 10px;
   font-weight: 400;
   text-transform: none;
@@ -683,9 +702,14 @@
 
 .expertise-main .command-preview__command,
 .workflow-panel .command-preview__command {
-  background: #0f172a;
-  border: 1px solid #334155;
+  background: var(--color-surface-neutral);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
   padding: 8px 12px;
   flex: none;
+}
+
+.expertise-main .command-preview__command code,
+.workflow-panel .command-preview__command code {
+  color: var(--color-text);
 }

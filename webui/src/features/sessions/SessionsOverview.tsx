@@ -52,14 +52,13 @@ export function SessionsOverview() {
                 value={runtime}
                 onChange={e => setRuntime(e.target.value)}
                 className="sessions-runtime-select"
-                style={{ padding: "4px 8px", borderRadius: 4, border: "1px solid #ccc", fontSize: 13 }}
               >
                 <option value="pi">pi</option>
                 <option value="claude">claude</option>
                 <option value="opencode">opencode</option>
                 <option value="hermes">hermes</option>
               </select>
-              <button type="button" onClick={reload} title="Refresh" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", alignItems: "center" }}>
+              <button type="button" onClick={reload} title="Refresh" className="sessions-refresh-btn">
                 <Icon name="refresh" size={16} />
               </button>
             </div>
@@ -89,7 +88,6 @@ export function SessionsOverview() {
                       key={session.id}
                       className={selected?.id === session.id ? "is-selected" : ""}
                       onClick={() => setSelected(session)}
-                      style={{ cursor: "pointer" }}
                     >
                       <td>
                         <Icon
@@ -122,13 +120,13 @@ export function SessionsOverview() {
         </section>
       </main>
 
-      <aside className="inspector">
+      <aside className="inspector sessions-inspector">
         {selected ? (
           <SessionInspector session={selected} onClose={() => setSelected(null)} />
         ) : (
-          <section className="inspector__body" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}>
+          <section className="inspector__body sessions-inspector__empty">
             <Icon name="info" size={32} />
-            <p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>Select a session to view details</p>
+            <p>Select a session to view details</p>
           </section>
         )}
       </aside>
@@ -209,7 +207,7 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
           <div><span>Artifacts</span><strong>{session.counts.artifacts}</strong></div>
           <div><span>Delegations</span><strong>{session.counts.delegations}</strong></div>
         </div>
-        <div className="inspector__actions">
+        <div className="sessions-inspector__actions">
           <button type="button" onClick={handleResume}>
             <Icon name="play_arrow" size={14} />Resume
           </button>
@@ -217,12 +215,12 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
             <Icon name="ios_share" size={14} />Export
           </button>
         </div>
-        <div className="danger-zone">
-          <div className="danger-zone__panel">
+        <div className="sessions-danger-zone">
+          <div className="sessions-danger-zone__panel">
             <p><Icon name="warning" size={14} />Destructive Action</p>
             <span>Terminate and purge this session. This cannot be undone.</span>
           </div>
-          <button className="danger-zone__button" type="button" onClick={handleTerminate} disabled={terminating}>
+          <button className="sessions-danger-zone__button" type="button" onClick={handleTerminate} disabled={terminating}>
             <Icon name="delete_forever" size={14} />{terminating ? "Terminating..." : "Terminate Session"}
           </button>
         </div>

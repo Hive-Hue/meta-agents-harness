@@ -281,10 +281,12 @@ export function ExpertiseGovernance() {
             </div>
           )}
 
-          {tab === "catalog" && <CatalogTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} qualifying={qualifying} syncResults={syncResults} />}
-          {tab === "evidence" && <EvidenceTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} />}
-          {tab === "proposals" && <ProposalsTab proposals={proposals} onApply={handleApply} />}
-          {tab === "lifecycle" && <LifecycleTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} />}
+          <div className="expertise-tab-panel">
+            {tab === "catalog" && <CatalogTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} qualifying={qualifying} syncResults={syncResults} />}
+            {tab === "evidence" && <EvidenceTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} />}
+            {tab === "proposals" && <ProposalsTab proposals={proposals} onApply={handleApply} />}
+            {tab === "lifecycle" && <LifecycleTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} />}
+          </div>
         </div>
       </main>
       <aside className="inspector">
@@ -382,6 +384,14 @@ function EvidenceTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntr
 }
 
 function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApply: (path:string)=>void }) {
+  if (proposals.length === 0) {
+    return (
+      <div className="expertise-table expertise-table--empty">
+        <div className="empty-state">No proposals.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="expertise-table">
       <table>

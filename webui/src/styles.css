@@ -327,9 +327,9 @@ input:focus-visible {
 .command-preview {
   display: flex;
   overflow: hidden;
-  border: 1px solid #334155;
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
-  background: #0f172a;
+  background: var(--color-surface);
 }
 
 .command-preview__context,
@@ -341,12 +341,12 @@ input:focus-visible {
 }
 
 .command-preview__context {
-  border-right: 1px solid #334155;
-  background: #1e293b;
+  border-right: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-neutral);
 }
 
 .command-preview__label {
-  color: #94a3b8;
+  color: var(--color-text-muted);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -354,13 +354,13 @@ input:focus-visible {
 }
 
 .command-preview__value {
-  color: #58e6ff;
+  color: var(--color-secondary-cyan);
   font-family: var(--font-mono);
   font-size: 12px;
 }
 
 .command-preview__command code {
-  color: #cbd5e1;
+  color: var(--color-text);
   font-family: var(--font-mono);
   font-size: 12px;
 }
@@ -370,11 +370,11 @@ input:focus-visible {
   place-items: center;
   border: 0;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-muted);
 }
 
 .command-preview__copy:hover {
-  color: #fff;
+  color: var(--color-secondary-cyan);
 }
 
 .sessions-main__content {
@@ -479,9 +479,9 @@ input:focus-visible {
 }
 
 .status-badge--running {
-  border-color: #a1efff;
+  border-color: #b6edf5;
   background: #eefcff;
-  color: var(--color-success);
+  color: var(--color-secondary-cyan);
 }
 
 .status-badge--completed {

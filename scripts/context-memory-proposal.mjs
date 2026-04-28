@@ -9,6 +9,34 @@ import { join, basename } from "node:path"
 import { createHash, randomUUID } from "node:crypto"
 import { parseSessionId, collectSessions } from "./m3-ops.mjs"
 import { CONTEXT_MEMORY_PROPOSAL_VERSION } from "../types/context-memory-types.mjs"
+import { findMahSkillFile } from "./mah-home.mjs"
+
+const AI_PROVIDER_PRESETS = [
+  {
+    id: "zai",
+    label: "Z.ai",
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    endpoint: "/chat/completions",
+  },
+  {
+    id: "openrouter",
+    label: "OpenRouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    endpoint: "/chat/completions",
+  },
+  {
+    id: "codex-oauth",
+    label: "Codex (OAuth)",
+    baseUrl: "https://chatgpt.com/backend-api/codex",
+    endpoint: "/responses",
+  },
+  {
+    id: "minimax",
+    label: "MiniMax",
+    baseUrl: "https://api.minimax.io/v1",
+    endpoint: "/chat/completions",
+  }
+]
 
 export function findSession(repoRoot, sessionIdFull) {
   const parsed = parseSessionId(sessionIdFull)
@@ -184,6 +212,160 @@ export function proposeFromSession(repoRoot, sessionIdFull) {
     summary, rationale, reviewers: ["orchestrator"], existing_refs: [],
   }
   return { ok: true, proposal, signals }
+}
+
+function findAiProviderPreset(providerId) {
+  const normalized = `${providerId || ""}`.trim().toLowerCase()
+  if (!normalized) return null
+  return AI_PROVIDER_PRESETS.find((provider) => provider.id === normalized || provider.label.toLowerCase() === normalized) || null
+}
+
+function resolveDirectAiOptions(options = {}, env = process.env) {
+  const provider = findAiProviderPreset(options.provider || env.MAH_AI_PROVIDER) || AI_PROVIDER_PRESETS[0]
+  const providerEnvKey = `MAH_AI_${provider.id.toUpperCase().replaceAll("-", "_")}_API_KEY`
+  const baseUrl = `${options.baseUrl || env.MAH_AI_BASE_URL || provider.baseUrl}`.trim().replace(/\/+$/, "")
+  const apiKey = `${options.apiKey || env[providerEnvKey] || env.MAH_AI_API_KEY || env.OPENAI_API_KEY || env.OPENROUTER_API_KEY || ""}`.trim()
+  const model = `${options.model || env.MAH_AI_MODEL || ""}`.trim()
+  const endpoint = `${options.endpoint || provider.endpoint || "/chat/completions"}`.trim()
+  return { provider, baseUrl, apiKey, model, endpoint }
+}
+
+function buildProposalRewritePrompt(proposal) {
+  const payload = {
+    summary: proposal.summary || "",
+    rationale: proposal.rationale || "",
+    proposed_content: proposal.proposed_content || "",
+    proposed_frontmatter: proposal.proposed_frontmatter || {},
+    source_ref: proposal.source_ref || "",
+    source_type: proposal.source_type || "",
+  }
+  return [
+    "Rewrite this Context Manager proposal to improve readability and reviewer utility.",
+    "Hard constraints:",
+    "- Keep facts and evidence unchanged.",
+    "- Do not invent tools, systems, capabilities, agents, or outcomes.",
+    "- Keep governance posture: draft proposal, manual review required.",
+    "- Return JSON only with keys: summary, rationale, proposed_content.",
+    "- Each field must be a string.",
+    "",
+    "Proposal payload:",
+    JSON.stringify(payload, null, 2)
+  ].join("\n")
+}
+
+function buildDirectAiRequestBody(options, skillContent, prompt) {
+  if (options.endpoint === "/responses") {
+    return {
+      model: options.model,
+      stream: false,
+      store: false,
+      input: [
+        {
+          role: "system",
+          content: `${skillContent}\n\nYou rewrite context proposals. Output JSON only.`
+        },
+        { role: "user", content: prompt }
+      ]
+    }
+  }
+  return {
+    model: options.model,
+    messages: [
+      {
+        role: "system",
+        content: `${skillContent}\n\nYou rewrite context proposals. Output JSON only.`
+      },
+      { role: "user", content: prompt }
+    ]
+  }
+}
+
+function extractDirectAiText(payload) {
+  const chatText = payload?.choices?.[0]?.message?.content
+  if (chatText) return `${chatText}`.trim()
+  if (payload?.output_text) return `${payload.output_text}`.trim()
+  const responseOutput = Array.isArray(payload?.output) ? payload.output : []
+  const parts = []
+  for (const item of responseOutput) {
+    const content = Array.isArray(item?.content) ? item.content : []
+    for (const contentItem of content) {
+      if (contentItem?.text) parts.push(contentItem.text)
+      if (contentItem?.type === "output_text" && contentItem?.text) parts.push(contentItem.text)
+    }
+  }
+  return parts.join("\n").trim()
+}
+
+function parseRewriteJson(rawText) {
+  const text = `${rawText || ""}`.trim()
+  if (!text) throw new Error("empty AI output")
+  const fenced = text.match(/```json\s*([\s\S]*?)```/i)
+  const candidate = fenced ? fenced[1].trim() : text
+  const parsed = JSON.parse(candidate)
+  if (!parsed || typeof parsed !== "object") throw new Error("AI output is not an object")
+  const summary = `${parsed.summary || ""}`.trim()
+  const rationale = `${parsed.rationale || ""}`.trim()
+  const proposedContent = `${parsed.proposed_content || ""}`.trim()
+  if (!summary || !rationale || !proposedContent) {
+    throw new Error("AI output missing required fields (summary, rationale, proposed_content)")
+  }
+  return { summary, rationale, proposedContent }
+}
+
+export async function refineProposalWithAi(repoRoot, proposal, aiOptions = {}, env = process.env) {
+  const options = resolveDirectAiOptions(aiOptions, env)
+  if (!options.apiKey) return { ok: false, reason: "no_api_key", error: "missing api key" }
+  if (!options.model) return { ok: false, reason: "no_model", error: "missing model" }
+
+  const skillPath =
+    findMahSkillFile("context-proposal-writer", { repoRoot }) ||
+    findMahSkillFile("context_proposal_writer", { repoRoot })
+  if (!skillPath || !existsSync(skillPath)) {
+    return { ok: false, reason: "no_skill", error: "context-proposal-writer skill not found" }
+  }
+
+  const skillContent = readFileSync(skillPath, "utf-8")
+  const prompt = buildProposalRewritePrompt(proposal)
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 120000)
+
+  try {
+    const response = await fetch(`${options.baseUrl}${options.endpoint}`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${options.apiKey}`
+      },
+      body: JSON.stringify(buildDirectAiRequestBody(options, skillContent, prompt))
+    })
+    const bodyText = await response.text()
+    if (!response.ok) {
+      return { ok: false, reason: "http_status", error: `status ${response.status}`, details: bodyText }
+    }
+
+    let payload
+    try {
+      payload = JSON.parse(bodyText)
+    } catch (error) {
+      return { ok: false, reason: "invalid_json", error: error.message, details: bodyText }
+    }
+
+    const output = extractDirectAiText(payload)
+    const rewrite = parseRewriteJson(output)
+    const nextProposal = {
+      ...proposal,
+      summary: rewrite.summary,
+      rationale: rewrite.rationale,
+      proposed_content: rewrite.proposedContent,
+    }
+    return { ok: true, proposal: nextProposal, provider: options.provider.id, model: options.model }
+  } catch (error) {
+    const reason = error?.name === "AbortError" ? "timeout" : "network_error"
+    return { ok: false, reason, error: error.message }
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 function buildProposalBody(signals, taskSignals) {

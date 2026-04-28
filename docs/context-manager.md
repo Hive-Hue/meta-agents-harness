@@ -135,11 +135,24 @@ Create a draft memory proposal from a session.
 
 \`\`\`bash
 mah context propose --from-session hermes:dev:session-id-here
+mah context propose --from-session hermes:dev:session-id-here --ai --provider openrouter --model nvidia/nemotron-3-super-120b-a12b:free
 \`\`\`
 
 Session ID format: runtime:crew:sessionId (e.g., hermes:dev:abc123)
 
 Proposals are written to .mah/context/proposals/ with status: draft. Review and promote manually.
+
+Optional AI rewrite mode:
+
+- `--ai` rewrites `summary`, `rationale`, and `proposed_content` before writing
+- Uses chat-completions style APIs (same direct-HTTP provider model used by bootstrap AI mode)
+- Supported flags:
+  - `--provider <zai|openrouter|codex-oauth|minimax>`
+  - `--model <id>`
+  - `--api-key <key>`
+  - `--base-url <url>`
+  - `--endpoint </chat/completions|/responses>`
+- If AI rewrite fails or is not configured, MAH falls back to deterministic proposal text
 
 ### mah context proposals list
 
