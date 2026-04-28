@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SettingsSection } from "./SettingsSection";
 import { FormField } from "./FormField";
 import { ToggleSwitch } from "./ToggleSwitch";
@@ -7,6 +7,13 @@ export function PreferencesPanel() {
   const [inspectorDefault, setInspectorDefault] = useState("expanded");
   const [commandPreview, setCommandPreview] = useState(true);
   const [logLevel, setLogLevel] = useState("all");
+  const [workspacePath, setWorkspacePath] = useState("");
+  const [skillsPath, setSkillsPath] = useState("");
+
+  useEffect(() => {
+    setWorkspacePath(localStorage.getItem("workspace_path") || "");
+    setSkillsPath(localStorage.getItem("skills_path") || "");
+  }, []);
 
   return (
     <>
@@ -42,6 +49,19 @@ export function PreferencesPanel() {
             { value: "error", label: "Error" },
           ]}
         />
+      </SettingsSection>
+
+      <SettingsSection title="Workspace Paths">
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+          <div>
+            <span style={{fontSize:11,fontWeight:700,color:"#444748",textTransform:"uppercase",letterSpacing:"0.04em",display:"block"}}>Workspace</span>
+            <span style={{fontFamily:"var(--font-mono)",fontSize:12,marginTop:4,display:"block",color:"#1c1b1b",wordBreak:"break-all"}}>{workspacePath || "—"}</span>
+          </div>
+          <div>
+            <span style={{fontSize:11,fontWeight:700,color:"#444748",textTransform:"uppercase",letterSpacing:"0.04em",display:"block"}}>Skills Folder</span>
+            <span style={{fontFamily:"var(--font-mono)",fontSize:12,marginTop:4,display:"block",color:"#1c1b1b",wordBreak:"break-all"}}>{skillsPath || "—"}</span>
+          </div>
+        </div>
       </SettingsSection>
 
       <SettingsSection title="About">

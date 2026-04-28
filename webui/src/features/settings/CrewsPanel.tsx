@@ -1,14 +1,15 @@
 import { SettingsSection } from "./SettingsSection";
 import { FormField } from "./FormField";
+import { useConfig } from "../config/useConfigStore";
 
-const teams = [
-  { name: "Orchestration", count: 1 },
-  { name: "Planning", count: 3 },
-  { name: "Engineering", count: 3 },
-  { name: "Validation", count: 3 },
-];
+interface CrewTeam { name: string; count: number; }
 
 export function CrewsPanel() {
+  const { config } = useConfig();
+  const crewList: CrewTeam[] = (config?.crews ?? []).map((crew: { display_name?: string; id: string; agents?: unknown[] }) => ({
+    name: crew.display_name || crew.id,
+    count: crew.agents?.length ?? 0,
+  }));
   return (
     <>
       <SettingsSection title="Active Crew">
@@ -24,9 +25,9 @@ export function CrewsPanel() {
         <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No runtime overrides configured for this crew.</p>
       </SettingsSection> */}
 
-      <SettingsSection title="Teams" badge="4">
+      <SettingsSection title="Teams" badge={String(crewList.length)}>
         <ul className="settings-teams-list">
-          {teams.map((t) => (
+          {crewList.map((t: CrewTeam) => (
             <li className="settings-team-item" key={t.name}>
               <span className="settings-team-item__name">{t.name}</span>
               <span className="settings-team-item__count">{t.count} agents</span>
