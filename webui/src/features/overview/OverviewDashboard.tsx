@@ -182,7 +182,7 @@ export function OverviewDashboard() {
         </section>
       </main>
       <aside className="inspector overview-inspector" aria-label="Workspace inspector">
-        <OverviewInspector />
+        <OverviewInspector workspace={workspace} config={config} sessions={sessions} />
       </aside>
     </>
   );

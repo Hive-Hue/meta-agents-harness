@@ -3,13 +3,23 @@ import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, spawnSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import yaml from "js-yaml";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs");
+const CONFIG_FILENAME = "meta-agents.yaml";
+const ENV_FILENAME = ".env";
+
+const PROVIDER_SECRET_SPECS = [
+  { id: "minimax", label: "MiniMax", envVar: "MINIMAX_API_KEY" },
+  { id: "zai", label: "ZAI", envVar: "ZAI_API_KEY" },
+  { id: "openai", label: "OpenAI", envVar: "OPENAI_API_KEY" },
+  { id: "openrouter", label: "OpenRouter", envVar: "OPENROUTER_API_KEY" },
+  { id: "gemini", label: "Google Gemini", envVar: "GEMINI_API_KEY" },
+] as const;
 
 // In-memory store for run sessions
 const runSessions = new Map<string, {
@@ -20,12 +30,42 @@ const runSessions = new Map<string, {
   createdAt: number;
 }>();
 
+function resolveWorkspaceRoot(req: import("http").IncomingMessage): string {
+  const rawHeader = req.headers["x-mah-workspace-path"];
+  const requestedPath = typeof rawHeader === "string" ? rawHeader.trim() : "";
+  if (!requestedPath || requestedPath === ".") return repoRoot;
+  return path.isAbsolute(requestedPath) ? path.resolve(requestedPath) : path.resolve(repoRoot, requestedPath);
+}
+
+function getWorkspaceMetadata(workspaceRoot: string) {
+  let exists = false;
+  let isDirectory = false;
+  try {
+    const stat = statSync(workspaceRoot);
+    exists = true;
+    isDirectory = stat.isDirectory();
+  } catch {
+    // Keep default metadata for non-existing paths.
+  }
+  return { exists, isDirectory };
+}
+
+function hasWorkspaceConfig(workspaceRoot: string): boolean {
+  return existsSync(path.join(workspaceRoot, CONFIG_FILENAME));
+}
+
 function handleConfigApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
-  const configPath = path.join(repoRoot, "meta-agents.yaml");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const configPath = path.join(workspaceRoot, CONFIG_FILENAME);
   res.setHeader("Content-Type", "application/json");
 
   if (req.method === "GET") {
     try {
+      if (!existsSync(configPath)) {
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, config: null }));
+        return;
+      }
       const raw = readFileSync(configPath, "utf-8");
       const config = yaml.load(raw) as Record<string, unknown>;
       res.statusCode = 200;
@@ -42,6 +82,13 @@ function handleConfigApi(req: import("http").IncomingMessage, res: import("http"
     req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
     req.on("end", () => {
       try {
+        const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+        if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+          return;
+        }
+
         const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
         const body = JSON.parse(raw) as { config?: unknown };
         if (!body || typeof body.config !== "object" || body.config === null) {
@@ -65,6 +112,211 @@ function handleConfigApi(req: import("http").IncomingMessage, res: import("http"
   res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
 }
 
+function parseDotEnvContent(content: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+    const key = match[1];
+    let value = match[2].trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+function redactSensitiveArgs(args: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < args.length; i += 1) {
+    const token = args[i];
+    if (token === "--api-key" || token === "--ai-api-key") {
+      out.push(token);
+      out.push("***");
+      i += 1;
+      continue;
+    }
+    if (token.startsWith("--api-key=") || token.startsWith("--ai-api-key=")) {
+      out.push(`${token.split("=")[0]}=***`);
+      continue;
+    }
+    out.push(token);
+  }
+  return out;
+}
+
+function escapeEnvValue(value: string): string {
+  if (/^[A-Za-z0-9_./:@-]+$/.test(value)) return value;
+  return JSON.stringify(value);
+}
+
+function upsertEnvVar(content: string, envVar: string, value: string): string {
+  const lines = content ? content.split(/\r?\n/) : [];
+  let replaced = false;
+  const nextLines = lines.filter((line) => {
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+    if (!match) return true;
+    if (match[1] !== envVar) return true;
+    if (!value) {
+      replaced = true;
+      return false;
+    }
+    replaced = true;
+    return true;
+  }).map((line) => {
+    const match = line.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+    if (!match || match[1] !== envVar) return line;
+    return `${envVar}=${escapeEnvValue(value)}`;
+  });
+
+  if (!replaced && value) {
+    if (nextLines.length > 0 && nextLines[nextLines.length - 1].trim()) nextLines.push("");
+    nextLines.push(`${envVar}=${escapeEnvValue(value)}`);
+  }
+
+  return `${nextLines.join("\n")}\n`;
+}
+
+function maskSecret(value: string): string {
+  const normalized = `${value || ""}`.trim();
+  if (!normalized) return "";
+  const suffix = normalized.slice(-4);
+  return `••••••••${suffix}`;
+}
+
+function handleSecretsApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+  if (!hasWorkspaceConfig(workspaceRoot)) {
+    res.statusCode = 409;
+    res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+    return;
+  }
+  const envPath = path.join(workspaceRoot, ENV_FILENAME);
+  const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const parsed = parseDotEnvContent(rawEnv);
+
+  if (req.method === "GET") {
+    const providers = PROVIDER_SECRET_SPECS.map((spec) => {
+      const value = `${parsed[spec.envVar] || process.env[spec.envVar] || ""}`.trim();
+      const configured = Boolean(value);
+      return {
+        id: spec.id,
+        provider: spec.label,
+        envVar: spec.envVar,
+        configured,
+        masked: configured ? maskSecret(value) : "Not configured",
+        status: configured ? "Configured" : "Missing",
+      };
+    });
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true, providers }));
+    return;
+  }
+
+  if (req.method === "PUT") {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on("end", () => {
+      try {
+        const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
+        const body = JSON.parse(bodyRaw) as { providerId?: string; apiKey?: string };
+        const providerId = `${body.providerId || ""}`.trim();
+        const apiKey = `${body.apiKey || ""}`.trim();
+        const spec = PROVIDER_SECRET_SPECS.find((item) => item.id === providerId);
+        if (!spec) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: "invalid providerId" }));
+          return;
+        }
+        const updatedContent = upsertEnvVar(rawEnv, spec.envVar, apiKey);
+        writeFileSync(envPath, updatedContent, "utf-8");
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, providerId: spec.id, configured: Boolean(apiKey) }));
+      } catch (error) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      }
+    });
+    return;
+  }
+
+  res.statusCode = 405;
+  res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+}
+
+function handleExpertiseProposalsApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "GET") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+
+  try {
+    const workspaceRoot = resolveWorkspaceRoot(req);
+    const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+    if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+      return;
+    }
+
+    const proposalsDir = path.join(workspaceRoot, ".mah", "expertise", "proposals");
+    if (!existsSync(proposalsDir)) {
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, proposals: [] }));
+      return;
+    }
+
+    const files = readdirSync(proposalsDir).filter((file) => file.endsWith(".yaml") || file.endsWith(".yml"));
+    const proposals = files.flatMap((file) => {
+      try {
+        const raw = readFileSync(path.join(proposalsDir, file), "utf-8");
+        const doc = yaml.load(raw);
+        if (!doc || typeof doc !== "object") return [];
+        const d = doc as Record<string, unknown>;
+        return [{
+          id: typeof d.id === "string" && d.id ? d.id : file,
+          file_path: `.mah/expertise/proposals/${file}`,
+          target_expertise_id: typeof d.target_expertise_id === "string" ? d.target_expertise_id : "",
+          summary: typeof d.summary === "string" ? d.summary : "",
+          rationale: typeof d.rationale === "string" ? d.rationale : "",
+          generated_by: (d.generated_by && typeof d.generated_by === "object") ? d.generated_by : { actor: "unknown", role: "" },
+          reviewers: Array.isArray(d.reviewers) ? d.reviewers : [],
+          status: typeof d.status === "string" ? d.status : "pending",
+          created_at: typeof d.created_at === "string" ? d.created_at : "",
+          proposed_changes: (d.proposed_changes && typeof d.proposed_changes === "object") ? d.proposed_changes : {},
+          target_snapshot: (d.target_snapshot && typeof d.target_snapshot === "object")
+            ? d.target_snapshot
+            : { lifecycle: "", validation_status: "", confidence: null },
+        }];
+      } catch {
+        return [];
+      }
+    });
+
+    proposals.sort((a, b) => `${b.created_at || ""}`.localeCompare(`${a.created_at || ""}`));
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true, proposals }));
+  } catch (error) {
+    res.statusCode = 500;
+    res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+  }
+}
+
 function handleExecApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   res.setHeader("Content-Type", "application/json");
 
@@ -78,9 +330,23 @@ function handleExecApi(req: import("http").IncomingMessage, res: import("http").
   req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
   req.on("end", () => {
     try {
+      const workspaceRoot = resolveWorkspaceRoot(req);
+      const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+      if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+        return;
+      }
+      if (!hasWorkspaceConfig(workspaceRoot)) {
+        res.statusCode = 409;
+        res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+        return;
+      }
+
       const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
       const body = JSON.parse(raw) as { args?: string[] };
       const args = Array.isArray(body?.args) ? body.args.filter((item) => typeof item === "string" && item.trim()) : [];
+      const redactedArgs = redactSensitiveArgs(args);
 
       const ALLOWED_COMMANDS = ["skills", "sessions", "expertise", "context"];
       if (args.length === 0 || !ALLOWED_COMMANDS.includes(args[0])) {
@@ -89,9 +355,13 @@ function handleExecApi(req: import("http").IncomingMessage, res: import("http").
         return;
       }
 
+      const envPath = path.join(workspaceRoot, ENV_FILENAME);
+      const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+      const workspaceEnv = parseDotEnvContent(rawEnv);
+
       const child = spawnSync(process.execPath, [cliPath, ...args], {
-        cwd: repoRoot,
-        env: process.env,
+        cwd: workspaceRoot,
+        env: { ...process.env, ...workspaceEnv },
         encoding: "utf-8",
         timeout: 20000,
       });
@@ -102,7 +372,7 @@ function handleExecApi(req: import("http").IncomingMessage, res: import("http").
         JSON.stringify({
           ok: status === 0,
           status,
-          command: `mah ${args.join(" ")}`,
+          command: `mah ${redactedArgs.join(" ")}`,
           stdout: child.stdout || "",
           stderr: child.stderr || "",
         }),
@@ -119,22 +389,36 @@ function handleExecApi(req: import("http").IncomingMessage, res: import("http").
   });
 }
 
-function handleWorkspaceApi(_req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+function handleWorkspaceApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
   const result: Record<string, unknown> = {
-    path: repoRoot,
-    name: path.basename(repoRoot),
+    path: workspaceRoot,
+    name: path.basename(workspaceRoot) || path.basename(repoRoot),
     gitBranch: "",
     gitDirty: false,
     gitClean: true,
-    configExists: existsSync(path.join(repoRoot, "meta-agents.yaml")),
+    exists: workspaceMeta.exists,
+    isDirectory: workspaceMeta.isDirectory,
+    configExists: existsSync(path.join(workspaceRoot, CONFIG_FILENAME)),
   };
   try {
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: repoRoot, encoding: "utf-8" }).trim();
-    (result as Record<string, unknown>).gitBranch = branch;
-    const status = execSync("git status --porcelain", { cwd: repoRoot, encoding: "utf-8" }).trim();
-    (result as Record<string, unknown>).gitDirty = status.length > 0;
-    (result as Record<string, unknown>).gitClean = status.length === 0;
+    if (workspaceMeta.exists && workspaceMeta.isDirectory) {
+      const branch = execSync("git rev-parse --abbrev-ref HEAD", {
+        cwd: workspaceRoot,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+      (result as Record<string, unknown>).gitBranch = branch;
+      const status = execSync("git status --porcelain", {
+        cwd: workspaceRoot,
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "ignore"],
+      }).trim();
+      (result as Record<string, unknown>).gitDirty = status.length > 0;
+      (result as Record<string, unknown>).gitClean = status.length === 0;
+    }
   } catch { /* not a git repo */ }
   res.statusCode = 200;
   res.end(JSON.stringify({ ok: true, workspace: result }));
@@ -152,6 +436,19 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
       const { task = "", crew = "dev", runtime = ".pi/" } = JSON.parse(raw);
       if (!task.trim()) { res.statusCode = 400; res.end(JSON.stringify({ ok: false, error: "no task" })); return; }
 
+      const workspaceRoot = resolveWorkspaceRoot(req);
+      const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+      if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+        return;
+      }
+      if (!hasWorkspaceConfig(workspaceRoot)) {
+        res.statusCode = 409;
+        res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+        return;
+      }
+
       const sessionId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const tp = () => new Date().toLocaleTimeString([], { hour12: false });
       runSessions.set(sessionId, {
@@ -161,7 +458,13 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
         createdAt: Date.now(),
       });
 
-      const child = spawn(process.execPath, [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtime, "--headless"], { cwd: repoRoot, env: { ...process.env } });
+      const envPath = path.join(workspaceRoot, ENV_FILENAME);
+      const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+      const workspaceEnv = parseDotEnvContent(rawEnv);
+      const child = spawn(process.execPath, [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtime, "--headless"], {
+        cwd: workspaceRoot,
+        env: { ...process.env, ...workspaceEnv },
+      });
 
       const session = runSessions.get(sessionId)!;
       session.process = child;
@@ -248,7 +551,18 @@ function mahApiMiddleware() {
           return;
         }
 
+        if (url === "/api/mah/secrets") {
+          handleSecretsApi(req, res);
+          return;
+        }
+        if (url === "/api/mah/expertise-proposals") {
+          handleExpertiseProposalsApi(req, res);
+          return;
+        }
+
         if (url === "/api/mah/run-start") { handleRunStart(req, res); return; }
+        if (url.startsWith("/api/mah/run-status/")) { handleRunStatus(req, res); return; }
+
         if (url.startsWith("/api/mah/run-status/")) { handleRunStatus(req, res); return; }
 
         next();

@@ -51,6 +51,53 @@ interface ConfigState {
 
 const ConfigContext = createContext<ConfigState | null>(null);
 
+function workspaceScopedKey(base: string): string {
+  const workspacePath = localStorage.getItem("mah_workspace_path") || "default";
+  return `${base}:${workspacePath}`;
+}
+
+function hydrateCatalogFromStorage(config: MahConfig): MahConfig {
+  const availableKey = workspaceScopedKey("mah_settings_available_models");
+  const fallbacksKey = workspaceScopedKey("mah_settings_model_fallbacks");
+  const nextCatalog = { ...(config.catalog ?? {}) };
+
+  try {
+    const rawAvailable = localStorage.getItem(availableKey);
+    if (rawAvailable) {
+      const parsed = JSON.parse(rawAvailable);
+      if (Array.isArray(parsed)) {
+        nextCatalog.available_models = parsed.filter((item) =>
+          item &&
+          typeof item === "object" &&
+          typeof item.provider === "string" &&
+          typeof item.model_id === "string"
+        );
+      }
+    }
+  } catch {
+    // ignore malformed persisted data
+  }
+
+  try {
+    const rawFallbacks = localStorage.getItem(fallbacksKey);
+    if (rawFallbacks) {
+      const parsed = JSON.parse(rawFallbacks);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        nextCatalog.model_fallbacks = Object.fromEntries(
+          Object.entries(parsed).map(([role, values]) => [
+            role,
+            Array.isArray(values) ? values.filter((item) => typeof item === "string") : [],
+          ])
+        );
+      }
+    }
+  } catch {
+    // ignore malformed persisted data
+  }
+
+  return { ...config, catalog: nextCatalog };
+}
+
 export function ConfigProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<MahConfig | null>(null);
   const [serverConfig, setServerConfig] = useState<MahConfig | null>(null);
@@ -78,9 +125,10 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         setLoading(false);
         return;
       }
-      setConfig(data.config);
-      setServerConfig(data.config);
-      serverRef.current = JSON.stringify(data.config);
+      const hydratedConfig = hydrateCatalogFromStorage(data.config);
+      setConfig(hydratedConfig);
+      setServerConfig(hydratedConfig);
+      serverRef.current = JSON.stringify(hydratedConfig);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {

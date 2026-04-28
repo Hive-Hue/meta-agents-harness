@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { SettingsSection } from "./SettingsSection";
 import { FormField } from "./FormField";
 import { ToggleSwitch } from "./ToggleSwitch";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 
 export function WorkspacePanel() {
   const [desc, setDesc] = useState("Multi-agent orchestration harness");
@@ -11,13 +12,44 @@ export function WorkspacePanel() {
   const [syncInterval, setSyncInterval] = useState("30");
   const [syncOnStartup, setSyncOnStartup] = useState(true);
   const [validateOnSync, setValidateOnSync] = useState(true);
-  const [workspacePath, setWorkspacePath] = useState(".");
+  const { workspacePath, setWorkspacePath } = useWorkspace();
+  const [workspacePathDraft, setWorkspacePathDraft] = useState(workspacePath);
+
+  useEffect(() => {
+    setWorkspacePathDraft(workspacePath);
+  }, [workspacePath]);
+
+  const applyWorkspacePath = () => {
+    const nextPath = workspacePathDraft.trim() || ".";
+    if (nextPath !== workspacePath) {
+      setWorkspacePath(nextPath);
+    }
+  };
 
   const handleBrowse = async () => {
     try {
       if ("showDirectoryPicker" in window) {
         const dirHandle = await (window as unknown as { showDirectoryPicker: () => Promise<{ name: string }> }).showDirectoryPicker();
         setWorkspacePath(dirHandle.name);
+      } else {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.webkitdirectory = true;
+        input.multiple = false;
+        input.style.display = "none";
+        input.onchange = (e) => {
+          e.preventDefault();
+          const files = (e.target as HTMLInputElement).files;
+          if (files && files[0]) {
+            const path = files[0].webkitRelativePath || files[0].name;
+            const dirPath = path.split("/")[0] || ".";
+            setWorkspacePath(dirPath);
+          }
+          // Clean up the input element after use
+          input.remove();
+        };
+        document.body.appendChild(input);
+        input.click();
       }
     } catch {
       // User cancelled or unsupported
@@ -26,7 +58,7 @@ export function WorkspacePanel() {
 
   return (
     <>
-      <SettingsSection title="Project Information">
+      <SettingsSection title="Project & Configuration">
         <FormField label="Project Name" value="meta-agents-harness" disabled />
         <div className="settings-field">
           <label className="settings-field__label">Workspace Path</label>
@@ -34,8 +66,15 @@ export function WorkspacePanel() {
             <input
               className="settings-field__input settings-field__input--mono"
               type="text"
-              value={workspacePath}
-              onChange={(e) => setWorkspacePath(e.target.value)}
+              value={workspacePathDraft}
+              onChange={(e) => setWorkspacePathDraft(e.target.value)}
+              onBlur={applyWorkspacePath}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  applyWorkspacePath();
+                }
+              }}
               placeholder="Enter or browse for workspace path"
               style={{ flex: 1 }}
             />
@@ -45,15 +84,15 @@ export function WorkspacePanel() {
             </button>
           </div>
           <span className="settings-field__hint">Root directory containing meta-agents.yaml</span>
+          <span className="settings-field__hint" style={{ color: "#94a3b8", fontSize: 11 }}>
+            { !("showDirectoryPicker" in window) && "Directory picker requires Chrome. This browser shows file input dialog." }
+          </span>
         </div>
         <FormField label="Description" type="textarea" value={desc} onChange={setDesc} rows={2} />
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <FormField label="Created" value="2025-01-15" disabled />
           <FormField label="Last Modified" value="2026-04-25" disabled />
         </div>
-      </SettingsSection>
-
-      <SettingsSection title="Default Configuration">
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <FormField
             label="Default Crew"

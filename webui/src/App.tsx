@@ -1,5 +1,6 @@
 import { Routes, Route } from "react-router";
 import { AppShell } from "./components/layout/AppShell";
+import { WorkspaceProvider } from "./contexts/WorkspaceContext";
 import { OverviewDashboard } from "./features/overview/OverviewDashboard";
 import { SessionsOverview } from "./features/sessions/SessionsOverview";
 import { BootstrapWizard } from "./features/bootstrap/BootstrapWizard";
@@ -13,6 +14,7 @@ import { SkillsManagement } from "./features/skills/SkillsManagement";
 
 export function App() {
   return (
+    <WorkspaceProvider>
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<OverviewDashboard />} />
@@ -27,5 +29,6 @@ export function App() {
         <Route path="skills" element={<SkillsManagement />} />
       </Route>
     </Routes>
+    </WorkspaceProvider>
   );
 }

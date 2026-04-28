@@ -27,6 +27,7 @@ export type EvidenceEvent = {
 
 export type ProposalInfo = {
   id: string;
+  file_path?: string;
   target_expertise_id: string;
   summary: string;
   rationale: string;
@@ -204,63 +205,31 @@ export function useProposals() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const listResp = await fetch("/api/mah/exec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ args: ["exec", "--", "ls", ".mah/expertise/proposals/"] }),
-        });
-        const listData = await listResp.json();
-        const proposalsList: ProposalInfo[] = [];
-        if (listData.ok && listData.stdout) {
-          const files = (listData.stdout as string).trim().split("\n").filter(f => f.endsWith(".yaml") || f.endsWith(".yml"));
-          for (const file of files) {
-            const fullPath = `.mah/expertise/proposals/${file}`;
-            const propResp = await fetch("/api/mah/exec", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ args: ["exec", "--", "cat", fullPath] }),
-            });
-            const propData = await propResp.json();
-            if (propData.ok && propData.stdout) {
-              try {
-                const yaml = await import("js-yaml");
-                const doc = yaml.load(propData.stdout);
-                if (doc && typeof doc === "object") {
-                  const d = doc as Record<string, unknown>;
-                  proposalsList.push({
-                    id: d.id as string || file,
-                    target_expertise_id: (d.target_expertise_id as string) || "",
-                    summary: (d.summary as string) || "",
-                    rationale: (d.rationale as string) || "",
-                    generated_by: (d.generated_by as { actor: string; role: string }) || { actor: "unknown", role: "" },
-                    reviewers: (d.reviewers as string[]) || [],
-                    status: (d.status as ProposalInfo["status"]) || "pending",
-                    created_at: (d.created_at as string) || "",
-                    proposed_changes: (d.proposed_changes as Record<string, unknown>) || {},
-                    target_snapshot: (d.target_snapshot as ProposalInfo["target_snapshot"]) || { lifecycle: "", validation_status: "", confidence: null },
-                  });
-                }
-              } catch { /* skip invalid YAML */ }
-            }
-          }
-        }
-        if (!cancelled) setProposals(proposalsList);
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch("/api/mah/expertise-proposals");
+      const data = await resp.json();
+      if (!data.ok) {
+        setError(data.error || "Failed to load proposals");
+        setProposals([]);
+        return;
       }
+      setProposals(Array.isArray(data.proposals) ? data.proposals : []);
+    } catch (e) {
+      setError(String(e));
+      setProposals([]);
+    } finally {
+      setLoading(false);
     }
-    load();
-    return () => { cancelled = true; };
   }, []);
 
-  return { proposals, loading, error };
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  return { proposals, loading, error, reload: load };
 }
 
 export function useRecommend(task: string, crew = "dev") {

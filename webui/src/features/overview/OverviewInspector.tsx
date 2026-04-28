@@ -1,6 +1,7 @@
 import { CommandPreview } from "../../components/ui/CommandPreview";
 import { Icon } from "../../components/ui/Icon";
-import { useWorkspaceData, relativeTime } from "./useWorkspaceData";
+import type { ConfigInfo, SessionInfo, WorkspaceInfo } from "./useWorkspaceData";
+import { relativeTime } from "./useWorkspaceData";
 
 const quickActions = [
   { icon: "rocket_launch", label: "Bootstrap" },
@@ -9,8 +10,13 @@ const quickActions = [
   { icon: "sync", label: "Sync" },
 ];
 
-export function OverviewInspector() {
-  const { workspace, config, sessions } = useWorkspaceData();
+interface OverviewInspectorProps {
+  workspace: WorkspaceInfo | null;
+  config: ConfigInfo | null;
+  sessions: SessionInfo[];
+}
+
+export function OverviewInspector({ workspace, config, sessions }: OverviewInspectorProps) {
 
   const runtimeKeys = config ? Object.keys(config.runtimes ?? {}) : [];
   const firstRuntime = runtimeKeys[0] ?? "N/A";

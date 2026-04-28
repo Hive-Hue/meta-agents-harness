@@ -17,7 +17,7 @@ export interface FindResult {
 
 export interface ContextProposal {
   id: string;
-  status: "pending" | "approved" | "rejected" | "promoted";
+  status: "draft" | "pending" | "approved" | "rejected" | "promoted";
   agent: string;
   stability: string;
   source_session: string;

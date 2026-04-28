@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { useConfig } from "../config/useConfigStore";
 import { SettingsSection } from "./SettingsSection";
@@ -18,9 +18,66 @@ export function ModelsPanel() {
   const [expandedFallbacks, setExpandedFallbacks] = useState<Set<string>>(new Set());
   const [addingFallback, setAddingFallback] = useState<string | null>(null);
   const [newFallback, setNewFallback] = useState("");
+  const modelsStorageKey = useMemo(() => {
+    const workspacePath = localStorage.getItem("mah_workspace_path") || "default";
+    return `mah_settings_available_models:${workspacePath}`;
+  }, []);
+  const fallbacksStorageKey = useMemo(() => {
+    const workspacePath = localStorage.getItem("mah_workspace_path") || "default";
+    return `mah_settings_model_fallbacks:${workspacePath}`;
+  }, []);
 
   const available = config?.catalog?.available_models ?? [];
   const fallbacks = config?.catalog?.model_fallbacks ?? {};
+
+  useEffect(() => {
+    const raw = localStorage.getItem(modelsStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+      const restored = parsed.filter((item) =>
+        item &&
+        typeof item === "object" &&
+        typeof item.provider === "string" &&
+        typeof item.model_id === "string"
+      );
+      if (!restored.length) return;
+      if (JSON.stringify(restored) === JSON.stringify(available)) return;
+      updateConfig({ catalog: { ...config?.catalog, available_models: restored } });
+    } catch {
+      // ignore malformed persisted state
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelsStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(modelsStorageKey, JSON.stringify(available));
+  }, [available, modelsStorageKey]);
+
+  useEffect(() => {
+    const raw = localStorage.getItem(fallbacksStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return;
+      const restored = Object.fromEntries(
+        Object.entries(parsed).map(([role, values]) => [
+          role,
+          Array.isArray(values) ? values.filter((item) => typeof item === "string") : [],
+        ])
+      );
+      if (JSON.stringify(restored) === JSON.stringify(fallbacks)) return;
+      updateConfig({ catalog: { ...config?.catalog, model_fallbacks: restored } });
+    } catch {
+      // ignore malformed persisted state
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fallbacksStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(fallbacksStorageKey, JSON.stringify(fallbacks));
+  }, [fallbacks, fallbacksStorageKey]);
 
   // All unique model strings for fallback dropdown
   const allModelStrings = [...new Set(

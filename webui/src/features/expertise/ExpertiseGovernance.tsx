@@ -3,6 +3,7 @@ import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { CommandPreview } from "../../components/ui/CommandPreview";
 import { useExpertiseData, useExpertiseDetail, useEvidenceData, useProposals, type ExpertiseEntry, type ProposalInfo, type SyncChange } from "./useExpertiseData";
+import { getFeatureAiCliOptions } from "../settings/aiFeatureSettings";
 import "./expertise.css";
 
 type WorkflowStep = "seed" | "sync" | "propose" | "review" | "apply";
@@ -26,17 +27,16 @@ export function ExpertiseGovernance() {
   const [tab, setTab] = useState<"catalog"|"evidence"|"proposals"|"lifecycle">("catalog");
   const [showSyncPreview, setShowSyncPreview] = useState(false);
   const [syncResults, setSyncResults] = useState<SyncChange[]>([]);
-  const [proposals, setProposals] = useState<ProposalInfo[]>([]);
-  const [pLoading, setPLoading] = useState(false);
-  const [pError, setPError] = useState<string|null>(null);
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState<string|null>(null);
   const [proposeAgent, setProposeAgent] = useState("");
   const [proposeLimit, setProposeLimit] = useState("5");
   const [proposeSummary, setProposeSummary] = useState("");
   const [proposeOutput, setProposeOutput] = useState("");
+  const [proposeAiPowered, setProposeAiPowered] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const { entries, reload } = useExpertiseData(crew);
+  const { proposals, reload: reloadProposals } = useProposals();
 
   const qualifying = entries.filter(e => (e.confidence?.evidence_count ?? 0) >= 5).map(e => e.id);
   const currentIdx = WORKFLOW_STEPS.findIndex(s => s.id === step);
@@ -68,16 +68,34 @@ export function ExpertiseGovernance() {
     setCreating(true);
     const safe = proposeAgent.replace(/[^a-zA-Z0-9_-]/g, "-");
     const out = proposeOutput || `.mah/expertise/proposals/proposal-${safe}.yaml`;
-    const r = await runMah(["expertise", "propose", proposeAgent, "--from-evidence", "--evidence-limit", proposeLimit, "--summary", proposeSummary, "--output", out]);
+    const args = ["expertise", "propose", proposeAgent, "--from-evidence", "--evidence-limit", proposeLimit, "--summary", proposeSummary, "--output", out];
+    if (proposeAiPowered) {
+      args.push("--ai");
+      const { provider, model, baseUrl, endpoint } = getFeatureAiCliOptions("expertise");
+      if (provider) args.push("--provider", provider);
+      if (model) args.push("--model", model);
+      if (baseUrl) args.push("--base-url", baseUrl);
+      if (endpoint) args.push("--endpoint", endpoint);
+    }
+    const r = await runMah(args);
     setCreateResult(r.ok ? `Written: ${out}` : `Error: ${r.stderr}`);
     setCreating(false);
-    if (r.ok) setStep("review");
+    if (r.ok) {
+      await reloadProposals();
+      setStep("review");
+      setTab("proposals");
+    }
   };
 
   const handleApply = async (path: string) => {
     if (!confirm(`Apply ${path}?`)) return;
-    await runMah(["expertise", "apply-proposal", path, "--json"]);
+    const r = await runMah(["expertise", "apply-proposal", path, "--json"]);
+    if (!r.ok) {
+      alert(r.stderr || r.error || "Failed to apply proposal");
+      return;
+    }
     await reload();
+    await reloadProposals();
   };
 
   return (
@@ -195,6 +213,17 @@ export function ExpertiseGovernance() {
                   <label><span>Evidence Limit</span>
                     <input type="number" min="1" max="50" value={proposeLimit} onChange={e=>setProposeLimit(e.target.value)} style={{width:80}} />
                   </label>
+                <label
+                  className="propose-form__full"
+                  style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={proposeAiPowered}
+                    onChange={e => setProposeAiPowered(e.target.checked)}
+                  />
+                  <div style={{ fontSize: 12, color: "#444748" }}>AI-powered propose (rewrite summary/rationale/changes)</div>
+                </label>
                 </div>
                 <label className="propose-form__full"><span>Summary</span>
                   <input type="text" placeholder="Evidence-backed update..." value={proposeSummary} onChange={e=>setProposeSummary(e.target.value)} />
@@ -202,6 +231,7 @@ export function ExpertiseGovernance() {
                 <label className="propose-form__full"><span>Output Path</span>
                   <input type="text" value={proposeOutput || `.mah/expertise/proposals/proposal-<agent>.yaml`} onChange={e=>setProposeOutput(e.target.value)} style={{fontFamily:"var(--font-mono)",fontSize:12}} />
                 </label>
+                
                 <button className="workflow-action-btn workflow-action-btn--primary" onClick={handleCreateProposal} disabled={creating || !proposeAgent || !proposeSummary.trim()}>
                   <Icon name="description" size={14} />{creating ? "Generating..." : "Generate"}
                 </button>
@@ -233,7 +263,7 @@ export function ExpertiseGovernance() {
                       </div>
                       <p style={{fontSize:12,margin:"6px 0"}}>{p.summary}</p>
                       {p.status !== "applied" && (
-                        <button className="workflow-action-btn" style={{padding:"4px 10px",fontSize:11}} onClick={() => handleApply(`.mah/expertise/proposals/${p.id}`)}>
+                        <button className="workflow-action-btn" style={{padding:"4px 10px",fontSize:11}} onClick={() => handleApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}>
                           <Icon name="check" size={12} />Apply
                         </button>
                       )}
@@ -263,7 +293,7 @@ export function ExpertiseGovernance() {
                   {proposals.filter(p=>p.status!=="applied").map(p => (
                     <div key={p.id} className="apply-item">
                       <strong>{p.target_expertise_id}</strong>
-                      <button className="workflow-action-btn" onClick={() => handleApply(`.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={14} />Apply</button>
+                      <button className="workflow-action-btn" onClick={() => handleApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={14} />Apply</button>
                     </div>
                   ))}
                 </div>
@@ -403,7 +433,7 @@ function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApp
               <td style={{fontSize:12,maxWidth:180}}>{p.summary}</td>
               <td style={{fontSize:11}}>{p.generated_by?.actor}</td>
               <td><StatusBadge tone={p.status==="approved"?"completed":p.status==="rejected"?"failed":"running"} label={p.status}/></td>
-              <td>{p.status!=="applied"&&<button className="workflow-action-btn" style={{padding:"4px 10px",fontSize:11}} onClick={()=>onApply(`.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={12}/>Apply</button>}</td>
+              <td>{p.status!=="applied"&&<button className="workflow-action-btn" style={{padding:"4px 10px",fontSize:11}} onClick={()=>onApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={12}/>Apply</button>}</td>
             </tr>
           ))}
         </tbody>

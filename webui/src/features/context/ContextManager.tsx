@@ -42,6 +42,7 @@ export function ContextManager() {
   const { results: findResults, loading: findLoading, error: findError, find } = useContextFind();
   const { results: validateResults, loading: validateLoading, error: validateError, summary: validateSummary, validate } = useContextValidate();
   const { proposals, loading: proposalsLoading, error: proposalsError, reload: reloadProposals } = useContextProposals();
+  const isActionableProposalStatus = (status?: string) => status === "pending" || status === "draft";
   const proposalToDoc = (p: ContextProposal): ContextDoc => ({
     id: p.id,
     kind: `proposal:${p.agent}`,
@@ -49,6 +50,19 @@ export function ContextManager() {
     priority: p.status,
     last_reviewed_at: p.source_session || "—",
   });
+
+  useEffect(() => {
+    if (tab !== "proposals") return;
+    void reloadProposals();
+  }, [tab, reloadProposals]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (tab === "proposals") void reloadProposals();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [tab, reloadProposals]);
 
   useEffect(() => {
     let active = true;
@@ -126,7 +140,7 @@ export function ContextManager() {
               <span>{proposals.length} proposals</span>
             </div>
           </div>
-          <CommandPreview context="context" command="mah context docs list --json" />
+          <CommandPreview context="context" command="mah context list --json" />
         </section>
 
         {/* Toolbar */}
@@ -403,7 +417,7 @@ export function ContextManager() {
                           <td><StatusBadge tone={p.status === "approved" || p.status === "promoted" ? "completed" : p.status === "rejected" ? "failed" : "running"} label={p.status} /></td>
                           <td className="context-summary-cell">{p.summary}</td>
                           <td>
-                            {p.status === "pending" && (
+                            {isActionableProposalStatus(p.status) && (
                               <div className="context-proposal-actions">
                                 <button className="context-action-btn context-action-btn--compact" onClick={async (e) => {
                                   e.stopPropagation();
@@ -525,7 +539,7 @@ export function ContextManager() {
                 </>
               )}
 
-              {itemDetails?.source === "proposal" && selectedItem?.preview?.priority === "pending" && (
+              {itemDetails?.source === "proposal" && isActionableProposalStatus(String(itemDetails?.proposal?.status || selectedItem?.preview?.priority || "")) && (
                 <div className="context-inspector__actions">
                   <button className="context-action-btn context-action-btn--compact" style={{flex:1}} onClick={async () => { await fetch("/api/mah/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({args:["context","proposals","promote",selectedItem.id,"--json"]})}); reloadProposals(); }}>
                     <Icon name="check" size={12} />Promote
