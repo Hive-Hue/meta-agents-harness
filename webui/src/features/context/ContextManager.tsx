@@ -34,6 +34,9 @@ export function ContextManager() {
   const [findTask, setFindTask] = useState("");
   const [findCap, setFindCap] = useState("");
   const [strictMode, setStrictMode] = useState(false);
+  const [showCreateProposal, setShowCreateProposal] = useState(false);
+  const [creatingProposal, setCreatingProposal] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
 
   const { docs, loading: docsLoading, error: docsError, reload: reloadDocs } = useContextDocuments();
   const { results: findResults, loading: findLoading, error: findError, find } = useContextFind();
@@ -147,9 +150,14 @@ export function ContextManager() {
             <div className="context-panel">
               <div className="context-panel__header">
                 <h3>Documents</h3>
-                <button className="context-action-btn" onClick={reloadDocs}>
-                  <Icon name="refresh" size={14} />Refresh
-                </button>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="context-action-btn" onClick={async () => { setRebuilding(true); await fetch("/api/mah/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({args:["context","index","--rebuild","--json"]})}); setRebuilding(false); reloadDocs(); }} disabled={rebuilding}>
+                    <Icon name="sync" size={14} />{rebuilding ? "Rebuilding..." : "Rebuild Index"}
+                  </button>
+                  <button className="context-action-btn" onClick={reloadDocs}>
+                    <Icon name="refresh" size={14} />Refresh
+                  </button>
+                </div>
               </div>
               {docsLoading ? (
                 <div className="loading-state">Loading...</div>
@@ -329,10 +337,40 @@ export function ContextManager() {
             <div className="context-panel">
               <div className="context-panel__header">
                 <h3>Proposals</h3>
-                <button className="context-action-btn" onClick={reloadProposals}>
-                  <Icon name="refresh" size={14} />Refresh
-                </button>
+                <div style={{display:"flex",gap:8}}>
+                  <button className="context-action-btn context-action-btn--primary" onClick={() => setShowCreateProposal(v => !v)}>
+                    <Icon name="add" size={14} />{showCreateProposal ? "Cancel" : "Create Proposal"}
+                  </button>
+                  <button className="context-action-btn" onClick={reloadProposals}>
+                    <Icon name="refresh" size={14} />Refresh
+                  </button>
+                </div>
               </div>
+              {showCreateProposal && (
+                <div className="create-proposal-form" style={{background:"#fafafa",border:"1px solid #eee",borderRadius:8,padding:16,marginBottom:16}}>
+                  <h4 style={{margin:"0 0 12px",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8"}}>New Proposal</h4>
+                  <div className="find-form__row">
+                    <label><span>Agent</span><input type="text" id="cp-agent" placeholder="e.g. backend-dev" style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}} /></label>
+                    <label><span>Stability</span><select id="cp-stability" style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}}><option value="experimental">experimental</option><option value="stable">stable</option><option value="curated">curated</option></select></label>
+                  </div>
+                  <label className="find-form__full"><span>Summary</span><input type="text" id="cp-summary" placeholder="Brief description..." style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}} /></label>
+                  <label className="find-form__full"><span>Rationale</span><input type="text" id="cp-rationale" placeholder="Why this proposal..." style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}} /></label>
+                  <button className="context-action-btn context-action-btn--primary" style={{marginTop:8}} onClick={async () => {
+                    const agent = (document.getElementById("cp-agent") as HTMLInputElement).value.trim();
+                    const stability = (document.getElementById("cp-stability") as HTMLSelectElement).value;
+                    const summary = (document.getElementById("cp-summary") as HTMLInputElement).value.trim();
+                    const rationale = (document.getElementById("cp-rationale") as HTMLInputElement).value.trim();
+                    if (!agent || !summary) { alert("Agent and summary required"); return; }
+                    setCreatingProposal(true);
+                    await fetch("/api/mah/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({args:["context","proposals","create",agent,"--stability",stability,"--summary",summary,"--rationale",rationale,"--json"]})});
+                    setCreatingProposal(false);
+                    setShowCreateProposal(false);
+                    reloadProposals();
+                  }} disabled={creatingProposal}>
+                    <Icon name="check" size={14} />{creatingProposal ? "Creating..." : "Create"}
+                  </button>
+                </div>
+              )}
               {proposalsLoading ? (
                 <div className="loading-state">Loading...</div>
               ) : proposalsError ? (
@@ -376,7 +414,11 @@ export function ContextManager() {
                                 </button>
                                 <button className="context-action-btn context-action-btn--compact" onClick={async (e) => {
                                   e.stopPropagation();
-                                  await fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ args: ["context", "proposals", "reject", p.id, "--json"] }) });
+                                  const reason = prompt("Rejection reason (optional):");
+                                  const args = reason
+                                    ? ["context","proposals","reject",p.id,"--reason",reason,"--json"]
+                                    : ["context","proposals","reject",p.id,"--json"];
+                                  await fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({args}) });
                                   reloadProposals();
                                 }}>
                                   <Icon name="close" size={12} />Reject
@@ -483,10 +525,14 @@ export function ContextManager() {
                 </>
               )}
 
-              {!detailsLoading && !detailsError && itemDetails?.filePath && (
-                <div className="context-inspector__section">
-                  <p className="inspector-section-label">File Path</p>
-                  <p className="context-inspector__mono">{itemDetails.filePath}</p>
+              {itemDetails?.source === "proposal" && selectedItem?.preview?.priority === "pending" && (
+                <div className="context-inspector__actions">
+                  <button className="context-action-btn context-action-btn--compact" style={{flex:1}} onClick={async () => { await fetch("/api/mah/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({args:["context","proposals","promote",selectedItem.id,"--json"]})}); reloadProposals(); }}>
+                    <Icon name="check" size={12} />Promote
+                  </button>
+                  <button className="context-action-btn context-action-btn--compact" style={{flex:1}} onClick={async () => { const reason = prompt("Rejection reason (optional):"); const args = reason ? ["context","proposals","reject",selectedItem.id,"--reason",reason,"--json"] : ["context","proposals","reject",selectedItem.id,"--json"]; await fetch("/api/mah/exec",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({args})}); reloadProposals(); }}>
+                    <Icon name="close" size={12} />Reject
+                  </button>
                 </div>
               )}
             </section>
