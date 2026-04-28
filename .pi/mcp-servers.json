@@ -77,6 +77,15 @@
         "ZEPLIN_ACCESS_TOKEN": "${ZEPLIN_ACCESS_TOKEN}"
       },
       "timeout_ms": 60000
+    },
+    "playwright": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "timeout_ms": 60000
     }
   }
 }

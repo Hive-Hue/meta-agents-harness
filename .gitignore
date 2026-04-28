@@ -66,3 +66,6 @@ meta-agents.backup.yaml
 
 # Playwright artifacts
 .playwright-mcp/
+
+# Local webui logs
+webui/vite-s.log
