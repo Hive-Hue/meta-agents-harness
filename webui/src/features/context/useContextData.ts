@@ -2,13 +2,10 @@ import { useState, useEffect, useCallback } from "react";
 
 export interface ContextDoc {
   id: string;
-  name: string;
-  source: "operational" | "proposal";
+  kind: string;
   stability: string;
-  capabilities: string[];
-  agent: string;
-  status: string;
-  indexed?: boolean;
+  priority: string;
+  last_reviewed_at: string;
 }
 
 export interface FindResult {

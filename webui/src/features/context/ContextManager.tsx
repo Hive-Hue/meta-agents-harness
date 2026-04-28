@@ -66,12 +66,11 @@ export function ContextManager() {
                   <table>
                     <thead>
                       <tr>
-                        <th>Name</th>
-                        <th>Agent</th>
-                        <th>Source</th>
+                        <th>ID</th>
+                        <th>Kind</th>
                         <th>Stability</th>
-                        <th>Capabilities</th>
-                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Last Reviewed</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -81,21 +80,11 @@ export function ContextManager() {
                           className={selectedDoc?.id === doc.id ? "is-selected" : ""}
                           onClick={() => setSelectedDoc(doc)}
                         >
-                          <td className="doc-name-cell">{doc.name}</td>
-                          <td><span className="agent-chip">{doc.agent}</span></td>
-                          <td><span className={`source-tag source-tag--${doc.source}`}>{doc.source}</span></td>
+                          <td className="doc-name-cell">{doc.id}</td>
+                          <td><span className="agent-chip">{doc.kind}</span></td>
                           <td>{doc.stability}</td>
-                          <td>
-                            <div className="cap-chips">
-                              {doc.capabilities.slice(0, 3).map(c => (
-                                <span key={c} className="cap-chip">{c}</span>
-                              ))}
-                              {doc.capabilities.length > 3 && (
-                                <span className="cap-chip cap-chip--more">+{doc.capabilities.length - 3}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td><StatusBadge tone={doc.status === "active" ? "completed" : "running"} label={doc.status} /></td>
+                          <td>{doc.priority}</td>
+                          <td style={{fontSize:12,color:"#666"}}>{doc.last_reviewed_at}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -309,25 +298,17 @@ export function ContextManager() {
         {selectedDoc ? (
           <>
             <div className="inspector-header">
-              <h3>{selectedDoc.name}</h3>
+              <h3>{selectedDoc.id}</h3>
               <button className="icon-button" onClick={() => setSelectedDoc(null)}>
                 <Icon name="close" size={16} />
               </button>
             </div>
             <div className="inspector-stats">
-              <div><span>Agent</span><strong>{selectedDoc.agent}</strong></div>
-              <div><span>Source</span><strong>{selectedDoc.source}</strong></div>
+              <div><span>Kind</span><strong>{selectedDoc.kind}</strong></div>
               <div><span>Stability</span><strong>{selectedDoc.stability}</strong></div>
-              <div><span>Status</span><strong><StatusBadge tone={selectedDoc.status === "active" ? "completed" : "running"} label={selectedDoc.status} /></strong></div>
+              <div><span>Priority</span><strong>{selectedDoc.priority}</strong></div>
+              <div><span>Last Reviewed</span><strong>{selectedDoc.last_reviewed_at}</strong></div>
             </div>
-            {selectedDoc.capabilities.length > 0 && (
-              <div style={{ padding: "12px 16px" }}>
-                <p className="inspector-section-label">Capabilities</p>
-                <div className="cap-chips">
-                  {selectedDoc.capabilities.map(c => <span key={c} className="cap-chip">{c}</span>)}
-                </div>
-              </div>
-            )}
           </>
         ) : (
           <div className="inspector-empty">
