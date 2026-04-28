@@ -234,9 +234,9 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
         </div>
       </section>
       {showProposalModal && (
-        <div className="proposal-modal-overlay" onClick={() => setShowProposalModal(false)}>
-          <div className="proposal-modal-box" onClick={e => e.stopPropagation()}>
-            <div className="proposal-modal-header">
+        <div className="modal-overlay" onClick={() => setShowProposalModal(false)}>
+          <div className="modal-box" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
               <h3>Create Context Proposal</h3>
               <button type="button" className="icon-button" onClick={() => setShowProposalModal(false)}><Icon name="close" size={16}/></button>
             </div>
