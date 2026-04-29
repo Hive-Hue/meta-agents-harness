@@ -69,3 +69,6 @@ meta-agents.backup.yaml
 
 # Local webui logs
 webui/vite-s.log
+
+# Plugin loader test temp fixtures
+.test-temp-plugin-loader/
