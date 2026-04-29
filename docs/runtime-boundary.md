@@ -27,6 +27,15 @@
 - MAH core normalizes external UX (`mah run --headless`, `--output=json|text`, `-o=json|text`) while runtime-specific mechanics remain in adapter methods.
 - `prepareHeadlessRunContext()` is the contract boundary for runtime-specific non-interactive execution plans.
 
+## Claude Domain Boundary
+
+- In Claude runtime, crew `domain` entries are currently **declarative** unless an adapter-level enforcement surface is available.
+- MAH now projects domain intent into sub-agent prompts as `Declared domain rules: ...` for observability and auditability.
+- `--policy enforce-domain` activates fail-fast protection in Claude runtime:
+  - If granular per-agent domain rules are detected, MAH stops before dispatch with a clear error.
+  - This prevents a false sense of path-level enforcement where runtime ACL wiring is not available.
+- For path-enforced domain controls, use runtimes/adapters that implement executable ACL/domain checks.
+
 ## Current status
 
 - Adapter model is stable enough for current harness usage, but still evolutive in `0.x`.

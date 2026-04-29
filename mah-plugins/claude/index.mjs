@@ -124,7 +124,123 @@ function parseClaudeInternalArgs(argv = []) {
   }
 }
 
-function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestratorPromptBody) {
+function mapModelToCcrRef(modelRef) {
+  const value = String(modelRef || "").trim()
+  if (!value) return ""
+  const slashIndex = value.indexOf("/")
+  if (slashIndex <= 0 || slashIndex >= value.length - 1) return ""
+  const provider = value.slice(0, slashIndex).trim()
+  const model = value.slice(slashIndex + 1).trim()
+  const providerMap = {
+    "zai": "Zai Coding Plan",
+    "zai-coding-plan": "Zai Coding Plan",
+    "minimax": "Minimax",
+    "minimax-coding-plan": "Minimax",
+    "openrouter": "openrouter",
+    "lmstudio": "lmstudio",
+    "openai-codex": "openrouter"
+  }
+  let modelId = model
+  if (provider === "minimax" || provider === "minimax-coding-plan") {
+    if (/^minimax-/i.test(modelId)) {
+      const suffix = modelId.replace(/^minimax-/i, "")
+      modelId = `MiniMax-${suffix ? suffix[0].toUpperCase() + suffix.slice(1) : suffix}`
+    }
+  }
+  return `${providerMap[provider] || provider},${modelId}`
+}
+
+function normalizeAgentTools(tools) {
+  if (Array.isArray(tools)) {
+    return Array.from(new Set(tools.map((item) => `${item || ""}`.trim()).filter(Boolean)))
+  }
+  if (typeof tools === "string" && tools.trim()) {
+    return Array.from(new Set(tools.split(",").map((item) => item.trim()).filter(Boolean)))
+  }
+  return []
+}
+
+function normalizeDomainRules(domain) {
+  if (Array.isArray(domain)) {
+    return domain
+      .map((rule) => {
+        if (!rule || typeof rule !== "object") return null
+        const targetPath = `${rule.path || ""}`.trim() || "."
+        return {
+          path: targetPath,
+          read: rule.read === true,
+          upsert: rule.upsert === true,
+          delete: rule.delete === true,
+          recursive: rule.recursive === true
+        }
+      })
+      .filter(Boolean)
+  }
+  if (domain && typeof domain === "object") {
+    const read = Array.isArray(domain.read) ? domain.read : []
+    const write = Array.isArray(domain.write) ? domain.write : []
+    const readRules = read
+      .map((item) => `${item || ""}`.trim())
+      .filter(Boolean)
+      .map((item) => ({ path: item, read: true, upsert: false, delete: false, recursive: true }))
+    const writeRules = write
+      .map((item) => `${item || ""}`.trim())
+      .filter(Boolean)
+      .map((item) => ({ path: item, read: true, upsert: true, delete: true, recursive: true }))
+    return [...readRules, ...writeRules]
+  }
+  return []
+}
+
+function formatDomainRule(rule) {
+  const perms = [
+    rule.read ? "r" : "-",
+    rule.upsert ? "u" : "-",
+    rule.delete ? "d" : "-"
+  ].join("")
+  return `${rule.path} [${perms}]${rule.recursive ? " (recursive)" : ""}`
+}
+
+function buildDomainPromptLine(domain) {
+  const rules = normalizeDomainRules(domain)
+  if (rules.length === 0) return ""
+  const preview = rules.slice(0, 8).map(formatDomainRule).join("; ")
+  const suffix = rules.length > 8 ? `; ... (+${rules.length - 8} more)` : ""
+  return `Declared domain rules: ${preview}${suffix}`
+}
+
+function hasGranularDomainRules(domain) {
+  const rules = normalizeDomainRules(domain)
+  if (rules.length === 0) return false
+  if (rules.length !== 1) return true
+  const only = rules[0]
+  return !(only.path === "." && only.read === true && only.upsert === false && only.delete === false)
+}
+
+function collectDomainCoverageDiagnostics(config) {
+  const granularAgents = []
+  const collect = (agent) => {
+    if (!agent?.name) return
+    const rules = normalizeDomainRules(agent.domain)
+    if (rules.length === 0) return
+    if (hasGranularDomainRules(agent.domain)) granularAgents.push(agent.name)
+  }
+  collect(config?.orchestrator)
+  for (const team of config?.teams || []) {
+    collect(team?.lead)
+    for (const member of team?.members || []) collect(member)
+  }
+  return { granularAgents }
+}
+
+function parsePolicyTokens(policy = "") {
+  return `${policy || ""}`
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestratorPromptBody, rootModel = "") {
   const teamLines = []
   for (const team of config.teams || []) {
     const lead = team?.lead?.name || "(missing-lead)"
@@ -135,7 +251,9 @@ function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestrato
       teamLines.push(`- ${team?.name || "unknown"}: ${lead}${members.length > 0 ? ` -> ${members.join(", ")}` : ""}`)
     }
   }
+  const rootModelRef = mapModelToCcrRef(rootModel)
   return [
+    rootModelRef ? `<CCR-ROOT-MODEL>${rootModelRef}</CCR-ROOT-MODEL>` : "",
     `Current role: orchestrator`,
     `Current agent: ${config?.orchestrator?.name || "orchestrator"}`,
     `System: ${config?.name || "MultiTeam"}`,
@@ -150,6 +268,8 @@ function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestrato
     "",
     `Hard rules:`,
     strictHierarchy ? `- Delegate only to leads.` : `- Delegate to leads and workers as needed, with explicit deliverables.`,
+    `- If the task requires worker-produced evidence, per-worker capabilities, or team capability reports, you MUST delegate to the relevant leads/workers via tool calls before answering.`,
+    `- Do not satisfy worker-scoped requests from topology/config text alone when delegation tools are available.`,
     `- Keep responses concise and execution-oriented.`,
     "",
     fullPrompts && orchestratorPromptBody ? `Agent operating prompt:\n${orchestratorPromptBody}` : ""
@@ -163,35 +283,47 @@ function buildClaudeAgents(repoRoot, configPath, config, fullPrompts, strictHier
     const lead = team?.lead
     if (lead?.name && lead?.prompt) {
       const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, lead.prompt).body : ""
+      const leadModelRef = mapModelToCcrRef(lead.model)
+      const leadTools = normalizeAgentTools(lead.tools)
+      const leadDomainLine = buildDomainPromptLine(lead.domain)
       agents[lead.name] = {
         description: lead.description || `Lead agent for team ${teamName}`,
+        ...(leadTools.length > 0 ? { tools: leadTools } : {}),
         prompt: [
+          leadModelRef ? `<CCR-SUBAGENT-MODEL>${leadModelRef}</CCR-SUBAGENT-MODEL>` : "",
           `Current role: lead`,
           `Current team: ${teamName}`,
           `Current agent: ${lead.name}`,
           `System: ${config?.name || "MultiTeam"}`,
           `Prompt source: ${lead.prompt}`,
           strictHierarchy ? `- Delegate only to workers from your own team.` : `- You may delegate within your team as needed.`,
+          `- If a request depends on worker output (capabilities, verification, implementation evidence), you MUST call delegate_agent to each relevant worker before summarizing.`,
+          `- Do not answer worker-scoped requests from topology/config text alone when delegation tools are available.`,
+          leadDomainLine,
           fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
         ].filter(Boolean).join("\n")
       }
     }
-    if (!strictHierarchy) {
-      for (const member of team.members || []) {
-        if (!member?.name || !member?.prompt) continue
-        const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
-        agents[member.name] = {
-          description: member.description || `Worker agent for team ${teamName}`,
-          prompt: [
-            `Current role: worker`,
-            `Current team: ${teamName}`,
-            `Current agent: ${member.name}`,
-            `System: ${config?.name || "MultiTeam"}`,
-            `Prompt source: ${member.prompt}`,
-            `- Do not delegate unless explicitly instructed.`,
-            fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
-          ].filter(Boolean).join("\n")
-        }
+    for (const member of team.members || []) {
+      if (!member?.name || !member?.prompt) continue
+      const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
+      const memberModelRef = mapModelToCcrRef(member.model)
+      const memberTools = normalizeAgentTools(member.tools)
+      const memberDomainLine = buildDomainPromptLine(member.domain)
+      agents[member.name] = {
+        description: member.description || `Worker agent for team ${teamName}`,
+        ...(memberTools.length > 0 ? { tools: memberTools } : {}),
+        prompt: [
+          memberModelRef ? `<CCR-SUBAGENT-MODEL>${memberModelRef}</CCR-SUBAGENT-MODEL>` : "",
+          `Current role: worker`,
+          `Current team: ${teamName}`,
+          `Current agent: ${member.name}`,
+          `System: ${config?.name || "MultiTeam"}`,
+          `Prompt source: ${member.prompt}`,
+          `- Do not delegate unless explicitly instructed.`,
+          memberDomainLine,
+          fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
+        ].filter(Boolean).join("\n")
       }
     }
   }
@@ -214,10 +346,10 @@ export const runtimePlugin = {
       sessionModeNew: false,
       sessionModeContinue: true,
       sessionModeNone: true,
-      sessionIdFlag: "--session-id",
+      sessionIdFlag: "--resume",
       sessionRootFlag: false,
       sessionMirrorFlag: true,
-      sessionContinueArgs: ["--continue"],
+      sessionContinueArgs: [],
       sessionNoneArgs: ["-p"],
       headless: {
         supported: true,
@@ -265,7 +397,23 @@ export const runtimePlugin = {
       }
 
       const orchestratorPrompt = loadPromptBody(repoRoot, configPath, config?.orchestrator?.prompt || "")
-      const rootPrompt = buildClaudeRootPrompt(config, parsed.strictHierarchy, parsed.fullPrompts, orchestratorPrompt.body)
+      const policyTokens = parsePolicyTokens(parsed.policy)
+      const domainCoverage = collectDomainCoverageDiagnostics(config)
+      if (policyTokens.includes("enforce-domain") && domainCoverage.granularAgents.length > 0) {
+        const sample = domainCoverage.granularAgents.slice(0, 6).join(", ")
+        const suffix = domainCoverage.granularAgents.length > 6 ? ` (+${domainCoverage.granularAgents.length - 6} more)` : ""
+        return {
+          ok: false,
+          error: `Claude runtime cannot enforce per-agent domain path ACLs from crew config. Granular domain rules found for: ${sample}${suffix}. Use runtime 'opencode' for enforced domain controls or run without '--policy enforce-domain'.`
+        }
+      }
+      const rootPrompt = buildClaudeRootPrompt(
+        config,
+        parsed.strictHierarchy,
+        parsed.fullPrompts,
+        orchestratorPrompt.body,
+        config?.orchestrator?.model || parsed.rootModel || ""
+      )
       const agents = buildClaudeAgents(repoRoot, configPath, config, parsed.fullPrompts, parsed.strictHierarchy)
 
       return {
@@ -274,11 +422,19 @@ export const runtimePlugin = {
         args: ["code", "--append-system-prompt", rootPrompt, "--agents", JSON.stringify(agents)],
         passthrough: parsed.passthrough,
         envOverrides,
-        warnings: parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the core-integrated path"] : [],
+        warnings: [
+          ...(parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the core-integrated path"] : []),
+          ...(domainCoverage.granularAgents.length > 0 && !policyTokens.includes("enforce-domain")
+            ? [
+                `claude: domain rules are declarative in --agents prompts and are not path-enforced by Claude runtime (${domainCoverage.granularAgents.length} agent(s) with granular domain).`
+              ]
+            : [])
+        ],
         internal: {
           crew, configPath,
           systemName: config?.name || "MultiTeam",
           strictHierarchy: parsed.strictHierarchy,
+          rootModel: parsed.rootModel,
           dryRun: parsed.dryRun,
           showLaunchInfo: parsed.showLaunchInfo,
           customAgents: Object.keys(agents).length

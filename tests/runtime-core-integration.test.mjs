@@ -5,7 +5,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
-import { preparePiRunContext } from "../scripts/runtime/runtime-core-integrations.mjs"
+import { prepareClaudeRunContext, preparePiRunContext } from "../scripts/runtime/runtime-core-integrations.mjs"
 import { ensurePiGlobalSettings, findMahSkillFile, resolveMahAssetPath } from "../scripts/core/mah-home.mjs"
 import { resolveWorkspaceRoot } from "../scripts/core/workspace-root.mjs"
 
@@ -676,6 +676,24 @@ test("claude explain run resolves to direct cli with generated agent context", (
   assert.equal(payload.exec, "ccr")
   assert.equal(payload.execArgs[0], "code")
   assert.ok(payload.execArgs.includes("--agents"))
+})
+
+test("prepareClaudeRunContext exposes declared domain rules in subagent prompts", () => {
+  const configPath = path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
+  const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: [] })
+  assert.equal(result.ok, true, result.error)
+  assert.ok((result.warnings || []).some((item) => /domain rules are declarative/i.test(item)))
+  const agentsIndex = result.args.indexOf("--agents")
+  assert.ok(agentsIndex >= 0)
+  const agents = JSON.parse(result.args[agentsIndex + 1])
+  assert.ok(agents["repo-analyst"]?.prompt.includes("Declared domain rules:"))
+})
+
+test("prepareClaudeRunContext fails with --policy enforce-domain when granular domains exist", () => {
+  const configPath = path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
+  const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: ["--policy", "enforce-domain"] })
+  assert.equal(result.ok, false)
+  assert.match(result.error || "", /cannot enforce per-agent domain path ACLs/i)
 })
 
 test("opencode explain run resolves to direct cli without wrapper plan", () => {

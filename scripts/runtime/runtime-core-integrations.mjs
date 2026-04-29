@@ -305,6 +305,98 @@ function loadPromptBody(repoRoot, configPath, promptPath) {
   return { body: "", resolvedPath: candidates[0] || "" }
 }
 
+function normalizeAgentTools(tools) {
+  if (Array.isArray(tools)) {
+    return Array.from(new Set(tools.map((item) => `${item || ""}`.trim()).filter(Boolean)))
+  }
+  if (typeof tools === "string" && tools.trim()) {
+    return Array.from(new Set(tools.split(",").map((item) => item.trim()).filter(Boolean)))
+  }
+  return []
+}
+
+function normalizeDomainRules(domain) {
+  if (Array.isArray(domain)) {
+    return domain
+      .map((rule) => {
+        if (!rule || typeof rule !== "object") return null
+        const targetPath = `${rule.path || ""}`.trim() || "."
+        return {
+          path: targetPath,
+          read: rule.read === true,
+          upsert: rule.upsert === true,
+          delete: rule.delete === true,
+          recursive: rule.recursive === true
+        }
+      })
+      .filter(Boolean)
+  }
+  if (domain && typeof domain === "object") {
+    const read = Array.isArray(domain.read) ? domain.read : []
+    const write = Array.isArray(domain.write) ? domain.write : []
+    const readRules = read
+      .map((item) => `${item || ""}`.trim())
+      .filter(Boolean)
+      .map((item) => ({ path: item, read: true, upsert: false, delete: false, recursive: true }))
+    const writeRules = write
+      .map((item) => `${item || ""}`.trim())
+      .filter(Boolean)
+      .map((item) => ({ path: item, read: true, upsert: true, delete: true, recursive: true }))
+    return [...readRules, ...writeRules]
+  }
+  return []
+}
+
+function formatDomainRule(rule) {
+  const perms = [
+    rule.read ? "r" : "-",
+    rule.upsert ? "u" : "-",
+    rule.delete ? "d" : "-"
+  ].join("")
+  return `${rule.path} [${perms}]${rule.recursive ? " (recursive)" : ""}`
+}
+
+function buildDomainPromptLine(domain) {
+  const rules = normalizeDomainRules(domain)
+  if (rules.length === 0) return ""
+  const preview = rules.slice(0, 8).map(formatDomainRule).join("; ")
+  const suffix = rules.length > 8 ? `; ... (+${rules.length - 8} more)` : ""
+  return `Declared domain rules: ${preview}${suffix}`
+}
+
+function hasGranularDomainRules(domain) {
+  const rules = normalizeDomainRules(domain)
+  if (rules.length === 0) return false
+  if (rules.length !== 1) return true
+  const only = rules[0]
+  return !(only.path === "." && only.read === true && only.upsert === false && only.delete === false)
+}
+
+function collectDomainCoverageDiagnostics(config) {
+  const granularAgents = []
+  const declaredAgents = []
+  const collect = (agent) => {
+    if (!agent?.name) return
+    const rules = normalizeDomainRules(agent.domain)
+    if (rules.length === 0) return
+    declaredAgents.push(agent.name)
+    if (hasGranularDomainRules(agent.domain)) granularAgents.push(agent.name)
+  }
+  collect(config?.orchestrator)
+  for (const team of config?.teams || []) {
+    collect(team?.lead)
+    for (const member of team?.members || []) collect(member)
+  }
+  return { granularAgents, declaredAgents }
+}
+
+function parsePolicyTokens(policy = "") {
+  return `${policy || ""}`
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+}
+
 function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestratorPromptBody, rootModel = "") {
   const teamLines = []
   for (const team of config.teams || []) {
@@ -336,6 +428,8 @@ function buildClaudeRootPrompt(config, strictHierarchy, fullPrompts, orchestrato
     strictHierarchy
       ? `- Delegate only to leads.`
       : `- Delegate to leads and workers as needed, with explicit deliverables.`,
+    `- If the task requires worker-produced evidence, per-worker capabilities, or team capability reports, you MUST delegate to the relevant leads/workers via tool calls before answering.`,
+    `- Do not satisfy worker-scoped requests from topology/config text alone when delegation tools are available.`,
     `- Keep responses concise and execution-oriented.`,
     "",
     fullPrompts && orchestratorPromptBody ? `Agent operating prompt:\n${orchestratorPromptBody}` : ""
@@ -350,8 +444,11 @@ function buildClaudeAgents(repoRoot, configPath, config, fullPrompts, strictHier
     if (lead?.name && lead?.prompt) {
       const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, lead.prompt).body : ""
       const leadCcrModel = mapModelToCcrRef(lead.model)
+      const leadTools = normalizeAgentTools(lead.tools)
+      const leadDomainLine = buildDomainPromptLine(lead.domain)
       agents[lead.name] = {
         description: lead.description || `Lead agent for team ${teamName}`,
+        ...(leadTools.length > 0 ? { tools: leadTools } : {}),
         prompt: [
           leadCcrModel?"<CCR-SUBAGENT-MODEL>"+leadCcrModel+"</CCR-SUBAGENT-MODEL>":"",
           `Current role: lead`,
@@ -362,29 +459,34 @@ function buildClaudeAgents(repoRoot, configPath, config, fullPrompts, strictHier
           strictHierarchy
             ? `- Delegate only to workers from your own team.`
             : `- You may delegate within your team as needed.`,
+          `- If a request depends on worker output (capabilities, verification, implementation evidence), you MUST call delegate_agent to each relevant worker before summarizing.`,
+          `- Do not answer worker-scoped requests from topology/config text alone when delegation tools are available.`,
+          leadDomainLine,
           fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
         ].filter(Boolean).join("\n")
       }
     }
 
-    if (!strictHierarchy) {
-      for (const member of team.members || []) {
-        if (!member?.name || !member?.prompt) continue
-        const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
-        const memberCcrModel = mapModelToCcrRef(member.model)
-        agents[member.name] = {
-          description: member.description || `Worker agent for team ${teamName}`,
-          prompt: [
-            memberCcrModel?"<CCR-SUBAGENT-MODEL>"+memberCcrModel+"</CCR-SUBAGENT-MODEL>":"",
-            `Current role: worker`,
-            `Current team: ${teamName}`,
-            `Current agent: ${member.name}`,
-            `System: ${config?.name || "MultiTeam"}`,
-            `Prompt source: ${member.prompt}`,
-            `- Do not delegate unless explicitly instructed.`,
-            fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
-          ].filter(Boolean).join("\n")
-        }
+    for (const member of team.members || []) {
+      if (!member?.name || !member?.prompt) continue
+      const promptBody = fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
+      const memberCcrModel = mapModelToCcrRef(member.model)
+      const memberTools = normalizeAgentTools(member.tools)
+      const memberDomainLine = buildDomainPromptLine(member.domain)
+      agents[member.name] = {
+        description: member.description || `Worker agent for team ${teamName}`,
+        ...(memberTools.length > 0 ? { tools: memberTools } : {}),
+        prompt: [
+          memberCcrModel?"<CCR-SUBAGENT-MODEL>"+memberCcrModel+"</CCR-SUBAGENT-MODEL>":"",
+          `Current role: worker`,
+          `Current team: ${teamName}`,
+          `Current agent: ${member.name}`,
+          `System: ${config?.name || "MultiTeam"}`,
+          `Prompt source: ${member.prompt}`,
+          `- Do not delegate unless explicitly instructed.`,
+          memberDomainLine,
+          fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
+        ].filter(Boolean).join("\n")
       }
     }
   }
@@ -569,6 +671,204 @@ function shouldUseOpencodeRunSubcommand(argv = []) {
   })
 }
 
+function parseJsonPayload(raw) {
+  const input = `${raw || ""}`.trim()
+  if (!input) return null
+  try {
+    return JSON.parse(input)
+  } catch {
+  }
+  const starts = ["[", "{"]
+  for (const token of starts) {
+    const start = input.indexOf(token)
+    if (start === -1) continue
+    const endToken = token === "[" ? "]" : "}"
+    const end = input.lastIndexOf(endToken)
+    if (end === -1 || end <= start) continue
+    const slice = input.slice(start, end + 1)
+    try {
+      return JSON.parse(slice)
+    } catch {
+    }
+  }
+  return null
+}
+
+function parseOpencodeSessionIdFromArgs(tokens = []) {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = `${tokens[i] || ""}`.trim()
+    if (!token) continue
+    if ((token === "--session" || token === "-s") && tokens[i + 1]) {
+      return `${tokens[i + 1] || ""}`.trim()
+    }
+    if (token.startsWith("--session=")) {
+      return token.slice("--session=".length).trim()
+    }
+  }
+  return ""
+}
+
+function listOpencodeProjectSessions(repoRoot, envOverrides = {}) {
+  const probe = spawnSync("opencode", ["session", "list", "--format", "json"], {
+    cwd: repoRoot,
+    env: { ...process.env, ...envOverrides },
+    encoding: "utf-8"
+  })
+  if (probe.status !== 0) return []
+  const parsed = parseJsonPayload(probe.stdout)
+  if (!Array.isArray(parsed)) return []
+  return parsed
+    .filter((item) => item && typeof item === "object")
+    .filter((item) => {
+      const directory = `${item.directory || ""}`.trim()
+      if (!directory) return true
+      return path.resolve(directory) === path.resolve(repoRoot)
+    })
+    .map((item) => ({
+      id: `${item.id || ""}`.trim(),
+      updated: Number.isFinite(item.updated) ? item.updated : Number.parseInt(`${item.updated || 0}`, 10) || 0
+    }))
+    .filter((item) => item.id)
+    .sort((left, right) => right.updated - left.updated)
+}
+
+function resolveOpencodeSessionIdForMirror(repoRoot, plan, envOverrides = {}) {
+  const args = [...(plan.args || []), ...(plan.passthrough || [])]
+  const explicit = parseOpencodeSessionIdFromArgs(args)
+  if (explicit) return explicit
+  const sessions = listOpencodeProjectSessions(repoRoot, envOverrides)
+  return sessions[0]?.id || ""
+}
+
+function parseClaudeResumeSessionId(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if ((token === "--resume" || token === "-r") && args[i + 1]) {
+      return `${args[i + 1] || ""}`.trim()
+    }
+    if (token.startsWith("--resume=")) {
+      return token.slice("--resume=".length).trim()
+    }
+  }
+  return ""
+}
+
+function resolveClaudeConfigRoot(envOverrides = {}) {
+  const explicit = `${envOverrides.CLAUDE_CONFIG_DIR || process.env.CLAUDE_CONFIG_DIR || ""}`.trim()
+  if (explicit) return explicit
+  const home = `${envOverrides.HOME || process.env.HOME || ""}`.trim()
+  if (!home) return ""
+  return path.join(home, ".claude")
+}
+
+function resolveClaudeProjectSlug(repoRoot) {
+  const resolved = path.resolve(repoRoot).replaceAll("\\", "/")
+  const noLeadingSlash = resolved.replace(/^\/+/, "")
+  const flattened = noLeadingSlash.replaceAll("/", "-").replaceAll(":", "")
+  return resolved.startsWith("/") ? `-${flattened}` : flattened
+}
+
+function resolveClaudeProjectSessionsDir(repoRoot, envOverrides = {}) {
+  const configRoot = resolveClaudeConfigRoot(envOverrides)
+  if (!configRoot) return ""
+  return path.join(configRoot, "projects", resolveClaudeProjectSlug(repoRoot))
+}
+
+function resolveClaudeSessionTranscriptPath(repoRoot, sessionId, envOverrides = {}) {
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanSessionId) return ""
+  const sessionsDir = resolveClaudeProjectSessionsDir(repoRoot, envOverrides)
+  if (!sessionsDir) return ""
+  const transcriptPath = path.join(sessionsDir, `${cleanSessionId}.jsonl`)
+  return existsSync(transcriptPath) ? transcriptPath : ""
+}
+
+function latestClaudeSessionId(repoRoot, envOverrides = {}) {
+  const sessionsDir = resolveClaudeProjectSessionsDir(repoRoot, envOverrides)
+  if (!sessionsDir || !existsSync(sessionsDir)) return ""
+  const candidates = readdirSync(sessionsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
+    .map((entry) => {
+      const fullPath = path.join(sessionsDir, entry.name)
+      const id = entry.name.slice(0, -".jsonl".length).trim()
+      const mtime = statSync(fullPath).mtimeMs || 0
+      return { id, mtime }
+    })
+    .filter((item) => item.id)
+    .sort((left, right) => right.mtime - left.mtime)
+  return candidates[0]?.id || ""
+}
+
+function trackClaudeSessionAlias(repoRoot, crewId, sessionId, metadata = {}, envOverrides = {}) {
+  const cleanCrew = `${crewId || ""}`.trim()
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanCrew || !cleanSessionId) return
+
+  const sessionDir = path.join(repoRoot, ".claude", "crew", cleanCrew, "sessions", cleanSessionId)
+  mkdirSync(sessionDir, { recursive: true })
+
+  const transcriptPath = resolveClaudeSessionTranscriptPath(repoRoot, cleanSessionId, envOverrides)
+  if (transcriptPath) {
+    forceSymlink(transcriptPath, path.join(sessionDir, "session.transcript.jsonl.link"))
+  }
+
+  writeJson(path.join(sessionDir, "session.alias.json"), {
+    runtime: "claude",
+    crew: cleanCrew,
+    session_id: cleanSessionId,
+    transcript_path: transcriptPath || "",
+    tracked_at: new Date().toISOString(),
+    ...metadata
+  })
+}
+
+function resolveOpencodeDbPath(repoRoot, envOverrides = {}) {
+  const probe = spawnSync("opencode", ["db", "path"], {
+    cwd: repoRoot,
+    env: { ...process.env, ...envOverrides },
+    encoding: "utf-8"
+  })
+  if (probe.status !== 0) return ""
+  return `${probe.stdout || ""}`.trim().split("\n").map((line) => line.trim()).filter(Boolean)[0] || ""
+}
+
+function mirrorOpencodeSession(repoRoot, crewId, sessionId, envOverrides = {}) {
+  if (!crewId || !sessionId) return
+  const sessionRoot = path.join(repoRoot, ".opencode", "crew", crewId, "sessions", sessionId)
+  mkdirSync(sessionRoot, { recursive: true })
+
+  const dbPath = resolveOpencodeDbPath(repoRoot, envOverrides)
+  if (dbPath && existsSync(dbPath)) {
+    forceSymlink(dbPath, path.join(sessionRoot, "opencode.db.link"))
+  }
+
+  const exported = spawnSync("opencode", ["export", sessionId], {
+    cwd: repoRoot,
+    env: { ...process.env, ...envOverrides },
+    encoding: "utf-8"
+  })
+  const exportedPayload = exported.status === 0 ? parseJsonPayload(exported.stdout) : null
+  if (exportedPayload && typeof exportedPayload === "object") {
+    writeJson(path.join(sessionRoot, "session.export.json"), exportedPayload)
+  } else if (`${exported.stdout || ""}`.trim() || `${exported.stderr || ""}`.trim()) {
+    writeFileSync(
+      path.join(sessionRoot, "session.export.log"),
+      `${exported.stdout || ""}${exported.stderr || ""}`,
+      "utf-8"
+    )
+  }
+
+  writeJson(path.join(sessionRoot, "session.alias.json"), {
+    runtime: "opencode",
+    crew: crewId,
+    session_id: sessionId,
+    db_path: dbPath || "",
+    export_file: exportedPayload ? "session.export.json" : "",
+    mirrored_at: new Date().toISOString()
+  })
+}
+
 function getAllowDelegateForCrew(repoRoot, crew) {
   const metaPath = path.join(repoRoot, "meta-agents.yaml")
   if (!existsSync(metaPath)) return null
@@ -655,6 +955,85 @@ function latestHermesSessionId(repoRoot, envOverrides = {}) {
   if (!candidate) return ""
   const tokens = candidate.split(/\s+/)
   return `${tokens[tokens.length - 1] || ""}`.trim()
+}
+
+function parseHermesResumeSessionId(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if ((token === "--resume" || token === "-r") && args[i + 1]) {
+      return `${args[i + 1] || ""}`.trim()
+    }
+    if (token.startsWith("--resume=")) {
+      return token.slice("--resume=".length).trim()
+    }
+  }
+  return ""
+}
+
+function trackHermesSessionAlias(repoRoot, crewId, sessionRoot, sessionId, metadata = {}) {
+  const cleanCrew = `${crewId || ""}`.trim()
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanCrew || !cleanSessionId) return
+
+  const canonicalSessionDir = path.join(repoRoot, ".hermes", "crew", cleanCrew, "sessions", cleanSessionId)
+  const configuredRoot = `${sessionRoot || ""}`.trim() ? resolveFromRepo(repoRoot, sessionRoot) : ""
+  const configuredSessionDir = configuredRoot
+    ? path.basename(configuredRoot) === cleanSessionId
+      ? configuredRoot
+      : path.join(configuredRoot, cleanSessionId)
+    : ""
+
+  const targetDirs = new Set([canonicalSessionDir, configuredSessionDir].filter(Boolean))
+  for (const targetDir of targetDirs) {
+    mkdirSync(targetDir, { recursive: true })
+    writeJson(path.join(targetDir, "session.alias.json"), {
+      runtime: "hermes",
+      crew: cleanCrew,
+      session_id: cleanSessionId,
+      source_session_root: configuredRoot ? rel(repoRoot, configuredRoot) : "",
+      tracked_at: new Date().toISOString(),
+      ...metadata
+    })
+  }
+}
+
+function exportHermesSessionSnapshot(repoRoot, crewId, sessionId, envOverrides = {}) {
+  const cleanCrew = `${crewId || ""}`.trim()
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanCrew || !cleanSessionId) return { export_file: "", export_error: "" }
+
+  const sessionDir = path.join(repoRoot, ".hermes", "crew", cleanCrew, "sessions", cleanSessionId)
+  mkdirSync(sessionDir, { recursive: true })
+  const exported = spawnSync("hermes", ["sessions", "export", "-", "--session-id", cleanSessionId], {
+    cwd: repoRoot,
+    env: { ...process.env, ...envOverrides },
+    encoding: "utf-8"
+  })
+  const lines = `${exported.stdout || ""}`.split("\n").map((line) => line.trim()).filter(Boolean)
+  const entries = []
+  for (const line of lines) {
+    try {
+      entries.push(JSON.parse(line))
+    } catch {
+      // Ignore non-JSONL lines from CLI logs/banners.
+    }
+  }
+
+  if (entries.length > 0) {
+    const payload = entries.length === 1 ? entries[0] : entries
+    writeJson(path.join(sessionDir, "session.export.json"), payload)
+    return { export_file: "session.export.json", export_error: "" }
+  }
+
+  const combinedLogs = `${exported.stdout || ""}${exported.stderr || ""}`.trim()
+  if (combinedLogs) {
+    writeFileSync(path.join(sessionDir, "session.export.log"), `${combinedLogs}\n`, "utf-8")
+  }
+  return {
+    export_file: "",
+    export_error: combinedLogs ? "export-output-not-jsonl" : `exit-${typeof exported.status === "number" ? exported.status : "unknown"}`
+  }
 }
 
 function hasHermesModelFlag(args = []) {
@@ -969,6 +1348,16 @@ export function prepareClaudeRunContext({ repoRoot, crew, configPath, argv = [],
   }
 
   const orchestratorPrompt = loadPromptBody(repoRoot, configPath, config?.orchestrator?.prompt || "")
+  const policyTokens = parsePolicyTokens(parsed.policy)
+  const domainCoverage = collectDomainCoverageDiagnostics(config)
+  if (policyTokens.includes("enforce-domain") && domainCoverage.granularAgents.length > 0) {
+    const sample = domainCoverage.granularAgents.slice(0, 6).join(", ")
+    const suffix = domainCoverage.granularAgents.length > 6 ? ` (+${domainCoverage.granularAgents.length - 6} more)` : ""
+    return {
+      ok: false,
+      error: `Claude runtime cannot enforce per-agent domain path ACLs from crew config. Granular domain rules found for: ${sample}${suffix}. Use runtime 'opencode' for enforced domain controls or run without '--policy enforce-domain'.`
+    }
+  }
   const rootPrompt = buildClaudeRootPrompt(
     config,
     parsed.strictHierarchy,
@@ -994,7 +1383,14 @@ export function prepareClaudeRunContext({ repoRoot, crew, configPath, argv = [],
       MAH_RUNTIME: "claude",
       MAH_ACTIVE_CREW: crew
     },
-    warnings: parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the MAH-managed path"] : [],
+    warnings: [
+      ...(parsed.sessionMirror === true ? ["claude: session mirroring metadata is not implemented in the MAH-managed path"] : []),
+      ...(domainCoverage.granularAgents.length > 0 && !policyTokens.includes("enforce-domain")
+        ? [
+            `claude: domain rules are declarative in --agents prompts and are not path-enforced by Claude runtime (${domainCoverage.granularAgents.length} agent(s) with granular domain).`
+          ]
+        : [])
+    ],
     internal: {
       crew,
       configPath,
@@ -1030,7 +1426,28 @@ export function executeClaudePreparedRun({ repoRoot, plan, runCommand }) {
     console.log(`[dry-run] ${plan.exec} ${rendered}`)
     return 0
   }
-  return runCommand(plan.exec, plan.args || [], plan.passthrough || [], plan.envOverrides || {})
+  const args = [...(plan.passthrough || [])]
+  const envOverrides = { ...(plan.envOverrides || {}) }
+  const resumedSessionId = parseClaudeResumeSessionId(args)
+  if (resumedSessionId) {
+    trackClaudeSessionAlias(repoRoot, internal.crew, resumedSessionId, {
+      reason: "resume-arg"
+    }, envOverrides)
+  }
+
+  const status = runCommand(plan.exec, plan.args || [], args, envOverrides)
+  if (internal.sessionMirror === false) return status
+
+  let finalSessionId = resumedSessionId
+  if (!finalSessionId && status === 0) {
+    finalSessionId = latestClaudeSessionId(repoRoot, envOverrides)
+  }
+  if (finalSessionId) {
+    trackClaudeSessionAlias(repoRoot, internal.crew, finalSessionId, {
+      reason: "post-run-latest-session"
+    }, envOverrides)
+  }
+  return status
 }
 
 export function activateOpenclaudeCrewState({ repoRoot, crewId }) {
@@ -1122,22 +1539,20 @@ export function prepareOpenclaudeRunContext({ repoRoot, crew, configPath, argv =
         ].filter(Boolean).join("\n")
       }
     }
-    if (!parsed.strictHierarchy) {
-      for (const member of team.members || []) {
-        if (!member?.name || !member?.prompt) continue
-        const promptBody = parsed.fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
-        agents[member.name] = {
-          description: member.description || `Worker agent for team ${teamName}`,
-          prompt: [
-            `Current role: worker`,
-            `Current team: ${teamName}`,
-            `Current agent: ${member.name}`,
-            `System: ${config?.name || "MultiTeam"}`,
-            `Prompt source: ${member.prompt}`,
-            `- Do not delegate unless explicitly instructed.`,
-            parsed.fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
-          ].filter(Boolean).join("\n")
-        }
+    for (const member of team.members || []) {
+      if (!member?.name || !member?.prompt) continue
+      const promptBody = parsed.fullPrompts ? loadPromptBody(repoRoot, configPath, member.prompt).body : ""
+      agents[member.name] = {
+        description: member.description || `Worker agent for team ${teamName}`,
+        prompt: [
+          `Current role: worker`,
+          `Current team: ${teamName}`,
+          `Current agent: ${member.name}`,
+          `System: ${config?.name || "MultiTeam"}`,
+          `Prompt source: ${member.prompt}`,
+          `- Do not delegate unless explicitly instructed.`,
+          parsed.fullPrompts && promptBody ? `Agent operating prompt:\n${promptBody}` : ""
+        ].filter(Boolean).join("\n")
       }
     }
   }
@@ -1265,7 +1680,20 @@ export function executeOpencodePreparedRun({ repoRoot, plan, runCommand }) {
       argv: internal.hierarchy === true ? ["--hierarchy"] : internal.hierarchy === false ? ["--no-hierarchy"] : []
     })
   }
-  return runCommand(plan.exec, plan.args || [], plan.passthrough || [], plan.envOverrides || {})
+  const envOverrides = plan.envOverrides || {}
+  const status = runCommand(plan.exec, plan.args || [], plan.passthrough || [], envOverrides)
+  try {
+    if (internal.crew) {
+      const explicitSessionId = parseOpencodeSessionIdFromArgs([...(plan.args || []), ...(plan.passthrough || [])])
+      if (status !== 0 && !explicitSessionId) return status
+      const sessionId = explicitSessionId || resolveOpencodeSessionIdForMirror(repoRoot, plan, envOverrides)
+      if (sessionId) mirrorOpencodeSession(repoRoot, internal.crew, sessionId, envOverrides)
+    }
+  } catch (error) {
+    const message = error?.message || String(error)
+    console.error(`WARN: failed to mirror OpenCode session: ${message}`)
+  }
+  return status
 }
 
 export function activateHermesCrewState({ repoRoot, crewId }) {
@@ -1352,12 +1780,25 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
   if (explicitSessionId && !hasExplicitResume) {
     args = stripContinueFlags(args)
     args.unshift("--resume", explicitSessionId)
+    trackHermesSessionAlias(repoRoot, internal.crew, internal.sessionRoot, explicitSessionId, {
+      reason: "env-session-id"
+    })
   } else if (!hasExplicitResume && continueRequested) {
     const pinnedSession = `${currentActive?.crew === internal.crew ? currentActive?.orchestrator_session_id || "" : ""}`.trim()
     if (pinnedSession) {
       args = stripContinueFlags(args)
       args.unshift("--resume", pinnedSession)
+      trackHermesSessionAlias(repoRoot, internal.crew, internal.sessionRoot, pinnedSession, {
+        reason: "continue-pinned-active-crew"
+      })
     }
+  }
+
+  const resumedSessionId = parseHermesResumeSessionId(args)
+  if (resumedSessionId) {
+    trackHermesSessionAlias(repoRoot, internal.crew, internal.sessionRoot, resumedSessionId, {
+      reason: "resume-arg"
+    })
   }
 
   if (shouldBootstrapHermes(args, envOverrides)) {
@@ -1401,11 +1842,35 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
         orchestrator_session_id: pinnedSessionId,
         updated_at: new Date().toISOString()
       })
+      trackHermesSessionAlias(repoRoot, internal.crew, internal.sessionRoot, pinnedSessionId, {
+        reason: "bootstrap-pinned-session"
+      })
     }
-    return runCommand(plan.exec, plan.args || [], ["-c", ...args], envOverrides)
+    const status = runCommand(plan.exec, plan.args || [], ["-c", ...args], envOverrides)
+    const finalSessionId = pinnedSessionId || latestHermesSessionId(repoRoot, envOverrides)
+    if (finalSessionId) {
+      const exportMeta = exportHermesSessionSnapshot(repoRoot, internal.crew, finalSessionId, envOverrides)
+      trackHermesSessionAlias(repoRoot, internal.crew, internal.sessionRoot, finalSessionId, {
+        reason: "post-run-export",
+        ...exportMeta
+      })
+    }
+    return status
   }
 
-  return runCommand(plan.exec, plan.args || [], args, envOverrides)
+  const status = runCommand(plan.exec, plan.args || [], args, envOverrides)
+  let finalSessionId = resumedSessionId || explicitSessionId
+  if (!finalSessionId && status === 0) {
+    finalSessionId = latestHermesSessionId(repoRoot, envOverrides)
+  }
+  if (finalSessionId) {
+    const exportMeta = exportHermesSessionSnapshot(repoRoot, internal.crew, finalSessionId, envOverrides)
+    trackHermesSessionAlias(repoRoot, internal.crew, internal.sessionRoot, finalSessionId, {
+      reason: "post-run-export",
+      ...exportMeta
+    })
+  }
+  return status
 }
 
 // =============================================================================

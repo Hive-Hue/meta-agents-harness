@@ -9,6 +9,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Added
 
+- Claude runtime now includes declared per-agent domain rules in generated `--agents` prompts (`Declared domain rules: ...`) for delegation observability.
+- `--policy enforce-domain` guardrail for Claude runtime: fail-fast when crew config contains granular per-agent domain rules that cannot be path-enforced by the runtime surface.
 - WebUI live data layer: Config Editor, Overview Dashboard, Skills Management, and Settings all consume real data from `meta-agents.yaml`, `mah` CLI, and workspace state
 - `webui/useConfigStore.tsx` — shared ConfigProvider + useConfig hook for reading/writing meta-agents.yaml
 - `webui/useWorkspaceData.ts` — workspace data hook with 3 parallel fetches (workspace, config, sessions)
@@ -53,6 +55,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Changed
 
+- Claude runtime warns explicitly when domain rules are prompt-declarative (non-enforced) in the active crew.
 - WebUI Vite middleware uses `next()` pattern to intercept API routes before SPA fallback
 - Settings sections are now collapsible with expand/collapse toggle
 - Workspace Path field supports both typing and OS folder picker
