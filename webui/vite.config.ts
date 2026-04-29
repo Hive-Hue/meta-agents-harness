@@ -2,8 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
 import { spawn, spawnSync, execSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
+import * as pty from "node-pty";
 import yaml from "js-yaml";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -29,6 +31,46 @@ const runSessions = new Map<string, {
   process?: ReturnType<typeof spawn>;
   createdAt: number;
 }>();
+
+const INTERACTIVE_RESUME_RUNTIMES = new Set(["claude", "opencode", "pi", "hermes", "kilo", "openclaude"]);
+
+type TerminalEvent =
+  | { type: "output"; text: string }
+  | { type: "exit"; code?: number | null }
+  | { type: "error"; message: string };
+
+const terminalSessions = new Map<string, {
+  id: string;
+  runtime: string;
+  sessionId: string;
+  pty: pty.IPty;
+  clients: Set<import("http").ServerResponse>;
+  closed: boolean;
+  exitCode: number | null;
+}>();
+
+function sendTerminalSse(res: import("http").ServerResponse, payload: TerminalEvent): void {
+  if (res.writableEnded) return;
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+function broadcastTerminalEvent(terminalId: string, payload: TerminalEvent): void {
+  const terminal = terminalSessions.get(terminalId);
+  if (!terminal) return;
+  terminal.clients.forEach((client) => {
+    sendTerminalSse(client, payload);
+  });
+}
+
+function cleanupTerminalSession(terminalId: string): void {
+  const terminal = terminalSessions.get(terminalId);
+  if (!terminal) return;
+  terminal.clients.forEach((client) => {
+    if (!client.writableEnded) client.end();
+  });
+  terminal.clients.clear();
+  terminalSessions.delete(terminalId);
+}
 
 function resolveWorkspaceRoot(req: import("http").IncomingMessage): string {
   const rawHeader = req.headers["x-mah-workspace-path"];
@@ -529,6 +571,238 @@ function handleRunStatus(req: import("http").IncomingMessage, res: import("http"
   res.end(JSON.stringify({ ok: true, sessionId: match[1], status: session.status, events: session.events, logs: session.logs, elapsedMs: Date.now() - session.createdAt }));
 }
 
+function handleTerminalOpen(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+
+  const chunks: Buffer[] = [];
+  req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+  req.on("end", () => {
+    try {
+      const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
+      const body = JSON.parse(bodyRaw) as { sessionId?: string; runtime?: string };
+      const runtime = `${body.runtime || ""}`.trim().toLowerCase();
+      const sessionId = `${body.sessionId || ""}`.trim();
+
+      if (!runtime || !sessionId) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: "runtime and sessionId are required" }));
+        return;
+      }
+      if (!INTERACTIVE_RESUME_RUNTIMES.has(runtime)) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({
+          ok: false,
+          error: `interactive browser console for resume is enabled only for: ${Array.from(INTERACTIVE_RESUME_RUNTIMES).join(", ")}`,
+        }));
+        return;
+      }
+
+      const workspaceRoot = resolveWorkspaceRoot(req);
+      const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+      if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+        return;
+      }
+
+      const envPath = path.join(workspaceRoot, ENV_FILENAME);
+      const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+      const workspaceEnv = parseDotEnvContent(rawEnv);
+
+      const terminalId = `terminal-${randomUUID()}`;
+      const terminal = pty.spawn(
+        process.execPath,
+        [cliPath, "sessions", "resume", sessionId],
+        {
+          cwd: workspaceRoot,
+          env: { ...process.env, ...workspaceEnv } as Record<string, string>,
+          cols: 120,
+          rows: 40,
+          name: "xterm-256color",
+        },
+      );
+
+      terminalSessions.set(terminalId, {
+        id: terminalId,
+        runtime,
+        sessionId,
+        pty: terminal,
+        clients: new Set(),
+        closed: false,
+        exitCode: null,
+      });
+
+      terminal.onData((data) => {
+        broadcastTerminalEvent(terminalId, { type: "output", text: data });
+      });
+      terminal.onExit(({ exitCode }) => {
+        const session = terminalSessions.get(terminalId);
+        if (!session) return;
+        session.closed = true;
+        session.exitCode = typeof exitCode === "number" ? exitCode : null;
+        broadcastTerminalEvent(terminalId, { type: "exit", code: session.exitCode });
+        setTimeout(() => cleanupTerminalSession(terminalId), 10_000);
+      });
+
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, terminalId }));
+    } catch (error) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    }
+  });
+}
+
+function handleTerminalStream(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  if (req.method !== "GET") {
+    res.statusCode = 405;
+    res.end("method not allowed");
+    return;
+  }
+  const match = (req.url ?? "").match(/^\/api\/mah\/terminal\/stream\/([^/?]+)/);
+  if (!match) {
+    res.statusCode = 400;
+    res.end("missing terminal id");
+    return;
+  }
+  const terminalId = decodeURIComponent(match[1]);
+  const terminal = terminalSessions.get(terminalId);
+  if (!terminal) {
+    res.statusCode = 404;
+    res.end("terminal not found");
+    return;
+  }
+
+  res.statusCode = 200;
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.write(": connected\n\n");
+
+  terminal.clients.add(res);
+  if (terminal.closed) {
+    sendTerminalSse(res, { type: "exit", code: terminal.exitCode });
+  }
+
+  req.on("close", () => {
+    terminal.clients.delete(res);
+  });
+}
+
+function handleTerminalInput(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+  const match = (req.url ?? "").match(/^\/api\/mah\/terminal\/input\/([^/?]+)/);
+  if (!match) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: "missing terminal id" }));
+    return;
+  }
+  const terminalId = decodeURIComponent(match[1]);
+  const terminal = terminalSessions.get(terminalId);
+  if (!terminal) {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ ok: false, error: "terminal not found" }));
+    return;
+  }
+
+  const chunks: Buffer[] = [];
+  req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+  req.on("end", () => {
+    try {
+      const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
+      const body = JSON.parse(bodyRaw) as { data?: string };
+      const data = typeof body.data === "string" ? body.data : "";
+      if (data) terminal.pty.write(data);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true }));
+    } catch (error) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    }
+  });
+}
+
+function handleTerminalResize(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+  const match = (req.url ?? "").match(/^\/api\/mah\/terminal\/resize\/([^/?]+)/);
+  if (!match) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: "missing terminal id" }));
+    return;
+  }
+  const terminalId = decodeURIComponent(match[1]);
+  const terminal = terminalSessions.get(terminalId);
+  if (!terminal) {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ ok: false, error: "terminal not found" }));
+    return;
+  }
+
+  const chunks: Buffer[] = [];
+  req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+  req.on("end", () => {
+    try {
+      const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
+      const body = JSON.parse(bodyRaw) as { cols?: number; rows?: number };
+      const cols = Number.isFinite(body.cols) ? Math.max(1, Number(body.cols)) : 120;
+      const rows = Number.isFinite(body.rows) ? Math.max(1, Number(body.rows)) : 40;
+      terminal.pty.resize(cols, rows);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true }));
+    } catch (error) {
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    }
+  });
+}
+
+function handleTerminalClose(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+  const match = (req.url ?? "").match(/^\/api\/mah\/terminal\/close\/([^/?]+)/);
+  if (!match) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: "missing terminal id" }));
+    return;
+  }
+  const terminalId = decodeURIComponent(match[1]);
+  const terminal = terminalSessions.get(terminalId);
+  if (!terminal) {
+    res.statusCode = 404;
+    res.end(JSON.stringify({ ok: false, error: "terminal not found" }));
+    return;
+  }
+  try {
+    terminal.pty.kill();
+    cleanupTerminalSession(terminalId);
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true }));
+  } catch (error) {
+    res.statusCode = 500;
+    res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+  }
+}
+
 function mahApiMiddleware() {
   return {
     name: "mah-api-middleware",
@@ -562,6 +836,11 @@ function mahApiMiddleware() {
 
         if (url === "/api/mah/run-start") { handleRunStart(req, res); return; }
         if (url.startsWith("/api/mah/run-status/")) { handleRunStatus(req, res); return; }
+        if (url === "/api/mah/terminal/open") { handleTerminalOpen(req, res); return; }
+        if (url.startsWith("/api/mah/terminal/stream/")) { handleTerminalStream(req, res); return; }
+        if (url.startsWith("/api/mah/terminal/input/")) { handleTerminalInput(req, res); return; }
+        if (url.startsWith("/api/mah/terminal/resize/")) { handleTerminalResize(req, res); return; }
+        if (url.startsWith("/api/mah/terminal/close/")) { handleTerminalClose(req, res); return; }
 
         if (url.startsWith("/api/mah/run-status/")) { handleRunStatus(req, res); return; }
 

@@ -116,6 +116,11 @@
   flex-wrap: wrap;
 }
 
+.metric-loading {
+  color: var(--color-text-muted);
+  opacity: 0.85;
+}
+
 .sessions-action-btn {
   display: inline-flex;
   align-items: center;
@@ -231,6 +236,23 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
+.modal-box--terminal {
+  width: min(960px, 94vw);
+  height: min(680px, 88vh);
+  min-width: 560px;
+  min-height: 220px;
+  max-width: 96vw;
+  max-height: 92vh;
+  resize: both;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-overlay.is-hidden {
+  display: none;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -243,4 +265,70 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--color-text);
+}
+
+.terminal-console__meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.terminal-console__output {
+  margin: 0;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e2e8f0;
+  padding: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.terminal-console__output--xterm {
+  padding: 0;
+  overflow: hidden;
+}
+
+.terminal-console__output--xterm .xterm {
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+.terminal-console__output--xterm .xterm-viewport,
+.terminal-console__output--xterm .xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.terminal-dock {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1100;
+  display: flex;
+  gap: 8px;
+}
+
+.terminal-console__controls {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.terminal-console__controls input {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
 }

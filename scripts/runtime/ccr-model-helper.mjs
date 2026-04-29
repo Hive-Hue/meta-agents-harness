@@ -14,5 +14,12 @@ export function mapModelToCcrRef(m) {
     "lmstudio": "lmstudio",
     "openai-codex": "openrouter"
   }
-  return (map[p] || p) + "," + n
+  let modelId = n
+  if (p === "minimax" || p === "minimax-coding-plan") {
+    if (/^minimax-/i.test(modelId)) {
+      const suffix = modelId.replace(/^minimax-/i, "")
+      modelId = `MiniMax-${suffix ? suffix[0].toUpperCase() + suffix.slice(1) : suffix}`
+    }
+  }
+  return (map[p] || p) + "," + modelId
 }

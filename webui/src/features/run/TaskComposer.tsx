@@ -48,6 +48,7 @@ export function TaskComposer({
           <option value="claude">claude</option>
           <option value="opencode">opencode</option>
           <option value="hermes">hermes</option>
+          <option value="kilo">kilo</option>
         </select>
         <button className="run-action-btn" type="button" onClick={onShowRouting} disabled={isRunning || !taskText}>
           <Icon name="route" size={14} />Preview Routing

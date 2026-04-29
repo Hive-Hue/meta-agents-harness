@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync, rmSync } from "node:fs"
 import path from "node:path"
-import { execSync } from "node:child_process"
+import { execSync, spawnSync } from "node:child_process"
 import YAML from "yaml"
 import { RUNTIME_ADAPTERS } from "../runtime/runtime-adapters.mjs"
 
@@ -18,6 +18,38 @@ function resolveRuntimeAdapter(runtimeRegistry, runtime) {
 function resolveRuntimeRoot(runtimeRegistry, runtime) {
   const adapter = resolveRuntimeAdapter(runtimeRegistry, runtime)
   return adapter?.markerDir || `.${runtime}`
+}
+
+function writeSessionAliasTracking(repoRoot, runtimeRegistry, {
+  runtime = "",
+  crew = "",
+  sessionId = "",
+  sourcePath = "",
+  reason = "resume"
+} = {}) {
+  const runtimeName = `${runtime || ""}`.trim().toLowerCase()
+  const crewId = `${crew || ""}`.trim()
+  const resolvedSessionId = `${sessionId || ""}`.trim()
+  if (!runtimeName || !crewId || !resolvedSessionId) return
+
+  const runtimeRoot = resolveRuntimeRoot(runtimeRegistry, runtimeName)
+  const canonicalRoot = path.join(repoRoot, runtimeRoot, "crew", crewId, "sessions", resolvedSessionId)
+  const resolvedSourcePath = `${sourcePath || ""}`.trim() ? path.resolve(sourcePath) : ""
+  const targetRoots = new Set([canonicalRoot, resolvedSourcePath].filter(Boolean))
+  const sourceRelative = resolvedSourcePath ? path.relative(repoRoot, resolvedSourcePath) : ""
+
+  const payload = {
+    runtime: runtimeName,
+    crew: crewId,
+    session_id: resolvedSessionId,
+    source_path: sourceRelative,
+    tracked_at: new Date().toISOString(),
+    reason
+  }
+  for (const root of targetRoots) {
+    mkdirSync(root, { recursive: true })
+    writeFileSync(path.join(root, "session.alias.json"), `${JSON.stringify(payload, null, 2)}\n`, "utf-8")
+  }
 }
 
 function appendUniqueArgs(target, extraArgs) {
@@ -43,6 +75,92 @@ function listSubdirs(rootPath) {
   return out
 }
 
+function parseIsoDate(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const asDate = new Date(value)
+    return Number.isNaN(asDate.getTime()) ? "" : asDate.toISOString()
+  }
+  if (typeof value === "string" && value.trim()) {
+    const asDate = new Date(value)
+    return Number.isNaN(asDate.getTime()) ? "" : asDate.toISOString()
+  }
+  return ""
+}
+
+function parseJsonPayload(raw) {
+  const input = `${raw || ""}`.trim()
+  if (!input) return null
+  try {
+    return JSON.parse(input)
+  } catch {
+  }
+  const starts = ["[", "{"]
+  for (const token of starts) {
+    const start = input.indexOf(token)
+    if (start === -1) continue
+    const endToken = token === "[" ? "]" : "}"
+    const end = input.lastIndexOf(endToken)
+    if (end === -1 || end <= start) continue
+    const slice = input.slice(start, end + 1)
+    try {
+      return JSON.parse(slice)
+    } catch {
+    }
+  }
+  return null
+}
+
+function normalizeSessionListCommand(command) {
+  if (!Array.isArray(command) || command.length === 0) return null
+  if (typeof command[0] === "string") {
+    return { exec: command[0], args: command.slice(1).filter((item) => typeof item === "string") }
+  }
+  if (!Array.isArray(command[0]) || command[0].length === 0) return null
+  const [exec, args] = command[0]
+  if (typeof exec !== "string" || !exec.trim()) return null
+  if (Array.isArray(args)) return { exec, args: args.filter((item) => typeof item === "string") }
+  return { exec, args: [] }
+}
+
+function collectSessionsFromListCommand(repoRoot, runtimeName, adapter, pushRow) {
+  const normalized = normalizeSessionListCommand(adapter?.sessionListCommand)
+  if (!normalized) return false
+  const result = spawnSync(normalized.exec, normalized.args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    timeout: 5000
+  })
+  if (result.error) return false
+  if (result.status !== 0) return false
+  const payload = parseJsonPayload(result.stdout)
+  const sessions = Array.isArray(payload) ? payload : Array.isArray(payload?.sessions) ? payload.sessions : null
+  if (!sessions) return false
+  for (const item of sessions) {
+    if (!item || typeof item !== "object") continue
+    const sessionId = `${item.id || item.session_id || ""}`.trim()
+    if (!sessionId) continue
+    const directory = `${item.directory || ""}`.trim()
+    if (directory) {
+      const resolvedDirectory = path.resolve(directory)
+      if (resolvedDirectory !== path.resolve(repoRoot)) continue
+    }
+    const crewId = `${item.crew || "global"}`.trim() || "global"
+    const sourcePath = path.join(repoRoot, ".mah", "sessions", runtimeName, sessionId)
+    pushRow({
+      id: `${runtimeName}:${crewId}:${sessionId}`,
+      runtime: runtimeName,
+      crew: crewId,
+      session_id: sessionId,
+      source_path: sourcePath,
+      started_at: parseIsoDate(item.created) || parseIsoDate(item.started_at),
+      last_active_at: parseIsoDate(item.updated) || parseIsoDate(item.last_active_at),
+      status: "available"
+    })
+  }
+  return true
+}
+
 export function readMetaConfig(repoRoot) {
   const metaPath = path.join(repoRoot, "meta-agents.yaml")
   const raw = readFileSync(metaPath, "utf-8")
@@ -51,12 +169,52 @@ export function readMetaConfig(repoRoot) {
 
 export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}, runtimeRegistry = RUNTIME_ADAPTERS) {
   const rows = []
+  const seenIds = new Set()
+  const opencodeBySession = new Map()
+  const kiloBySession = new Map()
   const normalizedRuntime = `${runtime || ""}`.trim()
   const normalizedCrew = `${crew || ""}`.trim()
 
   const pushRow = (entry) => {
     if (normalizedRuntime && entry.runtime !== normalizedRuntime) return
     if (normalizedCrew && entry.crew !== normalizedCrew) return
+
+    if (entry.runtime === "opencode") {
+      const canonicalKey = `opencode:${entry.session_id}`
+      const currentIndex = opencodeBySession.get(canonicalKey)
+      if (typeof currentIndex === "number") {
+        const current = rows[currentIndex]
+        const currentIsGlobal = `${current?.crew || ""}` === "global"
+        const nextIsGlobal = `${entry?.crew || ""}` === "global"
+        if (currentIsGlobal && !nextIsGlobal) {
+          seenIds.delete(current.id)
+          rows[currentIndex] = entry
+          seenIds.add(entry.id)
+        }
+        return
+      }
+      opencodeBySession.set(canonicalKey, rows.length)
+    }
+
+    if (entry.runtime === "kilo") {
+      const canonicalKey = `kilo:${entry.session_id}`
+      const currentIndex = kiloBySession.get(canonicalKey)
+      if (typeof currentIndex === "number") {
+        const current = rows[currentIndex]
+        const currentIsGlobal = `${current?.crew || ""}` === "global"
+        const nextIsGlobal = `${entry?.crew || ""}` === "global"
+        if (currentIsGlobal && !nextIsGlobal) {
+          seenIds.delete(current.id)
+          rows[currentIndex] = entry
+          seenIds.add(entry.id)
+        }
+        return
+      }
+      kiloBySession.set(canonicalKey, rows.length)
+    }
+
+    if (seenIds.has(entry.id)) return
+    seenIds.add(entry.id)
     rows.push(entry)
   }
 
@@ -88,22 +246,27 @@ export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}, runt
     if (!adapter?.supportsSessions) continue
     collectCrewRuntime(runtimeName, resolveRuntimeRoot(runtimeRegistry, runtimeName))
 
+    if (collectSessionsFromListCommand(repoRoot, runtimeName, adapter, pushRow)) continue
+
     const globalRoot = adapter?.sessionGlobalRoot
     if (!globalRoot) continue
     const absoluteGlobalRoot = path.join(repoRoot, globalRoot)
     if (!existsSync(absoluteGlobalRoot)) continue
-    const st = safeStat(absoluteGlobalRoot)
-    if (!st) continue
-    pushRow({
-      id: `${runtimeName}:global:global`,
-      runtime: runtimeName,
-      crew: "global",
-      session_id: "global",
-      source_path: absoluteGlobalRoot,
-      started_at: st.birthtime?.toISOString?.() || "",
-      last_active_at: st.mtime?.toISOString?.() || "",
-      status: "available"
-    })
+    const sessionDirs = listSubdirs(absoluteGlobalRoot)
+    for (const sessionId of sessionDirs) {
+      const sourcePath = path.join(absoluteGlobalRoot, sessionId)
+      const st = safeStat(sourcePath)
+      pushRow({
+        id: `${runtimeName}:global:${sessionId}`,
+        runtime: runtimeName,
+        crew: "global",
+        session_id: sessionId,
+        source_path: sourcePath,
+        started_at: st?.birthtime?.toISOString?.() || "",
+        last_active_at: st?.mtime?.toISOString?.() || "",
+        status: "available"
+      })
+    }
   }
 
   rows.sort((a, b) => `${b.last_active_at}`.localeCompare(`${a.last_active_at}`))
@@ -117,9 +280,13 @@ export function collectSessions(repoRoot, { runtime = "", crew = "" } = {}, runt
  */
 export function parseSessionId(sessionIdFull) {
   if (!sessionIdFull || typeof sessionIdFull !== "string") return null
-  const parts = sessionIdFull.split(":")
+  const normalized = sessionIdFull.trim()
+  const parts = normalized.split(":")
   if (parts.length !== 3) return null
-  const [runtime, crew, sessionId] = parts
+  const [runtimeRaw, crewRaw, sessionIdRaw] = parts
+  const runtime = `${runtimeRaw || ""}`.trim().toLowerCase()
+  const crew = `${crewRaw || ""}`.trim()
+  const sessionId = `${sessionIdRaw || ""}`.replace(/\s+/g, "")
   if (!runtime || !crew || !sessionId) return null
   return { runtime, crew, sessionId }
 }
@@ -226,8 +393,12 @@ export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs 
 
   // Find the session
   const sessions = collectSessions(repoRoot, { runtime }, runtimeRegistry)
-  const session = sessions.find((s) => s.id === sessionIdFull)
-  if (!session) {
+  const normalizedSessionFull = `${parsed.runtime}:${parsed.crew}:${parsed.sessionId}`
+  const session = sessions.find((s) => s.id === normalizedSessionFull)
+    || (runtime === "opencode"
+      ? sessions.find((s) => s.runtime === "opencode" && `${s.session_id || ""}` === parsed.sessionId)
+      : null)
+  if (!session && runtime !== "opencode") {
     return { ok: false, error: `session not found: ${sessionIdFull}` }
   }
 
@@ -245,10 +416,20 @@ export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs 
   } else if (capabilities.sessionIdFlag) {
     args.push(capabilities.sessionIdFlag, parsed.sessionId)
   }
-  if (capabilities.sessionRootFlag) {
+  if (capabilities.sessionRootFlag && session?.source_path) {
     args.unshift(capabilities.sessionRootFlag, session.source_path)
   }
   appendUniqueArgs(args, normalizeCapabilityArgs(capabilities.sessionContinueArgs))
+
+  if (session?.source_path || parsed.runtime === "claude" || parsed.runtime === "kilo") {
+    writeSessionAliasTracking(repoRoot, runtimeRegistry, {
+      runtime: parsed.runtime,
+      crew: parsed.crew,
+      sessionId: parsed.sessionId,
+      sourcePath: session?.source_path || "",
+      reason: "resume-session"
+    })
+  }
 
   return { ok: true, envOverrides, args }
 }

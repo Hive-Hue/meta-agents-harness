@@ -173,6 +173,12 @@ function cleanupTempDir() {
 describe("plugin-loader", async () => {
   setupTempDir()
 
+  it("reads MAH_VERSION from repository root package.json", async () => {
+    const loader = await getPluginLoader()
+    const rootPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"))
+    assert.equal(loader.MAH_VERSION, rootPkg.version)
+  })
+
   // Reset module state between tests by clearing the internal registry
   // The plugin-loader uses a module-level pluginRegistry Map
   // We test this by calling unloadPlugin for all non-core plugins after each test

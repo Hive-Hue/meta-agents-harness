@@ -769,12 +769,32 @@ function runtimeMcpAccess() {
   return ["clickup", "github", "context7"]
 }
 
+function normalizeClaudeCcrModel(model = "") {
+  const value = `${model || ""}`.trim()
+  if (!value) return value
+  const match = value.match(/^minimax\/(.+)$/i)
+  if (!match) return value
+  let modelId = `${match[1] || ""}`.trim()
+  if (!modelId) return value
+  if (/^minimax-/i.test(modelId)) {
+    const suffix = modelId.replace(/^minimax-/i, "")
+    modelId = `MiniMax-${suffix ? suffix[0].toUpperCase() + suffix.slice(1) : suffix}`
+  }
+  return `minimax/${modelId}`
+}
+
+function normalizeModelForRuntime(runtime, model = "") {
+  const normalized = normalizeModelId(model)
+  if (runtime === "claude" || runtime === "openclaude") return normalizeClaudeCcrModel(normalized)
+  return normalized
+}
+
 function resolveModel(meta, runtime, modelRef) {
   const override = meta.runtimes?.[runtime]?.model_overrides?.[modelRef]
   if (override) return override
   const catalogModel = meta.catalog?.models?.[modelRef] || "inherit"
   if (runtime === "opencode" || runtime === "kilo") return catalogModel
-  return normalizeModelId(catalogModel)
+  return normalizeModelForRuntime(runtime, catalogModel)
 }
 
 function resolveModelToken(meta, runtime, token) {
@@ -782,9 +802,9 @@ function resolveModelToken(meta, runtime, token) {
   if (!key) return ""
   if (meta.catalog?.models?.[key] || meta.runtimes?.[runtime]?.model_overrides?.[key]) {
     const resolved = resolveModel(meta, runtime, key)
-    return normalizeModelId(resolved || key)
+    return normalizeModelForRuntime(runtime, resolved || key)
   }
-  return normalizeModelId(key)
+  return normalizeModelForRuntime(runtime, key)
 }
 
 function resolveAgentModel(meta, runtime, agent) {
@@ -800,8 +820,8 @@ function resolveModelFallbacks(meta, runtime, modelRef) {
     .map((item) => {
       const key = `${item || ""}`.trim()
       if (!key) return ""
-      if (meta.catalog?.models?.[key]) return normalizeModelId(resolveModel(meta, runtime, key))
-      return normalizeModelId(key)
+      if (meta.catalog?.models?.[key]) return normalizeModelForRuntime(runtime, resolveModel(meta, runtime, key))
+      return normalizeModelForRuntime(runtime, key)
     })
     .filter(Boolean)
 }

@@ -1176,6 +1176,103 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
           delegations = procs.filter((p) => p.parentAgent !== null).length
         } catch { /* ignore */ }
       }
+
+      // Claude mirrors persist transcript pointers rather than MAH-native jsonl/index files.
+      // Fallback to transcript-based heuristics when canonical counters are missing.
+      if (conversation === 0 && tool_calls === 0 && artifacts === 0 && delegations === 0) {
+        let transcriptPath = path.join(sessionRoot, "session.transcript.jsonl.link")
+        if (!fs.existsSync(transcriptPath)) {
+          const aliasPath = path.join(sessionRoot, "session.alias.json")
+          if (fs.existsSync(aliasPath)) {
+            try {
+              const alias = JSON.parse(fs.readFileSync(aliasPath, "utf-8"))
+              const fromAlias = `${alias?.transcript_path || ""}`.trim()
+              if (fromAlias) transcriptPath = fromAlias
+            } catch { /* ignore malformed alias */ }
+          }
+        }
+
+        if (transcriptPath && fs.existsSync(transcriptPath)) {
+          try {
+            const lines = fs.readFileSync(transcriptPath, "utf-8")
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+            for (const line of lines) {
+              let item = null
+              try {
+                item = JSON.parse(line)
+              } catch {
+                continue
+              }
+              if (!item || typeof item !== "object") continue
+
+              const type = `${item.type || ""}`.toLowerCase()
+              if (type === "user" || type === "assistant") conversation += 1
+
+              const content = Array.isArray(item?.message?.content) ? item.message.content : []
+              for (const block of content) {
+                const blockType = `${block?.type || ""}`.toLowerCase()
+                if (blockType === "tool_use" || blockType === "tool") {
+                  tool_calls += 1
+                  const toolName = `${block?.name || block?.tool || block?.tool_name || ""}`.toLowerCase()
+                  if (toolName.includes("task") || toolName.includes("delegate")) delegations += 1
+                }
+                if (blockType === "file" || blockType === "diff" || blockType === "patch" || blockType === "artifact") {
+                  artifacts += 1
+                }
+              }
+
+              const serverToolUse = item?.message?.usage?.server_tool_use
+              if (serverToolUse && typeof serverToolUse === "object") {
+                for (const value of Object.values(serverToolUse)) {
+                  const n = Number.parseInt(`${value ?? 0}`, 10)
+                  if (Number.isFinite(n) && n > 0) tool_calls += n
+                }
+              }
+
+              const attachmentType = `${item?.attachment?.type || ""}`.toLowerCase()
+              if (attachmentType === "artifact" || attachmentType === "file" || attachmentType === "diff" || attachmentType === "patch") {
+                artifacts += 1
+              }
+            }
+          } catch { /* ignore transcript parse failures */ }
+        }
+      }
+
+      // OpenCode mirrors store exported payload in session.export.json.
+      // Use it as a fallback source for counts when jsonl/index files are absent.
+      const opencodeExportPath = path.join(sessionRoot, "session.export.json")
+      if (fs.existsSync(opencodeExportPath)) {
+        try {
+          const payload = JSON.parse(fs.readFileSync(opencodeExportPath, "utf-8"))
+          const messages = Array.isArray(payload?.messages) ? payload.messages : []
+          if (conversation === 0) conversation = messages.length
+
+          if (tool_calls === 0 || delegations === 0 || artifacts === 0) {
+            let toolCount = 0
+            let delegationCount = 0
+            let artifactPartCount = 0
+            for (const message of messages) {
+              const parts = Array.isArray(message?.parts) ? message.parts : []
+              for (const part of parts) {
+                const type = `${part?.type || ""}`.toLowerCase()
+                if (type === "tool") {
+                  toolCount += 1
+                  const toolName = `${part?.tool || part?.name || part?.tool_name || ""}`.toLowerCase()
+                  if (toolName.includes("task") || toolName.includes("delegate")) delegationCount += 1
+                }
+                if (type === "file" || type === "diff" || type === "patch" || type === "artifact") artifactPartCount += 1
+              }
+            }
+            if (tool_calls === 0) tool_calls = toolCount
+            if (delegations === 0) delegations = delegationCount
+
+            const summaryFiles = Number.parseInt(`${payload?.info?.summary?.files ?? 0}`, 10) || 0
+            if (artifacts === 0) artifacts = Math.max(summaryFiles, artifactPartCount)
+          }
+        } catch { /* ignore malformed export */ }
+      }
     } catch { /* counts may not exist */ }
     console.log(JSON.stringify({ session_id: sessionId, counts: { conversation, tool_calls, artifacts, delegations } }, null, 2))
     return 0
@@ -1209,20 +1306,27 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error(`ERROR: invalid session ID format: ${sessionId} (expected runtime:crew:sessionId)`)
       return 1
     }
-    const targetRuntime = effectiveRuntime || parsedSessionId.runtime
-    const sessions = collectSessions(repoRoot, { runtime: targetRuntime }, allRuntimes)
-    const session = sessions.find((s) => s.id === sessionId)
-    if (!session) {
-      console.error(`ERROR: session not found: ${sessionId}`)
-      return 1
-    }
+    const targetRuntime = filters.runtime || parsedSessionId.runtime
     const resumeResult = resumeSessionFn(repoRoot, sessionId, targetRuntime, argv.slice(2), allRuntimes)
     if (!resumeResult.ok) {
       console.error(`ERROR: ${resumeResult.error}`)
       return 1
     }
+    const opencodeDirectResume = targetRuntime === "opencode"
+    const opencodeResumeArgs = opencodeDirectResume
+      ? ["--session", parsedSessionId.sessionId]
+      : []
+    const opencodeResumeExec = opencodeDirectResume
+      ? (allRuntimes?.[targetRuntime]?.directCli || "opencode")
+      : ""
     // Dry-run: print the command plan without dispatching
     if (filters.dryRun) {
+      if (opencodeDirectResume) {
+        console.log(`[dry-run] Would resume session '${sessionId}' with runtime '${targetRuntime}'`)
+        console.log(`[dry-run] exec=${opencodeResumeExec}`)
+        console.log(`[dry-run] args=${opencodeResumeArgs.join(" ")}`)
+        return 0
+      }
       const plan = resolveDispatchPlan(targetRuntime, "run", resumeResult.args)
       if (plan.error) {
         console.error(`ERROR: ${plan.error}`)
@@ -1232,6 +1336,9 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.log(`[dry-run] exec=${plan.exec}`)
       console.log(`[dry-run] args=${[...plan.args, ...plan.passthrough].join(" ")}`)
       return 0
+    }
+    if (opencodeDirectResume) {
+      return runCommand(opencodeResumeExec, opencodeResumeArgs, [], {}, { headless: false })
     }
     // Dispatch the run command with session context
     return dispatch(targetRuntime, "run", resumeResult.args)

@@ -127,6 +127,83 @@ test("collectSessions session id format is runtime:crew:sessionId", () => {
   }
 })
 
+test("collectSessions does not create global placeholder from empty global root", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-opencode-empty-global-"))
+  try {
+    const globalRoot = path.join(tempDir, ".opencode", "sessions")
+    mkdirSync(globalRoot, { recursive: true })
+    writeFileSync(path.join(globalRoot, ".gitkeep"), "", "utf-8")
+
+    const runtimeRegistry = {
+      opencode: {
+        name: "opencode",
+        markerDir: ".opencode",
+        supportsSessions: true,
+        sessionGlobalRoot: ".opencode/sessions"
+      }
+    }
+
+    const sessions = collectSessions(tempDir, { runtime: "opencode" }, runtimeRegistry)
+    assert.equal(sessions.length, 0)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("collectSessions reads runtime sessionListCommand JSON output", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-opencode-list-command-"))
+  try {
+    const payload = [
+      { id: "ses_project", created: 1, updated: 2, directory: tempDir },
+      { id: "ses_other", created: 3, updated: 4, directory: "/tmp/other-project" }
+    ]
+    const runtimeRegistry = {
+      opencode: {
+        name: "opencode",
+        markerDir: ".opencode",
+        supportsSessions: true,
+        sessionListCommand: [process.execPath, "-e", `console.log(${JSON.stringify(JSON.stringify(payload))})`]
+      }
+    }
+
+    const sessions = collectSessions(tempDir, { runtime: "opencode" }, runtimeRegistry)
+    assert.equal(sessions.length, 1)
+    assert.equal(sessions[0].id, "opencode:global:ses_project")
+    assert.equal(sessions[0].runtime, "opencode")
+    assert.equal(sessions[0].crew, "global")
+    assert.equal(sessions[0].session_id, "ses_project")
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("collectSessions prefers opencode crew mirror over global entry", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-opencode-crew-prefer-"))
+  try {
+    const crewMirror = path.join(tempDir, ".opencode", "crew", "dev", "sessions", "ses_shared")
+    mkdirSync(crewMirror, { recursive: true })
+    const payload = [{ id: "ses_shared", created: 1, updated: 2, directory: tempDir }]
+    const runtimeRegistry = {
+      opencode: {
+        name: "opencode",
+        markerDir: ".opencode",
+        supportsSessions: true,
+        sessionListCommand: [process.execPath, "-e", `console.log(${JSON.stringify(JSON.stringify(payload))})`]
+      }
+    }
+
+    const sessions = collectSessions(tempDir, { runtime: "opencode" }, runtimeRegistry)
+    assert.equal(sessions.length, 1)
+    assert.equal(sessions[0].id, "opencode:dev:ses_shared")
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("opencode adapter uses --session flag", () => {
+  assert.equal(RUNTIME_ADAPTERS.opencode.capabilities.sessionIdFlag, "--session")
+})
+
 // ============================================================
 // Tests for listSessions (alias for collectSessions)
 // ============================================================
@@ -278,6 +355,44 @@ test("resumeSession uses --session flag for kilo runtime", () => {
     assert.equal(result.ok, true)
     assert.deepEqual(result.envOverrides, {})
     assert.deepEqual(result.args, ["--session", "kilo-session-1"])
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("resumeSession writes alias tracking for kilo under crew sessions root", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-kilo-alias-"))
+  try {
+    const sessionId = "kilo-session-alias"
+    const sessionPath = path.join(tempDir, ".kilo", "crew", "dev", "sessions", sessionId)
+    mkdirSync(sessionPath, { recursive: true })
+    const result = resumeSession(tempDir, `kilo:dev:${sessionId}`, "kilo", [], runtimeRegistryWithKilo)
+    assert.equal(result.ok, true)
+    const aliasPath = path.join(sessionPath, "session.alias.json")
+    assert.equal(existsSync(aliasPath), true)
+    const alias = JSON.parse(readFileSync(aliasPath, "utf-8"))
+    assert.equal(alias.runtime, "kilo")
+    assert.equal(alias.crew, "dev")
+    assert.equal(alias.session_id, sessionId)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("resumeSession writes alias tracking for claude under crew sessions root", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-claude-alias-"))
+  try {
+    const sessionId = "claude-session-alias"
+    const sessionPath = path.join(tempDir, ".claude", "crew", "dev", "sessions", sessionId)
+    mkdirSync(sessionPath, { recursive: true })
+    const result = resumeSession(tempDir, `claude:dev:${sessionId}`, "claude", [])
+    assert.equal(result.ok, true)
+    const aliasPath = path.join(sessionPath, "session.alias.json")
+    assert.equal(existsSync(aliasPath), true)
+    const alias = JSON.parse(readFileSync(aliasPath, "utf-8"))
+    assert.equal(alias.runtime, "claude")
+    assert.equal(alias.crew, "dev")
+    assert.equal(alias.session_id, sessionId)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }

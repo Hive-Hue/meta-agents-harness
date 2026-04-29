@@ -24,7 +24,7 @@ test("mapModelToCcrRef: zai/glm-5.1", () => {
 })
 
 test("mapModelToCcrRef: minimax/minimax-m2.7", () => {
-  assert.equal(mapModelToCcrRef("minimax/minimax-m2.7"), "Minimax,minimax-m2.7")
+  assert.equal(mapModelToCcrRef("minimax/minimax-m2.7"), "Minimax,MiniMax-M2.7")
 })
 
 test("mapModelToCcrRef: openai-codex/gpt-5.3-codex", () => {
@@ -70,7 +70,7 @@ test("CCR-SUBAGENT-MODEL tag format", () => {
 test("CCR-ROOT-MODEL tag format", () => {
   const rootTag = mapModelToCcrRef("minimax/minimax-m2.7")
   const fullRootTag = `<CCR-ROOT-MODEL>${rootTag}</CCR-ROOT-MODEL>`
-  assert.equal(fullRootTag, "<CCR-ROOT-MODEL>Minimax,minimax-m2.7</CCR-ROOT-MODEL>")
+  assert.equal(fullRootTag, "<CCR-ROOT-MODEL>Minimax,MiniMax-M2.7</CCR-ROOT-MODEL>")
 })
 
 // ============================================================================
@@ -104,20 +104,20 @@ test("Claude runtime config has teams with leads and workers", () => {
 })
 
 test("runtime-core-integrations.mjs has exec: ccr and code arg", () => {
-  const source = readFileSync(path.join(repoRoot, "scripts", "runtime-core-integrations.mjs"), "utf-8")
+  const source = readFileSync(path.join(repoRoot, "scripts", "runtime", "runtime-core-integrations.mjs"), "utf-8")
   assert.ok(source.includes('exec: "ccr"'), "exec should be ccr")
   assert.ok(source.includes('"code",') && source.includes('"--append-system-prompt"'), "code should be prepended before --append-system-prompt")
 })
 
 test("runtime-core-integrations.mjs has CCR tag injection", () => {
-  const source = readFileSync(path.join(repoRoot, "scripts", "runtime-core-integrations.mjs"), "utf-8")
+  const source = readFileSync(path.join(repoRoot, "scripts", "runtime", "runtime-core-integrations.mjs"), "utf-8")
   assert.ok(source.includes("CCR-ROOT-MODEL"), "CCR-ROOT-MODEL tag should be in source")
   assert.ok(source.includes("CCR-SUBAGENT-MODEL"), "CCR-SUBAGENT-MODEL tag should be in source")
   assert.ok(source.includes("mapModelToCcrRef"), "mapModelToCcrRef should be used in source")
 })
 
 test("runtime-adapters.mjs has ccr directCli and commands", () => {
-  const source = readFileSync(path.join(repoRoot, "scripts", "runtime-adapters.mjs"), "utf-8")
+  const source = readFileSync(path.join(repoRoot, "scripts", "runtime", "runtime-adapters.mjs"), "utf-8")
   assert.ok(source.includes('directCli: "ccr"'), "directCli should be ccr")
   assert.ok(source.includes('["ccr", ["--help"]]'), "commands should use ccr")
 })

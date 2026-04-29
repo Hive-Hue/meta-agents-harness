@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FitAddon } from "@xterm/addon-fit";
+import { Terminal } from "@xterm/xterm";
 import { CommandPreview } from "../../components/ui/CommandPreview";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { useSessionsData, type SessionInfo } from "./useSessionsData";
 import { getFeatureAiCliOptions } from "../settings/aiFeatureSettings";
+import "@xterm/xterm/css/xterm.css";
 import "./sessions.css";
 
 function formatTime(iso?: string) {
@@ -20,6 +23,18 @@ function relativeTime(iso?: string) {
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
     return `${Math.floor(diff / 3600000)}h ago`;
   } catch { return "—"; }
+}
+
+async function safeReadJson(resp: Response): Promise<Record<string, unknown>> {
+  const raw = await resp.text();
+  if (!raw.trim()) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 export function SessionsOverview() {
@@ -58,6 +73,7 @@ export function SessionsOverview() {
                 <option value="claude">claude</option>
                 <option value="opencode">opencode</option>
                 <option value="hermes">hermes</option>
+                <option value="kilo">kilo</option>
               </select>
               <button type="button" onClick={reload} title="Refresh" className="sessions-refresh-btn">
                 <Icon name="refresh" size={16} />
@@ -143,18 +159,263 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
   const [proposalAgent, setProposalAgent] = useState("");
   const [proposalAiPowered, setProposalAiPowered] = useState(false);
   const [creatingProposal, setCreatingProposal] = useState(false);
+  const [counts, setCounts] = useState(session.counts);
+  const [countsLoading, setCountsLoading] = useState(false);
+  const [resumeBusy, setResumeBusy] = useState(false);
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalMinimized, setTerminalMinimized] = useState(false);
+  const [terminalId, setTerminalId] = useState("");
+  const [terminalClosed, setTerminalClosed] = useState(false);
+  const [terminalExitCode, setTerminalExitCode] = useState<number | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const resizeDebounceRef = useRef<number | null>(null);
+  const terminalModalRef = useRef<HTMLDivElement | null>(null);
+  const terminalHostRef = useRef<HTMLDivElement | null>(null);
+  const xtermRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+
+  const closeTerminalStream = () => {
+    eventSourceRef.current?.close();
+    eventSourceRef.current = null;
+  };
+
+  const closeTerminalModal = () => {
+    closeTerminalStream();
+    if (terminalId) {
+      fetch(`/api/mah/terminal/close/${encodeURIComponent(terminalId)}`, {
+        method: "POST",
+      }).catch(() => {
+        // ignore close failures
+      });
+    }
+    setTerminalOpen(false);
+    setTerminalMinimized(false);
+    setTerminalId("");
+    setTerminalClosed(false);
+    setTerminalExitCode(null);
+    xtermRef.current?.dispose();
+    xtermRef.current = null;
+    fitAddonRef.current = null;
+    if (resizeDebounceRef.current !== null) {
+      window.clearTimeout(resizeDebounceRef.current);
+      resizeDebounceRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    setCounts(session.counts);
+    setCountsLoading(true);
+    (async () => {
+      try {
+        const resp = await fetch("/api/mah/exec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ args: ["sessions", "counts", session.id] }),
+        });
+        const data = await resp.json();
+        if (!data.ok || cancelled) return;
+        const parsed = JSON.parse(data.stdout || "{}");
+        if (!cancelled && parsed?.counts) {
+          setCounts({
+            conversation: Number(parsed.counts.conversation || 0),
+            tool_calls: Number(parsed.counts.tool_calls || 0),
+            artifacts: Number(parsed.counts.artifacts || 0),
+            delegations: Number(parsed.counts.delegations || 0),
+          });
+        }
+      } catch {
+        // Keep optimistic defaults from session list on fetch failure.
+      } finally {
+        if (!cancelled) setCountsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session.id, session.counts]);
+
+  useEffect(() => () => closeTerminalStream(), []);
+
+  useEffect(() => {
+    if (!terminalOpen || !terminalHostRef.current) return;
+
+    const terminal = new Terminal({
+      convertEol: true,
+      cursorBlink: true,
+      fontSize: 12,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+      theme: {
+        background: "#0b1220",
+        foreground: "#e2e8f0",
+      },
+      scrollback: 2000,
+    });
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(terminalHostRef.current);
+    fitAddon.fit();
+    terminal.focus();
+    xtermRef.current = terminal;
+    fitAddonRef.current = fitAddon;
+    terminal.attachCustomKeyEventHandler((event) => {
+      const key = `${event.key || ""}`.toLowerCase();
+      const wantsCopy = (event.ctrlKey || event.metaKey) && key === "c";
+      if (!wantsCopy) return true;
+      const selection = terminal.getSelection();
+      if (!selection) return true; // keep Ctrl+C as SIGINT when nothing is selected
+      if (navigator?.clipboard?.writeText) {
+        void navigator.clipboard.writeText(selection).catch(() => {});
+      }
+      return false;
+    });
+    const dataSubscription = terminal.onData((data) => {
+      void sendTerminalInput(data);
+    });
+
+    const onResize = () => {
+      requestAnimationFrame(() => {
+        try {
+          fitAddon.fit();
+          if (resizeDebounceRef.current !== null) {
+            window.clearTimeout(resizeDebounceRef.current);
+          }
+          resizeDebounceRef.current = window.setTimeout(() => {
+            const cols = terminal.cols;
+            const rows = terminal.rows;
+            if (cols > 0 && rows > 0) {
+              void sendTerminalResize(cols, rows);
+            }
+          }, 60);
+        } catch {
+          // ignore resize issues while terminal is closing
+        }
+      });
+    };
+    const resizeObserver = terminalHostRef.current
+      ? new ResizeObserver(onResize)
+      : null;
+    if (resizeObserver && terminalHostRef.current) {
+      resizeObserver.observe(terminalHostRef.current);
+    }
+    window.addEventListener("resize", onResize);
+
+    return () => {
+      window.removeEventListener("resize", onResize);
+      resizeObserver?.disconnect();
+      dataSubscription.dispose();
+      terminal.dispose();
+      if (xtermRef.current === terminal) xtermRef.current = null;
+      if (fitAddonRef.current === fitAddon) fitAddonRef.current = null;
+    };
+  }, [terminalOpen]);
+
+  useEffect(() => {
+    if (!terminalOpen || terminalMinimized) return;
+    const timer = setTimeout(() => {
+      try {
+        fitAddonRef.current?.fit();
+      } catch {
+        // ignore fit race during modal transitions
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [terminalOpen, terminalMinimized]);
 
   const handleResume = async () => {
-    const resp = await fetch("/api/mah/exec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ args: ["sessions", "resume", session.id] }),
-    });
-    const data = await resp.json();
-    if (data.ok) {
-      alert(`Session ${session.id} resumed in terminal.`);
-    } else {
-      alert(`Error: ${data.stderr}`);
+    setResumeBusy(true);
+    const resumeSessionId = session.id;
+    try {
+      const resp = await fetch("/api/mah/terminal/open", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: resumeSessionId, runtime: session.runtime }),
+      });
+      const data = await safeReadJson(resp);
+      if (!resp.ok || !data.ok || !data.terminalId) {
+        const hint = resp.status === 404 ? " (dica: reinicie `npm run dev` do webui após mudar o vite.config.ts)" : "";
+        throw new Error(`${data.error || `failed to open terminal (HTTP ${resp.status})`}${hint}`);
+      }
+
+      const nextTerminalId = `${data.terminalId}`;
+      setTerminalId(nextTerminalId);
+      setTerminalMinimized(false);
+      setTerminalClosed(false);
+      setTerminalExitCode(null);
+      setTerminalOpen(true);
+
+      closeTerminalStream();
+      const source = new EventSource(`/api/mah/terminal/stream/${encodeURIComponent(nextTerminalId)}`);
+      source.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data || "{}") as {
+            type?: string;
+            text?: string;
+            code?: number | null;
+            message?: string;
+          };
+          if (payload.type === "output" && typeof payload.text === "string") {
+            xtermRef.current?.write(payload.text);
+            return;
+          }
+          if (payload.type === "error" && payload.message) {
+            xtermRef.current?.writeln(`\r\n[bridge error] ${payload.message}`);
+            return;
+          }
+          if (payload.type === "exit") {
+            setTerminalClosed(true);
+            setTerminalExitCode(typeof payload.code === "number" ? payload.code : null);
+            source.close();
+            eventSourceRef.current = null;
+          }
+        } catch {
+          // ignore malformed stream events
+        }
+      };
+      source.onerror = () => {
+        xtermRef.current?.writeln("\r\n[connection] stream interrupted");
+      };
+      eventSourceRef.current = source;
+      window.setTimeout(() => {
+        const terminal = xtermRef.current;
+        if (!terminal) return;
+        const cols = terminal.cols;
+        const rows = terminal.rows;
+        if (cols > 0 && rows > 0) {
+          void sendTerminalResize(cols, rows);
+        }
+      }, 0);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "failed to open interactive terminal";
+      alert(`Error: ${message}`);
+    } finally {
+      setResumeBusy(false);
+    }
+  };
+
+  const sendTerminalInput = async (text: string) => {
+    if (!terminalId || !text) return;
+    try {
+      await fetch(`/api/mah/terminal/input/${encodeURIComponent(terminalId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: text }),
+      });
+    } catch {
+      xtermRef.current?.writeln("\r\n[connection] failed to send input");
+    }
+  };
+
+  const sendTerminalResize = async (cols: number, rows: number) => {
+    if (!terminalId || cols <= 0 || rows <= 0) return;
+    try {
+      await fetch(`/api/mah/terminal/resize/${encodeURIComponent(terminalId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cols, rows }),
+      });
+    } catch {
+      // ignore transient resize errors
     }
   };
 
@@ -209,14 +470,26 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
           <div><span>Status</span><strong><StatusBadge tone={toneMap[session.status] || "failed"} label={session.status} /></strong></div>
           <div><span>Runtime</span><strong>{session.runtime}</strong></div>
           <div><span>Crew</span><strong>{session.crew}</strong></div>
-          <div><span>Conversations</span><strong>{session.counts.conversation}</strong></div>
-          <div><span>Tool Calls</span><strong>{session.counts.tool_calls}</strong></div>
-          <div><span>Artifacts</span><strong>{session.counts.artifacts}</strong></div>
-          <div><span>Delegations</span><strong>{session.counts.delegations}</strong></div>
+          <div>
+            <span>Conversations</span>
+            <strong className={countsLoading ? "metric-loading" : ""}>{countsLoading ? "..." : counts.conversation}</strong>
+          </div>
+          <div>
+            <span>Tool Calls</span>
+            <strong className={countsLoading ? "metric-loading" : ""}>{countsLoading ? "..." : counts.tool_calls}</strong>
+          </div>
+          <div>
+            <span>Artifacts</span>
+            <strong className={countsLoading ? "metric-loading" : ""}>{countsLoading ? "..." : counts.artifacts}</strong>
+          </div>
+          <div>
+            <span>Delegations</span>
+            <strong className={countsLoading ? "metric-loading" : ""}>{countsLoading ? "..." : counts.delegations}</strong>
+          </div>
         </div>
         <div className="sessions-inspector__actions">
-          <button type="button" onClick={handleResume}>
-            <Icon name="play_arrow" size={14} />Resume
+          <button type="button" onClick={handleResume} disabled={resumeBusy}>
+            <Icon name="play_arrow" size={14} />{resumeBusy ? "Opening..." : "Resume"}
           </button>
           <button type="button" onClick={handleExport}>
             <Icon name="ios_share" size={14} />Export
@@ -309,6 +582,60 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
               }}><Icon name="check" size={14} />{creatingProposal ? "Creating..." : "Create Proposal"}</button>
             </div>
           </div>
+        </div>
+      )}
+      {terminalOpen && (
+        <div className={`modal-overlay terminal-overlay ${terminalMinimized ? "is-hidden" : ""}`}>
+          <div
+            ref={terminalModalRef}
+            className="modal-box modal-box--terminal"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h3>Session Console · {session.runtime}</h3>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() => setTerminalMinimized((current) => !current)}
+                  title={terminalMinimized ? "Restore" : "Minimize"}
+                >
+                  —
+                </button>
+                <button type="button" className="icon-button" onClick={closeTerminalModal}>
+                  <Icon name="close" size={16} />
+                </button>
+              </div>
+            </div>
+            <div className="terminal-console__meta">
+              <span>{session.id}</span>
+              <span>{terminalClosed ? `finished (${terminalExitCode ?? "?"})` : "interactive"}</span>
+            </div>
+            <div
+              className="terminal-console__output terminal-console__output--xterm"
+              ref={terminalHostRef}
+              onClick={() => xtermRef.current?.focus()}
+            />
+          </div>
+        </div>
+      )}
+      {terminalOpen && terminalMinimized && (
+        <div className="terminal-dock">
+          <button
+            type="button"
+            className="sessions-action-btn"
+            onClick={() => setTerminalMinimized(false)}
+          >
+            Restore Session Console
+          </button>
+          <button
+            type="button"
+            className="sessions-action-btn"
+            onClick={closeTerminalModal}
+            title="Close Terminal"
+          >
+            <Icon name="close" size={14} />
+          </button>
         </div>
       )}
     </>

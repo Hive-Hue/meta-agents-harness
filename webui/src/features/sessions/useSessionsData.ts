@@ -23,11 +23,14 @@ export function useSessionsData(runtime?: string) {
     try {
       const args = ["sessions", "list", "--json"];
       if (runtime) args.push("--runtime", runtime);
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 12000);
       const resp = await fetch("/api/mah/exec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ args }),
-      });
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer));
       const data = await resp.json();
       if (data.ok) {
         let rows: any[] = [];
@@ -40,64 +43,29 @@ export function useSessionsData(runtime?: string) {
             try { rows.push(JSON.parse(line)); } catch { /* skip */ }
           }
         }
-        const detailed = await Promise.all(rows.map(async (row: any) => {
-          // Get status and timestamps from sessions status
-          let status: SessionInfo["status"] = "available";
-          let createdAt = "";
-          let updatedAt = "";
-          let finalAgent: string | undefined;
-          let task = "";
-          try {
-            const statusResp = await fetch("/api/mah/exec", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ args: ["sessions", "status", row.id, "--json"] }),
-            });
-            const statusData = await statusResp.json();
-            if (statusData.ok) {
-              const st = JSON.parse(statusData.stdout || "{}");
-              status = st.status || "available";
-              createdAt = st.createdAt || "";
-              updatedAt = st.updatedAt || "";
-              finalAgent = st.finalAgent;
-              task = statusData.stdout || "";
-            }
-          } catch { /* skip */ }
-
-          // Get counts from sessions counts
-          let counts = { conversation: 0, tool_calls: 0, artifacts: 0, delegations: 0 };
-          try {
-            const countsResp = await fetch("/api/mah/exec", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ args: ["sessions", "counts", row.id] }),
-            });
-            const countsData = await countsResp.json();
-            if (countsData.ok) {
-              const ct = JSON.parse(countsData.stdout || "{}");
-              if (ct.counts) counts = ct.counts;
-            }
-          } catch { /* skip */ }
-
+        const mapped = rows.map((row: any) => {
           return {
             id: row.id,
-            sessionId: row.session_id || row.id.split(":")[2] || "",
             crew: row.crew || "",
             runtime: row.runtime || runtime || "",
-            status,
-            createdAt: createdAt || row.started_at || "",
-            updatedAt: updatedAt || row.last_active_at || "",
-            counts,
-            finalAgent,
-            task,
+            status: (row.status || "available") as SessionInfo["status"],
+            createdAt: row.started_at || "",
+            updatedAt: row.last_active_at || "",
+            counts: { conversation: 0, tool_calls: 0, artifacts: 0, delegations: 0 },
+            finalAgent: undefined,
+            task: "",
           } as SessionInfo;
-        }));
-        setSessions(detailed);
+        });
+        setSessions(mapped);
       } else {
         setError(data.stderr || "Failed to load sessions");
       }
     } catch (e) {
-      setError(String(e));
+      if (e instanceof DOMException && e.name === "AbortError") {
+        setError("Timeout loading sessions. Tente novamente.");
+      } else {
+        setError(String(e));
+      }
     } finally {
       setLoading(false);
     }

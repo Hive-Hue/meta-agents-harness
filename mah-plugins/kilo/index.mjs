@@ -16,6 +16,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { spawnSync } from "node:child_process"
 import path from "node:path"
 import YAML from "yaml"
 
@@ -112,7 +113,8 @@ function normalizeKiloModelId(model = "") {
   const value = `${model || ""}`.trim()
   if (!value) return value
   const aliases = {
-    "minimax-coding-plan/MiniMax-M2.7": "minimax/minimax-m2.7",
+    "minimax-coding-plan/MiniMax-M2.7": "minimax/MiniMax-M2.7",
+    "minimax/minimax-m2.7": "minimax/MiniMax-M2.7",
     "zai-coding-plan/glm-5": "zai/glm-5",
     "zai-coding-plan/glm-5.1": "zai/glm-5.1"
   }
@@ -127,6 +129,198 @@ function readAgentFlagFromArgs(args = []) {
     if (token.startsWith("--agent=")) return token.slice("--agent=".length).trim()
   }
   return ""
+}
+
+function readSessionIdFromArgs(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if ((token === "--session" || token === "-s") && args[i + 1]) {
+      return `${args[i + 1]}`.trim()
+    }
+    if (token.startsWith("--session=")) {
+      return token.slice("--session=".length).trim()
+    }
+    if (token.startsWith("-s=")) {
+      return token.slice("-s=".length).trim()
+    }
+  }
+  return ""
+}
+
+function hasKiloResumeIntent(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if (token === "-c" || token === "--continue" || token === "-s" || token === "--session") return true
+    if (token.startsWith("--session=") || token.startsWith("-s=")) return true
+  }
+  return false
+}
+
+function hasKiloCommandFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if (token === "--command" || token.startsWith("--command=")) return true
+  }
+  return false
+}
+
+function hasKiloPromptMessage(args = []) {
+  const flagsWithValue = new Set([
+    "-s",
+    "--session",
+    "--agent",
+    "-m",
+    "--model",
+    "-f",
+    "--file",
+    "--title",
+    "--attach",
+    "-p",
+    "--password",
+    "--dir",
+    "--port",
+    "--variant",
+    "--format",
+    "--command"
+  ])
+  let skipNext = false
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`.trim()
+    if (!token) continue
+    if (skipNext) {
+      skipNext = false
+      continue
+    }
+    if (flagsWithValue.has(token)) {
+      skipNext = true
+      continue
+    }
+    if (token.startsWith("-")) continue
+    return true
+  }
+  return false
+}
+
+function resolveKiloSessionIdFromCli(repoRoot) {
+  const child = spawnSync("kilo", ["session", "list", "--format", "json"], {
+    cwd: repoRoot,
+    env: process.env,
+    encoding: "utf-8"
+  })
+  if (child.status !== 0 || !child.stdout) return ""
+
+  let parsed
+  try {
+    parsed = JSON.parse(child.stdout)
+  } catch {
+    return ""
+  }
+
+  const sessions = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray(parsed?.sessions)
+      ? parsed.sessions
+      : []
+  if (sessions.length === 0) return ""
+
+  const normalizedRepoRoot = path.resolve(repoRoot)
+  const inWorkspace = sessions.filter((entry) => {
+    const workspacePath = `${entry?.workspace || entry?.cwd || entry?.path || entry?.directory || ""}`.trim()
+    if (!workspacePath) return false
+    return path.resolve(workspacePath) === normalizedRepoRoot
+  })
+  const candidates = inWorkspace.length > 0 ? inWorkspace : sessions
+  const sorted = [...candidates].sort((a, b) => {
+    const aUpdated = Number.isFinite(a?.updated) ? Number(a.updated) : 0
+    const bUpdated = Number.isFinite(b?.updated) ? Number(b.updated) : 0
+    const aTs = aUpdated || Date.parse(`${a?.updated_at || a?.last_active_at || a?.created_at || ""}`) || 0
+    const bTs = bUpdated || Date.parse(`${b?.updated_at || b?.last_active_at || b?.created_at || ""}`) || 0
+    return bTs - aTs
+  })
+
+  const latest = sorted[0]
+  return `${latest?.session_id || latest?.sessionId || latest?.id || ""}`.trim()
+}
+
+function parseJsonPayload(rawText = "") {
+  const text = `${rawText || ""}`.trim()
+  if (!text) return null
+  try {
+    return JSON.parse(text)
+  } catch {
+    // Kilo may print banner/log lines around the JSON payload.
+  }
+
+  const objectStart = text.indexOf("{")
+  const arrayStart = text.indexOf("[")
+  const start = [objectStart, arrayStart].filter((idx) => idx >= 0).sort((a, b) => a - b)[0]
+  if (start == null) return null
+
+  const endObject = text.lastIndexOf("}")
+  const endArray = text.lastIndexOf("]")
+  const end = Math.max(endObject, endArray)
+  if (end < start) return null
+
+  try {
+    return JSON.parse(text.slice(start, end + 1))
+  } catch {
+    return null
+  }
+}
+
+function mirrorKiloSession(repoRoot, crewId, sessionId, envOverrides = {}) {
+  const cleanCrewId = `${crewId || ""}`.trim()
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanCrewId || !cleanSessionId) return { export_file: "", export_error: "" }
+
+  const sessionDir = path.join(repoRoot, ".kilo", "crew", cleanCrewId, "sessions", cleanSessionId)
+  mkdirSync(sessionDir, { recursive: true })
+
+  const exported = spawnSync("kilo", ["export", cleanSessionId], {
+    cwd: repoRoot,
+    env: { ...process.env, ...envOverrides },
+    encoding: "utf-8"
+  })
+  const parsed = exported.status === 0 ? parseJsonPayload(exported.stdout) : null
+  if (parsed && typeof parsed === "object") {
+    writeJson(path.join(sessionDir, "session.export.json"), parsed)
+    return { export_file: "session.export.json", export_error: "" }
+  }
+
+  const combinedLogs = `${exported.stdout || ""}${exported.stderr || ""}`.trim()
+  if (combinedLogs) {
+    writeFileSync(path.join(sessionDir, "session.export.log"), `${combinedLogs}\n`, "utf-8")
+  }
+  return {
+    export_file: "",
+    export_error: combinedLogs ? "export-output-not-json" : `exit-${typeof exported.status === "number" ? exported.status : "unknown"}`
+  }
+}
+
+function trackKiloSessionAlias(repoRoot, crewId, sessionId, metadata = {}) {
+  const cleanCrewId = `${crewId || ""}`.trim()
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanCrewId || !cleanSessionId) return
+
+  const sessionDir = path.join(repoRoot, ".kilo", "crew", cleanCrewId, "sessions", cleanSessionId)
+  mkdirSync(sessionDir, { recursive: true })
+  writeJson(path.join(sessionDir, "session.alias.json"), {
+    runtime: "kilo",
+    crew: cleanCrewId,
+    session_id: cleanSessionId,
+    tracked_at: new Date().toISOString(),
+    ...metadata
+  })
+}
+
+function resolveEffectiveKiloCrew(repoRoot, crew) {
+  const cleanCrew = `${crew || ""}`.trim()
+  if (cleanCrew) return cleanCrew
+  const defaultCrewDir = path.join(repoRoot, ".kilo", "crew", "dev")
+  return existsSync(defaultCrewDir) ? "dev" : ""
 }
 
 function collectCrewAgentBlocks(crewConfig) {
@@ -359,10 +553,10 @@ export const runtimePlugin = {
 
     // kilo session subcommands (parsed from kilo session --help output)
     sessionListCommand: [
-      ["kilo", ["session", "list", "--output-format", "json"]]
+      ["kilo", ["session", "list", "--format", "json"]]
     ],
     sessionExportCommand: [
-      ["kilo", ["session", "export"]]
+      ["kilo", ["export"]]
     ],
     sessionDeleteCommand: [
       ["kilo", ["session", "delete"]]
@@ -414,35 +608,59 @@ export const runtimePlugin = {
       const envOverrides = { ...baseEnvOverrides }
       const warnings = []
       let orchestratorName = ""
+      const effectiveCrew = resolveEffectiveKiloCrew(repoRoot, crew)
 
-      if (crew && configPath && existsSync(configPath)) {
-        const built = buildKiloRunConfig({ repoRoot, crew, configPath })
+      if (effectiveCrew && configPath && existsSync(configPath)) {
+        const built = buildKiloRunConfig({ repoRoot, crew: effectiveCrew, configPath })
         warnings.push(...(built.warnings || []))
         if (built.ok) {
           envOverrides.KILO_CONFIG_CONTENT = buildKiloConfigEnv(built.config)
           orchestratorName = built.config?.default_agent || ""
         }
-      } else if (crew && configPath) {
+      } else if (effectiveCrew && configPath) {
         warnings.push(`kilo: crew config not found at ${configPath}, running without injected MAH context`)
       }
 
       envOverrides.MAH_RUNTIME = "kilo"
-      if (crew) envOverrides.MAH_ACTIVE_CREW = crew
+      if (effectiveCrew) envOverrides.MAH_ACTIVE_CREW = effectiveCrew
       const requestedAgent = `${envOverrides.MAH_AGENT || readAgentFlagFromArgs(argv) || process.env.MAH_AGENT || orchestratorName}`.trim()
 
-      const hasMessage = Array.isArray(argv) && argv.length > 0
+      const passthrough = Array.isArray(argv) ? [...argv] : []
+      const hasResume = hasKiloResumeIntent(passthrough)
+      const hasCommand = hasKiloCommandFlag(passthrough)
+      const hasMessage = hasKiloPromptMessage(passthrough)
       const args = []
-      if (hasMessage) args.push("run")
+      // Resume without prompt should use top-level Kilo TUI (`kilo --continue/--session`)
+      // instead of `kilo run`, otherwise the CLI requires a message and exits.
+      if (hasMessage || hasCommand) args.push("run")
       if (requestedAgent) args.push("--agent", requestedAgent)
 
       return {
         ok: true,
         exec: this.directCli,
         args,
-        passthrough: Array.isArray(argv) ? argv : [],
+        passthrough,
         envOverrides,
         warnings
       }
+    },
+
+    executePreparedRun({ repoRoot, plan, runCommand }) {
+      const explicitSessionId = readSessionIdFromArgs([...(plan?.args || []), ...(plan?.passthrough || [])])
+      const crewId = `${plan?.crew || plan?.envOverrides?.MAH_ACTIVE_CREW || process.env.MAH_ACTIVE_CREW || ""}`.trim()
+      const status = runCommand(plan.exec, plan.args, plan.passthrough || [], plan.envOverrides || {})
+      if (!crewId) return status
+
+      const discoveredSessionId = explicitSessionId ? "" : resolveKiloSessionIdFromCli(repoRoot)
+      const sessionId = explicitSessionId || discoveredSessionId
+      if (sessionId) {
+        const mirrorMeta = mirrorKiloSession(repoRoot, crewId, sessionId, plan.envOverrides || {})
+        trackKiloSessionAlias(repoRoot, crewId, sessionId, {
+          source: explicitSessionId ? "argv" : "session-list",
+          ...mirrorMeta
+        })
+      }
+      return status
     },
 
     prepareHeadlessRunContext({ task = "", argv = [], envOverrides = {} }) {
