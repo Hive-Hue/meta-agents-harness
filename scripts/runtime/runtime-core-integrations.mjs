@@ -823,6 +823,66 @@ function trackClaudeSessionAlias(repoRoot, crewId, sessionId, metadata = {}, env
   })
 }
 
+function resolveOpenclaudeConfigRoot(envOverrides = {}) {
+  const explicit = `${envOverrides.OPENCLAUDE_CONFIG_DIR || process.env.OPENCLAUDE_CONFIG_DIR || ""}`.trim()
+  if (explicit) return explicit
+  return resolveClaudeConfigRoot(envOverrides)
+}
+
+function resolveOpenclaudeProjectSessionsDir(repoRoot, envOverrides = {}) {
+  const configRoot = resolveOpenclaudeConfigRoot(envOverrides)
+  if (!configRoot) return ""
+  return path.join(configRoot, "projects", resolveClaudeProjectSlug(repoRoot))
+}
+
+function resolveOpenclaudeSessionTranscriptPath(repoRoot, sessionId, envOverrides = {}) {
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanSessionId) return ""
+  const sessionsDir = resolveOpenclaudeProjectSessionsDir(repoRoot, envOverrides)
+  if (!sessionsDir) return ""
+  const transcriptPath = path.join(sessionsDir, `${cleanSessionId}.jsonl`)
+  return existsSync(transcriptPath) ? transcriptPath : ""
+}
+
+function latestOpenclaudeSessionId(repoRoot, envOverrides = {}) {
+  const sessionsDir = resolveOpenclaudeProjectSessionsDir(repoRoot, envOverrides)
+  if (!sessionsDir || !existsSync(sessionsDir)) return ""
+  const candidates = readdirSync(sessionsDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))
+    .map((entry) => {
+      const fullPath = path.join(sessionsDir, entry.name)
+      const id = entry.name.slice(0, -".jsonl".length).trim()
+      const mtime = statSync(fullPath).mtimeMs || 0
+      return { id, mtime }
+    })
+    .filter((item) => item.id)
+    .sort((left, right) => right.mtime - left.mtime)
+  return candidates[0]?.id || ""
+}
+
+function trackOpenclaudeSessionAlias(repoRoot, crewId, sessionId, metadata = {}, envOverrides = {}) {
+  const cleanCrew = `${crewId || ""}`.trim()
+  const cleanSessionId = `${sessionId || ""}`.trim()
+  if (!cleanCrew || !cleanSessionId) return
+
+  const sessionDir = path.join(repoRoot, ".openclaude", "crew", cleanCrew, "sessions", cleanSessionId)
+  mkdirSync(sessionDir, { recursive: true })
+
+  const transcriptPath = resolveOpenclaudeSessionTranscriptPath(repoRoot, cleanSessionId, envOverrides)
+  if (transcriptPath) {
+    forceSymlink(transcriptPath, path.join(sessionDir, "session.transcript.jsonl.link"))
+  }
+
+  writeJson(path.join(sessionDir, "session.alias.json"), {
+    runtime: "openclaude",
+    crew: cleanCrew,
+    session_id: cleanSessionId,
+    transcript_path: transcriptPath || "",
+    tracked_at: new Date().toISOString(),
+    ...metadata
+  })
+}
+
 function resolveOpencodeDbPath(repoRoot, envOverrides = {}) {
   const probe = spawnSync("opencode", ["db", "path"], {
     cwd: repoRoot,
@@ -1603,7 +1663,27 @@ export function executeOpenclaudePreparedRun({ repoRoot, plan, runCommand }) {
     console.log(`[dry-run] ${plan.exec} ${rendered}`)
     return 0
   }
-  return runCommand(plan.exec, plan.args || [], plan.passthrough || [], plan.envOverrides || {})
+  const args = [...(plan.passthrough || [])]
+  const envOverrides = { ...(plan.envOverrides || {}) }
+  const resumedSessionId = parseClaudeResumeSessionId(args)
+  if (resumedSessionId) {
+    trackOpenclaudeSessionAlias(repoRoot, internal.crew, resumedSessionId, {
+      reason: "resume-arg"
+    }, envOverrides)
+  }
+
+  const status = runCommand(plan.exec, plan.args || [], args, envOverrides)
+
+  let finalSessionId = resumedSessionId
+  if (!finalSessionId && status === 0) {
+    finalSessionId = latestOpenclaudeSessionId(repoRoot, envOverrides)
+  }
+  if (finalSessionId) {
+    trackOpenclaudeSessionAlias(repoRoot, internal.crew, finalSessionId, {
+      reason: "post-run-latest-session"
+    }, envOverrides)
+  }
+  return status
 }
 
 export function activateOpencodeCrewState({ repoRoot, crewId, argv = [] }) {

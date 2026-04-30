@@ -1,13 +1,14 @@
 import { CommandPreview } from "../../components/ui/CommandPreview";
 import { Icon } from "../../components/ui/Icon";
+import { useNavigate } from "react-router";
 import type { ConfigInfo, SessionInfo, WorkspaceInfo } from "./useWorkspaceData";
 import { relativeTime } from "./useWorkspaceData";
 
 const quickActions = [
-  { icon: "rocket_launch", label: "Bootstrap" },
-  { icon: "play_circle", label: "Run Task" },
-  { icon: "verified", label: "Validate All" },
-  { icon: "sync", label: "Sync" },
+  { icon: "rocket_launch", label: "Bootstrap", route: "/bootstrap" },
+  { icon: "checklist", label: "Run Task", route: "/tasks" },
+  { icon: "verified", label: "Validate All", route: "/config" },
+  { icon: "sync", label: "Sync", route: "/expertise" },
 ];
 
 interface OverviewInspectorProps {
@@ -17,6 +18,7 @@ interface OverviewInspectorProps {
 }
 
 export function OverviewInspector({ workspace, config, sessions }: OverviewInspectorProps) {
+  const navigate = useNavigate();
 
   const runtimeKeys = config ? Object.keys(config.runtimes ?? {}) : [];
   const firstRuntime = runtimeKeys[0] ?? "N/A";
@@ -71,7 +73,12 @@ export function OverviewInspector({ workspace, config, sessions }: OverviewInspe
           <h4 className="overview-inspector__section-title">Quick Actions</h4>
           <div className="overview-inspector__action-buttons">
             {quickActions.map((action) => (
-              <button className="overview-inspector__action-btn" type="button" key={action.label}>
+              <button
+                className="overview-inspector__action-btn"
+                type="button"
+                key={action.label}
+                onClick={() => navigate(action.route)}
+              >
                 <Icon name={action.icon} size={16} />
                 <span>{action.label}</span>
               </button>

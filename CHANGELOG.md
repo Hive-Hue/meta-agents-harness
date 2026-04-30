@@ -52,6 +52,14 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Bootstrap success output reframed as "expertise-aware topology generated" with next-step guidance (S7)
 - `scripts/bootstrap/bootstrap-meta-agents.mjs` AI-assisted and logical success messages updated (S7)
 - Interactive AI provider picker for `mah init --ai` / bootstrap (`↑/↓ + Enter`) with presets for `Z.ai`, `OpenRouter`, `Codex (OAuth)`, and `MiniMax`
+- MAH runtime session core now tracks resume aliases across `claude`, `openclaude`, `hermes`, `opencode`, and `kilo`, including OpenClaude latest-session tracking and crew-scoped mirror metadata
+- PI runtime asset resolution now supports MAH overlay lookup from `~/.mah` and package-root fallbacks for default extensions, themes, and skills
+- WebUI authentication with `HttpOnly` session cookies, login screen, protected `/api/mah/*` middleware, and auth status/login/logout endpoints in Vite middleware
+- WebUI global console dock with shell bootstrap, minimize/restore behavior across pages, and event bridge for opening console from other features
+- WebUI `Tasks` workspace with missions, kanban board, PERT/CPM view, Gantt timeline, inbox, replan flows, YAML-backed persistence under `.mah/tasks/`, and Vite API endpoints for task/mission operations
+- `webui/src/features/tasks/*`, `webui/src/features/auth/*`, and `webui/src/features/console/consoleBridge.ts` as new feature modules for task orchestration, authentication, and console integration
+- `tests/runtime-core-integration.test.mjs` expanded with MAH overlay, OpenClaude session alias, and runtime activation coverage
+- `tests/sessions-operations.test.mjs` expanded with OpenClaude session resume and alias-tracking coverage
 
 ### Changed
 
@@ -76,6 +84,12 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - default bootstrap planning agents stay on `read_only_cwd`
 - default bootstrap executive workers (`engineering` and `validation` teams) now use `write_cwd` (`read/edit/bash` on `.` with `recursive: true`)
 - default `source_configs` and `session` paths are now implicit and omitted from generated YAML unless explicitly customized
+- `scripts/runtime/runtime-core-integrations.mjs` and `scripts/session/m3-ops.mjs` now normalize session tracking and runtime asset lookup around crew-local metadata instead of ad hoc runtime behavior
+- WebUI sessions flow now resumes work through the shared global console instead of page-local terminal handling
+- WebUI header/sidebar/navigation updated to expose `Tasks`, move `Logout` to the far right, and keep task subviews synchronized with URL state
+- `Tasks` UX refined with expandable board and PERT modals, sticky board headers, scrollable lanes, gesture-based PERT pan/zoom, help-modal guidance, toast notifications, and Gantt timeline presentation
+- Overview quick actions now deep-link into the real task workspace and command previews provide clipboard feedback/fallback behavior
+- `vite.config.js` and `vite.config.ts` now serve the same expanded MAH middleware surface for auth, terminal, tasks, missions, and shell/session orchestration
 
 ### Fixed
 
@@ -94,6 +108,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Domain enforcement now applies to all agent runtimes (`worker`, `lead`, and `orchestrator`), fixing a bypass where leads could operate outside declared YAML domain profiles
 - Expertise evidence `task_description` is now sanitized before persistence to strip `CAVEMAN_CREW` blocks, ANSI escapes, and orchestrator routing boilerplate, preserving only useful task intent
 - Empty expertise catalog blocked routing commands — `mah expertise seed` now required before first use
+- Console opening in the WebUI now falls back to creating a shell when no prior terminal exists and no longer flickers closed on first open
+- Workspace quick actions and command-copy controls in the WebUI now execute reliably
+- `/tasks` initial loading no longer crashes when mission/task data is not yet available, and board/task navigation remains stable across view changes
 
 ### Note
 

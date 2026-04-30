@@ -419,9 +419,15 @@ export function resumeSession(repoRoot, sessionIdFull, runtime, passthroughArgs 
   if (capabilities.sessionRootFlag && session?.source_path) {
     args.unshift(capabilities.sessionRootFlag, session.source_path)
   }
-  appendUniqueArgs(args, normalizeCapabilityArgs(capabilities.sessionContinueArgs))
+  const shouldAppendContinueArgs = !(
+    parsed.runtime === "openclaude"
+    && (args.includes("--resume") || args.includes("-r"))
+  )
+  if (shouldAppendContinueArgs) {
+    appendUniqueArgs(args, normalizeCapabilityArgs(capabilities.sessionContinueArgs))
+  }
 
-  if (session?.source_path || parsed.runtime === "claude" || parsed.runtime === "kilo") {
+  if (session?.source_path || parsed.runtime === "claude" || parsed.runtime === "openclaude" || parsed.runtime === "kilo") {
     writeSessionAliasTracking(repoRoot, runtimeRegistry, {
       runtime: parsed.runtime,
       crew: parsed.crew,

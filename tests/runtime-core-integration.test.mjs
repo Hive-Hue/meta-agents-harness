@@ -5,7 +5,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
-import { prepareClaudeRunContext, preparePiRunContext } from "../scripts/runtime/runtime-core-integrations.mjs"
+import { executeOpenclaudePreparedRun, prepareClaudeRunContext, preparePiRunContext } from "../scripts/runtime/runtime-core-integrations.mjs"
 import { ensurePiGlobalSettings, findMahSkillFile, resolveMahAssetPath } from "../scripts/core/mah-home.mjs"
 import { resolveWorkspaceRoot } from "../scripts/core/workspace-root.mjs"
 
@@ -694,6 +694,66 @@ test("prepareClaudeRunContext fails with --policy enforce-domain when granular d
   const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: ["--policy", "enforce-domain"] })
   assert.equal(result.ok, false)
   assert.match(result.error || "", /cannot enforce per-agent domain path ACLs/i)
+})
+
+test("executeOpenclaudePreparedRun tracks alias for resumed session id", () => {
+  const tempRoot = mkdtempSync(path.join(os.tmpdir(), "mah-openclaude-run-"))
+  try {
+    const status = executeOpenclaudePreparedRun({
+      repoRoot: tempRoot,
+      plan: {
+        exec: "openclaude",
+        args: ["code"],
+        passthrough: ["--resume", "openclaude-session-42"],
+        envOverrides: {},
+        internal: { crew: "dev" }
+      },
+      runCommand: () => 0
+    })
+    assert.equal(status, 0)
+    const aliasPath = path.join(tempRoot, ".openclaude", "crew", "dev", "sessions", "openclaude-session-42", "session.alias.json")
+    assert.equal(existsSync(aliasPath), true)
+    const alias = JSON.parse(readFileSync(aliasPath, "utf-8"))
+    assert.equal(alias.runtime, "openclaude")
+    assert.equal(alias.crew, "dev")
+    assert.equal(alias.session_id, "openclaude-session-42")
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true })
+  }
+})
+
+test("executeOpenclaudePreparedRun tracks latest session after run", () => {
+  const tempRoot = mkdtempSync(path.join(os.tmpdir(), "mah-openclaude-latest-"))
+  const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-openclaude-home-"))
+  try {
+    const projectSlug = path.resolve(tempRoot).replaceAll("\\", "/").replace(/^\/+/, "").replaceAll("/", "-").replaceAll(":", "")
+    const normalizedSlug = path.resolve(tempRoot).startsWith("/") ? `-${projectSlug}` : projectSlug
+    const projectDir = path.join(tempHome, "projects", normalizedSlug)
+    mkdirSync(projectDir, { recursive: true })
+    const latestSessionId = "openclaude-session-latest"
+    writeFileSync(path.join(projectDir, `${latestSessionId}.jsonl`), '{"type":"assistant"}\n', "utf-8")
+
+    const status = executeOpenclaudePreparedRun({
+      repoRoot: tempRoot,
+      plan: {
+        exec: "openclaude",
+        args: ["code"],
+        passthrough: [],
+        envOverrides: { OPENCLAUDE_CONFIG_DIR: tempHome },
+        internal: { crew: "dev" }
+      },
+      runCommand: () => 0
+    })
+    assert.equal(status, 0)
+    const aliasPath = path.join(tempRoot, ".openclaude", "crew", "dev", "sessions", latestSessionId, "session.alias.json")
+    assert.equal(existsSync(aliasPath), true)
+    const alias = JSON.parse(readFileSync(aliasPath, "utf-8"))
+    assert.equal(alias.runtime, "openclaude")
+    assert.equal(alias.session_id, latestSessionId)
+  } finally {
+    rmSync(tempRoot, { recursive: true, force: true })
+    rmSync(tempHome, { recursive: true, force: true })
+  }
 })
 
 test("opencode explain run resolves to direct cli without wrapper plan", () => {

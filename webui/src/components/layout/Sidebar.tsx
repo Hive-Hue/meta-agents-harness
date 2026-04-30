@@ -7,6 +7,7 @@ const navItems = [
   { label: "Config", icon: "tune", path: "/config" },
   { label: "Crews", icon: "groups", path: "/crews" },
   { label: "Run", icon: "play_circle", path: "/run" },
+  { label: "Tasks", icon: "checklist", path: "/tasks" },
   { label: "Sessions", icon: "history", path: "/sessions" },
   { label: "Expertise", icon: "psychology", path: "/expertise" },
   { label: "Skills", icon: "extension", path: "/skills" },

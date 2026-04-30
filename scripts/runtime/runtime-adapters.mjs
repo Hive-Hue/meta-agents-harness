@@ -256,7 +256,7 @@ export const RUNTIME_ADAPTERS = {
       sessionModeNew: false,
       sessionModeContinue: true,
       sessionModeNone: true,
-      sessionIdFlag: "--session-id",
+      sessionIdFlag: "--resume",
       sessionRootFlag: false,
       sessionMirrorFlag: true,
       sessionContinueArgs: ["--continue"],

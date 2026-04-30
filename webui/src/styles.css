@@ -205,6 +205,124 @@ input:focus-visible {
   background: var(--color-surface-neutral);
 }
 
+.header-action--active {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  width: 520px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-box--terminal {
+  width: min(960px, 94vw);
+  height: min(680px, 88vh);
+  min-width: 560px;
+  min-height: 220px;
+  max-width: 96vw;
+  max-height: 92vh;
+  resize: both;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-overlay.is-hidden {
+  display: none;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.terminal-console__meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+}
+
+.terminal-console__output {
+  margin: 0;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  background: #0b1220;
+  color: #e2e8f0;
+  padding: 12px;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.terminal-console__output--xterm {
+  padding: 0;
+  overflow: hidden;
+}
+
+.terminal-console__output--xterm .xterm {
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+}
+
+.terminal-console__output--xterm .xterm-viewport,
+.terminal-console__output--xterm .xterm-screen {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.terminal-dock {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 1100;
+  display: flex;
+  gap: 8px;
+}
+
+.sessions-action-btn {
+  border: 1px solid var(--color-border-subtle);
+  background: #fff;
+  color: #334155;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sessions-action-btn:hover {
+  background: var(--color-surface-neutral);
+}
+
 .sidebar {
   display: flex;
   width: var(--rail-width);

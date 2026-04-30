@@ -2,11 +2,18 @@ import { Icon } from "../ui/Icon";
 
 const utilityActions = [
   { label: "Console", icon: "terminal" },
-  { label: "Settings", icon: "settings" },
+  // { label: "Settings", icon: "settings" },
   { label: "Docs", icon: "help_outline" },
+  { label: "Logout", icon: "logout" },
 ];
 
-export function HeaderBar() {
+type HeaderBarProps = {
+  onConsoleClick?: () => void;
+  onLogoutClick?: () => void;
+  consoleActive?: boolean;
+};
+
+export function HeaderBar({ onConsoleClick, onLogoutClick, consoleActive = false }: HeaderBarProps) {
   return (
     <header className="header-bar">
       <div className="header-bar__brand" aria-label="MAH Operator Console">
@@ -32,7 +39,18 @@ export function HeaderBar() {
 
         <div className="header-actions" aria-label="Global utilities">
           {utilityActions.map((action) => (
-            <button className="header-action" key={action.label} type="button">
+            <button
+              className={`header-action${action.label === "Console" && consoleActive ? " header-action--active" : ""}`}
+              key={action.label}
+              type="button"
+              onClick={
+                action.label === "Console"
+                  ? onConsoleClick
+                  : action.label === "Logout"
+                    ? onLogoutClick
+                    : undefined
+              }
+            >
               <Icon name={action.icon} size={20} />
               <span>{action.label}</span>
             </button>

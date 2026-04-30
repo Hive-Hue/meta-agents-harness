@@ -360,6 +360,20 @@ test("resumeSession uses --session flag for kilo runtime", () => {
   }
 })
 
+test("resumeSession uses --resume flag for openclaude runtime", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-openclaude-resume-"))
+  try {
+    const sessionPath = path.join(tempDir, ".openclaude", "crew", "dev", "sessions", "openclaude-session-1")
+    mkdirSync(sessionPath, { recursive: true })
+    const result = resumeSession(tempDir, "openclaude:dev:openclaude-session-1", "openclaude", [])
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.envOverrides, {})
+    assert.deepEqual(result.args, ["--resume", "openclaude-session-1"])
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
 test("resumeSession writes alias tracking for kilo under crew sessions root", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-kilo-alias-"))
   try {
@@ -391,6 +405,25 @@ test("resumeSession writes alias tracking for claude under crew sessions root", 
     assert.equal(existsSync(aliasPath), true)
     const alias = JSON.parse(readFileSync(aliasPath, "utf-8"))
     assert.equal(alias.runtime, "claude")
+    assert.equal(alias.crew, "dev")
+    assert.equal(alias.session_id, sessionId)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("resumeSession writes alias tracking for openclaude under crew sessions root", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-openclaude-alias-"))
+  try {
+    const sessionId = "openclaude-session-alias"
+    const sessionPath = path.join(tempDir, ".openclaude", "crew", "dev", "sessions", sessionId)
+    mkdirSync(sessionPath, { recursive: true })
+    const result = resumeSession(tempDir, `openclaude:dev:${sessionId}`, "openclaude", [])
+    assert.equal(result.ok, true)
+    const aliasPath = path.join(sessionPath, "session.alias.json")
+    assert.equal(existsSync(aliasPath), true)
+    const alias = JSON.parse(readFileSync(aliasPath, "utf-8"))
+    assert.equal(alias.runtime, "openclaude")
     assert.equal(alias.crew, "dev")
     assert.equal(alias.session_id, sessionId)
   } finally {
@@ -647,6 +680,16 @@ test("opencode adapter has session capability fields", () => {
   assert.ok("sessionListCommand" in adapter)
   assert.ok("sessionExportCommand" in adapter)
   assert.ok("sessionDeleteCommand" in adapter)
+})
+
+test("openclaude adapter has session capability fields", () => {
+  const adapter = RUNTIME_ADAPTERS.openclaude
+  assert.equal(adapter.supportsSessions, true, "openclaude should have supportsSessions=true")
+  assert.equal(adapter.supportsSessionNew, false, "openclaude should have supportsSessionNew=false")
+  assert.ok("sessionListCommand" in adapter)
+  assert.ok("sessionExportCommand" in adapter)
+  assert.ok("sessionDeleteCommand" in adapter)
+  assert.equal(adapter.capabilities?.sessionIdFlag, "--resume")
 })
 
 test("hermes adapter has session capability fields", () => {
