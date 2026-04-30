@@ -9,6 +9,7 @@ export type TaskRecord = {
   state: TaskState;
   priority: TaskPriority;
   missionId: string;
+  crewId?: string;
   owner: string;
   runtime: string;
   dependencies: string[];

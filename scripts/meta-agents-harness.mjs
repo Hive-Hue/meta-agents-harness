@@ -199,6 +199,8 @@ function printHelp() {
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
   console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>] [--provider <id>] [--model <id>] [--api-key <key>] [--base-url <url>]  Generate config (add --ai for expertise-aware topology)")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
+  console.log("  task [list|show|create|update|run] [args]")
+  console.log("  mission [list|show|create|update|commit-scope|replan] [args]")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -4839,6 +4841,16 @@ async function main() {
         .filter((arg) => !["--trace", "--json", "--mermaid", "--headless", "--strict-markers"].includes(arg))
       process.exitCode = await runSessions(sessionsArgv, jsonMode, runtimeResult.runtime)
     })()
+    return
+  }
+
+  if (first === "task") {
+    process.exitCode = runLocalScript(path.join("scripts", "./tasks/tasks-cli.mjs"), argv.slice(1))
+    return
+  }
+
+  if (first === "mission") {
+    process.exitCode = runLocalScript(path.join("scripts", "./tasks/missions-cli.mjs"), argv.slice(1))
     return
   }
 

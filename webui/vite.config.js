@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
 import * as pty from "node-pty";
 import yaml from "js-yaml";
 const __filename = fileURLToPath(import.meta.url);
@@ -28,9 +28,6 @@ const WEBUI_AUTH_MAX_AGE_SECONDS = 60 * 60 * 8;
 const WEBUI_AUTH_USER = `${process.env.MAH_WEBUI_USER || "admin"}`;
 const WEBUI_AUTH_PASSWORD = `${process.env.MAH_WEBUI_PASSWORD || "mah"}`;
 const webUiSessions = new Set();
-const TASKS_STORAGE_DIR = path.join(".mah", "tasks");
-const TASKS_FILE = "tasks.yaml";
-const MISSIONS_FILE = "missions.yaml";
 const terminalSessions = new Map();
 function sendTerminalSse(res, payload) {
     if (res.writableEnded)
@@ -168,183 +165,6 @@ function readJsonBody(req, callback, onError) {
         }
     });
 }
-function getTasksStoragePaths(workspaceRoot) {
-    const baseDir = path.join(workspaceRoot, TASKS_STORAGE_DIR);
-    return {
-        baseDir,
-        tasksPath: path.join(baseDir, TASKS_FILE),
-        missionsPath: path.join(baseDir, MISSIONS_FILE),
-    };
-}
-function buildTaskCommand(task) {
-    const crew = task.owner.includes("-") ? task.owner.split("-")[0] : task.owner;
-    return `mah task run --id ${task.id} --crew ${crew} --runtime ${task.runtime}`;
-}
-function defaultTaskRecords() {
-    return [
-        {
-            id: "TASK-118",
-            title: "Prefetch audit context docs",
-            state: "backlog",
-            priority: "medium",
-            missionId: "q4-audit",
-            owner: "planning-lead",
-            runtime: "openclaude",
-            dependencies: [],
-            estimate: "1h 20m",
-            confidence: 78,
-            risk: "Context gap",
-            summary: "Load and normalize auth hardening references before execution begins.",
-            lastUpdate: "8m ago",
-            rationale: "Needed to reduce blocked risk before engineering tasks start.",
-            command: buildTaskCommand({ id: "TASK-118", owner: "planning-lead", runtime: "openclaude" }),
-        },
-        {
-            id: "TASK-126",
-            title: "Generate runtime sync diff",
-            state: "ready",
-            priority: "medium",
-            missionId: "q4-audit",
-            owner: "ops-lead",
-            runtime: "pi",
-            dependencies: ["TASK-118"],
-            estimate: "45m",
-            confidence: 86,
-            risk: "Low",
-            summary: "Produce an artifact diff to validate the new runtime boundary.",
-            lastUpdate: "4m ago",
-            rationale: "Selected because ops-lead owns runtime projections and validation hooks.",
-            command: buildTaskCommand({ id: "TASK-126", owner: "ops-lead", runtime: "pi" }),
-        },
-        {
-            id: "TASK-142",
-            title: "Verify auth middleware",
-            state: "in_progress",
-            priority: "high",
-            missionId: "q4-audit",
-            owner: "security-lead",
-            runtime: "pi",
-            dependencies: ["TASK-118", "TASK-126"],
-            estimate: "2h 30m",
-            confidence: 92,
-            risk: "Dependency risk",
-            summary: "Validate the new auth middleware path and update the hardened execution flow.",
-            lastUpdate: "active now",
-            sessionId: "ses_01j4f82x",
-            rationale: "Assigned to security-lead due to strongest expertise match on auth verification and risk scoring.",
-            command: buildTaskCommand({ id: "TASK-142", owner: "security-lead", runtime: "pi" }),
-        },
-        {
-            id: "TASK-154",
-            title: "Unlock blocked context dependency",
-            state: "blocked",
-            priority: "high",
-            missionId: "q4-audit",
-            owner: "context-lead",
-            runtime: "openclaude",
-            dependencies: ["TASK-118"],
-            estimate: "55m",
-            confidence: 63,
-            risk: "High",
-            summary: "Resolve missing legacy auth docs required by downstream execution.",
-            lastUpdate: "12m ago",
-            blockedReason: "Waiting for TASK-118 import and context validation",
-            rationale: "Context-lead must approve document retrieval before downstream tasks can continue.",
-            command: buildTaskCommand({ id: "TASK-154", owner: "context-lead", runtime: "openclaude" }),
-        },
-        {
-            id: "TASK-160",
-            title: "Validate artifact sync",
-            state: "review",
-            priority: "medium",
-            missionId: "q4-audit",
-            owner: "validation-lead",
-            runtime: "hermes",
-            dependencies: ["TASK-142"],
-            estimate: "40m",
-            confidence: 84,
-            risk: "Validation required",
-            summary: "Review generated artifacts, compare drift, and clear sync confidence.",
-            lastUpdate: "17m ago",
-            rationale: "Validation-lead owns final evidence review and release gating.",
-            command: buildTaskCommand({ id: "TASK-160", owner: "validation-lead", runtime: "hermes" }),
-        },
-    ];
-}
-function defaultMissionRecords() {
-    return [
-        {
-            id: "q4-audit",
-            name: "Q4 Audit Hardening",
-            objective: "Ship auth hardening, runtime sync validation, and context coverage for the audit window.",
-            status: "active",
-            dueWindow: "Oct 15 - Nov 20",
-            risk: "Medium",
-            capacity: "92%",
-            progress: 68,
-            health: "Stable with one critical bottleneck",
-            successCriteria: [
-                "Auth middleware verified across the active runtimes",
-                "Critical path reduced below 8 nodes",
-                "Context gaps closed before final hardening run",
-            ],
-            command: "mah mission status --id q4-audit",
-        },
-        {
-            id: "infra-sync",
-            name: "Infrastructure Sync",
-            objective: "Normalize generated runtime artifacts before the next operator rollout.",
-            status: "draft",
-            dueWindow: "Nov 21 - Nov 29",
-            risk: "Low",
-            capacity: "44%",
-            progress: 12,
-            health: "Scoping",
-            successCriteria: ["Diff reviewed", "Sync policy agreed"],
-            command: "mah mission status --id infra-sync",
-        },
-        {
-            id: "migration",
-            name: "System Migration",
-            objective: "Move legacy mission routing to the new governed runtime core.",
-            status: "at_risk",
-            dueWindow: "Nov 04 - Dec 02",
-            risk: "High",
-            capacity: "96%",
-            progress: 54,
-            health: "Blocked by shared runtime constraint",
-            successCriteria: ["Parallel path restored", "Fallback policy tested"],
-            command: "mah mission status --id migration",
-        },
-    ];
-}
-function ensureTasksStorage(workspaceRoot) {
-    const { baseDir, tasksPath, missionsPath } = getTasksStoragePaths(workspaceRoot);
-    if (!existsSync(baseDir))
-        mkdirSync(baseDir, { recursive: true });
-    if (!existsSync(tasksPath))
-        writeFileSync(tasksPath, yaml.dump({ tasks: defaultTaskRecords() }, { lineWidth: -1, quotingType: "'" }), "utf-8");
-    if (!existsSync(missionsPath))
-        writeFileSync(missionsPath, yaml.dump({ missions: defaultMissionRecords() }, { lineWidth: -1, quotingType: "'" }), "utf-8");
-    return { tasksPath, missionsPath };
-}
-function readTasksStore(workspaceRoot) {
-    const { tasksPath, missionsPath } = ensureTasksStorage(workspaceRoot);
-    const rawTasks = yaml.load(readFileSync(tasksPath, "utf-8"));
-    const rawMissions = yaml.load(readFileSync(missionsPath, "utf-8"));
-    return {
-        tasks: Array.isArray(rawTasks?.tasks) ? rawTasks.tasks : [],
-        missions: Array.isArray(rawMissions?.missions) ? rawMissions.missions : [],
-    };
-}
-function writeTasks(workspaceRoot, tasks) {
-    const { tasksPath } = ensureTasksStorage(workspaceRoot);
-    writeFileSync(tasksPath, yaml.dump({ tasks }, { lineWidth: -1, quotingType: "'" }), "utf-8");
-}
-function writeMissions(workspaceRoot, missions) {
-    const { missionsPath } = ensureTasksStorage(workspaceRoot);
-    writeFileSync(missionsPath, yaml.dump({ missions }, { lineWidth: -1, quotingType: "'" }), "utf-8");
-}
 function validateWorkspaceForTasks(res, workspaceRoot) {
     const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
     if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
@@ -353,53 +173,6 @@ function validateWorkspaceForTasks(res, workspaceRoot) {
         return false;
     }
     return true;
-}
-function nextTaskId(tasks) {
-    const next = tasks.reduce((max, task) => {
-        const value = Number.parseInt(task.id.replace(/^TASK-/, ""), 10);
-        return Number.isFinite(value) ? Math.max(max, value) : max;
-    }, 100);
-    return `TASK-${next + 1}`;
-}
-function createTaskRecord(input, tasks) {
-    const id = `${input.id || nextTaskId(tasks)}`.trim();
-    const owner = `${input.owner || "planning-lead"}`.trim();
-    const runtime = `${input.runtime || "openclaude"}`.trim();
-    return {
-        id,
-        title: `${input.title || "New task"}`.trim(),
-        state: input.state || "backlog",
-        priority: input.priority || "medium",
-        missionId: `${input.missionId || "q4-audit"}`.trim(),
-        owner,
-        runtime,
-        dependencies: Array.isArray(input.dependencies) ? input.dependencies.map((item) => `${item}`) : [],
-        estimate: `${input.estimate || "45m"}`.trim(),
-        confidence: Number.isFinite(input.confidence) ? Number(input.confidence) : 75,
-        risk: `${input.risk || "Low"}`.trim(),
-        summary: `${input.summary || "Task created from the Tasks workspace."}`.trim(),
-        lastUpdate: "just now",
-        sessionId: input.sessionId ? `${input.sessionId}` : undefined,
-        blockedReason: input.blockedReason ? `${input.blockedReason}` : undefined,
-        rationale: `${input.rationale || "Created from the Tasks page for operator planning."}`.trim(),
-        command: buildTaskCommand({ id, owner, runtime }),
-    };
-}
-function createMissionRecord(input, missions) {
-    const baseId = `${input.id || input.name || `mission-${missions.length + 1}`}`.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-");
-    return {
-        id: baseId,
-        name: `${input.name || "New Mission"}`.trim(),
-        objective: `${input.objective || "Mission objective pending definition."}`.trim(),
-        status: input.status || "draft",
-        dueWindow: `${input.dueWindow || "TBD"}`.trim(),
-        risk: `${input.risk || "Low"}`.trim(),
-        capacity: `${input.capacity || "0%"}`.trim(),
-        progress: Number.isFinite(input.progress) ? Number(input.progress) : 0,
-        health: `${input.health || "Scoping"}`.trim(),
-        successCriteria: Array.isArray(input.successCriteria) ? input.successCriteria.map((item) => `${item}`) : ["Define scope"],
-        command: `mah mission status --id ${baseId}`,
-    };
 }
 function handleConfigApi(req, res) {
     const workspaceRoot = resolveWorkspaceRoot(req);
@@ -474,6 +247,33 @@ function parseDotEnvContent(content) {
         result[key] = value;
     }
     return result;
+}
+function runMahCliJson(workspaceRoot, args) {
+    const envPath = path.join(workspaceRoot, ENV_FILENAME);
+    const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+    const workspaceEnv = parseDotEnvContent(rawEnv);
+    const child = spawnSync(process.execPath, [cliPath, ...args], {
+        cwd: workspaceRoot,
+        env: { ...process.env, ...workspaceEnv },
+        encoding: "utf-8",
+    });
+    const stdout = `${child.stdout || ""}`.trim();
+    let payload = {};
+    if (stdout) {
+        try {
+            const parsed = JSON.parse(stdout);
+            if (parsed && typeof parsed === "object")
+                payload = parsed;
+        }
+        catch {
+            payload = {};
+        }
+    }
+    if (child.status !== 0 || payload.ok === false) {
+        const error = `${payload.error || child.stderr || child.stdout || "mah cli command failed"}`.trim();
+        throw new Error(error);
+    }
+    return payload;
 }
 function redactSensitiveArgs(args) {
     const out = [];
@@ -662,9 +462,9 @@ function handleTasksApi(req, res) {
         return;
     if (req.method === "GET") {
         try {
-            const { tasks } = readTasksStore(workspaceRoot);
+            const data = runMahCliJson(workspaceRoot, ["task", "list", "--json"]);
             res.statusCode = 200;
-            res.end(JSON.stringify({ ok: true, tasks }));
+            res.end(JSON.stringify({ ok: true, tasks: Array.isArray(data.tasks) ? data.tasks : [] }));
         }
         catch (error) {
             res.statusCode = 500;
@@ -675,12 +475,13 @@ function handleTasksApi(req, res) {
     if (req.method === "POST") {
         readJsonBody(req, (body) => {
             try {
-                const store = readTasksStore(workspaceRoot);
-                const task = createTaskRecord(body.task || {}, store.tasks);
-                const tasks = [task, ...store.tasks];
-                writeTasks(workspaceRoot, tasks);
+                const data = runMahCliJson(workspaceRoot, ["task", "create", "--payload", JSON.stringify(body.task || {}), "--json"]);
                 res.statusCode = 200;
-                res.end(JSON.stringify({ ok: true, task, tasks }));
+                res.end(JSON.stringify({
+                    ok: true,
+                    task: data.task ?? null,
+                    tasks: Array.isArray(data.tasks) ? data.tasks : [],
+                }));
             }
             catch (error) {
                 res.statusCode = 500;
@@ -697,31 +498,18 @@ function handleTasksApi(req, res) {
         const taskId = decodeURIComponent(patchMatch[1]);
         readJsonBody(req, (body) => {
             try {
-                const store = readTasksStore(workspaceRoot);
-                const tasks = store.tasks.map((task) => {
-                    if (task.id !== taskId)
-                        return task;
-                    const owner = `${body.updates?.owner || task.owner}`.trim();
-                    const runtime = `${body.updates?.runtime || task.runtime}`.trim();
-                    return {
-                        ...task,
-                        ...body.updates,
-                        owner,
-                        runtime,
-                        dependencies: Array.isArray(body.updates?.dependencies) ? body.updates.dependencies.map((item) => `${item}`) : task.dependencies,
-                        command: buildTaskCommand({ id: task.id, owner, runtime }),
-                        lastUpdate: "just now",
-                    };
-                });
-                const updated = tasks.find((task) => task.id === taskId);
-                if (!updated) {
+                const data = runMahCliJson(workspaceRoot, ["task", "update", taskId, "--payload", JSON.stringify(body.updates || {}), "--json"]);
+                if (!data.task) {
                     res.statusCode = 404;
                     res.end(JSON.stringify({ ok: false, error: "task not found" }));
                     return;
                 }
-                writeTasks(workspaceRoot, tasks);
                 res.statusCode = 200;
-                res.end(JSON.stringify({ ok: true, task: updated, tasks }));
+                res.end(JSON.stringify({
+                    ok: true,
+                    task: data.task,
+                    tasks: Array.isArray(data.tasks) ? data.tasks : [],
+                }));
             }
             catch (error) {
                 res.statusCode = 500;
@@ -737,29 +525,20 @@ function handleTasksApi(req, res) {
     if (req.method === "POST" && runMatch) {
         try {
             const taskId = decodeURIComponent(runMatch[1]);
-            const store = readTasksStore(workspaceRoot);
-            const now = new Date().toISOString();
-            let updatedTask = null;
-            const tasks = store.tasks.map((task) => {
-                if (task.id !== taskId)
-                    return task;
-                updatedTask = {
-                    ...task,
-                    state: "in_progress",
-                    sessionId: task.sessionId || `ses_${randomUUID().replace(/-/g, "").slice(0, 8)}`,
-                    lastUpdate: now,
-                };
-                return updatedTask;
-            });
-            if (!updatedTask) {
+            const data = runMahCliJson(workspaceRoot, ["task", "run", "--id", taskId, "--json"]);
+            if (!data.task) {
                 res.statusCode = 404;
                 res.end(JSON.stringify({ ok: false, error: "task not found" }));
                 return;
             }
-            const finalTask = updatedTask;
-            writeTasks(workspaceRoot, tasks);
             res.statusCode = 200;
-            res.end(JSON.stringify({ ok: true, task: finalTask, command: finalTask.command }));
+            res.end(JSON.stringify({
+                ok: true,
+                task: data.task,
+                tasks: Array.isArray(data.tasks) ? data.tasks : [],
+                command: data.command || "",
+                run: data.run || null,
+            }));
         }
         catch (error) {
             res.statusCode = 500;
@@ -777,9 +556,9 @@ function handleMissionsApi(req, res) {
         return;
     if (req.method === "GET") {
         try {
-            const { missions } = readTasksStore(workspaceRoot);
+            const data = runMahCliJson(workspaceRoot, ["mission", "list", "--json"]);
             res.statusCode = 200;
-            res.end(JSON.stringify({ ok: true, missions }));
+            res.end(JSON.stringify({ ok: true, missions: Array.isArray(data.missions) ? data.missions : [] }));
         }
         catch (error) {
             res.statusCode = 500;
@@ -790,12 +569,13 @@ function handleMissionsApi(req, res) {
     if (req.method === "POST" && req.url === "/api/mah/missions") {
         readJsonBody(req, (body) => {
             try {
-                const store = readTasksStore(workspaceRoot);
-                const mission = createMissionRecord(body.mission || {}, store.missions);
-                const missions = [mission, ...store.missions];
-                writeMissions(workspaceRoot, missions);
+                const data = runMahCliJson(workspaceRoot, ["mission", "create", "--payload", JSON.stringify(body.mission || {}), "--json"]);
                 res.statusCode = 200;
-                res.end(JSON.stringify({ ok: true, mission, missions }));
+                res.end(JSON.stringify({
+                    ok: true,
+                    mission: data.mission ?? null,
+                    missions: Array.isArray(data.missions) ? data.missions : [],
+                }));
             }
             catch (error) {
                 res.statusCode = 500;
@@ -812,17 +592,18 @@ function handleMissionsApi(req, res) {
         const missionId = decodeURIComponent(patchMatch[1]);
         readJsonBody(req, (body) => {
             try {
-                const store = readTasksStore(workspaceRoot);
-                const missions = store.missions.map((mission) => mission.id === missionId ? { ...mission, ...body.updates } : mission);
-                const updated = missions.find((mission) => mission.id === missionId);
-                if (!updated) {
+                const data = runMahCliJson(workspaceRoot, ["mission", "update", missionId, "--payload", JSON.stringify(body.updates || {}), "--json"]);
+                if (!data.mission) {
                     res.statusCode = 404;
                     res.end(JSON.stringify({ ok: false, error: "mission not found" }));
                     return;
                 }
-                writeMissions(workspaceRoot, missions);
                 res.statusCode = 200;
-                res.end(JSON.stringify({ ok: true, mission: updated, missions }));
+                res.end(JSON.stringify({
+                    ok: true,
+                    mission: data.mission,
+                    missions: Array.isArray(data.missions) ? data.missions : [],
+                }));
             }
             catch (error) {
                 res.statusCode = 500;
@@ -838,19 +619,18 @@ function handleMissionsApi(req, res) {
     if (req.method === "POST" && commitMatch) {
         try {
             const missionId = decodeURIComponent(commitMatch[1]);
-            const store = readTasksStore(workspaceRoot);
-            const missions = store.missions.map((mission) => mission.id === missionId
-                ? { ...mission, status: "active", health: "Scope committed", progress: Math.max(mission.progress, 5) }
-                : mission);
-            const updated = missions.find((mission) => mission.id === missionId);
-            if (!updated) {
+            const data = runMahCliJson(workspaceRoot, ["mission", "commit-scope", "--id", missionId, "--json"]);
+            if (!data.mission) {
                 res.statusCode = 404;
                 res.end(JSON.stringify({ ok: false, error: "mission not found" }));
                 return;
             }
-            writeMissions(workspaceRoot, missions);
             res.statusCode = 200;
-            res.end(JSON.stringify({ ok: true, mission: updated, missions }));
+            res.end(JSON.stringify({
+                ok: true,
+                mission: data.mission,
+                missions: Array.isArray(data.missions) ? data.missions : [],
+            }));
         }
         catch (error) {
             res.statusCode = 500;
@@ -862,50 +642,19 @@ function handleMissionsApi(req, res) {
     if (req.method === "POST" && replanMatch) {
         try {
             const missionId = decodeURIComponent(replanMatch[1]);
-            const store = readTasksStore(workspaceRoot);
-            const tasks = store.tasks.map((task) => {
-                if (task.missionId !== missionId)
-                    return task;
-                if (task.id === "TASK-142") {
-                    return {
-                        ...task,
-                        owner: "eng-lead",
-                        runtime: "pi/local",
-                        confidence: Math.min(task.confidence + 3, 99),
-                        rationale: "Replanned to eng-lead after expertise rebalance and lower queue delay on pi/local.",
-                        command: buildTaskCommand({ id: task.id, owner: "eng-lead", runtime: "pi/local" }),
-                        lastUpdate: "replanned now",
-                    };
-                }
-                if (task.id === "TASK-154") {
-                    return {
-                        ...task,
-                        state: "ready",
-                        blockedReason: undefined,
-                        rationale: "Context prefetch resolved the bottleneck and unlocked downstream execution.",
-                        lastUpdate: "replanned now",
-                    };
-                }
-                return task;
-            });
-            const missions = store.missions.map((mission) => mission.id === missionId
-                ? { ...mission, risk: "Lower", health: "Replanned to reduce bottleneck", progress: Math.max(mission.progress, 72) }
-                : mission);
-            const updatedMission = missions.find((mission) => mission.id === missionId);
-            if (!updatedMission) {
+            const data = runMahCliJson(workspaceRoot, ["mission", "replan", "--id", missionId, "--json"]);
+            if (!data.mission) {
                 res.statusCode = 404;
                 res.end(JSON.stringify({ ok: false, error: "mission not found" }));
                 return;
             }
-            writeTasks(workspaceRoot, tasks);
-            writeMissions(workspaceRoot, missions);
             res.statusCode = 200;
             res.end(JSON.stringify({
                 ok: true,
-                mission: updatedMission,
-                missions,
-                tasks,
-                summary: "Agentic replan moved TASK-142 to eng-lead on pi/local and unlocked TASK-154 via context prefetch.",
+                mission: data.mission,
+                missions: Array.isArray(data.missions) ? data.missions : [],
+                tasks: Array.isArray(data.tasks) ? data.tasks : [],
+                summary: data.summary || "",
             }));
         }
         catch (error) {

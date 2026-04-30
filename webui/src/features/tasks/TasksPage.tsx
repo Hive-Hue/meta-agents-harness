@@ -347,6 +347,25 @@ export function TasksPage() {
   const [isBoardModalOpen, setIsBoardModalOpen] = useState(false);
   const [isPertModalOpen, setIsPertModalOpen] = useState(false);
   const [isFlowHelpOpen, setIsFlowHelpOpen] = useState(false);
+  const [isTaskCreateOpen, setIsTaskCreateOpen] = useState(false);
+  const [isMissionCreateOpen, setIsMissionCreateOpen] = useState(false);
+  const [taskDraft, setTaskDraft] = useState({
+    title: "",
+    missionId: "",
+    crewId: "dev",
+    owner: "planning-lead",
+    runtime: "openclaude",
+    priority: "medium" as "high" | "medium" | "low",
+    estimate: "45m",
+    summary: "",
+  });
+  const [missionDraft, setMissionDraft] = useState({
+    name: "",
+    objective: "",
+    dueWindow: "",
+    risk: "Medium",
+    capacity: "70%",
+  });
   const activeView = normalizeView(searchParams.get("view"));
   const selectedTaskId = searchParams.get("task") ?? "";
   const selectedMissionId = searchParams.get("mission") ?? "";
@@ -499,14 +518,17 @@ export function TasksPage() {
   ), [selectedMissionId, tasks]);
 
   useEffect(() => {
-    if (!isPertModalOpen && !isBoardModalOpen) return;
+    if (!isPertModalOpen && !isBoardModalOpen && !isFlowHelpOpen && !isTaskCreateOpen && !isMissionCreateOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsPertModalOpen(false);
       if (event.key === "Escape") setIsBoardModalOpen(false);
+      if (event.key === "Escape") setIsFlowHelpOpen(false);
+      if (event.key === "Escape") setIsTaskCreateOpen(false);
+      if (event.key === "Escape") setIsMissionCreateOpen(false);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isBoardModalOpen, isPertModalOpen]);
+  }, [isBoardModalOpen, isFlowHelpOpen, isMissionCreateOpen, isPertModalOpen, isTaskCreateOpen]);
 
   useEffect(() => {
     if (!toast) return;
@@ -514,12 +536,35 @@ export function TasksPage() {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
+  const openTaskCreateModal = () => {
+    setTaskDraft({
+      title: "",
+      missionId: selectedMissionId || missions[0]?.id || "q4-audit",
+      crewId: "dev",
+      owner: "planning-lead",
+      runtime: "openclaude",
+      priority: "medium",
+      estimate: "45m",
+      summary: "",
+    });
+    setIsTaskCreateOpen(true);
+  };
+
   const handleCreateTask = async () => {
-    const title = window.prompt("Nome da nova task:");
-    if (!title?.trim()) return;
+    if (!taskDraft.title.trim()) return;
     try {
-      const created = await createTask({ title, missionId: selectedMissionId || missions[0]?.id || "q4-audit" });
+      const created = await createTask({
+        title: taskDraft.title.trim(),
+        missionId: taskDraft.missionId || selectedMissionId || missions[0]?.id || "q4-audit",
+        crewId: taskDraft.crewId.trim() || "dev",
+        owner: taskDraft.owner.trim() || "planning-lead",
+        runtime: taskDraft.runtime.trim() || "openclaude",
+        priority: taskDraft.priority,
+        estimate: taskDraft.estimate.trim() || "45m",
+        summary: taskDraft.summary.trim() || "Task created from the Tasks workspace.",
+      });
       if (created) {
+        setIsTaskCreateOpen(false);
         updateTasksParams({ view: "board", task: created.id, mission: created.missionId }, false);
         setToast({ message: `Task ${created.id} criada em .mah/tasks.`, tone: "info" });
       }
@@ -528,12 +573,29 @@ export function TasksPage() {
     }
   };
 
+  const openMissionCreateModal = () => {
+    setMissionDraft({
+      name: "",
+      objective: "",
+      dueWindow: "",
+      risk: "Medium",
+      capacity: "70%",
+    });
+    setIsMissionCreateOpen(true);
+  };
+
   const handleCreateMission = async () => {
-    const name = window.prompt("Nome da nova mission:");
-    if (!name?.trim()) return;
+    if (!missionDraft.name.trim()) return;
     try {
-      const created = await createMission({ name, objective: "Mission criada a partir da WebUI Tasks." });
+      const created = await createMission({
+        name: missionDraft.name.trim(),
+        objective: missionDraft.objective.trim() || "Mission criada a partir da WebUI Tasks.",
+        dueWindow: missionDraft.dueWindow.trim() || "TBD",
+        risk: missionDraft.risk.trim() || "Medium",
+        capacity: missionDraft.capacity.trim() || "70%",
+      });
       if (created) {
+        setIsMissionCreateOpen(false);
         updateTasksParams({ view: "missions", mission: created.id }, false);
         setToast({ message: `Mission ${created.name} criada em .mah/tasks.`, tone: "info" });
       }
@@ -603,7 +665,7 @@ export function TasksPage() {
               <span>{counts.active} in progress</span>
             </div>
           </div>
-          <CommandPreview context="tasks" command={`mah tasks list --mission ${selectedMissionId || "q4-audit"} --json`} />
+          <CommandPreview context="tasks" command={`mah task list --mission ${selectedMissionId || "q4-audit"} --json`} />
         </section>
 
         <section className="tasks-main__content">
@@ -625,11 +687,11 @@ export function TasksPage() {
                 <span>Mission defines scope and window. Task is the executable work item inside that mission.</span>
               </div>
               <div className="tasks-toolbar">
-                <button type="button" className="tasks-toolbar__btn" onClick={() => void handleCreateMission()}>
+                <button type="button" className="tasks-toolbar__btn" onClick={openMissionCreateModal}>
                   <Icon name="flag" size={16} />
                   {busyAction === "create-mission" ? "Creating..." : "New Mission"}
                 </button>
-                <button type="button" className="tasks-toolbar__btn tasks-toolbar__btn--primary" onClick={() => void handleCreateTask()}>
+                <button type="button" className="tasks-toolbar__btn tasks-toolbar__btn--primary" onClick={openTaskCreateModal}>
                   <Icon name="add" size={16} />
                   {busyAction === "create-task" ? "Creating..." : "New Task"}
                 </button>
@@ -683,7 +745,7 @@ export function TasksPage() {
               selectedMissionId={selectedMissionId}
               onSelectMission={handleSelectMission}
               onSelectTask={handleSelectTask}
-              onCreateMission={() => void handleCreateMission()}
+              onCreateMission={openMissionCreateModal}
             />
           )}
           {activeView === "pert" && tasks.length > 0 && (
@@ -736,6 +798,206 @@ export function TasksPage() {
           />
         )}
       </aside>
+
+      {isMissionCreateOpen ? (
+        <div className="tasks-modal-backdrop" onClick={() => setIsMissionCreateOpen(false)}>
+          <section className="tasks-modal tasks-modal--compose" onClick={(event) => event.stopPropagation()}>
+            <div className="tasks-modal__header">
+              <div>
+                <p className="tasks-panel__label">New Mission</p>
+                <h3>Create mission container</h3>
+              </div>
+              <button type="button" className="tasks-toolbar__btn" onClick={() => setIsMissionCreateOpen(false)}>
+                <Icon name="close" size={16} />
+                Close
+              </button>
+            </div>
+
+            <div className="tasks-form">
+              <div className="tasks-form__grid">
+                <label className="tasks-field tasks-field--full">
+                  <span>Name</span>
+                  <input
+                    type="text"
+                    value={missionDraft.name}
+                    onChange={(event) => setMissionDraft((current) => ({ ...current, name: event.target.value }))}
+                    placeholder="Q4 Audit Hardening"
+                  />
+                </label>
+                <label className="tasks-field tasks-field--full">
+                  <span>Objective</span>
+                  <textarea
+                    rows={4}
+                    value={missionDraft.objective}
+                    onChange={(event) => setMissionDraft((current) => ({ ...current, objective: event.target.value }))}
+                    placeholder="Define scope, expected delivery window, and success criteria."
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Due Window</span>
+                  <input
+                    type="text"
+                    value={missionDraft.dueWindow}
+                    onChange={(event) => setMissionDraft((current) => ({ ...current, dueWindow: event.target.value }))}
+                    placeholder="Nov 01 - Nov 28"
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Risk</span>
+                  <select
+                    value={missionDraft.risk}
+                    onChange={(event) => setMissionDraft((current) => ({ ...current, risk: event.target.value }))}
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </label>
+                <label className="tasks-field">
+                  <span>Capacity</span>
+                  <input
+                    type="text"
+                    value={missionDraft.capacity}
+                    onChange={(event) => setMissionDraft((current) => ({ ...current, capacity: event.target.value }))}
+                    placeholder="70%"
+                  />
+                </label>
+              </div>
+              <div className="tasks-modal__actions">
+                <button type="button" className="tasks-toolbar__btn" onClick={() => setIsMissionCreateOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tasks-toolbar__btn tasks-toolbar__btn--primary"
+                  onClick={() => void handleCreateMission()}
+                  disabled={!missionDraft.name.trim() || busyAction === "create-mission"}
+                >
+                  <Icon name="flag" size={16} />
+                  {busyAction === "create-mission" ? "Creating..." : "Create Mission"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {isTaskCreateOpen ? (
+        <div className="tasks-modal-backdrop" onClick={() => setIsTaskCreateOpen(false)}>
+          <section className="tasks-modal tasks-modal--compose" onClick={(event) => event.stopPropagation()}>
+            <div className="tasks-modal__header">
+              <div>
+                <p className="tasks-panel__label">New Task</p>
+                <h3>Create executable work item</h3>
+              </div>
+              <button type="button" className="tasks-toolbar__btn" onClick={() => setIsTaskCreateOpen(false)}>
+                <Icon name="close" size={16} />
+                Close
+              </button>
+            </div>
+
+            <div className="tasks-form">
+              <div className="tasks-form__grid">
+                <label className="tasks-field tasks-field--full">
+                  <span>Title</span>
+                  <input
+                    type="text"
+                    value={taskDraft.title}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, title: event.target.value }))}
+                    placeholder="Verify auth middleware"
+                  />
+                </label>
+                <label className="tasks-field tasks-field--full">
+                  <span>Summary</span>
+                  <textarea
+                    rows={4}
+                    value={taskDraft.summary}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, summary: event.target.value }))}
+                    placeholder="Describe the concrete execution expected for this task."
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Mission</span>
+                  <select
+                    value={taskDraft.missionId}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, missionId: event.target.value }))}
+                  >
+                    {missions.map((mission) => (
+                      <option key={mission.id} value={mission.id}>{mission.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="tasks-field">
+                  <span>Crew</span>
+                  <input
+                    type="text"
+                    value={taskDraft.crewId}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, crewId: event.target.value }))}
+                    placeholder="dev"
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Owner</span>
+                  <input
+                    type="text"
+                    value={taskDraft.owner}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, owner: event.target.value }))}
+                    placeholder="planning-lead"
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Runtime</span>
+                  <select
+                    value={taskDraft.runtime}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, runtime: event.target.value }))}
+                  >
+                    <option value="openclaude">openclaude</option>
+                    <option value="pi">pi</option>
+                    <option value="claude">claude</option>
+                    <option value="hermes">hermes</option>
+                    <option value="opencode">opencode</option>
+                    <option value="kilo">kilo</option>
+                  </select>
+                </label>
+                <label className="tasks-field">
+                  <span>Priority</span>
+                  <select
+                    value={taskDraft.priority}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, priority: event.target.value as "high" | "medium" | "low" }))}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label className="tasks-field">
+                  <span>Estimate</span>
+                  <input
+                    type="text"
+                    value={taskDraft.estimate}
+                    onChange={(event) => setTaskDraft((current) => ({ ...current, estimate: event.target.value }))}
+                    placeholder="45m"
+                  />
+                </label>
+              </div>
+              <div className="tasks-modal__actions">
+                <button type="button" className="tasks-toolbar__btn" onClick={() => setIsTaskCreateOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tasks-toolbar__btn tasks-toolbar__btn--primary"
+                  onClick={() => void handleCreateTask()}
+                  disabled={!taskDraft.title.trim() || busyAction === "create-task"}
+                >
+                  <Icon name="add" size={16} />
+                  {busyAction === "create-task" ? "Creating..." : "Create Task"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {isPertModalOpen && activeView === "pert" ? (
         <div className="tasks-modal-backdrop" onClick={() => setIsPertModalOpen(false)}>

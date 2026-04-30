@@ -57,9 +57,12 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - WebUI authentication with `HttpOnly` session cookies, login screen, protected `/api/mah/*` middleware, and auth status/login/logout endpoints in Vite middleware
 - WebUI global console dock with shell bootstrap, minimize/restore behavior across pages, and event bridge for opening console from other features
 - WebUI `Tasks` workspace with missions, kanban board, PERT/CPM view, Gantt timeline, inbox, replan flows, YAML-backed persistence under `.mah/tasks/`, and Vite API endpoints for task/mission operations
+- `mah task` CLI namespace with `list`, `show`, `create`, `update`, and `run` for workspace task orchestration
+- `mah mission` CLI namespace with `list`, `show`, `create`, `update`, `commit-scope`, and `replan` for workspace planning orchestration
 - `webui/src/features/tasks/*`, `webui/src/features/auth/*`, and `webui/src/features/console/consoleBridge.ts` as new feature modules for task orchestration, authentication, and console integration
 - `tests/runtime-core-integration.test.mjs` expanded with MAH overlay, OpenClaude session alias, and runtime activation coverage
 - `tests/sessions-operations.test.mjs` expanded with OpenClaude session resume and alias-tracking coverage
+- `tests/tasks-cli.test.mjs` and `tests/missions-cli.test.mjs` covering the new planning CLI namespaces
 
 ### Changed
 
@@ -90,6 +93,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `Tasks` UX refined with expandable board and PERT modals, sticky board headers, scrollable lanes, gesture-based PERT pan/zoom, help-modal guidance, toast notifications, and Gantt timeline presentation
 - Overview quick actions now deep-link into the real task workspace and command previews provide clipboard feedback/fallback behavior
 - `vite.config.js` and `vite.config.ts` now serve the same expanded MAH middleware surface for auth, terminal, tasks, missions, and shell/session orchestration
+- WebUI `Tasks` APIs now delegate task and mission state changes through `mah task` / `mah mission` instead of duplicating planning rules in Vite middleware
+- `development` package metadata now tracks the upcoming `v0.9.0` release line in both the root package and WebUI package
 
 ### Fixed
 

@@ -47,6 +47,10 @@ mah use dev
 
 # Run interactive session
 mah run
+
+# Inspect the planning workspace
+mah mission list --json
+mah task list --mission q4-audit --json
 ```
 
 ---
@@ -188,7 +192,7 @@ mah init --yes --ai \
 3. **Infers sensible defaults** — chooses appropriate crews, agents, and profiles
 4. **Falls back gracefully** — if HTTP AI fails, uses logical mode automatically
 
-With the upcoming `v0.9.0` release, AI-assisted bootstrap can also:
+In the `v0.9.0` development line, AI-assisted bootstrap can also:
 5. **Configure expertise-aware routing** — agents matched by skill, not just order
 6. **Set up Context Manager** — operational memory fetched per task at runtime
 7. **Enable visible execution** — lifecycle events, session status, and trace on demand

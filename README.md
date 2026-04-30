@@ -80,6 +80,7 @@ Current focus areas include:
 - preparing an adapter model for future runtime extensibility
 - improving operator UX with explainability and safer sync flows
 - unified session operations across all runtimes (list, resume, new, export, delete)
+- first-class planning workspace with `mah task`, `mah mission`, and WebUI `Tasks`
 
 This branch is the right place to evaluate the **direction**, **architecture**, and **product positioning** of the project.
 
@@ -196,6 +197,10 @@ mah skills add stitch-react-handoff --agent frontend-dev
 mah context find --agent worker-1 --task "fix auth"   # fetch operational memory
 mah context propose --from-session pi:dev:abc123      # governed learning
 mah sessions status                                   # see what's running
+mah mission list --json                               # inspect planning containers
+mah mission replan --id q4-audit --json              # apply mission replan
+mah task list --mission q4-audit --json              # inspect executable work
+mah task run --id TASK-142 --json                    # run a tracked task
 ```
 
 ### 2. Canonical configuration

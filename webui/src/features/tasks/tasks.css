@@ -1203,9 +1203,72 @@
   padding: 18px;
 }
 
+.tasks-modal--compose {
+  width: min(760px, 100%);
+  padding: 20px;
+}
+
 .tasks-modal--flow-help {
   width: min(760px, 100%);
   padding: 20px;
+}
+
+.tasks-form {
+  margin-top: 18px;
+  display: grid;
+  gap: 18px;
+}
+
+.tasks-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tasks-field {
+  display: grid;
+  gap: 8px;
+}
+
+.tasks-field--full {
+  grid-column: 1 / -1;
+}
+
+.tasks-field span {
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tasks-field input,
+.tasks-field select,
+.tasks-field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--color-text);
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.tasks-field textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.tasks-field input:focus,
+.tasks-field select:focus,
+.tasks-field textarea:focus {
+  outline: none;
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tasks-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .tasks-modal--flow-help .tasks-flow-guide__steps,
@@ -1300,6 +1363,10 @@
   .tasks-modal__header {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .tasks-form__grid {
+    grid-template-columns: 1fr;
   }
 
   .tasks-flow-guide__notes {
