@@ -116,8 +116,9 @@
 }
 
 .workflow-panel {
-  padding: 28px 32px;
+  padding: 16px 32px;
   max-width: 100%;
+  margin-bottom: -250px;
 }
 
 .workflow-panel__header {
@@ -125,7 +126,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 1px;
 }
 
 .workflow-panel__icon {
@@ -149,7 +150,7 @@
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.6;
-  margin: 0 0 20px;
+  margin: 0 0 16px;
 }
 
 
