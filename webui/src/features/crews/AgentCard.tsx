@@ -1,5 +1,3 @@
-import { Icon } from "../../components/ui/Icon";
-
 export interface Agent {
   id: string;
   role: "orchestrator" | "lead" | "worker";
@@ -45,18 +43,6 @@ export function AgentCard({ agent, selected, onClick }: AgentCardProps) {
         <span className="agent-card__domain">
           {agent.domain.join(", ")}
         </span>
-      </div>
-      <div className="agent-card__meta">
-        <span className={"agent-card__expertise agent-card__expertise--" + agent.expertise}>
-          <Icon name={agent.expertise === "validated" ? "verified" : agent.expertise === "experimental" ? "science" : "warning"} size={10} />
-          {agent.expertise}
-        </span>
-      </div>
-      <div className="agent-card__confidence">
-        <div
-          className={"agent-card__confidence-fill agent-card__confidence-fill--" + confidenceClass}
-          style={{ width: (agent.confidence * 100) + "%" }}
-        />
       </div>
     </div>
   );
