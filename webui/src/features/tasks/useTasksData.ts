@@ -38,6 +38,13 @@ export type MissionRecord = {
   command: string;
 };
 
+type DeleteMissionResult = {
+  mission?: MissionRecord;
+  missions: MissionRecord[];
+  tasks: TaskRecord[];
+  removedTasks: TaskRecord[];
+};
+
 type ApiPayload = Record<string, unknown>;
 
 async function readJson(resp: Response): Promise<ApiPayload> {
@@ -102,12 +109,39 @@ export function useTasksData(workspacePath: string) {
         method: "POST",
         body: JSON.stringify({ task }),
       }, workspacePath);
-      setTasks(Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : tasks);
+      setTasks(Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : []);
       return data.task as TaskRecord | undefined;
     } finally {
       setBusyAction("");
     }
-  }, [tasks, workspacePath]);
+  }, [workspacePath]);
+
+  const updateTask = useCallback(async (taskId: string, updates: Partial<TaskRecord>) => {
+    setBusyAction(`update-task-${taskId}`);
+    try {
+      const data = await apiRequest(`/api/mah/tasks/${encodeURIComponent(taskId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ updates }),
+      }, workspacePath);
+      setTasks(Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : []);
+      return data.task as TaskRecord | undefined;
+    } finally {
+      setBusyAction("");
+    }
+  }, [workspacePath]);
+
+  const deleteTask = useCallback(async (taskId: string) => {
+    setBusyAction(`delete-task-${taskId}`);
+    try {
+      const data = await apiRequest(`/api/mah/tasks/${encodeURIComponent(taskId)}`, {
+        method: "DELETE",
+      }, workspacePath);
+      setTasks(Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : []);
+      return data.task as TaskRecord | undefined;
+    } finally {
+      setBusyAction("");
+    }
+  }, [workspacePath]);
 
   const createMission = useCallback(async (mission: Partial<MissionRecord>) => {
     setBusyAction("create-mission");
@@ -116,12 +150,49 @@ export function useTasksData(workspacePath: string) {
         method: "POST",
         body: JSON.stringify({ mission }),
       }, workspacePath);
-      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : missions);
+      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : []);
       return data.mission as MissionRecord | undefined;
     } finally {
       setBusyAction("");
     }
-  }, [missions, workspacePath]);
+  }, [workspacePath]);
+
+  const updateMission = useCallback(async (missionId: string, updates: Partial<MissionRecord>) => {
+    setBusyAction(`update-mission-${missionId}`);
+    try {
+      const data = await apiRequest(`/api/mah/missions/${encodeURIComponent(missionId)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ updates }),
+      }, workspacePath);
+      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : []);
+      return data.mission as MissionRecord | undefined;
+    } finally {
+      setBusyAction("");
+    }
+  }, [workspacePath]);
+
+  const deleteMission = useCallback(async (missionId: string, cascade = false): Promise<DeleteMissionResult> => {
+    setBusyAction(`delete-mission-${missionId}`);
+    try {
+      const suffix = cascade ? "?cascade=true" : "";
+      const data = await apiRequest(`/api/mah/missions/${encodeURIComponent(missionId)}${suffix}`, {
+        method: "DELETE",
+      }, workspacePath);
+      const nextMissions = Array.isArray(data.missions) ? data.missions as MissionRecord[] : [];
+      const nextTasks = Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : [];
+      const removedTasks = Array.isArray(data.removedTasks) ? data.removedTasks as TaskRecord[] : [];
+      setMissions(nextMissions);
+      setTasks(nextTasks);
+      return {
+        mission: data.mission as MissionRecord | undefined,
+        missions: nextMissions,
+        tasks: nextTasks,
+        removedTasks,
+      };
+    } finally {
+      setBusyAction("");
+    }
+  }, [workspacePath]);
 
   const commitMissionScope = useCallback(async (missionId: string) => {
     setBusyAction(`commit-${missionId}`);
@@ -129,12 +200,12 @@ export function useTasksData(workspacePath: string) {
       const data = await apiRequest(`/api/mah/missions/${encodeURIComponent(missionId)}/commit-scope`, {
         method: "POST",
       }, workspacePath);
-      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : missions);
+      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : []);
       return data.mission as MissionRecord | undefined;
     } finally {
       setBusyAction("");
     }
-  }, [missions, workspacePath]);
+  }, [workspacePath]);
 
   const applyMissionReplan = useCallback(async (missionId: string) => {
     setBusyAction(`replan-${missionId}`);
@@ -142,13 +213,13 @@ export function useTasksData(workspacePath: string) {
       const data = await apiRequest(`/api/mah/missions/${encodeURIComponent(missionId)}/replan`, {
         method: "POST",
       }, workspacePath);
-      setTasks(Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : tasks);
-      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : missions);
+      setTasks(Array.isArray(data.tasks) ? data.tasks as TaskRecord[] : []);
+      setMissions(Array.isArray(data.missions) ? data.missions as MissionRecord[] : []);
       return `${data.summary || ""}`;
     } finally {
       setBusyAction("");
     }
-  }, [missions, tasks, workspacePath]);
+  }, [workspacePath]);
 
   const runTask = useCallback(async (taskId: string) => {
     setBusyAction(`run-${taskId}`);
@@ -174,7 +245,11 @@ export function useTasksData(workspacePath: string) {
     busyAction,
     reload,
     createTask,
+    updateTask,
+    deleteTask,
     createMission,
+    updateMission,
+    deleteMission,
     commitMissionScope,
     applyMissionReplan,
     runTask,

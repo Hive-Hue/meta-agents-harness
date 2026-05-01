@@ -91,3 +91,63 @@ test("mah mission replan returns updated mission and tasks", () => {
     rmSync(tempWorkspace, { recursive: true, force: true })
   }
 })
+
+test("mah mission update changes mission status and capacity", () => {
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-update-"))
+  try {
+    const create = run([
+      "mission",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "delivery-wave", name: "Delivery Wave" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
+    const update = run([
+      "mission",
+      "update",
+      "delivery-wave",
+      "--payload",
+      JSON.stringify({ status: "active", capacity: "80%", risk: "Medium" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(update.status, 0, update.stderr)
+    const payload = JSON.parse(update.stdout)
+    assert.equal(payload.ok, true)
+    assert.equal(payload.mission.id, "delivery-wave")
+    assert.equal(payload.mission.status, "active")
+    assert.equal(payload.mission.capacity, "80%")
+  } finally {
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})
+
+test("mah mission delete requires cascade when mission has linked tasks", () => {
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-delete-guard-"))
+  try {
+    const result = run(["mission", "delete", "--id", "q4-audit", "--json"], tempWorkspace)
+    assert.equal(result.status, 1)
+    const payload = JSON.parse(result.stdout)
+    assert.equal(payload.ok, false)
+    assert.match(payload.error, /linked task\(s\)/)
+  } finally {
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})
+
+test("mah mission delete --cascade removes mission and linked tasks", () => {
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-delete-cascade-"))
+  try {
+    const result = run(["mission", "delete", "--id", "q4-audit", "--cascade", "--json"], tempWorkspace)
+    assert.equal(result.status, 0, result.stderr)
+    const payload = JSON.parse(result.stdout)
+    assert.equal(payload.ok, true)
+    assert.equal(payload.mission.id, "q4-audit")
+    assert.ok(payload.removedTasks.length > 0)
+    assert.ok(!payload.missions.some((mission) => mission.id === "q4-audit"))
+    assert.ok(!payload.tasks.some((task) => task.missionId === "q4-audit"))
+  } finally {
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})

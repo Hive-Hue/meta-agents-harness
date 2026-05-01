@@ -521,6 +521,29 @@ function handleTasksApi(req, res) {
         });
         return;
     }
+    const deleteMatch = (req.url ?? "").match(/^\/api\/mah\/tasks\/([^/?]+)$/);
+    if (req.method === "DELETE" && deleteMatch) {
+        try {
+            const taskId = decodeURIComponent(deleteMatch[1]);
+            const data = runMahCliJson(workspaceRoot, ["task", "delete", taskId, "--json"]);
+            if (!data.task) {
+                res.statusCode = 404;
+                res.end(JSON.stringify({ ok: false, error: "task not found" }));
+                return;
+            }
+            res.statusCode = 200;
+            res.end(JSON.stringify({
+                ok: true,
+                task: data.task,
+                tasks: Array.isArray(data.tasks) ? data.tasks : [],
+            }));
+        }
+        catch (error) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+        return;
+    }
     const runMatch = (req.url ?? "").match(/^\/api\/mah\/tasks\/([^/?]+)\/run$/);
     if (req.method === "POST" && runMatch) {
         try {
@@ -613,6 +636,36 @@ function handleMissionsApi(req, res) {
             res.statusCode = 400;
             res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
         });
+        return;
+    }
+    const deleteMatch = (req.url ?? "").match(/^\/api\/mah\/missions\/([^/?]+)(\?[^#]*)?$/);
+    if (req.method === "DELETE" && deleteMatch) {
+        try {
+            const missionId = decodeURIComponent(deleteMatch[1]);
+            const url = new URL(req.url ?? "", "http://localhost");
+            const cascade = url.searchParams.get("cascade") === "true";
+            const args = ["mission", "delete", "--id", missionId, "--json"];
+            if (cascade)
+                args.splice(args.length - 1, 0, "--cascade");
+            const data = runMahCliJson(workspaceRoot, args);
+            if (!data.mission) {
+                res.statusCode = 404;
+                res.end(JSON.stringify({ ok: false, error: "mission not found" }));
+                return;
+            }
+            res.statusCode = 200;
+            res.end(JSON.stringify({
+                ok: true,
+                mission: data.mission,
+                missions: Array.isArray(data.missions) ? data.missions : [],
+                tasks: Array.isArray(data.tasks) ? data.tasks : [],
+                removedTasks: Array.isArray(data.removedTasks) ? data.removedTasks : [],
+            }));
+        }
+        catch (error) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
         return;
     }
     const commitMatch = (req.url ?? "").match(/^\/api\/mah\/missions\/([^/?]+)\/commit-scope$/);

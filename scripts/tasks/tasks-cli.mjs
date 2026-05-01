@@ -3,7 +3,7 @@ import path from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 import { collectSessions } from "../session/m3-ops.mjs"
-import { buildTaskPrompt, createTask, listTasks, normalizeTaskRuntime, readTaskStore, updateTask } from "./tasks-store.mjs"
+import { buildTaskPrompt, createTask, deleteTask, listTasks, normalizeTaskRuntime, readTaskStore, updateTask } from "./tasks-store.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -71,6 +71,7 @@ Usage:
   mah task show <id> [--json]
   mah task create --payload '<json>' [--json]
   mah task update <id> --payload '<json>' [--json]
+  mah task delete <id> [--json]
   mah task run --id <id> [--json]
 
 Examples:
@@ -78,6 +79,7 @@ Examples:
   mah task show TASK-118
   mah task create --payload '{"title":"New task","missionId":"q4-audit","crewId":"dev"}' --json
   mah task update TASK-118 --payload '{"state":"ready"}' --json
+  mah task delete TASK-118 --json
   mah task run --id TASK-118 --json
 `)
 }
@@ -268,6 +270,19 @@ async function main() {
       console.log(`started ${task.id}`)
       if (linkedSessionId) console.log(`session=${linkedSessionId}`)
     }
+    return
+  }
+
+  if (subcommand === "delete") {
+    const taskId = parseValueArg(rest, "--id") || `${rest.find((token) => !token.startsWith("-")) || ""}`.trim()
+    const result = deleteTask(repoRoot, taskId)
+    if (!result.task) {
+      process.exitCode = jsonMode ? printJson({ ok: false, error: "task not found" }, 1) : 1
+      if (!jsonMode) console.error("ERROR: task not found")
+      return
+    }
+    process.exitCode = jsonMode ? printJson({ ok: true, task: result.task, tasks: result.tasks }) : 0
+    if (!jsonMode) console.log(`deleted ${result.task.id}`)
     return
   }
 

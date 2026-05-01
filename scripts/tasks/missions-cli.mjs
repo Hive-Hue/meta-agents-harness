@@ -2,6 +2,7 @@ import {
   applyMissionReplan,
   commitMissionScope,
   createMission,
+  deleteMission,
   listMissions,
   updateMission
 } from "./tasks-store.mjs"
@@ -40,6 +41,7 @@ Usage:
   mah mission show <id> [--json]
   mah mission create --payload '<json>' [--json]
   mah mission update <id> --payload '<json>' [--json]
+  mah mission delete --id <id> [--cascade] [--json]
   mah mission commit-scope --id <id> [--json]
   mah mission replan --id <id> [--json]
 `)
@@ -144,6 +146,26 @@ async function main() {
     }
     process.exitCode = jsonMode ? printJson({ ok: true, mission: result.mission, missions: result.missions }) : 0
     if (!jsonMode) console.log(`committed ${result.mission.id}`)
+    return
+  }
+
+  if (subcommand === "delete") {
+    const missionId = parseValueArg(rest, "--id") || `${rest.find((token) => !token.startsWith("-")) || ""}`.trim()
+    try {
+      const result = deleteMission(repoRoot, missionId, { cascade: hasFlag(rest, "--cascade") })
+      if (!result.mission) {
+        process.exitCode = jsonMode ? printJson({ ok: false, error: "mission not found" }, 1) : 1
+        if (!jsonMode) console.error("ERROR: mission not found")
+        return
+      }
+      process.exitCode = jsonMode
+        ? printJson({ ok: true, mission: result.mission, missions: result.missions, tasks: result.tasks, removedTasks: result.removedTasks })
+        : 0
+      if (!jsonMode) console.log(`deleted ${result.mission.id}`)
+    } catch (error) {
+      process.exitCode = jsonMode ? printJson({ ok: false, error: error.message || String(error) }, 1) : 1
+      if (!jsonMode) console.error(`ERROR: ${error.message || String(error)}`)
+    }
     return
   }
 

@@ -97,3 +97,26 @@ test("mah task show returns task details", () => {
     rmSync(tempWorkspace, { recursive: true, force: true })
   }
 })
+
+test("mah task delete removes a persisted task", () => {
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-task-delete-"))
+  try {
+    const create = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-260", title: "Delete me", missionId: "q4-audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
+    const remove = run(["task", "delete", "TASK-260", "--json"], tempWorkspace)
+    assert.equal(remove.status, 0, remove.stderr)
+    const payload = JSON.parse(remove.stdout)
+    assert.equal(payload.ok, true)
+    assert.equal(payload.task.id, "TASK-260")
+    assert.ok(!payload.tasks.some((task) => task.id === "TASK-260"))
+  } finally {
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})
