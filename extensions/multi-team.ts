@@ -135,7 +135,7 @@ interface AgentConfig {
 
 interface TeamConfig {
 	name: string;
-	lead: AgentConfig;
+	lead?: AgentConfig;
 	members: AgentConfig[];
 }
 
@@ -167,11 +167,14 @@ interface DispatchTarget {
 	agent: AgentConfig;
 	role: RuntimeRole;
 	team?: TeamConfig;
+	crewName?: string;
+	configPath?: string;
 }
 
 interface CardState {
 	agent: AgentConfig;
 	teamName?: string;
+	crewName?: string;
 	role: RuntimeRole;
 	status: CardStatus;
 	task: string;
@@ -960,6 +963,55 @@ function loadConfig(cwd: string): ResolvedConfig {
 	};
 }
 
+function crewFromConfigPath(configPath: string): string {
+	const normalized = configPath.replace(/\\/g, "/");
+	const match = normalized.match(/\/crew\/([^/]+)\/multi-team\.yaml$/);
+	if (match?.[1]) return match[1];
+	return process.env.MAH_ACTIVE_CREW || "dev";
+}
+
+function resolveCrewConfigPaths(cwd: string): Array<{ crew: string; configPath: string }> {
+	const runtimeName = `${process.env.MAH_RUNTIME || ""}`.trim().toLowerCase();
+	const runtimeMarker = runtimeName === "kilo" ? ".kilo" : ".pi";
+	const crewRoot = resolve(cwd, runtimeMarker, "crew");
+	const found: Array<{ crew: string; configPath: string }> = [];
+	if (!existsSync(crewRoot)) return found;
+	for (const entry of readdirSync(crewRoot)) {
+		const crewDir = resolve(crewRoot, entry);
+		let isDir = false;
+		try {
+			isDir = statSync(crewDir).isDirectory();
+		} catch {
+			isDir = false;
+		}
+		if (!isDir) continue;
+		const configPath = resolve(crewDir, "multi-team.yaml");
+		if (existsSync(configPath)) {
+			found.push({ crew: entry, configPath });
+		}
+	}
+	return found.sort((a, b) => a.crew.localeCompare(b.crew));
+}
+
+function discoverAgentsFromCrewDir(configPath: string): AgentConfig[] {
+	const crewDir = dirname(configPath);
+	const agentsDir = resolve(crewDir, "agents");
+	if (!existsSync(agentsDir)) return [];
+	const discovered: AgentConfig[] = [];
+	for (const entry of readdirSync(agentsDir)) {
+		if (!entry.endsWith(".md")) continue;
+		if (entry.toLowerCase() === "orchestrator.md") continue;
+		const base = entry.replace(/\.md$/i, "");
+		const name = base.replace(/_/g, "-");
+		discovered.push({
+			name,
+			prompt: resolve(agentsDir, entry),
+			description: "Discovered from crew agents directory",
+		});
+	}
+	return discovered.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function resolveArtifact(repoRoot: string, target: string): string {
 	return resolve(repoRoot, target);
 }
@@ -1035,17 +1087,21 @@ function resolveRuntime(config: ResolvedConfig): RuntimeState {
 	const teamName = process.env.MAH_MULTI_TEAM?.trim() || process.env.PI_MULTI_TEAM?.trim();
 
 	if (role === "orchestrator") {
+		const leadChildren = config.teams
+			.map((team) => team.lead)
+			.filter(Boolean) as AgentConfig[];
+		const workerFallback = config.teams.flatMap((team) => Array.isArray(team.members) ? team.members : []);
 		return {
 			role,
 			agent: config.orchestrator,
-			children: config.teams.map((team) => team.lead),
+			children: leadChildren.length > 0 ? leadChildren : workerFallback,
 		};
 	}
 
 	if (role === "lead") {
 		const team = config.teams.find((item) =>
 			(teamName && matchesName(item.name, teamName)) ||
-			(agentName && matchesName(item.lead.name, agentName))
+			(item.lead?.name && agentName && matchesName(item.lead.name, agentName))
 		);
 		if (!team) throw new Error(`Lead runtime could not resolve team for "${agentName || teamName}".`);
 		return {
@@ -1584,6 +1640,10 @@ export default function (pi: ExtensionAPI) {
 	let toolCallSequence = 0;
 	const pendingToolCalls: PendingToolCall[] = [];
 	const cards = new Map<string, CardState>();
+	let widgetCrewFilter = "all";
+	const crewWidgetCatalog = new Map<string, CardState[]>();
+	const crossCrewTargets = new Map<string, DispatchTarget>();
+	let activeCrewName = "";
 	const childProcesses = new Map<string, ChildProcessWithoutNullStreams>();
 	const activeDelegations = new Map<string, Promise<any>>();
 
@@ -1602,6 +1662,211 @@ export default function (pi: ExtensionAPI) {
 	function currentParentAgent(): string | null {
 		const parent = process.env.PI_MULTI_PARENT?.trim();
 		return parent || null;
+	}
+
+	function isFullCrewsMode(): boolean {
+		const scope = `${process.env.MAH_ROUTING_SCOPE || ""}`.trim().toLowerCase();
+		return scope === "full_crews" || process.env.MAH_FULL_CREWS === "1";
+	}
+
+	function inferAgentCrew(agent: AgentConfig, fallbackCrew = ""): string {
+		const anyAgent = agent as any;
+		const explicitCrew = `${anyAgent?.crew || anyAgent?.crewId || anyAgent?.crew_id || ""}`.trim();
+		if (explicitCrew) return explicitCrew;
+		const name = `${agent?.name || ""}`.trim();
+		const colonPrefix = /^([a-z0-9._-]+):[a-z0-9._-]+$/i.exec(name);
+		if (colonPrefix?.[1]) return colonPrefix[1];
+		const atSuffix = /^([a-z0-9._-]+)@([a-z0-9._-]+)$/i.exec(name);
+		if (atSuffix?.[2]) return atSuffix[2];
+		return fallbackCrew || process.env.MAH_ACTIVE_CREW || "dev";
+	}
+
+	function widgetCrewOptions(items: CardState[]): string[] {
+		const crews = [...new Set(items.map((item) => `${item.crewName || ""}`.trim()).filter(Boolean))].sort();
+		for (const crew of crewWidgetCatalog.keys()) {
+			if (crew && !crews.includes(crew)) crews.push(crew);
+		}
+		crews.sort((a, b) => a.localeCompare(b));
+		return ["all", ...crews];
+	}
+
+	function buildCrewWidgetCatalog(cwd: string) {
+		crewWidgetCatalog.clear();
+		crossCrewTargets.clear();
+		const role = runtime?.role || "orchestrator";
+		const referenceTeamName = runtime?.team?.name || "";
+		for (const entry of resolveCrewConfigPaths(cwd)) {
+			try {
+				const parsed = parseYamlSubset(readFileSync(entry.configPath, "utf-8")) as any;
+				const seedCards: CardState[] = [];
+				const teams = Array.isArray(parsed?.teams) ? parsed.teams : [];
+				const agents = Array.isArray(parsed?.agents) ? parsed.agents : [];
+
+				if (role === "orchestrator") {
+					if (teams.length > 0) {
+						for (const team of teams) {
+							if (team?.lead?.name) {
+								const leadTarget: DispatchTarget = {
+									agent: team.lead,
+									role: "lead",
+									team,
+									crewName: entry.crew,
+									configPath: entry.configPath,
+								};
+								crossCrewTargets.set(childKey(team.lead.name), leadTarget);
+								seedCards.push({
+									agent: team.lead,
+									role: "lead",
+									teamName: team.name,
+									crewName: entry.crew,
+									status: "idle",
+									task: "",
+									lastLine: "",
+									elapsed: 0,
+									runCount: 0,
+								});
+								continue;
+							}
+							for (const member of Array.isArray(team?.members) ? team.members : []) {
+								if (!member?.name) continue;
+								const workerTarget: DispatchTarget = {
+									agent: member,
+									role: "worker",
+									team,
+									crewName: entry.crew,
+									configPath: entry.configPath,
+								};
+								crossCrewTargets.set(childKey(member.name), workerTarget);
+								seedCards.push({
+									agent: member,
+									role: "worker",
+									teamName: team?.name || "",
+									crewName: entry.crew,
+									status: "idle",
+									task: "",
+									lastLine: "",
+									elapsed: 0,
+									runCount: 0,
+								});
+							}
+						}
+					} else if (agents.length > 0) {
+						const leadAgents = agents.filter((agent: any) => `${agent?.role || ""}`.toLowerCase() === "lead");
+						const workerAgents = agents.filter((agent: any) => `${agent?.role || ""}`.toLowerCase() === "worker");
+						const selected = leadAgents.length > 0 ? leadAgents : workerAgents;
+						for (const agent of selected) {
+							if (!agent?.id && !agent?.name) continue;
+							const normalizedAgent: AgentConfig = {
+								name: `${agent.name || agent.id}`,
+								prompt: `${agent.prompt || ""}`,
+								description: `${agent.description || ""}`,
+								model: `${agent.model || ""}`,
+								tools: agent.tools,
+								skills: agent.skills,
+								expertise: agent.expertise,
+								domain: agent.domain,
+								domain_profile: agent.domain_profile,
+							};
+							const normalizedTarget: DispatchTarget = {
+								agent: normalizedAgent,
+								role: leadAgents.length > 0 ? "lead" : "worker",
+								team: { name: `${agent.team || ""}`, members: [] },
+								crewName: entry.crew,
+								configPath: entry.configPath,
+							};
+							crossCrewTargets.set(childKey(normalizedAgent.name), normalizedTarget);
+							seedCards.push({
+								agent: normalizedAgent,
+								role: leadAgents.length > 0 ? "lead" : "worker",
+								teamName: `${agent.team || ""}`,
+								crewName: entry.crew,
+								status: "idle",
+								task: "",
+								lastLine: "",
+								elapsed: 0,
+								runCount: 0,
+							});
+						}
+					} else {
+						const discovered = discoverAgentsFromCrewDir(entry.configPath);
+						for (const agent of discovered) {
+							seedCards.push({
+								agent,
+								role: "worker",
+								teamName: "",
+								crewName: entry.crew,
+								status: "idle",
+								task: "",
+								lastLine: "",
+								elapsed: 0,
+								runCount: 0,
+							});
+						}
+					}
+				} else if (role === "lead") {
+					if (teams.length > 0) {
+						const selectedTeam = teams.find((team) => matchesName(team.name || "", referenceTeamName)) || teams[0];
+						for (const member of Array.isArray(selectedTeam?.members) ? selectedTeam.members : []) {
+							seedCards.push({
+								agent: member,
+								role: "worker",
+								teamName: selectedTeam?.name || "",
+								crewName: entry.crew,
+								status: "idle",
+								task: "",
+								lastLine: "",
+								elapsed: 0,
+								runCount: 0,
+							});
+						}
+					} else if (agents.length > 0) {
+						const workers = agents.filter((agent: any) => `${agent?.role || ""}`.toLowerCase() === "worker");
+						for (const agent of workers) {
+							if (referenceTeamName && !matchesName(`${agent?.team || ""}`, referenceTeamName)) continue;
+							seedCards.push({
+								agent: {
+									name: `${agent.name || agent.id}`,
+									prompt: `${agent.prompt || ""}`,
+									description: `${agent.description || ""}`,
+									model: `${agent.model || ""}`,
+									tools: agent.tools,
+									skills: agent.skills,
+									expertise: agent.expertise,
+									domain: agent.domain,
+									domain_profile: agent.domain_profile,
+								},
+								role: "worker",
+								teamName: `${agent.team || ""}`,
+								crewName: entry.crew,
+								status: "idle",
+								task: "",
+								lastLine: "",
+								elapsed: 0,
+								runCount: 0,
+							});
+						}
+					} else {
+						const discovered = discoverAgentsFromCrewDir(entry.configPath);
+						for (const agent of discovered) {
+							seedCards.push({
+								agent,
+								role: "worker",
+								teamName: "",
+								crewName: entry.crew,
+								status: "idle",
+								task: "",
+								lastLine: "",
+								elapsed: 0,
+								runCount: 0,
+							});
+						}
+					}
+				}
+				crewWidgetCatalog.set(entry.crew, seedCards);
+			} catch {
+				// best effort: ignore malformed crew config
+			}
+		}
 	}
 
 	function sessionPath(...parts: string[]): string {
@@ -1915,7 +2180,7 @@ export default function (pi: ExtensionAPI) {
 				return { role: "orchestrator", team: "global" };
 			}
 			for (const team of config.teams) {
-				if (matchesName(team.lead.name, agent.name)) {
+				if (team.lead?.name && matchesName(team.lead.name, agent.name)) {
 					return { role: "lead", team: team.name };
 				}
 				if (team.members.some((member) => matchesName(member.name, agent.name))) {
@@ -2333,9 +2598,27 @@ export default function (pi: ExtensionAPI) {
 		if (runtime.role === "orchestrator") {
 			const catalog = config.teams.map((team) => {
 				const members = team.members.map((member) => displayName(member.name)).join(", ");
-				return `- Team "${team.name}" -> lead \`${team.lead.name}\` (${members})`;
+				if (team.lead?.name) return `- Team "${team.name}" -> lead \`${team.lead.name}\` (${members})`;
+				return `- Team "${team.name}" -> workers (${members || "none"})`;
 			}).join("\n");
-			sections.unshift(`## Runtime Catalog\n${catalog}`);
+			const externalByCrew = new Map<string, DispatchTarget[]>();
+			if (isFullCrewsMode()) {
+				for (const target of crossCrewTargets.values()) {
+					if (!target.crewName || target.crewName === activeCrewName) continue;
+					const list = externalByCrew.get(target.crewName) || [];
+					list.push(target);
+					externalByCrew.set(target.crewName, list);
+				}
+			}
+			const externalLines: string[] = [];
+			for (const [crew, targets] of Array.from(externalByCrew.entries()).sort((a, b) => a[0].localeCompare(b[0]))) {
+				const leads = targets.filter((target) => target.role === "lead").map((target) => target.agent.name);
+				const workers = targets.filter((target) => target.role === "worker").map((target) => target.agent.name);
+				if (leads.length > 0) externalLines.push(`- Crew "${crew}" -> leads (${leads.join(", ")})`);
+				if (workers.length > 0) externalLines.push(`- Crew "${crew}" -> workers (${workers.join(", ")})`);
+			}
+			const fullCatalog = externalLines.length > 0 ? `${catalog}\n${externalLines.join("\n")}` : catalog;
+			sections.unshift(`## Runtime Catalog\n${fullCatalog}`);
 		} else if (runtime.role === "lead" && runtime.team) {
 			const catalog = runtime.team.members.map((member) => {
 				const tools = normalizeTools(effectiveTools(config, member), "worker").join(", ");
@@ -2370,8 +2653,9 @@ export default function (pi: ExtensionAPI) {
 		// Title row
 		const titleText = shortText(displayName(state.agent.name), contentWidth - 2);
 
-		// Meta row: role badge + team
-		const metaText = shortText(`${roleIcon} ${state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel}`, contentWidth);
+		// Meta row: role badge + team + crew (when available)
+		const crewPart = state.crewName ? ` · ${state.crewName}` : "";
+		const metaText = shortText(`${roleIcon} ${state.teamName ? `${roleLabel} · ${state.teamName}` : roleLabel}${crewPart}`, contentWidth);
 
 		// Status row: icon + status + elapsed + run count
 		const elapsedText = state.status !== "idle" ? ` ${Math.round(state.elapsed / 1000)}s` : "";
@@ -2457,7 +2741,30 @@ export default function (pi: ExtensionAPI) {
 						return text.render(width);
 					}
 
-					const items = Array.from(cards.values());
+					const activeItems = Array.from(cards.values());
+					let items = activeItems;
+					if (widgetCrewFilter === "all") {
+						const merged = new Map<string, CardState>();
+						for (const item of activeItems) {
+							const key = `${item.crewName || activeCrewName}|${childKey(item.agent.name)}`;
+							merged.set(key, item);
+						}
+						for (const [crewName, catalogItems] of crewWidgetCatalog.entries()) {
+							for (const item of catalogItems) {
+								const key = `${crewName || item.crewName || activeCrewName}|${childKey(item.agent.name)}`;
+								if (!merged.has(key)) merged.set(key, item);
+							}
+						}
+						items = Array.from(merged.values());
+					}
+					const crewOptions = widgetCrewOptions(items);
+					if (widgetCrewFilter !== "all" && crewOptions.includes(widgetCrewFilter)) {
+						if (widgetCrewFilter === activeCrewName) {
+							items = activeItems.filter((item) => (item.crewName || "") === widgetCrewFilter);
+						} else {
+							items = crewWidgetCatalog.get(widgetCrewFilter) || [];
+						}
+					}
 					const lines: string[] = [];
 
 					// ── Header summary bar (opencode-style) ──
@@ -2479,7 +2786,8 @@ export default function (pi: ExtensionAPI) {
 
 					const headerLeft = headerParts.join(theme.fg("dim", " ·"));
 					const roleName = runtime.role === "orchestrator" ? "Orchestrator" : "Lead";
-					const headerRight = theme.fg("dim", `${roleName} `);
+					const crewLabel = widgetCrewFilter === "all" ? "all-crews" : `crew:${widgetCrewFilter}`;
+					const headerRight = theme.fg("dim", `${roleName} · ${crewLabel} `);
 					const headerPad = Math.max(0, width - visibleWidth(headerLeft) - visibleWidth(headerRight));
 					lines.push(truncateToWidth(headerLeft + " ".repeat(headerPad) + headerRight, width));
 					lines.push(theme.fg("accent", "━".repeat(Math.min(4, width))) + theme.fg("dim", "─".repeat(Math.max(0, width - 4))));
@@ -2533,14 +2841,23 @@ export default function (pi: ExtensionAPI) {
 	function initCards() {
 		if (!runtime) return;
 		cards.clear();
+		const activeCrew = `${process.env.MAH_SELECTED_CREW || process.env.MAH_ACTIVE_CREW || crewFromConfigPath(config?.configPath || "") || "dev"}`.trim() || "dev";
+		activeCrewName = activeCrew;
 		for (const child of runtime.children) {
 			const teamName = runtime.role === "orchestrator"
-				? config?.teams.find((team) => matchesName(team.lead.name, child.name))?.name
+				? config?.teams.find((team) =>
+					(team.lead?.name && matchesName(team.lead.name, child.name)) ||
+					(team.members || []).some((member) => matchesName(member.name, child.name))
+				)?.name
 				: runtime.team?.name;
+			const crewName = inferAgentCrew(child, activeCrew);
 			cards.set(childKey(child.name), {
 				agent: child,
-				role: runtime.role === "orchestrator" ? "lead" : "worker",
+				role: runtime.role === "orchestrator"
+					? (config?.teams.some((team) => team.lead?.name && matchesName(team.lead.name, child.name)) ? "lead" : "worker")
+					: "worker",
 				teamName,
+				crewName,
 				status: "idle",
 				task: "",
 				lastLine: "",
@@ -2548,17 +2865,69 @@ export default function (pi: ExtensionAPI) {
 				runCount: 0,
 			});
 		}
+		widgetCrewFilter = "all";
 	}
 
 	function resolveTarget(targetName: string): DispatchTarget | null {
 		if (!config || !runtime) return null;
+		const resolveCrossCrewAlias = (name: string): DispatchTarget | null => {
+			if (!isFullCrewsMode()) return null;
+			const normalized = `${name || ""}`.trim();
+			if (!normalized) return null;
+			const simplified = normalized
+				.toLowerCase()
+				.replace(/\b(crew|team|workers?)\b/g, " ")
+				.replace(/\s+/g, " ")
+				.trim();
+			const direct = crossCrewTargets.get(childKey(normalized));
+			if (direct) return direct;
+			if (simplified && simplified !== normalized.toLowerCase()) {
+				const directSimplified = crossCrewTargets.get(childKey(simplified));
+				if (directSimplified) return directSimplified;
+			}
 
-		if (runtime.role === "orchestrator") {
-			const team = config.teams.find((item) =>
-				matchesName(item.name, targetName) || matchesName(item.lead.name, targetName)
-			);
-			return team ? { agent: team.lead, role: "lead", team } : null;
+			const grouped = new Map<string, DispatchTarget[]>();
+			for (const target of crossCrewTargets.values()) {
+				const crew = `${target.crewName || ""}`.trim();
+				if (!crew) continue;
+				const list = grouped.get(crew) || [];
+				list.push(target);
+				grouped.set(crew, list);
+			}
+
+			const byCrew = Array.from(grouped.entries()).find(([crew]) => matchesName(crew, normalized) || (simplified ? matchesName(crew, simplified) : false));
+			if (byCrew) {
+				const targets = byCrew[1];
+				return targets.find((target) => target.role === "lead")
+					|| targets.find((target) => target.role === "worker")
+					|| null;
+			}
+
+			for (const targets of grouped.values()) {
+				const byTeam = targets.find((target) =>
+					target.team?.name && (matchesName(target.team.name, normalized) || (simplified ? matchesName(target.team.name, simplified) : false))
+				);
+				if (byTeam) return byTeam;
+			}
+			return null;
+		};
+
+	if (runtime.role === "orchestrator") {
+		const team = config.teams.find((item) =>
+			matchesName(item.name, targetName) || (item.lead?.name ? matchesName(item.lead.name, targetName) : false)
+		);
+		if (team?.lead) return { agent: team.lead, role: "lead", team };
+		const directWorkerTeam = config.teams.find((item) =>
+			(item.members || []).some((member) => matchesName(member.name, targetName))
+		);
+		if (directWorkerTeam) {
+			const worker = (directWorkerTeam.members || []).find((member) => matchesName(member.name, targetName));
+			if (worker) return { agent: worker, role: "worker", team: directWorkerTeam };
 		}
+		const external = resolveCrossCrewAlias(targetName);
+		if (external) return external;
+		return null;
+	}
 
 		if (runtime.role === "lead" && runtime.team) {
 			const worker = runtime.team.members.find((member) => matchesName(member.name, targetName));
@@ -2572,16 +2941,31 @@ export default function (pi: ExtensionAPI) {
 		if (!config || !runtime || runtime.role !== "orchestrator") return null;
 		for (const team of config.teams) {
 			const worker = team.members.find((member) => matchesName(member.name, targetName));
-			if (worker) return { lead: team.lead, team, worker };
+			if (worker && team.lead) return { lead: team.lead, team, worker };
 		}
 		return null;
 	}
 
 	function availableTargetsText(): string {
-		if (!runtime || !config) return "";
-		if (runtime.role === "orchestrator") {
-			return config.teams.map((team) => `${team.name} (${team.lead.name})`).join(", ");
+	if (!runtime || !config) return "";
+	if (runtime.role === "orchestrator") {
+		const local = config.teams.map((team) => {
+			if (team.lead?.name) return `${team.name} (${team.lead.name})`;
+			const workers = (team.members || []).map((member) => member.name).join(", ");
+			return `${team.name} [workers: ${workers || "none"}]`;
+		});
+		if (!isFullCrewsMode()) return local.join(", ");
+		const seen = new Set(local);
+		for (const target of crossCrewTargets.values()) {
+			if (target.crewName === activeCrewName) continue;
+			const label = `${target.crewName || "crew"}:${target.agent.name}`;
+			if (!seen.has(label)) {
+				seen.add(label);
+				local.push(label);
+			}
 		}
+		return local.join(", ");
+	}
 		if (runtime.role === "lead" && runtime.team) {
 			return runtime.team.members.map((member) => member.name).join(", ");
 		}
@@ -2712,9 +3096,9 @@ export default function (pi: ExtensionAPI) {
 			|| text.includes("no file changes were made");
 	}
 
-	function outputSignalsBlocked(output: string): boolean {
-		const text = output.toLowerCase();
-		return text.includes("blocked by ")
+function outputSignalsBlocked(output: string): boolean {
+	const text = output.toLowerCase();
+	return text.includes("blocked by ")
 			|| text.includes("ownership guardrail")
 			|| text.includes("access denied")
 			|| text.includes("permission denied")
@@ -2723,7 +3107,13 @@ export default function (pi: ExtensionAPI) {
 			|| text.includes("429")
 			|| text.includes("no api key found")
 			|| text.includes("missing api key");
-	}
+}
+
+function isLivenessTask(task: string): boolean {
+	const normalized = `${task || ""}`.toLowerCase();
+	if (!normalized.trim()) return false;
+	return /\b(ping|pong|alive|liveness|health(?:\s|-)?check|heartbeat|status)\b/.test(normalized);
+}
 
 	function sleep(ms: number): Promise<void> {
 		return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
@@ -2853,8 +3243,25 @@ export default function (pi: ExtensionAPI) {
 			});
 		}
 
-		const card = cards.get(childKey(child.agent.name));
-		if (card?.status === "running") {
+		const cardRefs: CardState[] = [];
+		const seenCardObjects = new Set<CardState>();
+		const primary = cards.get(childKey(child.agent.name));
+		if (primary) {
+			cardRefs.push(primary);
+			seenCardObjects.add(primary);
+		}
+		for (const list of crewWidgetCatalog.values()) {
+			for (const item of list) {
+				if (!matchesName(item.agent.name, child.agent.name)) continue;
+				if (child.crewName && item.crewName && !matchesName(item.crewName, child.crewName)) continue;
+				if (!seenCardObjects.has(item)) {
+					cardRefs.push(item);
+					seenCardObjects.add(item);
+				}
+			}
+		}
+		const card = cardRefs[0];
+		if (cardRefs.some((item) => item.status === "running")) {
 			return Promise.resolve({
 				output: `${displayName(child.agent.name)} is already running.`,
 				exitCode: 1,
@@ -2863,23 +3270,23 @@ export default function (pi: ExtensionAPI) {
 			});
 		}
 
-		if (card) {
-			card.status = "running";
-			card.task = task;
-			card.lastLine = "";
-			card.elapsed = 0;
-			card.runCount++;
-			updateWidget();
+		for (const item of cardRefs) {
+			item.status = "running";
+			item.task = task;
+			item.lastLine = "";
+			item.elapsed = 0;
+			item.runCount++;
 		}
+		if (cardRefs.length > 0) updateWidget();
 
 		const startTime = Date.now();
-		if (card) {
-			card.timer = (globalThis.setInterval(() => {
-				card.elapsed = Date.now() - startTime;
+		for (const item of cardRefs) {
+			item.timer = (globalThis.setInterval(() => {
+				item.elapsed = Date.now() - startTime;
 				updateWidget();
 			}, 1000) as any);
-			if (typeof card.timer?.unref === "function") {
-				card.timer.unref();
+			if (typeof item.timer?.unref === "function") {
+				item.timer.unref();
 			}
 		}
 
@@ -2887,6 +3294,7 @@ export default function (pi: ExtensionAPI) {
 		const prompt = buildDelegationPrompt(child, task);
 		const extensionPath = SELF_EXTENSION_PATH;
 		const mcpBridgePath = SELF_MCP_BRIDGE_PATH;
+		const childConfigPath = child.configPath || config.configPath;
 		const childTools = normalizeTools(effectiveTools(config, child.agent), child.role);
 		const requestedSpawnTools = child.role === "worker"
 			? childTools
@@ -2955,7 +3363,7 @@ export default function (pi: ExtensionAPI) {
 			stdio: ["ignore", "pipe", "pipe"],
 			env: {
 				...process.env,
-				MAH_MULTI_CONFIG: config!.configPath,
+				MAH_MULTI_CONFIG: childConfigPath,
 				MAH_MULTI_ROLE: child.role,
 				MAH_MULTI_AGENT: child.agent.name,
 				MAH_MULTI_TEAM: child.team?.name || "",
@@ -2963,7 +3371,7 @@ export default function (pi: ExtensionAPI) {
 				MAH_MULTI_SESSION_ROOT: currentSessionRoot(),
 				MAH_MULTI_PARENT: runtime!.agent.name,
 				MAH_MULTI_DEPTH: String(currentDepth() + 1),
-				PI_MULTI_CONFIG: config!.configPath,
+				PI_MULTI_CONFIG: childConfigPath,
 				PI_MULTI_ROLE: child.role,
 				PI_MULTI_AGENT: child.agent.name,
 				PI_MULTI_TEAM: child.team?.name || "",
@@ -3000,10 +3408,11 @@ export default function (pi: ExtensionAPI) {
 						}
 
 						textChunks.push(raw);
-						if (card) {
+						if (cardRefs.length > 0) {
 							const fullCurrentResponse = textChunks.join("");
 							const lines = fullCurrentResponse.split("\n").filter((row) => row.trim());
-							card.lastLine = lines.pop() || "";
+							const nextLine = lines.pop() || "";
+							for (const item of cardRefs) item.lastLine = nextLine;
 							updateWidget();
 						}
 					};
@@ -3065,7 +3474,9 @@ export default function (pi: ExtensionAPI) {
 				} catch { }
 			}
 
-			if (card?.timer) clearInterval(card.timer);
+			for (const item of cardRefs) {
+				if (item.timer) clearInterval(item.timer);
+			}
 			const elapsed = Date.now() - startTime;
 			const output = textChunks.join("");
 			const stderrOutput = stderrChunks.join("").trim();
@@ -3075,6 +3486,7 @@ export default function (pi: ExtensionAPI) {
 			const executionPostureFailure = child.role === "worker"
 				&& childExitCode === 0
 				&& realToolCalls.length === 0
+				&& !isLivenessTask(task)
 				&& !outputSignalsBlocked(output);
 			const effectiveExitCode = executionPostureFailure ? 2 : childExitCode;
 			let effectiveOutput = executionPostureFailure
@@ -3092,17 +3504,20 @@ export default function (pi: ExtensionAPI) {
 				effectiveOutput = `[stderr]\n${compactStderr}`;
 			}
 
-			if (card) {
+			if (cardRefs.length > 0) {
 				if (!functionallyDone || effectiveExitCode !== 0) {
 					if (!functionallyDone) {
-						card.status = effectiveExitCode === 0 ? "done" : "error";
+						for (const item of cardRefs) item.status = effectiveExitCode === 0 ? "done" : "error";
 					} else if (effectiveExitCode !== 0 && effectiveExitCode !== 137 && code !== null) {
-						card.status = "error";
+						for (const item of cardRefs) item.status = "error";
 					}
 				}
-				card.elapsed = elapsed;
-				if (!card.lastLine || card.lastLine.startsWith("Running") || card.lastLine === "Done (Functional)") {
-					card.lastLine = effectiveOutput.split("\n").filter((line) => line.trim()).pop() || (effectiveExitCode === 0 ? "Done" : `Error ${effectiveExitCode}`);
+				const fallbackLine = effectiveOutput.split("\n").filter((line) => line.trim()).pop() || (effectiveExitCode === 0 ? "Done" : `Error ${effectiveExitCode}`);
+				for (const item of cardRefs) {
+					item.elapsed = elapsed;
+					if (!item.lastLine || item.lastLine.startsWith("Running") || item.lastLine === "Done (Functional)") {
+						item.lastLine = fallbackLine;
+					}
 				}
 				updateWidget();
 			}
@@ -3164,11 +3579,16 @@ export default function (pi: ExtensionAPI) {
 
 		proc.on("error", (err) => {
 			childProcesses.delete(child.agent.name);
-			if (card?.timer) clearInterval(card.timer);
-			if (card) {
-				card.status = "error";
-				card.lastLine = `Spawn error: ${err.message}`;
-				card.elapsed = Date.now() - startTime;
+			for (const item of cardRefs) {
+				if (item.timer) clearInterval(item.timer);
+			}
+			if (cardRefs.length > 0) {
+				const elapsedNow = Date.now() - startTime;
+				for (const item of cardRefs) {
+					item.status = "error";
+					item.lastLine = `Spawn error: ${err.message}`;
+					item.elapsed = elapsedNow;
+				}
 				updateWidget();
 			}
 			appendEvent("delegate_error", { target: child.agent.name, error: err.message });
@@ -3850,7 +4270,11 @@ export default function (pi: ExtensionAPI) {
 				`orchestrator -> ${config.orchestrator.name} [${normalizeTools(effectiveTools(config, config.orchestrator), "orchestrator").join(", ")}]`,
 			];
 			for (const team of config.teams) {
-				lines.push(`team:${team.name} -> ${team.lead.name} [${normalizeTools(effectiveTools(config, team.lead), "lead").join(", ")}]`);
+				if (team.lead?.name) {
+					lines.push(`team:${team.name} -> ${team.lead.name} [${normalizeTools(effectiveTools(config, team.lead), "lead").join(", ")}]`);
+				} else {
+					lines.push(`team:${team.name} -> (no lead)`);
+				}
 				for (const member of team.members) {
 					const tools = normalizeTools(effectiveTools(config, member), "worker").join(", ");
 					const domain = domainRulesSummary(config, effectiveDomain(config, member)).join("; ") || "(none)";
@@ -3858,6 +4282,26 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 			ctx.ui.notify(lines.join("\n"), "info");
+		},
+	});
+
+	pi.registerShortcut("alt+c", {
+		description: "Cycle visible widget crew (only in --full-crews mode)",
+		handler: async (ctx) => {
+			if (!runtime) return;
+			if (!isFullCrewsMode()) {
+				ctx.ui.notify("Crew widget toggle available only in --full-crews mode.", "warning");
+				return;
+			}
+			const options = widgetCrewOptions(Array.from(cards.values()));
+			if (options.length <= 1) {
+				ctx.ui.notify("No additional crews available in current widget set.", "info");
+				return;
+			}
+			const currentIndex = Math.max(0, options.indexOf(widgetCrewFilter));
+			widgetCrewFilter = options[(currentIndex + 1) % options.length];
+			updateWidget();
+			ctx.ui.notify(`Widget crew filter: ${widgetCrewFilter}`, "info");
 		},
 	});
 
@@ -4272,6 +4716,7 @@ Note: Controls thinking level for delegated child agents only.`
 		try {
 			config = loadConfig(ctx.cwd);
 			runtime = resolveRuntime(config);
+			buildCrewWidgetCatalog(ctx.cwd);
 			ensureSessionLayout();
 			ensureExpertiseFile(runtime.agent);
 			initCards();
@@ -4315,6 +4760,7 @@ Note: Controls thinking level for delegated child agents only.`
 			`Multi-Team loaded\nSystem: ${config!.name}\nRole: ${runtime.role}\nAgent: ${runtime.agent.name}\nSession: ${currentSessionId()}\n\n` +
 			`/multi-team       Runtime summary\n` +
 			`/multi-team-tree  Print hierarchy\n` +
+			`Alt+C            Cycle crew widget filter (full-crews)\n` +
 			`/thinking         Control thinking level`,
 			"info",
 		);

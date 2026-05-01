@@ -5771,6 +5771,9 @@ async function main() {
       passthrough = stripFullCrewsFlag(passthrough)
       passthrough = upsertFlagValue(passthrough, "--crew", cooperativeDecision.selectedCrew)
       passthrough = upsertFlagValue(passthrough, "--agent", cooperativeDecision.selectedAgent)
+      process.env.MAH_ROUTING_SCOPE = "full_crews"
+      process.env.MAH_SOURCE_CREW = cooperativeDecision.sourceCrew
+      process.env.MAH_SELECTED_CREW = cooperativeDecision.selectedCrew
     }
   }
 

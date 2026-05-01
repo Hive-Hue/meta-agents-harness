@@ -845,7 +845,6 @@ function buildOpencodeCrewDoc(meta, crew) {
   for (const teamName of teamNames) {
     const leadId = crew.topology?.leads?.[teamName]
     const lead = byId.get(leadId)
-    if (!lead) continue
 
     const memberIds = crew.topology?.workers?.[teamName] || []
     const members = memberIds
@@ -869,9 +868,12 @@ function buildOpencodeCrewDoc(meta, crew) {
         domain: domainFromProfile(meta, member.domain_profile, "opencode")
       }))
 
-    teams.push({
+    const teamDoc = {
       name: titleCase(teamName),
-      lead: {
+      members
+    }
+    if (lead) {
+      teamDoc.lead = {
         id: lead.id,
         role: "lead",
         ...agentRuntimeMetadata(lead),
@@ -888,9 +890,9 @@ function buildOpencodeCrewDoc(meta, crew) {
         mcp_access: runtimeMcpAccess(),
         routes_to: memberIds,
         domain: domainFromProfile(meta, lead.domain_profile, "opencode")
-      },
-      members
-    })
+      }
+    }
+    teams.push(teamDoc)
   }
 
   const orchestratorId = crew.topology?.orchestrator
@@ -931,7 +933,7 @@ function buildOpencodeCrewDoc(meta, crew) {
       skills: runtimeSkillEntries(meta, orchestrator.skills, "opencode"),
       tools: ["task", "update-expertise-model"],
       mcp_access: runtimeMcpAccess(),
-      routes_to: leadIds,
+      routes_to: leadIds.length > 0 ? leadIds : teamNames.flatMap((teamName) => crew.topology?.workers?.[teamName] || []),
       domain: domainFromProfile(meta, orchestrator.domain_profile, "opencode")
     },
     teams
@@ -952,9 +954,7 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
 
   for (const teamName of teamNames) {
     const leadId = crew.topology?.leads?.[teamName]
-    if (!leadId) continue
     const lead = byId.get(leadId)
-    if (!lead) continue
     const memberIds = crew.topology?.workers?.[teamName] || []
     const members = memberIds
       .map((memberId) => byId.get(memberId))
@@ -978,9 +978,12 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
         domain: domainFromProfile(meta, member.domain_profile, runtime)
       }))
 
-    teams.push({
+    const teamDoc = {
       name: titleCase(teamName),
-      lead: {
+      members
+    }
+    if (lead) {
+      teamDoc.lead = {
         name: lead.id,
         description: `${titleCase(lead.id)} ${teamName} lead`,
         ...agentRuntimeMetadata(lead),
@@ -998,9 +1001,9 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
         skills: runtimeSkillPaths(meta, lead.skills, runtime),
         routes_to: memberIds,
         domain: domainFromProfile(meta, lead.domain_profile, runtime)
-      },
-      members
-    })
+      }
+    }
+    teams.push(teamDoc)
   }
 
   const orchestratorId = crew.topology?.orchestrator
@@ -1037,7 +1040,7 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
       model_fallbacks: resolveAgentFallbacks(meta, runtime, orchestrator),
       tools: runtimeTools(orchestrator, runtime),
       skills: runtimeSkillPaths(meta, orchestrator.skills, runtime),
-      routes_to: leadIds,
+      routes_to: leadIds.length > 0 ? leadIds : teamNames.flatMap((teamName) => crew.topology?.workers?.[teamName] || []),
       domain: domainFromProfile(meta, orchestrator.domain_profile, runtime)
     },
     teams

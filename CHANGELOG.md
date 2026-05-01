@@ -9,6 +9,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Added
 
+- PI `--full-crews` orchestrator runtime now exposes cross-crew catalog visibility in prompt/runtime catalog and resolves delegation targets across crews (including worker-only crews without leads)
 - Claude runtime now includes declared per-agent domain rules in generated `--agents` prompts (`Declared domain rules: ...`) for delegation observability.
 - `--policy enforce-domain` guardrail for Claude runtime: fail-fast when crew config contains granular per-agent domain rules that cannot be path-enforced by the runtime surface.
 - WebUI live data layer: Config Editor, Overview Dashboard, Skills Management, and Settings all consume real data from `meta-agents.yaml`, `mah` CLI, and workspace state
@@ -66,6 +67,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Changed
 
+- PI multi-team TUI `Alt+C` crew filter in `--full-crews` now separates visual filtering from delegation routing; `all-crews` view renders the union of widgets from all discovered crews
 - Claude runtime warns explicitly when domain rules are prompt-declarative (non-enforced) in the active crew.
 - WebUI Vite middleware uses `next()` pattern to intercept API routes before SPA fallback
 - Settings sections are now collapsible with expand/collapse toggle
@@ -98,6 +100,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Fixed
 
+- `sync-meta-agents` no longer drops teams that have workers but no lead when generating runtime `multi-team.yaml`; orchestrator `routes_to` now falls back to workers when no leads exist
+- PI multi-team runtime no longer dereferences `team.lead` unsafely in worker-only teams, fixing `0 agents`/missing widgets in crew filters
+- PI cross-crew delegation now propagates target crew config (`MAH_MULTI_CONFIG`/`PI_MULTI_CONFIG`) to child runs so workers execute under the correct crew runtime
+- Parallel delegation no longer reports false-negative failures for liveness/ping tasks when workers respond without tool calls
+- Cross-crew widget cards now receive live status/timer updates during delegation, restoring running animations for worker-only external crews
 - Path traversal regex in `promoteProposal` (`context-memory-proposal.mjs`) incorrectly rejected valid document IDs containing `/` (e.g., `dev/agent/implement/...`); regex changed from `/[.]{2}|[/\\]|\0/` to `/[.]{2}|\\|\0/`
 - Proposal generation used `Kind:` instead of `kind:` in YAML preview block, causing schema validation to fail during promotion
 - `mah run --headless` completely overhauled for correct non-interactive execution across all runtimes
