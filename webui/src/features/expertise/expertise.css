@@ -118,7 +118,7 @@
 .workflow-panel {
   padding: 16px 32px;
   max-width: 100%;
-  margin-bottom: -250px;
+  margin-bottom: 16px;
 }
 
 .workflow-panel__header {

@@ -27,6 +27,7 @@ export function ExpertiseGovernance() {
   const [tab, setTab] = useState<"catalog"|"evidence"|"proposals"|"lifecycle">("catalog");
   const [showSyncPreview, setShowSyncPreview] = useState(false);
   const [syncResults, setSyncResults] = useState<SyncChange[]>([]);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState<string|null>(null);
   const [proposeAgent, setProposeAgent] = useState("");
@@ -43,23 +44,45 @@ export function ExpertiseGovernance() {
 
   const handleSeed = async () => {
     setSyncLoading(true);
+    setSyncMessage(null);
     const r = await runMah(["expertise", "seed", "--crew", crew, "--force"]);
     if (r.ok) await reload();
+    if (!r.ok) setSyncMessage(r.stderr || r.error || "Seed failed");
     setSyncLoading(false);
     if (r.ok) setStep("sync");
   };
 
   const handleSyncDryRun = async () => {
     setSyncLoading(true);
+    setSyncMessage(null);
+    setSyncResults([]);
     const r = await runMah(["expertise", "sync", "--crew", crew, "--dry-run", "--json"]);
-    if (r.ok) { try { setSyncResults(JSON.parse(r.stdout).results || []); } catch {} }
+    if (!r.ok) {
+      setSyncMessage(r.stderr || r.error || "Sync dry-run failed");
+      setSyncLoading(false);
+      return;
+    }
+    try {
+      const parsed = JSON.parse(r.stdout || "{}");
+      setSyncResults(Array.isArray(parsed.results) ? parsed.results : []);
+      setSyncMessage(`Dry-run completed: ${Array.isArray(parsed.results) ? parsed.results.length : 0} entries analyzed.`);
+    } catch (err) {
+      setSyncMessage(`Failed to parse dry-run output: ${String(err)}`);
+    }
     setSyncLoading(false);
   };
 
   const handleSyncExec = async () => {
     setSyncLoading(true);
+    setSyncMessage(null);
     const r = await runMah(["expertise", "sync", "--crew", crew, "--json"]);
-    if (r.ok) { await reload(); setStep("propose"); }
+    if (r.ok) {
+      await reload();
+      setStep("propose");
+      setSyncMessage("Sync applied successfully.");
+    } else {
+      setSyncMessage(r.stderr || r.error || "Sync execution failed");
+    }
     setSyncLoading(false);
   };
 
@@ -172,6 +195,11 @@ export function ExpertiseGovernance() {
               <button type="button" className="workflow-action-btn workflow-action-btn--primary" onClick={async () => { await handleSyncDryRun(); setShowSyncPreview(true); }}>
                 <Icon name="search" size={14} />Preview Changes
               </button>
+              {syncMessage && (
+                <div className={syncMessage.toLowerCase().includes("failed") ? "propose-result propose-result--error" : "propose-result propose-result--ok"} style={{marginTop: 10}}>
+                  {syncMessage}
+                </div>
+              )}
             </div>
           )}
 
@@ -322,7 +350,7 @@ export function ExpertiseGovernance() {
       <aside className="inspector">
         <ExpertiseInspector entry={entries.find(e=>e.id===selectedId)||null} onClose={()=>setSelectedId(null)} />
       </aside>
-      {showSyncPreview && syncResults.length > 0 && (
+      {showSyncPreview && (
         <SyncPreviewModal
           results={syncResults}
           onClose={() => setShowSyncPreview(false)}
@@ -506,6 +534,7 @@ function ExpertiseInspector({ entry, onClose }: { entry: ExpertiseEntry|null; on
 function SyncPreviewModal({ results, onClose, onExecute }: { results: SyncChange[]; onClose: () => void; onExecute: () => void }) {
   const changed = results.filter(r => !r.skipped && r.changed);
   const skipped = results.filter(r => r.skipped);
+  const noRows = results.length === 0;
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" onClick={e => e.stopPropagation()}>
@@ -514,6 +543,9 @@ function SyncPreviewModal({ results, onClose, onExecute }: { results: SyncChange
           <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={16}/></button>
         </div>
         <div className="sync-preview-table" style={{maxHeight: "360px", overflowY: "auto", border: "1px solid #eee", borderRadius: "6px", margin: "16px 0"}}>
+          {noRows ? (
+            <div className="empty-state" style={{padding: 16}}>No sync rows returned by dry-run.</div>
+          ) : (
           <table style={{width: "100%", fontSize: "12px"}}>
             <thead>
               <tr>
@@ -538,6 +570,7 @@ function SyncPreviewModal({ results, onClose, onExecute }: { results: SyncChange
               ))}
             </tbody>
           </table>
+          )}
         </div>
         <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"8px"}}>
           <button type="button" className="workflow-action-btn" onClick={onClose}>Cancel</button>
