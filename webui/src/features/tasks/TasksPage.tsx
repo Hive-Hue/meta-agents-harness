@@ -1444,6 +1444,12 @@ function PertView({
               <div><span>Total Slack</span><strong>{formatMinutes(diagram.totalSlack)}</strong></div>
               <div><span>ETA</span><strong>{formatMinutes(diagram.projectFinish)}</strong></div>
             </div>
+            {!expanded ? (
+              <button type="button" className="tasks-toolbar__btn" onClick={onOpenModal}>
+                <Icon name="open_in_full" size={16} />
+                Expand Diagram
+              </button>
+            ) : null}
             {expanded && onCloseModal ? (
               <button type="button" className="tasks-toolbar__btn" onClick={onCloseModal}>
                 <Icon name="close" size={16} />
@@ -1461,14 +1467,6 @@ function PertView({
             <span>Click and drag canvas to pan</span>
             <span>Zoom {Math.round(zoom * 100)}%</span>
           </div>
-          {!expanded ? (
-            <div className="tasks-toolbar tasks-toolbar--inline-end">
-              <button type="button" className="tasks-toolbar__btn" onClick={onOpenModal}>
-                <Icon name="open_in_full" size={16} />
-                Expand Diagram
-              </button>
-            </div>
-          ) : null}
         </div>
         <div
           ref={editorRef}

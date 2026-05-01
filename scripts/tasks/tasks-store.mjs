@@ -27,7 +27,7 @@ export function defaultTaskRecords() {
   return [
     {
       id: "TASK-118",
-      title: "Prefetch audit context docs",
+      title: "Consolidate auth baseline evidence",
       state: "backlog",
       priority: "medium",
       missionId: "q4-audit",
@@ -35,17 +35,17 @@ export function defaultTaskRecords() {
       owner: "planning-lead",
       runtime: "openclaude",
       dependencies: [],
-      estimate: "1h 20m",
-      confidence: 78,
-      risk: "Context gap",
-      summary: "Load and normalize auth hardening references before execution begins.",
+      estimate: "1h 10m",
+      confidence: 81,
+      risk: "Scope drift",
+      summary: "Collect incident notes, policy deltas, and previous rollout logs to establish a clean baseline.",
       lastUpdate: "8m ago",
-      rationale: "Needed to reduce blocked risk before engineering tasks start.",
+      rationale: "Planning starts by locking a factual baseline to avoid rework in downstream validation.",
       command: buildTaskCommand({ id: "TASK-118" })
     },
     {
       id: "TASK-126",
-      title: "Generate runtime sync diff",
+      title: "Generate runtime policy diff",
       state: "ready",
       priority: "medium",
       missionId: "q4-audit",
@@ -53,68 +53,68 @@ export function defaultTaskRecords() {
       owner: "ops-lead",
       runtime: "pi",
       dependencies: ["TASK-118"],
-      estimate: "45m",
-      confidence: 86,
+      estimate: "50m",
+      confidence: 84,
       risk: "Low",
-      summary: "Produce an artifact diff to validate the new runtime boundary.",
+      summary: "Build structured diff across runtime policy files to highlight auth-impacting changes.",
       lastUpdate: "4m ago",
-      rationale: "Selected because ops-lead owns runtime projections and validation hooks.",
+      rationale: "Ops lead owns runtime drift analysis and can expose precise deltas for security review.",
       command: buildTaskCommand({ id: "TASK-126" })
     },
     {
       id: "TASK-142",
-      title: "Verify auth middleware",
+      title: "Verify auth middleware behavior",
       state: "in_progress",
       priority: "high",
       missionId: "q4-audit",
       crewId: "dev",
       owner: "security-lead",
       runtime: "pi",
-      dependencies: ["TASK-118", "TASK-126"],
-      estimate: "2h 30m",
-      confidence: 92,
-      risk: "Dependency risk",
-      summary: "Validate the new auth middleware path and update the hardened execution flow.",
+      dependencies: ["TASK-126"],
+      estimate: "2h 20m",
+      confidence: 90,
+      risk: "Auth regression",
+      summary: "Run targeted auth scenarios against middleware changes and confirm deny/allow behavior.",
       lastUpdate: "active now",
       sessionId: "pi:dev:ses_01j4f82x",
-      rationale: "Assigned to security-lead due to strongest expertise match on auth verification and risk scoring.",
+      rationale: "Security lead is responsible for policy enforcement quality and high-risk regression coverage.",
       command: buildTaskCommand({ id: "TASK-142" })
     },
     {
       id: "TASK-154",
-      title: "Unlock blocked context dependency",
+      title: "Resolve legacy context dependency",
       state: "blocked",
-      priority: "high",
+      priority: "medium",
       missionId: "q4-audit",
       crewId: "dev",
       owner: "context-lead",
       runtime: "openclaude",
       dependencies: ["TASK-118"],
-      estimate: "55m",
-      confidence: 63,
-      risk: "High",
-      summary: "Resolve missing legacy auth docs required by downstream execution.",
+      estimate: "1h 05m",
+      confidence: 69,
+      risk: "Knowledge gap",
+      summary: "Normalize legacy docs and map old terminology to current runtime controls.",
       lastUpdate: "12m ago",
-      blockedReason: "Waiting for TASK-118 import and context validation",
-      rationale: "Context-lead must approve document retrieval before downstream tasks can continue.",
+      blockedReason: "Pending archive access approval from compliance workspace",
+      rationale: "Context normalization reduces interpretation errors but should not block core security verification.",
       command: buildTaskCommand({ id: "TASK-154" })
     },
     {
       id: "TASK-160",
-      title: "Validate artifact sync",
+      title: "Validate release readiness bundle",
       state: "review",
-      priority: "medium",
+      priority: "high",
       missionId: "q4-audit",
       crewId: "dev",
       owner: "validation-lead",
       runtime: "hermes",
-      dependencies: ["TASK-142"],
-      estimate: "40m",
-      confidence: 84,
-      risk: "Validation required",
-      summary: "Review generated artifacts, compare drift, and clear sync confidence.",
+      dependencies: ["TASK-142", "TASK-154"],
+      estimate: "55m",
+      confidence: 82,
+      risk: "Release gate",
+      summary: "Consolidate security checks and context updates into final evidence package for go/no-go.",
       lastUpdate: "17m ago",
-      rationale: "Validation-lead owns final evidence review and release gating.",
+      rationale: "Validation lead owns the final release gate and cross-team evidence consistency check.",
       command: buildTaskCommand({ id: "TASK-160" })
     }
   ]
@@ -124,18 +124,18 @@ export function defaultMissionRecords() {
   return [
     {
       id: "q4-audit",
-      name: "Q4 Audit Hardening",
-      objective: "Ship auth hardening, runtime sync validation, and context coverage for the audit window.",
+      name: "Q4 Auth Reliability Hardening",
+      objective: "Prepare a release-ready auth reliability package with policy diff, regression verification, and traceable evidence.",
       status: "active",
-      dueWindow: "Oct 15 - Nov 20",
+      dueWindow: "Nov 04 - Nov 28",
       risk: "Medium",
-      capacity: "92%",
-      progress: 68,
-      health: "Stable with one critical bottleneck",
+      capacity: "88%",
+      progress: 62,
+      health: "Critical path stable; context branch constrained",
       successCriteria: [
-        "Auth middleware verified across the active runtimes",
-        "Critical path reduced below 8 nodes",
-        "Context gaps closed before final hardening run"
+        "Auth middleware verified with zero high-severity regressions",
+        "Runtime policy diff approved by security and ops leads",
+        "Release readiness bundle accepted by validation lead"
       ],
       command: buildMissionCommand({ id: "q4-audit" })
     },
@@ -319,6 +319,15 @@ export function updateTask(repoRoot, taskId, updates = {}) {
   return { task: updatedTask, tasks: nextTasks }
 }
 
+export function deleteTask(repoRoot, taskId) {
+  const { tasks } = readTaskStore(repoRoot)
+  const task = tasks.find((item) => item.id === taskId) || null
+  if (!task) return { task: null, tasks }
+  const nextTasks = tasks.filter((item) => item.id !== taskId)
+  writeTaskStore(repoRoot, nextTasks)
+  return { task, tasks: nextTasks }
+}
+
 export function buildTaskPrompt(task) {
   const dependencies = Array.isArray(task.dependencies) && task.dependencies.length > 0
     ? task.dependencies.join(", ")
@@ -371,6 +380,31 @@ export function updateMission(repoRoot, missionId, updates = {}) {
   return { mission: updatedMission, missions: nextMissions }
 }
 
+export function deleteMission(repoRoot, missionId, options = {}) {
+  const { missions, tasks } = readTaskStore(repoRoot)
+  const mission = missions.find((item) => item.id === missionId) || null
+  if (!mission) return { mission: null, missions, tasks, removedTasks: [] }
+
+  const linkedTasks = tasks.filter((task) => task.missionId === missionId)
+  if (linkedTasks.length > 0 && !options.cascade) {
+    throw new Error(`mission has ${linkedTasks.length} linked task(s); rerun with cascade`)
+  }
+
+  const nextMissions = missions.filter((item) => item.id !== missionId)
+  const removedTaskIds = new Set(linkedTasks.map((task) => task.id))
+  const nextTasks = linkedTasks.length > 0 ? tasks.filter((task) => !removedTaskIds.has(task.id)) : tasks
+
+  writeMissionStore(repoRoot, nextMissions)
+  if (linkedTasks.length > 0) writeTaskStore(repoRoot, nextTasks)
+
+  return {
+    mission,
+    missions: nextMissions,
+    tasks: nextTasks,
+    removedTasks: linkedTasks,
+  }
+}
+
 export function commitMissionScope(repoRoot, missionId) {
   return updateMission(repoRoot, missionId, {
     status: "active",
@@ -388,6 +422,7 @@ export function applyMissionReplan(repoRoot, missionId) {
         ...task,
         owner: "eng-lead",
         runtime: "pi/local",
+        dependencies: ["TASK-126"],
         confidence: Math.min(task.confidence + 3, 99),
         rationale: "Replanned to eng-lead after expertise rebalance and lower queue delay on pi/local.",
         lastUpdate: "replanned now"
@@ -400,6 +435,13 @@ export function applyMissionReplan(repoRoot, missionId) {
         blockedReason: undefined,
         rationale: "Context prefetch resolved the bottleneck and unlocked downstream execution.",
         lastUpdate: "replanned now"
+      }, tasks)
+    }
+    if (task.id === "TASK-160") {
+      return normalizeTaskRecord({
+        ...task,
+        dependencies: ["TASK-142", "TASK-154"],
+        lastUpdate: task.lastUpdate || "replanned now",
       }, tasks)
     }
     return task
