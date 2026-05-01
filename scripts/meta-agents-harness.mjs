@@ -14,6 +14,8 @@ import { resolveMahHome } from "./core/mah-home.mjs"
 import { resolveWorkspaceRoot } from "./core/workspace-root.mjs"
 import { buildContextMemoryExplainPayload } from "./context/context-memory-integration.mjs"
 import { buildAssistantStatePayload } from "./runtime/assistant-state.mjs"
+import { resolveWorkspaceCandidates } from "./routing/workspace-candidate-resolver.mjs"
+import { rankCooperativeCandidates } from "./routing/cooperative-ranking.mjs"
 import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
 import { recordDelegationEvidence } from "./expertise/evidence/evidence-pipeline.mjs"
 
@@ -217,7 +219,7 @@ function printHelp() {
   console.log("  use <crew>")
   console.log("  clear")
   console.log("  delegate --target <agent> --task '<task>' [--runtime <target>] [--crew <id>] [--execute|-x]")
-  console.log("  run [runtime-args]")
+  console.log("  run [runtime-args] [--full-crews]")
   console.log("  plan")
   console.log("  diff")
   console.log("  sync")
@@ -231,6 +233,7 @@ function printHelp() {
   console.log("  --session-id <id>")
   console.log("  --session-root <path>")
   console.log("  --session-mirror / --no-session-mirror")
+  console.log("  --full-crews")
   console.log("  --trace")
   console.log("  --json")
   console.log("  --mermaid")
@@ -314,6 +317,115 @@ function parseFilterArgs(argv) {
     mermaidLevel: parseValueArg(argv, "--mermaid-level"),
     mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities"),
     dryRun: hasFlag(argv, "--dry-run")
+  }
+}
+
+function readCooperativeRoutingConfig() {
+  try {
+    const meta = readMetaConfig(repoRoot)
+    const cfg = meta?.cooperative_routing || {}
+    return {
+      enabled: cfg.enabled !== false,
+      defaultScope: cfg.default_scope === "full_crews" ? "full_crews" : "active_crew",
+      allowedCrews: Array.isArray(cfg.allowed_crews) ? cfg.allowed_crews.filter(Boolean) : [],
+      preferActiveCrewTiebreaker: cfg.prefer_active_crew_tiebreaker !== false
+    }
+  } catch {
+    return {
+      enabled: true,
+      defaultScope: "active_crew",
+      allowedCrews: [],
+      preferActiveCrewTiebreaker: true
+    }
+  }
+}
+
+function resolveRoutingScopeFromArgs(argv = [], routingConfig = readCooperativeRoutingConfig()) {
+  if (hasFlag(argv, "--full-crews")) return "full_crews"
+  return routingConfig.defaultScope || "active_crew"
+}
+
+function stripFullCrewsFlag(argv = []) {
+  return argv.filter((item) => item !== "--full-crews")
+}
+
+function upsertFlagValue(argv = [], flag, value) {
+  const out = []
+  let consumed = false
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === flag) {
+      consumed = true
+      i += 1
+      continue
+    }
+    if (token.startsWith(`${flag}=`)) {
+      consumed = true
+      continue
+    }
+    out.push(token)
+  }
+  if (!consumed || value) out.push(flag, value)
+  return out
+}
+
+async function buildCooperativeRoutingDecision({
+  runtime,
+  passthrough,
+  routingScope
+}) {
+  const sourceCrew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+  const routingConfig = readCooperativeRoutingConfig()
+
+  if (routingScope === "full_crews" && !routingConfig.enabled) {
+    return { ok: false, error: "cooperative routing is disabled by config (cooperative_routing.enabled=false)" }
+  }
+
+  const resolver = resolveWorkspaceCandidates({
+    repoRoot,
+    runtime,
+    sourceCrew,
+    routingScope,
+    runtimeProfile: runtimeProfiles[runtime]
+  })
+
+  if (routingConfig.allowedCrews.length > 0) {
+    resolver.candidates = resolver.candidates.filter((candidate) => routingConfig.allowedCrews.includes(candidate.crew))
+    resolver.candidateCrews = [...new Set(resolver.candidates.map((candidate) => candidate.crew))]
+  }
+
+  const { getRegistry } = await import("./expertise/expertise-registry.mjs")
+  const registry = await getRegistry()
+  const expertiseById = Object.fromEntries((registry?.entries || []).map((entry) => [entry.id, entry]))
+
+  const ranking = rankCooperativeCandidates({
+    task: stripFullCrewsFlag(passthrough).join(" "),
+    candidates: resolver.candidates,
+    sourceCrew: resolver.sourceCrew,
+    expertiseById,
+    weights: {
+      activeCrewPreference: routingConfig.preferActiveCrewTiebreaker ? 0.1 : 0
+    }
+  })
+
+  if (!ranking.selected) {
+    return {
+      ok: false,
+      error: `no valid cooperative candidate found (scope=${routingScope}, source_crew=${sourceCrew})`,
+      resolver,
+      ranking
+    }
+  }
+
+  return {
+    ok: true,
+    routingScope,
+    sourceCrew: resolver.sourceCrew,
+    selectedCrew: ranking.selected.crew,
+    selectedAgent: ranking.selected.agent,
+    candidateCrews: resolver.candidateCrews,
+    candidatesCount: resolver.candidates.length,
+    ranking
   }
 }
 
@@ -935,6 +1047,19 @@ function printExplain(traceMode, payload) {
   }
   if (payload.active_crew) console.log(`active_crew=${payload.active_crew}`)
   if (payload.target_crew) console.log(`target_crew=${payload.target_crew}`)
+  if (payload.routing_scope) console.log(`routing_scope=${payload.routing_scope}`)
+  if (payload.source_crew) console.log(`routing_source_crew=${payload.source_crew}`)
+  if (typeof payload.candidate_crews_count === "number") {
+    console.log(`routing_candidate_crews=${payload.candidate_crews_count}`)
+  }
+  if (typeof payload.candidate_agents_count === "number") {
+    console.log(`routing_candidate_agents=${payload.candidate_agents_count}`)
+  }
+  if (payload.cooperative_ranking?.selected?.agent) {
+    console.log(`routing_selected_agent=${payload.cooperative_ranking.selected.agent}`)
+    console.log(`routing_selected_crew=${payload.cooperative_ranking.selected.crew}`)
+    console.log(`routing_selected_score=${payload.cooperative_ranking.selected.score}`)
+  }
   if (payload.command === "run") {
     console.log("lifecycle_sequence=queued → routed → running → completed|failed")
   }
@@ -1109,6 +1234,9 @@ async function runSessionsStatus(sessionId, jsonMode = false) {
       let line = `  ${ts}  ${ev.event.padEnd(16)}`
       if (ev.event === 'routed' && ev.agent) line += ` → ${ev.agent} (conf: ${typeof ev.routing_confidence === 'number' ? (ev.routing_confidence * 100).toFixed(0) + '%' : '?'})`
       if (ev.event === 'routed' && ev.routing_reason) line += ` — ${ev.routing_reason}`
+      if (ev.routing_scope) line += ` [scope=${ev.routing_scope}]`
+      if (ev.source_crew) line += ` [source=${ev.source_crew}]`
+      if (ev.selected_crew) line += ` [selected_crew=${ev.selected_crew}]`
       if (ev.event === 'completed') line += ` (exit: ${ev.result_code})`
       if (ev.event === 'failed') line += ` — ${ev.result_reason || 'failed'}`
       if (ev.event === 'context_loaded') line += ` (${ev.context_count || 0} docs)`
@@ -5077,6 +5205,7 @@ async function main() {
     const explainFilters = parseFilterArgs(normalizedArgv.slice(2))
     const isHeadless = hasHeadlessFlag(argv)
     const crewContext = resolveCrewExecutionContext(explainFilters.crew)
+    const routingScope = resolveRoutingScopeFromArgs(normalizedArgv.slice(2), readCooperativeRoutingConfig())
     if (explainCommand === "detect") {
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
@@ -5370,6 +5499,43 @@ async function main() {
 
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
       const passthrough = normalizedArgv.slice(2)
+      const explainRoutingResolver = explainCommand === "run"
+        ? resolveWorkspaceCandidates({
+            repoRoot,
+            runtime: runtimeResult.runtime,
+            sourceCrew: explainFilters.crew || process.env.MAH_ACTIVE_CREW || "dev",
+            routingScope,
+            runtimeProfile: runtimeProfiles[runtimeResult.runtime]
+          })
+        : null
+      const explainRouting = explainRoutingResolver
+        ? {
+            routing_scope: explainRoutingResolver.routingScope,
+            source_crew: explainRoutingResolver.sourceCrew,
+            candidate_crews_count: explainRoutingResolver.candidateCrews.length,
+            candidate_agents_count: explainRoutingResolver.candidates.length,
+            candidate_crews: explainRoutingResolver.candidateCrews
+          }
+        : {}
+      let cooperativeRanking = null
+      if (explainCommand === "run" && explainRoutingResolver) {
+        try {
+          const routingDecision = await buildCooperativeRoutingDecision({
+            runtime: runtimeResult.runtime,
+            passthrough,
+            routingScope
+          })
+          cooperativeRanking = routingDecision.ranking || null
+        } catch (error) {
+          cooperativeRanking = {
+            selected: null,
+            ranking: [],
+            excluded: [],
+            warning: `cooperative ranking unavailable: ${error.message}`,
+            weights: null
+          }
+        }
+      }
 
       // Handle headless mode for run command
       if (explainCommand === "run" && isHeadless) {
@@ -5419,6 +5585,8 @@ async function main() {
           env: { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
           warnings: headlessPlan.warnings || [],
           crewContext,
+          ...explainRouting,
+          cooperative_ranking: cooperativeRanking,
           internal: headlessPlan.internal || {}
         }
         if (normalizedArgv.includes("--with-context-memory")) {
@@ -5453,7 +5621,8 @@ async function main() {
         env: plan.envOverrides || {},
         warnings: plan.warnings || [],
         candidates: plan.candidates || [],
-        crewContext
+        crewContext,
+        ...(explainCommand === "run" ? { ...explainRouting, cooperative_ranking: cooperativeRanking } : {})
       }
       if (normalizedArgv.includes("--with-context-memory")) {
         payload.context_memory = buildContextMemoryExplainPayload(passthrough)
@@ -5583,14 +5752,70 @@ async function main() {
   }
 
   const command = first
-  const passthrough = normalizedArgv.slice(1)
+  let passthrough = normalizedArgv.slice(1)
+  let cooperativeDecision = null
+
+  if (command === "run") {
+    const routingScope = resolveRoutingScopeFromArgs(passthrough, readCooperativeRoutingConfig())
+    if (routingScope === "full_crews") {
+      cooperativeDecision = await buildCooperativeRoutingDecision({
+        runtime: runtimeResult.runtime,
+        passthrough,
+        routingScope
+      })
+      if (!cooperativeDecision?.ok) {
+        console.error(`ERROR: ${cooperativeDecision?.error || "failed cooperative routing"}`)
+        process.exitCode = 1
+        return
+      }
+      passthrough = stripFullCrewsFlag(passthrough)
+      passthrough = upsertFlagValue(passthrough, "--crew", cooperativeDecision.selectedCrew)
+      passthrough = upsertFlagValue(passthrough, "--agent", cooperativeDecision.selectedAgent)
+    }
+  }
 
   // Check for headless mode on run command
   if (command === "run" && hasHeadlessFlag(argv)) {
     const outputMode = parseOutputMode(argv)
+    const lifecycleSessionId = command === "run" && cooperativeDecision?.ok
+      ? `${runtimeResult.runtime}:${cooperativeDecision.sourceCrew}:coop-${Date.now()}`
+      : ""
+    if (lifecycleSessionId) {
+      const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
+      recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+        event: "queued",
+        routing_scope: cooperativeDecision.routingScope,
+        source_crew: cooperativeDecision.sourceCrew,
+        selected_crew: cooperativeDecision.selectedCrew,
+        selected_agent: cooperativeDecision.selectedAgent,
+        candidate_crews: cooperativeDecision.candidateCrews
+      })
+      recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+        event: "routed",
+        agent: cooperativeDecision.selectedAgent,
+        routing_reason: "cooperative-ranking",
+        routing_confidence: cooperativeDecision.ranking?.selected?.score ?? null,
+        routing_scope: cooperativeDecision.routingScope,
+        source_crew: cooperativeDecision.sourceCrew,
+        selected_crew: cooperativeDecision.selectedCrew,
+        selected_agent: cooperativeDecision.selectedAgent,
+        candidate_crews: cooperativeDecision.candidateCrews
+      })
+    }
     const result = await dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
     if (outputMode === "json") {
-      console.log(JSON.stringify(result, null, 2))
+      console.log(JSON.stringify({
+        ...result,
+        routing: cooperativeDecision?.ok
+          ? {
+              routing_scope: cooperativeDecision.routingScope,
+              source_crew: cooperativeDecision.sourceCrew,
+              selected_crew: cooperativeDecision.selectedCrew,
+              selected_agent: cooperativeDecision.selectedAgent,
+              candidate_crews: cooperativeDecision.candidateCrews
+            }
+          : undefined
+      }, null, 2))
     }
     if (outputMode !== "json" && result.sessionId) {
       const { getLifecycleEvents } = await import("./session/m3-ops.mjs")
@@ -5605,6 +5830,39 @@ async function main() {
   }
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)
+  if (command === "run" && cooperativeDecision?.ok) {
+    const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
+    const lifecycleSessionId = `${runtimeResult.runtime}:${cooperativeDecision.sourceCrew}:coop-${Date.now()}`
+    recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+      event: "queued",
+      routing_scope: cooperativeDecision.routingScope,
+      source_crew: cooperativeDecision.sourceCrew,
+      selected_crew: cooperativeDecision.selectedCrew,
+      selected_agent: cooperativeDecision.selectedAgent,
+      candidate_crews: cooperativeDecision.candidateCrews
+    })
+    recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+      event: "routed",
+      agent: cooperativeDecision.selectedAgent,
+      routing_reason: "cooperative-ranking",
+      routing_confidence: cooperativeDecision.ranking?.selected?.score ?? null,
+      routing_scope: cooperativeDecision.routingScope,
+      source_crew: cooperativeDecision.sourceCrew,
+      selected_crew: cooperativeDecision.selectedCrew,
+      selected_agent: cooperativeDecision.selectedAgent,
+      candidate_crews: cooperativeDecision.candidateCrews
+    })
+    recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+      event: status === 0 ? "completed" : "failed",
+      result_code: status,
+      result_reason: status === 0 ? "cooperative-run-success" : "cooperative-run-failed",
+      routing_scope: cooperativeDecision.routingScope,
+      source_crew: cooperativeDecision.sourceCrew,
+      selected_crew: cooperativeDecision.selectedCrew,
+      selected_agent: cooperativeDecision.selectedAgent,
+      candidate_crews: cooperativeDecision.candidateCrews
+    })
+  }
   process.exitCode = status
 }
 

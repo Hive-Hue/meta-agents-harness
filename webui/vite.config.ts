@@ -861,7 +861,7 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
   req.on("end", async () => {
     try {
       const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
-      const { task = "", crew = "dev", runtime = ".pi/" } = JSON.parse(raw);
+      const { task = "", crew = "dev", runtime = ".pi/", routingScope = "active_crew" } = JSON.parse(raw);
       if (!task.trim()) { res.statusCode = 400; res.end(JSON.stringify({ ok: false, error: "no task" })); return; }
 
       const workspaceRoot = resolveWorkspaceRoot(req);
@@ -889,7 +889,9 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
       const envPath = path.join(workspaceRoot, ENV_FILENAME);
       const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
       const workspaceEnv = parseDotEnvContent(rawEnv);
-      const child = spawn(process.execPath, [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtime, "--headless"], {
+      const runArgs = [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtime, "--headless"];
+      if (routingScope === "full_crews") runArgs.push("--full-crews");
+      const child = spawn(process.execPath, runArgs, {
         cwd: workspaceRoot,
         env: { ...process.env, ...workspaceEnv },
       });

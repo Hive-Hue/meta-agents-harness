@@ -9,8 +9,8 @@ const navItems = [
   { label: "Run", icon: "play_circle", path: "/run" },
   { label: "Tasks", icon: "checklist", path: "/tasks" },
   { label: "Sessions", icon: "history", path: "/sessions" },
-  { label: "Expertise", icon: "psychology", path: "/expertise" },
   { label: "Skills", icon: "extension", path: "/skills" },
+  { label: "Expertise", icon: "psychology", path: "/expertise" },
   { label: "Context", icon: "database", path: "/context" },
   { label: "Settings", icon: "settings", path: "/settings", pinned: true },
 ];

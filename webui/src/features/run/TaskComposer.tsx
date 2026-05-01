@@ -9,6 +9,8 @@ type TaskComposerProps = {
   onCrewChange: (val: string) => void;
   runtime: string;
   onRuntimeChange: (val: string) => void;
+  routingScope: "active_crew" | "full_crews";
+  onRoutingScopeChange: (val: "active_crew" | "full_crews") => void;
   showRouting: boolean;
   onShowRouting: () => void;
   onHideRouting: () => void;
@@ -21,6 +23,7 @@ export function TaskComposer({
   taskText, onTaskTextChange,
   crew, crews, onCrewChange,
   runtime, onRuntimeChange,
+  routingScope, onRoutingScopeChange,
   showRouting, onShowRouting, onHideRouting,
   onStartRun, onStopRun,
   runState,
@@ -50,6 +53,15 @@ export function TaskComposer({
           <option value="hermes">hermes</option>
           <option value="kilo">kilo</option>
         </select>
+        <select
+          className="run-composer__select"
+          value={routingScope}
+          onChange={(e) => onRoutingScopeChange(e.target.value as "active_crew" | "full_crews")}
+          disabled={isRunning}
+        >
+          <option value="active_crew">Active Crew</option>
+          <option value="full_crews">Full Crews</option>
+        </select>
         <button className="run-action-btn" type="button" onClick={onShowRouting} disabled={isRunning || !taskText}>
           <Icon name="route" size={14} />Preview Routing
         </button>
@@ -67,6 +79,7 @@ export function TaskComposer({
         <RoutingPreview
           crew={crew}
           runtime={runtime}
+          routingScope={routingScope}
           taskText={taskText}
           onClose={onHideRouting}
           onRefresh={() => {/* TODO: call expertise routing */}}

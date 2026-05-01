@@ -90,6 +90,12 @@ const schema = z.object({
     model_fallbacks: z.record(z.string(), z.array(z.string())).optional()
   }).passthrough(),
   domain_profiles: z.record(z.string(), z.array(domainRuleSchema)).optional(),
+  cooperative_routing: z.object({
+    enabled: z.boolean().optional(),
+    default_scope: z.enum(["active_crew", "full_crews"]).optional(),
+    allowed_crews: z.array(z.string().min(1)).optional(),
+    prefer_active_crew_tiebreaker: z.boolean().optional()
+  }).optional(),
   crews: z.array(crewSchema).min(1)
 }).passthrough()
 
@@ -108,6 +114,7 @@ function validateCrossRefs(config) {
 
   const modelRefs = new Set(Object.keys(config.catalog?.models || {}))
   const domainRefs = new Set(Object.keys(config.domain_profiles || {}))
+  const crewRefs = new Set((config.crews || []).map((crew) => crew.id))
   const canonicalSkillRefs = new Set([
     ...defaultSharedSkills,
     ...((config.crews || []).flatMap((crew) => (crew.agents || []).flatMap((agent) => agent.skills || [])))
@@ -174,6 +181,18 @@ function validateCrossRefs(config) {
         }
       }
     }
+  }
+
+  const cooperativeRouting = config.cooperative_routing || {}
+  if (Array.isArray(cooperativeRouting.allowed_crews)) {
+    for (const crewId of cooperativeRouting.allowed_crews) {
+      if (!crewRefs.has(crewId)) {
+        issues.push(`cooperative_routing.allowed_crews references unknown crew '${crewId}'`)
+      }
+    }
+  }
+  if (cooperativeRouting.enabled === false && cooperativeRouting.default_scope === "full_crews") {
+    issues.push("cooperative_routing.default_scope cannot be 'full_crews' when cooperative_routing.enabled=false")
   }
 
   return issues

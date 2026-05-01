@@ -7,15 +7,17 @@ type RunInspectorProps = {
   taskText: string;
   crew: string;
   runtime: string;
+  routingScope: "active_crew" | "full_crews";
   onRetry?: () => void;
   onReset?: () => void;
 };
 
-export function RunInspector({ runState, taskText, crew, runtime, onRetry, onReset }: RunInspectorProps) {
+export function RunInspector({ runState, taskText, crew, runtime, routingScope, onRetry, onReset }: RunInspectorProps) {
   // Fixed command: mah --headless run --runtime <rt> --crew <crew> --task "<task>"
   const parts = ["mah", "--headless", "run"];
   if (runtime) parts.push("--runtime", runtime);
   if (crew) parts.push("--crew", crew);
+  if (routingScope === "full_crews") parts.push("--full-crews");
   if (taskText) parts.push("--task", `"${taskText.slice(0, 50)}${taskText.length > 50 ? "..." : ""}"`);
   const command = parts.join(" ");
 
@@ -60,6 +62,10 @@ export function RunInspector({ runState, taskText, crew, runtime, onRetry, onRes
             <div className="run-inspector__field">
               <dt>Crew</dt>
               <dd>{crew}</dd>
+            </div>
+            <div className="run-inspector__field">
+              <dt>Routing Scope</dt>
+              <dd>{routingScope === "full_crews" ? "Full Crews" : "Active Crew"}</dd>
             </div>
           </dl>
         </div>

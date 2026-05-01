@@ -31,6 +31,7 @@ function RunConsoleInner() {
   const [taskText, setTaskText] = useState("");
   const [crew, setCrew] = useState(crews[0]?.id ?? "dev");
   const [runtime, setRuntime] = useState("pi");
+  const [routingScope, setRoutingScope] = useState<"active_crew" | "full_crews">("active_crew");
   const [showRouting, setShowRouting] = useState(false);
   const [events, setEvents] = useState<LifecycleEvent[]>(idleEvents);
   const [logLines, setLogLines] = useState<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }[]>([]);
@@ -52,7 +53,7 @@ function RunConsoleInner() {
       const resp = await fetch("/api/mah/run-start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task: taskText, crew, runtime }),
+        body: JSON.stringify({ task: taskText, crew, runtime, routingScope }),
         signal: abortControllerRef.current.signal,
       });
       const result = await resp.json();
@@ -165,6 +166,8 @@ function RunConsoleInner() {
               onCrewChange={setCrew}
               runtime={runtime}
               onRuntimeChange={setRuntime}
+              routingScope={routingScope}
+              onRoutingScopeChange={setRoutingScope}
               showRouting={showRouting}
               onShowRouting={() => setShowRouting(true)}
               onHideRouting={() => setShowRouting(false)}
@@ -182,6 +185,7 @@ function RunConsoleInner() {
           taskText={taskText}
           crew={crew}
           runtime={runtime}
+          routingScope={routingScope}
           onRetry={startRun}
           onReset={resetRun}
         />

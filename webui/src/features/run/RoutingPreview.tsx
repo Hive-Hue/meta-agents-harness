@@ -3,12 +3,13 @@ import { Icon } from "../../components/ui/Icon";
 type RoutingPreviewProps = {
   crew: string;
   runtime: string;
+  routingScope: "active_crew" | "full_crews";
   taskText: string;
   onClose: () => void;
   onRefresh: () => void;
 };
 
-export function RoutingPreview({ crew, runtime, taskText, onClose, onRefresh }: RoutingPreviewProps) {
+export function RoutingPreview({ crew, runtime, routingScope, taskText, onClose, onRefresh }: RoutingPreviewProps) {
   return (
     <div className="routing-preview">
       <div className="routing-preview__header">
@@ -41,8 +42,11 @@ export function RoutingPreview({ crew, runtime, taskText, onClose, onRefresh }: 
       <div className="routing-preview__fallbacks">
         Domain: <strong>runtime_impl</strong> — can edit scripts, types, tests
       </div>
+      <div className="routing-preview__fallbacks">
+        Scope: <strong>{routingScope === "full_crews" ? "full_crews" : "active_crew"}</strong>
+      </div>
       <div className="routing-preview__command">
-        $ mah --runtime {runtime || "<runtime>"} --headless run --crew {crew || "<crew>"} --task "{taskText.slice(0, 40)}{taskText.length > 40 ? "..." : ""}"
+        $ mah --runtime {runtime || "<runtime>"} --headless run --crew {crew || "<crew>"} {routingScope === "full_crews" ? "--full-crews " : ""}--task "{taskText.slice(0, 40)}{taskText.length > 40 ? "..." : ""}"
       </div>
     </div>
   );
