@@ -1,4 +1,16 @@
-import type { Agent } from "./AgentCard";
+import { Icon } from "../../components/ui/Icon";
+
+export interface Agent {
+  id: string;
+  role: "orchestrator" | "lead" | "worker";
+  model: string;
+  modelRef: string;
+  skills: string[];
+  domain: string[];
+  expertise: "validated" | "experimental" | "restricted";
+  confidence: number;
+  team: string;
+}
 
 type Team = {
   name: string;
@@ -15,6 +27,10 @@ type FlowchartViewProps = {
 export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }: FlowchartViewProps) {
   const orchestrator = agents.find((agent) => agent.role === "orchestrator") ?? null;
   const nonOrchestrationTeams = teams.filter((team) => team.name !== "Orchestration");
+  const confidenceClassFor = (confidence: number) =>
+    confidence >= 0.8 ? "high" : confidence >= 0.6 ? "mid" : "low";
+  const expertiseIconFor = (expertise: Agent["expertise"]) =>
+    expertise === "validated" ? "verified" : expertise === "experimental" ? "science" : "warning";
 
   return (
     <section className="flowchart" aria-label="Crew hierarchy flowchart">
@@ -27,6 +43,18 @@ export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }:
           >
             <span className="flow-node__id">{orchestrator.id}</span>
             <span className="flow-node__meta">{orchestrator.model}</span>
+            <div className="agent-card__meta">
+              <span className={"agent-card__expertise agent-card__expertise--" + orchestrator.expertise}>
+                <Icon name={expertiseIconFor(orchestrator.expertise)} size={10} />
+                {orchestrator.expertise}
+              </span>
+            </div>
+            <div className="agent-card__confidence">
+              <div
+                className={"agent-card__confidence-fill agent-card__confidence-fill--" + confidenceClassFor(orchestrator.confidence)}
+                style={{ width: (orchestrator.confidence * 100) + "%" }}
+              />
+            </div>
           </button>
         </div>
       )}
@@ -54,6 +82,18 @@ export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }:
                 >
                   <span className="flow-node__id">{lead.id}</span>
                   <span className="flow-node__meta">{lead.model}</span>
+                  <div className="agent-card__meta">
+                    <span className={"agent-card__expertise agent-card__expertise--" + lead.expertise}>
+                      <Icon name={expertiseIconFor(lead.expertise)} size={10} />
+                      {lead.expertise}
+                    </span>
+                  </div>
+                  <div className="agent-card__confidence">
+                    <div
+                      className={"agent-card__confidence-fill agent-card__confidence-fill--" + confidenceClassFor(lead.confidence)}
+                      style={{ width: (lead.confidence * 100) + "%" }}
+                    />
+                  </div>
                 </button>
               ))}
               {leads.length > 0 && workers.length > 0 && <div className="flow-team__branch" aria-hidden="true" />}
@@ -68,6 +108,18 @@ export function FlowchartView({ teams, agents, selectedAgentId, onSelectAgent }:
                     >
                       <span className="flow-node__id">{worker.id}</span>
                       <span className="flow-node__meta">{worker.model}</span>
+                      <div className="agent-card__meta">
+                        <span className={"agent-card__expertise agent-card__expertise--" + worker.expertise}>
+                          <Icon name={expertiseIconFor(worker.expertise)} size={10} />
+                          {worker.expertise}
+                        </span>
+                      </div>
+                      <div className="agent-card__confidence">
+                        <div
+                          className={"agent-card__confidence-fill agent-card__confidence-fill--" + confidenceClassFor(worker.confidence)}
+                          style={{ width: (worker.confidence * 100) + "%" }}
+                        />
+                      </div>
                     </button>
                   ))}
                 </div>
