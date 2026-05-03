@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 
 export type ExpertiseEntry = {
   id: string;
@@ -61,6 +62,7 @@ export type Metrics = {
 };
 
 export function useExpertiseData(crew = "dev") {
+  const { workspacePath } = useWorkspace();
   const [entries, setEntries] = useState<ExpertiseEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export function useExpertiseData(crew = "dev") {
     try {
       const resp = await fetch("/api/mah/exec", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
         body: JSON.stringify({ args: ["expertise", "list", "--crew", crew, "--json"] }),
       });
       const data = await resp.json();
@@ -86,13 +88,14 @@ export function useExpertiseData(crew = "dev") {
     } finally {
       setLoading(false);
     }
-  }, [crew]);
+  }, [crew, workspacePath]);
 
   useEffect(() => { load(); }, [load]);
   return { entries, loading, error, reload: load };
 }
 
 export function useExpertiseDetail(id: string) {
+  const { workspacePath } = useWorkspace();
   const [entry, setEntry] = useState<ExpertiseEntry | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +109,7 @@ export function useExpertiseDetail(id: string) {
       try {
         const resp = await fetch("/api/mah/exec", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
           body: JSON.stringify({ args: ["expertise", "show", id, "--json"] }),
         });
         const data = await resp.json();
@@ -125,12 +128,13 @@ export function useExpertiseDetail(id: string) {
     }
     load();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, workspacePath]);
 
   return { entry, metrics, loading, error };
 }
 
 export function useEvidenceData(id: string, limit = 50) {
+  const { workspacePath } = useWorkspace();
   const [events, setEvents] = useState<EvidenceEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +147,7 @@ export function useEvidenceData(id: string, limit = 50) {
       try {
         const resp = await fetch("/api/mah/exec", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
           body: JSON.stringify({ args: ["expertise", "evidence", id, "--limit", String(limit), "--json"] }),
         });
         const data = await resp.json();
@@ -161,12 +165,13 @@ export function useEvidenceData(id: string, limit = 50) {
     }
     load();
     return () => { cancelled = true; };
-  }, [id, limit]);
+  }, [id, limit, workspacePath]);
 
   return { events, loading, error };
 }
 
 export function useSyncDryRun(crew = "dev") {
+  const { workspacePath } = useWorkspace();
   const [changes, setChanges] = useState<SyncChange[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,7 +185,7 @@ export function useSyncDryRun(crew = "dev") {
       args.push("--json");
       const resp = await fetch("/api/mah/exec", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
         body: JSON.stringify({ args }),
       });
       const data = await resp.json();
@@ -195,12 +200,13 @@ export function useSyncDryRun(crew = "dev") {
     } finally {
       setLoading(false);
     }
-  }, [crew]);
+  }, [crew, workspacePath]);
 
   return { changes, loading, error, runSync };
 }
 
 export function useProposals() {
+  const { workspacePath } = useWorkspace();
   const [proposals, setProposals] = useState<ProposalInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +215,9 @@ export function useProposals() {
     setLoading(true);
     setError(null);
     try {
-      const resp = await fetch("/api/mah/expertise-proposals");
+      const resp = await fetch("/api/mah/expertise-proposals", {
+        headers: { "x-mah-workspace-path": workspacePath },
+      });
       const data = await resp.json();
       if (!data.ok) {
         setError(data.error || "Failed to load proposals");
@@ -223,7 +231,7 @@ export function useProposals() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [workspacePath]);
 
   useEffect(() => {
     void load();
@@ -233,6 +241,7 @@ export function useProposals() {
 }
 
 export function useRecommend(task: string, crew = "dev") {
+  const { workspacePath } = useWorkspace();
   const [result, setResult] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -244,7 +253,7 @@ export function useRecommend(task: string, crew = "dev") {
     try {
       const resp = await fetch("/api/mah/exec", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
         body: JSON.stringify({ args: ["expertise", "recommend", "--task", task, "--crew", crew, "--json"] }),
       });
       const data = await resp.json();
@@ -258,7 +267,7 @@ export function useRecommend(task: string, crew = "dev") {
     } finally {
       setLoading(false);
     }
-  }, [task, crew]);
+  }, [task, crew, workspacePath]);
 
   return { result, loading, error, recommend };
 }

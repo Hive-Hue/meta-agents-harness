@@ -97,6 +97,14 @@ MAH does not load expertise from global `~/.mah` overlay.
 Global install keeps shared runtime assets such as skills, extensions, plugins, and themes.
 Expertise is workspace concern and is materialized into `.mah/expertise/catalog` by `mah sync` / `mah generate`.
 
+## WebUI Workspace Scope
+
+- WebUI expertise screens (`/expertise`) execute CLI-backed operations against the active `Workspace Path`.
+- If the selected workspace changes, expertise list/detail/evidence/proposals resolve from that workspace's `.mah/expertise/*`.
+- `Workspace Detection` in Bootstrap also scans the active workspace path and validates expertise using both:
+  - catalog entries under `.mah/expertise/catalog/**`
+  - `.mah/expertise/registry.json`
+
 ## Automation Skill
 
 The [`skills/expertise-governance/SKILL.md`](../../skills/expertise-governance/SKILL.md) skill provides an automated orchestrator workflow for running the full governance cycle (steps 1–8) across all agents. It includes eligibility rules, evidence-limit guidance, human review criteria, lifecycle transition table, and quality gates.

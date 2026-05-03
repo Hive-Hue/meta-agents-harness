@@ -23,149 +23,21 @@ export function buildMissionCommand(mission) {
   return `mah mission show ${mission.id}`
 }
 
+function formatMinutes(totalMinutes = 0) {
+  const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0))
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  if (hours > 0 && rest > 0) return `${hours}h ${rest}m`
+  if (hours > 0) return `${hours}h`
+  return `${rest}m`
+}
+
 export function defaultTaskRecords() {
-  return [
-    {
-      id: "TASK-118",
-      title: "Consolidate auth baseline evidence",
-      state: "backlog",
-      priority: "medium",
-      missionId: "q4-audit",
-      crewId: "dev",
-      owner: "planning-lead",
-      runtime: "openclaude",
-      dependencies: [],
-      estimate: "1h 10m",
-      confidence: 81,
-      risk: "Scope drift",
-      summary: "Collect incident notes, policy deltas, and previous rollout logs to establish a clean baseline.",
-      lastUpdate: "8m ago",
-      rationale: "Planning starts by locking a factual baseline to avoid rework in downstream validation.",
-      command: buildTaskCommand({ id: "TASK-118" })
-    },
-    {
-      id: "TASK-126",
-      title: "Generate runtime policy diff",
-      state: "ready",
-      priority: "medium",
-      missionId: "q4-audit",
-      crewId: "dev",
-      owner: "ops-lead",
-      runtime: "pi",
-      dependencies: ["TASK-118"],
-      estimate: "50m",
-      confidence: 84,
-      risk: "Low",
-      summary: "Build structured diff across runtime policy files to highlight auth-impacting changes.",
-      lastUpdate: "4m ago",
-      rationale: "Ops lead owns runtime drift analysis and can expose precise deltas for security review.",
-      command: buildTaskCommand({ id: "TASK-126" })
-    },
-    {
-      id: "TASK-142",
-      title: "Verify auth middleware behavior",
-      state: "in_progress",
-      priority: "high",
-      missionId: "q4-audit",
-      crewId: "dev",
-      owner: "security-lead",
-      runtime: "pi",
-      dependencies: ["TASK-126"],
-      estimate: "2h 20m",
-      confidence: 90,
-      risk: "Auth regression",
-      summary: "Run targeted auth scenarios against middleware changes and confirm deny/allow behavior.",
-      lastUpdate: "active now",
-      sessionId: "pi:dev:ses_01j4f82x",
-      rationale: "Security lead is responsible for policy enforcement quality and high-risk regression coverage.",
-      command: buildTaskCommand({ id: "TASK-142" })
-    },
-    {
-      id: "TASK-154",
-      title: "Resolve legacy context dependency",
-      state: "blocked",
-      priority: "medium",
-      missionId: "q4-audit",
-      crewId: "dev",
-      owner: "context-lead",
-      runtime: "openclaude",
-      dependencies: ["TASK-118"],
-      estimate: "1h 05m",
-      confidence: 69,
-      risk: "Knowledge gap",
-      summary: "Normalize legacy docs and map old terminology to current runtime controls.",
-      lastUpdate: "12m ago",
-      blockedReason: "Pending archive access approval from compliance workspace",
-      rationale: "Context normalization reduces interpretation errors but should not block core security verification.",
-      command: buildTaskCommand({ id: "TASK-154" })
-    },
-    {
-      id: "TASK-160",
-      title: "Validate release readiness bundle",
-      state: "review",
-      priority: "high",
-      missionId: "q4-audit",
-      crewId: "dev",
-      owner: "validation-lead",
-      runtime: "hermes",
-      dependencies: ["TASK-142", "TASK-154"],
-      estimate: "55m",
-      confidence: 82,
-      risk: "Release gate",
-      summary: "Consolidate security checks and context updates into final evidence package for go/no-go.",
-      lastUpdate: "17m ago",
-      rationale: "Validation lead owns the final release gate and cross-team evidence consistency check.",
-      command: buildTaskCommand({ id: "TASK-160" })
-    }
-  ]
+  return []
 }
 
 export function defaultMissionRecords() {
-  return [
-    {
-      id: "q4-audit",
-      name: "Q4 Auth Reliability Hardening",
-      objective: "Prepare a release-ready auth reliability package with policy diff, regression verification, and traceable evidence.",
-      status: "active",
-      dueWindow: "Nov 04 - Nov 28",
-      risk: "Medium",
-      capacity: "88%",
-      progress: 62,
-      health: "Critical path stable; context branch constrained",
-      successCriteria: [
-        "Auth middleware verified with zero high-severity regressions",
-        "Runtime policy diff approved by security and ops leads",
-        "Release readiness bundle accepted by validation lead"
-      ],
-      command: buildMissionCommand({ id: "q4-audit" })
-    },
-    {
-      id: "infra-sync",
-      name: "Infrastructure Sync",
-      objective: "Normalize generated runtime artifacts before the next operator rollout.",
-      status: "draft",
-      dueWindow: "Nov 21 - Nov 29",
-      risk: "Low",
-      capacity: "44%",
-      progress: 12,
-      health: "Scoping",
-      successCriteria: ["Diff reviewed", "Sync policy agreed"],
-      command: buildMissionCommand({ id: "infra-sync" })
-    },
-    {
-      id: "migration",
-      name: "System Migration",
-      objective: "Move legacy mission routing to the new governed runtime core.",
-      status: "at_risk",
-      dueWindow: "Nov 04 - Dec 02",
-      risk: "High",
-      capacity: "96%",
-      progress: 54,
-      health: "Blocked by shared runtime constraint",
-      successCriteria: ["Parallel path restored", "Fallback policy tested"],
-      command: buildMissionCommand({ id: "migration" })
-    }
-  ]
+  return []
 }
 
 function getTaskStoragePaths(repoRoot) {
@@ -217,6 +89,14 @@ function normalizeMissionId(value = "", existingMissions = []) {
 }
 
 export function normalizeTaskRecord(input = {}, existingTasks = []) {
+  const summaryWords = `${input.summary || ""}`.trim().split(/\s+/).filter(Boolean).length
+  const dependenciesCount = Array.isArray(input.dependencies) ? input.dependencies.length : 0
+  const priority = `${input.priority || "medium"}`.trim()
+  const derivedMinutes = Math.max(
+    20,
+    Math.round(30 + dependenciesCount * 10 + summaryWords * 0.8 + (priority === "high" ? 25 : priority === "medium" ? 10 : 0)),
+  )
+  const derivedEstimate = formatMinutes(derivedMinutes)
   const id = `${input.id || nextTaskId(existingTasks)}`.trim()
   const crewId = `${input.crewId || "dev"}`.trim() || "dev"
   const owner = `${input.owner || "planning-lead"}`.trim() || "planning-lead"
@@ -226,12 +106,12 @@ export function normalizeTaskRecord(input = {}, existingTasks = []) {
     title: `${input.title || "New Task"}`.trim(),
     state: `${input.state || "backlog"}`.trim(),
     priority: `${input.priority || "medium"}`.trim(),
-    missionId: `${input.missionId || "q4-audit"}`.trim(),
+    missionId: `${input.missionId || ""}`.trim(),
     crewId,
     owner,
     runtime,
     dependencies: Array.isArray(input.dependencies) ? input.dependencies.map((item) => `${item}`) : [],
-    estimate: `${input.estimate || "45m"}`.trim(),
+    estimate: `${input.estimate || derivedEstimate}`.trim(),
     confidence: Number.isFinite(input.confidence) ? Number(input.confidence) : 78,
     risk: `${input.risk || "Medium"}`.trim(),
     summary: `${input.summary || "Task created from the Tasks workspace."}`.trim(),
@@ -415,35 +295,36 @@ export function commitMissionScope(repoRoot, missionId) {
 
 export function applyMissionReplan(repoRoot, missionId) {
   const { tasks, missions } = readTaskStore(repoRoot)
+  const missionTasks = tasks.filter((task) => task.missionId === missionId)
+  const firstBlocked = missionTasks.find((task) => task.state === "blocked")
+  const firstActive = missionTasks.find((task) => task.state === "in_progress" || task.state === "ready")
+  const unlockedTaskIds = []
+  const tunedTaskIds = []
+
   const nextTasks = tasks.map((task) => {
     if (task.missionId !== missionId) return task
-    if (task.id === "TASK-142") {
-      return normalizeTaskRecord({
-        ...task,
-        owner: "eng-lead",
-        runtime: "pi/local",
-        dependencies: ["TASK-126"],
-        confidence: Math.min(task.confidence + 3, 99),
-        rationale: "Replanned to eng-lead after expertise rebalance and lower queue delay on pi/local.",
-        lastUpdate: "replanned now"
-      }, tasks)
-    }
-    if (task.id === "TASK-154") {
+
+    if (firstBlocked && task.id === firstBlocked.id) {
+      unlockedTaskIds.push(task.id)
       return normalizeTaskRecord({
         ...task,
         state: "ready",
         blockedReason: undefined,
-        rationale: "Context prefetch resolved the bottleneck and unlocked downstream execution.",
+        rationale: "Replan removed the immediate blocker and queued this task for execution.",
         lastUpdate: "replanned now"
       }, tasks)
     }
-    if (task.id === "TASK-160") {
+
+    if (firstActive && task.id === firstActive.id) {
+      tunedTaskIds.push(task.id)
       return normalizeTaskRecord({
         ...task,
-        dependencies: ["TASK-142", "TASK-154"],
-        lastUpdate: task.lastUpdate || "replanned now",
+        confidence: Math.min(Number(task.confidence || 0) + 3, 99),
+        rationale: "Replan prioritized this active task to reduce downstream wait time.",
+        lastUpdate: "replanned now"
       }, tasks)
     }
+
     return task
   })
 
@@ -468,6 +349,9 @@ export function applyMissionReplan(repoRoot, missionId) {
     mission: updatedMission,
     missions: nextMissions,
     tasks: nextTasks,
-    summary: "Agentic replan moved TASK-142 to eng-lead on pi/local and unlocked TASK-154 via context prefetch."
+    summary: [
+      tunedTaskIds.length > 0 ? `Prioritized ${tunedTaskIds.join(", ")}` : "",
+      unlockedTaskIds.length > 0 ? `unblocked ${unlockedTaskIds.join(", ")}` : "",
+    ].filter(Boolean).join(" and ") || "Agentic replan applied with no task-level changes."
   }
 }

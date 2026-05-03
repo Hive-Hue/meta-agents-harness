@@ -416,7 +416,7 @@ input:focus-visible {
   width: var(--rail-width);
   flex-shrink: 0;
   flex-direction: column;
-  overflow-y: hidden;
+  overflow: hidden;
   border-right: 1px solid rgba(100, 231, 255, 0.08);
   background: linear-gradient(180deg, rgba(13, 16, 23, 0.96), rgba(17, 21, 30, 0.92));
 }
@@ -712,8 +712,12 @@ input:focus-visible {
 }
 
 .status-badge--completed {
-  border-color: var(--color-raised);
+  border-color: rgba(46, 125, 50, 0.28);
   background: #eaeef2;
+  color: #01853c;
+}
+
+.status-badge--completed .material-symbols-outlined {
   color: #01853c;
 }
 

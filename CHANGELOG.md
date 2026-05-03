@@ -9,6 +9,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Added
 
+- WebUI `Tasks` now supports full Task Inspector CRUD flow with themed modal editing (`Edit Task`), inline create shortcut, and guarded delete confirmation
+- WebUI `/tasks` PERT/CPM view now includes agentic execution overlays (AI ETA, token estimate, and cost estimate) plus configurable estimation coefficients in `Settings > Preferences > Agentic Estimation`
+- WebUI Bootstrap `Workspace Detection` now performs real backend scanning via `/api/mah/bootstrap/detect` using current `Workspace Path` (no mocked detection cards)
+
 - PI `--full-crews` orchestrator runtime now exposes cross-crew catalog visibility in prompt/runtime catalog and resolves delegation targets across crews (including worker-only crews without leads)
 - Claude runtime now includes declared per-agent domain rules in generated `--agents` prompts (`Declared domain rules: ...`) for delegation observability.
 - `--policy enforce-domain` guardrail for Claude runtime: fail-fast when crew config contains granular per-agent domain rules that cannot be path-enforced by the runtime surface.
@@ -69,6 +73,12 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Changed
 
+- WebUI task creation no longer requires mission assignment; tasks can be created with `missionId=""` and render as mission-unscoped work items
+- Task estimate input was removed from `/tasks` `New Task`; `estimate` is now automatically derived by task-store heuristics when omitted
+- Expertise screen actions now use workspace-aware API requests (`x-mah-workspace-path`) so catalog/proposals/evidence/lifecycle resolve against the active workspace instead of implicit default pathing
+- Auth login branding now applies `invert` filter to MAH logo for dark-screen readability
+- `/expertise` button and active-state contrast updated across workflow stepper/actions/tabs/list selections for dark-theme legibility
+
 - PI multi-team TUI `Alt+C` crew filter in `--full-crews` now separates visual filtering from delegation routing; `all-crews` view renders the union of widgets from all discovered crews
 - Claude runtime warns explicitly when domain rules are prompt-declarative (non-enforced) in the active crew.
 - WebUI Vite middleware uses `next()` pattern to intercept API routes before SPA fallback
@@ -104,6 +114,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Fixed
 
+- Workspace Detection expertise indicator no longer produces false `No expertise entries found` when catalog files exist under `.mah/expertise/catalog/**` or when `.mah/expertise/registry.json` is present
+- Expertise governance data loading now consistently points to the selected workspace path, fixing false-empty catalog/proposal states in multi-workspace use
+- Sidebar rail overflow now uses full clipping (`overflow: hidden`) to remove stray horizontal scrollbar artifacts
 - `sync-meta-agents` no longer drops teams that have workers but no lead when generating runtime `multi-team.yaml`; orchestrator `routes_to` now falls back to workers when no leads exist
 - PI multi-team runtime no longer dereferences `team.lead` unsafely in worker-only teams, fixing `0 agents`/missing widgets in crew filters
 - PI cross-crew delegation now propagates target crew config (`MAH_MULTI_CONFIG`/`PI_MULTI_CONFIG`) to child runs so workers execute under the correct crew runtime

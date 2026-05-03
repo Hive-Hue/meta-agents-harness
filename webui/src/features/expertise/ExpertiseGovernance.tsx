@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { CommandPreview } from "../../components/ui/CommandPreview";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useExpertiseData, useExpertiseDetail, useEvidenceData, useProposals, type ExpertiseEntry, type ProposalInfo, type SyncChange } from "./useExpertiseData";
 import { getFeatureAiCliOptions } from "../settings/aiFeatureSettings";
 import "./expertise.css";
@@ -16,11 +17,15 @@ const WORKFLOW_STEPS = [
   { id: "apply" as WorkflowStep, label: "5. Apply" },
 ];
 
-function runMah(args: string[]) {
-  return fetch("/api/mah/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ args }) }).then(r => r.json());
-}
-
 export function ExpertiseGovernance() {
+  const { workspacePath } = useWorkspace();
+  const runMah = useCallback((args: string[]) => (
+    fetch("/api/mah/exec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
+      body: JSON.stringify({ args }),
+    }).then(r => r.json())
+  ), [workspacePath]);
   const [crew] = useState("dev");
   const [step, setStep] = useState<WorkflowStep>("seed");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -471,6 +476,7 @@ function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApp
 }
 
 function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntry[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  const { workspacePath } = useWorkspace();
   const [sel, setSel] = useState<string | null>(selectedId);
   useEffect(() => { if (selectedId) setSel(selectedId); }, [selectedId]);
   const trans: Record<string, string[]> = { experimental: ["active"], active: ["restricted", "experimental"], restricted: ["active", "revoked"], revoked: [] };
@@ -488,7 +494,18 @@ function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEnt
             </div>
             <div className="lifecycle-transitions">
               {(trans[current.lifecycle || "experimental"] || []).map(s => (
-                <button key={s} className="lifecycle-transition-btn" onClick={async () => { if (!confirm(`Transition ${current.id}→${s}?`)) return; await runMah(["expertise", "lifecycle", current.id, "--to", s, "--json"]); }}>
+                <button
+                  key={s}
+                  className="lifecycle-transition-btn"
+                  onClick={async () => {
+                    if (!confirm(`Transition ${current.id}→${s}?`)) return;
+                    await fetch("/api/mah/exec", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
+                      body: JSON.stringify({ args: ["expertise", "lifecycle", current.id, "--to", s, "--json"] }),
+                    });
+                  }}
+                >
                   <Icon name="arrow_forward" size={12} />{s}
                 </button>
               ))}

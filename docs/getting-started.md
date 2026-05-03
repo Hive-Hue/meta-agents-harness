@@ -50,13 +50,17 @@ mah run
 
 # Inspect the planning workspace
 mah mission list --json
-mah task list --mission q4-audit --json
+mah task list --json
 ```
 
 ### 4. WebUI Theme (v0.9.0 line)
 
 In the WebUI, open **Settings → Display → Theme** and select **Dark** or **Light**.
 The theme is applied immediately and persisted locally (`mah:theme`) for future reloads.
+
+### 5. WebUI Workspace Detection (v0.9.0 line)
+
+Bootstrap `Workspace Detection` scans the active **Workspace Path** (from Settings) and reports live state for config/runtime markers/git/expertise/context.
 
 ---
 

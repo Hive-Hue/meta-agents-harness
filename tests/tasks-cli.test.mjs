@@ -19,9 +19,18 @@ function run(args, cwd) {
   })
 }
 
-test("mah task list --json returns seeded tasks", () => {
+test("mah task list --json returns persisted tasks", () => {
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-task-list-"))
   try {
+    const create = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-118", title: "List seed", missionId: "mission-1" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
     const result = run(["task", "list", "--json"], tempWorkspace)
     assert.equal(result.status, 0, result.stderr)
     const payload = JSON.parse(result.stdout)
@@ -88,6 +97,15 @@ test("mah task update changes state and runtime", () => {
 test("mah task show returns task details", () => {
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-task-show-"))
   try {
+    const create = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-118", title: "Show seed", missionId: "mission-1" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
     const result = run(["task", "show", "TASK-118", "--json"], tempWorkspace)
     assert.equal(result.status, 0, result.stderr)
     const payload = JSON.parse(result.stdout)

@@ -49,8 +49,8 @@
   align-items: center !important;
   gap: 8px !important;
   flex-direction: row !important;
-  background: none;
-  border: 0;
+  background: transparent;
+  border: 1px solid transparent;
   padding: 6px 10px;
   border-radius: 6px;
   cursor: pointer;
@@ -64,8 +64,9 @@
 }
 
 .workflow-step--active .workflow-step__btn {
-  background: #0a0a0a;
-  color: var(--color-surface);
+  background: var(--color-cyan-surface);
+  border-color: var(--color-cyan);
+  color: var(--color-text);
 }
 
 .workflow-step--done .workflow-step__btn {
@@ -77,7 +78,7 @@
   height: 18px;
   border-radius: 50%;
   background: currentColor;
-  color: var(--color-surface);
+  color: var(--color-background);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -92,8 +93,8 @@
 }
 
 .workflow-step--active .workflow-step__num {
-  background: var(--color-surface);
-  color: #0a0a0a;
+  background: var(--color-cyan);
+  color: #0a0d13;
 }
 
 .workflow-step--done .workflow-step__num {
@@ -199,18 +200,20 @@
 }
 
 .workflow-action-btn--primary {
-  background: #0a0a0a;
-  border-color: #0a0a0a;
-  color: var(--color-surface);
+  background: var(--color-cyan-surface);
+  border-color: var(--color-cyan);
+  color: var(--color-text);
 }
 
 .workflow-action-btn--primary:hover {
-  background: var(--color-text);
+  background: rgba(100, 231, 255, 0.22);
+  border-color: var(--color-secondary-cyan);
 }
 
 .workflow-action-btn--primary:disabled {
-  background: #ccc;
-  border-color: #ccc;
+  background: var(--color-cyan-surface);
+  border-color: var(--color-border-subtle);
+  color: var(--color-text-dim);
 }
 
 /* Sync preview */
@@ -435,8 +438,8 @@
 }
 
 .expertise-tab--inline.expertise-tab--active {
-  color: #0a0a0a;
-  border-bottom-color: #0a0a0a;
+  color: var(--color-text);
+  border-bottom-color: var(--color-cyan);
 }
 
 /* Table */
@@ -486,7 +489,7 @@
 }
 
 .expertise-table tr.is-selected td {
-  background: #f0f0f0;
+  background: var(--color-cyan-surface);
 }
 
 .agent-name-cell {
@@ -545,16 +548,16 @@
   font-size: 12px;
   border-radius: 4px;
   cursor: pointer;
-  color: #444;
+  color: var(--color-text-muted);
 }
 
 .evidence-agent-btn:hover {
-  background: #f0f0f0;
+  background: var(--color-surface-neutral);
 }
 
 .evidence-agent-btn.is-active {
-  background: #0a0a0a;
-  color: var(--color-surface);
+  background: var(--color-cyan-surface);
+  color: var(--color-text);
 }
 
 .evidence-events {
@@ -630,7 +633,7 @@
 }
 
 .lifecycle-transition-btn:hover {
-  border-color: #0a0a0a;
+  border-color: var(--color-cyan);
   background: var(--color-surface-neutral);
 }
 

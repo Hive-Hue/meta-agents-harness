@@ -5,6 +5,7 @@ import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { requestGlobalConsoleOpen } from "../console/consoleBridge";
+import { getAgenticEstimationSettings, type AgenticEstimationSettings } from "./agenticEstimationSettings";
 import { useTasksData, type MissionRecord, type TaskRecord, type TaskState } from "./useTasksData";
 import "./tasks.css";
 
@@ -172,6 +173,9 @@ type PertNodeLayout = {
   lf: number;
   slack: number;
   duration: number;
+  aiDuration: number;
+  tokenEstimate: number;
+  costEstimateUsd: number;
   x: number;
   y: number;
   width: number;
@@ -185,7 +189,35 @@ type PertEdgeLayout = {
   critical: boolean;
 };
 
-function buildPertDiagram(tasks: TaskRecord[]) {
+function buildPertDiagram(tasks: TaskRecord[], settings: AgenticEstimationSettings) {
+  const runtimeDurationFactor = (runtime: string): number => {
+    const normalized = runtime.toLowerCase();
+    if (normalized.includes("pi/local")) return settings.runtimeDurationFactor["pi/local"] ?? settings.runtimeDurationFactor.default ?? 1;
+    if (normalized.includes("pi")) return settings.runtimeDurationFactor.pi ?? settings.runtimeDurationFactor.default ?? 1;
+    if (normalized.includes("hermes")) return settings.runtimeDurationFactor.hermes ?? settings.runtimeDurationFactor.default ?? 1;
+    if (normalized.includes("opencode")) return settings.runtimeDurationFactor.opencode ?? settings.runtimeDurationFactor.default ?? 1;
+    if (normalized.includes("openclaude")) return settings.runtimeDurationFactor.openclaude ?? settings.runtimeDurationFactor.default ?? 1;
+    if (normalized.includes("claude")) return settings.runtimeDurationFactor.claude ?? settings.runtimeDurationFactor.default ?? 1;
+    return settings.runtimeDurationFactor.default ?? 1;
+  };
+
+  const runtimeCostPer1kTokensUsd = (runtime: string): number => {
+    const normalized = runtime.toLowerCase();
+    if (normalized.includes("hermes")) return settings.runtimeCostPer1kTokensUsd.hermes ?? settings.runtimeCostPer1kTokensUsd.default ?? 0.003;
+    if (normalized.includes("pi")) return settings.runtimeCostPer1kTokensUsd.pi ?? settings.runtimeCostPer1kTokensUsd.default ?? 0.003;
+    if (normalized.includes("opencode")) return settings.runtimeCostPer1kTokensUsd.opencode ?? settings.runtimeCostPer1kTokensUsd.default ?? 0.003;
+    if (normalized.includes("openclaude")) return settings.runtimeCostPer1kTokensUsd.openclaude ?? settings.runtimeCostPer1kTokensUsd.default ?? 0.003;
+    if (normalized.includes("claude")) return settings.runtimeCostPer1kTokensUsd.claude ?? settings.runtimeCostPer1kTokensUsd.default ?? 0.003;
+    return settings.runtimeCostPer1kTokensUsd.default ?? 0.003;
+  };
+
+  const estimateTokens = (task: TaskRecord, durationMinutes: number): number => {
+    const dependencyWeight = task.dependencies.length * settings.tokenPerDependency;
+    const textWeight = `${task.title} ${task.summary || ""}`.trim().split(/\s+/).filter(Boolean).length * settings.tokenPerWord;
+    const priorityWeight = task.priority === "high" ? settings.tokenPriorityHigh : task.priority === "medium" ? settings.tokenPriorityMedium : 180;
+    return Math.max(1200, Math.round(settings.tokenBase + durationMinutes * settings.tokenPerMinute + dependencyWeight + textWeight + priorityWeight));
+  };
+
   const taskMap = new Map(tasks.map((task) => [task.id, task] as const));
   const successors = new Map<string, string[]>();
   tasks.forEach((task) => successors.set(task.id, []));
@@ -262,7 +294,7 @@ function buildPertDiagram(tasks: TaskRecord[]) {
   };
 
   const NODE_WIDTH = 236;
-  const NODE_HEIGHT = 132;
+  const NODE_HEIGHT = 148;
   const COLUMN_GAP = 82;
   const ROW_GAP = 34;
   const TOP_OFFSET = 76;
@@ -275,6 +307,12 @@ function buildPertDiagram(tasks: TaskRecord[]) {
     const stageTop = TOP_OFFSET + Math.max(0, (3 * (NODE_HEIGHT + ROW_GAP) - totalStageHeight) / 2);
     group.forEach((task, index) => {
       const duration = parseEstimateMinutes(task.estimate);
+      const aiDuration = Math.max(
+        8,
+        Math.round((settings.baseMinutes + duration * runtimeDurationFactor(task.runtime) + task.dependencies.length * settings.dependencyMinutes + `${task.summary || ""}`.split(/\s+/).filter(Boolean).length * settings.summaryWordMinutes + (task.priority === "high" ? settings.priorityHighMinutes : task.priority === "medium" ? settings.priorityMediumMinutes : 0))),
+      );
+      const tokenEstimate = estimateTokens(task, aiDuration);
+      const costEstimateUsd = Number(((tokenEstimate / 1000) * runtimeCostPer1kTokensUsd(task.runtime)).toFixed(3));
       const es = earliestStartOf(task.id);
       const ef = earliestFinishOf(task.id);
       const ls = latestStartOf(task.id);
@@ -290,6 +328,9 @@ function buildPertDiagram(tasks: TaskRecord[]) {
         lf,
         slack,
         duration,
+        aiDuration,
+        tokenEstimate,
+        costEstimateUsd,
         x: LEFT_OFFSET + stage * (NODE_WIDTH + COLUMN_GAP),
         y: stageTop + index * (NODE_HEIGHT + ROW_GAP),
         width: NODE_WIDTH,
@@ -312,6 +353,9 @@ function buildPertDiagram(tasks: TaskRecord[]) {
   const width = LEFT_OFFSET * 2 + (maxStage + 1) * NODE_WIDTH + maxStage * COLUMN_GAP;
   const height = maxBottom + 52;
   const totalSlack = layouts.reduce((sum, node) => sum + node.slack, 0);
+  const totalAiMinutes = layouts.reduce((sum, node) => sum + node.aiDuration, 0);
+  const totalTokenEstimate = layouts.reduce((sum, node) => sum + node.tokenEstimate, 0);
+  const totalCostEstimateUsd = Number(layouts.reduce((sum, node) => sum + node.costEstimateUsd, 0).toFixed(3));
 
   return {
     nodes: layouts,
@@ -319,6 +363,9 @@ function buildPertDiagram(tasks: TaskRecord[]) {
     width,
     height,
     projectFinish,
+    totalAiMinutes,
+    totalTokenEstimate,
+    totalCostEstimateUsd,
     totalSlack,
     criticalCount: layouts.filter((node) => node.critical).length,
     stageCount: maxStage + 1,
@@ -338,6 +385,8 @@ export function TasksPage() {
     busyAction,
     reload,
     createTask,
+    updateTask,
+    deleteTask,
     createMission,
     commitMissionScope,
     applyMissionReplan,
@@ -348,6 +397,7 @@ export function TasksPage() {
   const [isPertModalOpen, setIsPertModalOpen] = useState(false);
   const [isFlowHelpOpen, setIsFlowHelpOpen] = useState(false);
   const [isTaskCreateOpen, setIsTaskCreateOpen] = useState(false);
+  const [isTaskEditOpen, setIsTaskEditOpen] = useState(false);
   const [isMissionCreateOpen, setIsMissionCreateOpen] = useState(false);
   const [taskDraft, setTaskDraft] = useState({
     title: "",
@@ -356,9 +406,10 @@ export function TasksPage() {
     owner: "planning-lead",
     runtime: "openclaude",
     priority: "medium" as "high" | "medium" | "low",
-    estimate: "45m",
     summary: "",
   });
+  const [taskEditDraft, setTaskEditDraft] = useState<Partial<TaskRecord>>({});
+  const [agenticSettings, setAgenticSettings] = useState<AgenticEstimationSettings>(() => getAgenticEstimationSettings());
   const [missionDraft, setMissionDraft] = useState({
     name: "",
     objective: "",
@@ -503,9 +554,9 @@ export function TasksPage() {
       .map((task, index) => ({
       id: `INBOX-${index + 1}`,
       taskId: task.id,
-      title: index === 0 ? "Session suggests follow-up" : index === 1 ? "Mission telemetry proposes replan" : "Validation promoted new task",
-      source: task.sessionId || task.id,
-      reason: task.blockedReason || task.summary,
+      title: task.title,
+      source: task.sessionId || task.state.replaceAll("_", " "),
+      reason: task.blockedReason || task.summary || "No additional context available.",
       owner: task.owner,
       runtime: task.runtime,
       tone:
@@ -518,17 +569,18 @@ export function TasksPage() {
   ), [selectedMissionId, tasks]);
 
   useEffect(() => {
-    if (!isPertModalOpen && !isBoardModalOpen && !isFlowHelpOpen && !isTaskCreateOpen && !isMissionCreateOpen) return;
+    if (!isPertModalOpen && !isBoardModalOpen && !isFlowHelpOpen && !isTaskCreateOpen && !isTaskEditOpen && !isMissionCreateOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsPertModalOpen(false);
       if (event.key === "Escape") setIsBoardModalOpen(false);
       if (event.key === "Escape") setIsFlowHelpOpen(false);
       if (event.key === "Escape") setIsTaskCreateOpen(false);
+      if (event.key === "Escape") setIsTaskEditOpen(false);
       if (event.key === "Escape") setIsMissionCreateOpen(false);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isBoardModalOpen, isFlowHelpOpen, isMissionCreateOpen, isPertModalOpen, isTaskCreateOpen]);
+  }, [isBoardModalOpen, isFlowHelpOpen, isMissionCreateOpen, isPertModalOpen, isTaskCreateOpen, isTaskEditOpen]);
 
   useEffect(() => {
     if (!toast) return;
@@ -536,31 +588,54 @@ export function TasksPage() {
     return () => window.clearTimeout(timeoutId);
   }, [toast]);
 
+  useEffect(() => {
+    const reloadSettings = () => setAgenticSettings(getAgenticEstimationSettings());
+    window.addEventListener("mah:agentic-estimation-changed", reloadSettings);
+    window.addEventListener("storage", reloadSettings);
+    return () => {
+      window.removeEventListener("mah:agentic-estimation-changed", reloadSettings);
+      window.removeEventListener("storage", reloadSettings);
+    };
+  }, []);
+
   const openTaskCreateModal = () => {
     setTaskDraft({
       title: "",
-      missionId: selectedMissionId || missions[0]?.id || "q4-audit",
+      missionId: selectedMissionId || missions[0]?.id || "",
       crewId: "dev",
       owner: "planning-lead",
       runtime: "openclaude",
       priority: "medium",
-      estimate: "45m",
       summary: "",
     });
     setIsTaskCreateOpen(true);
   };
 
+  const openTaskEditModal = (task?: TaskRecord) => {
+    if (!task) return;
+    setTaskEditDraft({
+      title: task.title,
+      summary: task.summary,
+      owner: task.owner,
+      runtime: task.runtime,
+      priority: task.priority,
+      state: task.state,
+      risk: task.risk,
+    });
+    setIsTaskEditOpen(true);
+  };
+
   const handleCreateTask = async () => {
     if (!taskDraft.title.trim()) return;
+    const missionId = taskDraft.missionId || selectedMissionId || "";
     try {
       const created = await createTask({
         title: taskDraft.title.trim(),
-        missionId: taskDraft.missionId || selectedMissionId || missions[0]?.id || "q4-audit",
+        missionId,
         crewId: taskDraft.crewId.trim() || "dev",
         owner: taskDraft.owner.trim() || "planning-lead",
         runtime: taskDraft.runtime.trim() || "openclaude",
         priority: taskDraft.priority,
-        estimate: taskDraft.estimate.trim() || "45m",
         summary: taskDraft.summary.trim() || "Task created from the Tasks workspace.",
       });
       if (created) {
@@ -646,6 +721,31 @@ export function TasksPage() {
     });
   };
 
+  const handleUpdateTask = async (taskId: string, updates: Partial<TaskRecord>) => {
+    try {
+      const updated = await updateTask(taskId, updates);
+      if (updated) {
+        updateTasksParams({ task: updated.id, mission: updated.missionId }, true);
+        setToast({ message: `Task ${updated.id} updated.`, tone: "info" });
+      }
+    } catch (nextError) {
+      setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      const removed = await deleteTask(taskId);
+      if (!removed) return;
+      const remaining = tasks.filter((item) => item.id !== taskId);
+      const nextTask = remaining[0];
+      updateTasksParams({ task: nextTask?.id || null, mission: nextTask?.missionId || selectedMissionId || null }, true);
+      setToast({ message: `Task ${taskId} deleted.`, tone: "info" });
+    } catch (nextError) {
+      setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
+    }
+  };
+
   return (
     <>
       <main className="tasks-main">
@@ -665,7 +765,7 @@ export function TasksPage() {
               <span>{counts.active} in progress</span>
             </div>
           </div>
-          <CommandPreview context="tasks" command={`mah task list --mission ${selectedMissionId || "q4-audit"} --json`} />
+          <CommandPreview context="tasks" command={selectedMissionId ? `mah task list --mission ${selectedMissionId} --json` : "mah task list --json"} />
         </section>
 
         <section className="tasks-main__content">
@@ -754,6 +854,7 @@ export function TasksPage() {
               onSelectTask={handleSelectTask}
               onOpenModal={() => setIsPertModalOpen(true)}
               onCloseModal={undefined}
+              agenticSettings={agenticSettings}
               tasks={tasks}
             />
           )}
@@ -773,6 +874,7 @@ export function TasksPage() {
               selectedTaskId={selectedTaskId}
               onSelectTask={handleSelectTask}
               selectedMission={selectedMission}
+              tasks={tasks}
               onApplyReplan={() => void handleApplyReplan()}
               busy={busyAction.startsWith("replan-")}
             />
@@ -792,9 +894,13 @@ export function TasksPage() {
         ) : (
           <TaskInspector
             task={selectedTask}
+            busyAction={busyAction}
             onRunTask={() => void handleRunTask(selectedTask?.id || "")}
             onResumeTaskSession={() => handleResumeTaskSession(selectedTask)}
             onOpenSessions={() => navigate("/sessions")}
+            onCreateTask={openTaskCreateModal}
+            onEditTask={() => openTaskEditModal(selectedTask)}
+            onDeleteTask={(taskId) => void handleDeleteTask(taskId)}
           />
         )}
       </aside>
@@ -917,11 +1023,12 @@ export function TasksPage() {
                   />
                 </label>
                 <label className="tasks-field">
-                  <span>Mission</span>
+                  <span>Mission (optional)</span>
                   <select
                     value={taskDraft.missionId}
                     onChange={(event) => setTaskDraft((current) => ({ ...current, missionId: event.target.value }))}
                   >
+                    <option value="">No mission</option>
                     {missions.map((mission) => (
                       <option key={mission.id} value={mission.id}>{mission.name}</option>
                     ))}
@@ -970,15 +1077,6 @@ export function TasksPage() {
                     <option value="high">High</option>
                   </select>
                 </label>
-                <label className="tasks-field">
-                  <span>Estimate</span>
-                  <input
-                    type="text"
-                    value={taskDraft.estimate}
-                    onChange={(event) => setTaskDraft((current) => ({ ...current, estimate: event.target.value }))}
-                    placeholder="45m"
-                  />
-                </label>
               </div>
               <div className="tasks-modal__actions">
                 <button type="button" className="tasks-toolbar__btn" onClick={() => setIsTaskCreateOpen(false)}>
@@ -999,6 +1097,84 @@ export function TasksPage() {
         </div>
       ) : null}
 
+      {isTaskEditOpen && selectedTask ? (
+        <div className="tasks-modal-backdrop" onClick={() => setIsTaskEditOpen(false)}>
+          <section className="tasks-modal tasks-modal--compose" onClick={(event) => event.stopPropagation()}>
+            <div className="tasks-modal__header">
+              <div>
+                <p className="tasks-panel__label">Edit Task</p>
+                <h3>{selectedTask.id}</h3>
+              </div>
+              <button type="button" className="tasks-toolbar__btn" onClick={() => setIsTaskEditOpen(false)}>
+                <Icon name="close" size={16} />
+                Close
+              </button>
+            </div>
+
+            <div className="tasks-form">
+              <div className="tasks-form__grid">
+                <label className="tasks-field tasks-field--full">
+                  <span>Title</span>
+                  <input type="text" value={taskEditDraft.title || ""} onChange={(event) => setTaskEditDraft((current) => ({ ...current, title: event.target.value }))} />
+                </label>
+                <label className="tasks-field tasks-field--full">
+                  <span>Summary</span>
+                  <textarea rows={4} value={taskEditDraft.summary || ""} onChange={(event) => setTaskEditDraft((current) => ({ ...current, summary: event.target.value }))} />
+                </label>
+                <label className="tasks-field">
+                  <span>State</span>
+                  <select value={taskEditDraft.state || selectedTask.state} onChange={(event) => setTaskEditDraft((current) => ({ ...current, state: event.target.value as TaskState }))}>
+                    <option value="backlog">Backlog</option>
+                    <option value="ready">Ready</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="review">Review</option>
+                    <option value="done">Done</option>
+                  </select>
+                </label>
+                <label className="tasks-field">
+                  <span>Priority</span>
+                  <select value={taskEditDraft.priority || selectedTask.priority} onChange={(event) => setTaskEditDraft((current) => ({ ...current, priority: event.target.value as "high" | "medium" | "low" }))}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                  </select>
+                </label>
+                <label className="tasks-field">
+                  <span>Owner</span>
+                  <input type="text" value={taskEditDraft.owner || ""} onChange={(event) => setTaskEditDraft((current) => ({ ...current, owner: event.target.value }))} />
+                </label>
+                <label className="tasks-field">
+                  <span>Runtime</span>
+                  <input type="text" value={taskEditDraft.runtime || ""} onChange={(event) => setTaskEditDraft((current) => ({ ...current, runtime: event.target.value }))} />
+                </label>
+                <label className="tasks-field tasks-field--full">
+                  <span>Risk</span>
+                  <input type="text" value={taskEditDraft.risk || ""} onChange={(event) => setTaskEditDraft((current) => ({ ...current, risk: event.target.value }))} />
+                </label>
+              </div>
+              <div className="tasks-modal__actions">
+                <button type="button" className="tasks-toolbar__btn" onClick={() => setIsTaskEditOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tasks-toolbar__btn tasks-toolbar__btn--primary"
+                  onClick={async () => {
+                    await handleUpdateTask(selectedTask.id, taskEditDraft);
+                    setIsTaskEditOpen(false);
+                  }}
+                  disabled={busyAction === `update-task-${selectedTask.id}`}
+                >
+                  <Icon name="save" size={16} />
+                  {busyAction === `update-task-${selectedTask.id}` ? "Saving..." : "Save Task"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {isPertModalOpen && activeView === "pert" ? (
         <div className="tasks-modal-backdrop" onClick={() => setIsPertModalOpen(false)}>
           <section className="tasks-modal tasks-modal--pert" onClick={(event) => event.stopPropagation()}>
@@ -1007,6 +1183,7 @@ export function TasksPage() {
               onSelectTask={handleSelectTask}
               onOpenModal={() => undefined}
               onCloseModal={() => setIsPertModalOpen(false)}
+              agenticSettings={agenticSettings}
               tasks={tasks}
               expanded
             />
@@ -1074,10 +1251,15 @@ export function TasksPage() {
       ) : null}
 
       {toast ? (
-        <div className={`tasks-toast${toast.tone === "error" ? " tasks-toast--error" : ""}`} role="status" aria-live="polite">
+        <div className={`tasks-toast${toast.tone === "error" ? " tasks-toast--error" : ""}${toast.message.toLowerCase().includes("deleted") ? " tasks-toast--delete" : ""}`} role="status" aria-live="polite">
           <span>{toast.message}</span>
-          <button type="button" className="tasks-toast__close" aria-label="Fechar notificação" onClick={() => setToast(null)}>
-            <Icon name="close" size={14} />
+          <button
+            type="button"
+            className={`tasks-toast__close${toast.message.toLowerCase().includes("deleted") ? " tasks-toast__close--danger" : ""}`}
+            aria-label="Fechar notificação"
+            onClick={() => setToast(null)}
+          >
+            <Icon name={toast.message.toLowerCase().includes("deleted") ? "delete" : "close"} size={14} />
           </button>
         </div>
       ) : null}
@@ -1220,6 +1402,14 @@ function MissionsView({
 }) {
   const currentMission = missions.find((mission) => mission.id === selectedMissionId) ?? missions[0];
   const missionTasks = tasks.filter((task) => task.missionId === currentMission.id);
+  const blockedCount = missionTasks.filter((task) => task.state === "blocked").length;
+  const criticalCount = missionTasks.filter((task) => task.priority === "high" || task.state === "blocked").length;
+  const avgConfidence = missionTasks.length > 0
+    ? Math.round(missionTasks.reduce((sum, task) => sum + (task.confidence || 0), 0) / missionTasks.length)
+    : 0;
+  const deliveryConfidence = missionTasks.length > 0
+    ? `${avgConfidence}%`
+    : "n/a";
 
   return (
     <div className="tasks-stack">
@@ -1273,10 +1463,10 @@ function MissionsView({
           <span>{currentMission.progress}% mission progress</span>
         </div>
         <div className="tasks-kpis">
-          <div><span>Nodes</span><strong>14</strong></div>
-          <div><span>Blocked</span><strong>3</strong></div>
-          <div><span>Critical</span><strong>8</strong></div>
-          <div><span>Delivery</span><strong>High confidence</strong></div>
+          <div><span>Nodes</span><strong>{missionTasks.length}</strong></div>
+          <div><span>Blocked</span><strong>{blockedCount}</strong></div>
+          <div><span>Critical</span><strong>{criticalCount}</strong></div>
+          <div><span>Delivery</span><strong>{deliveryConfidence}</strong></div>
         </div>
       </section>
 
@@ -1329,6 +1519,7 @@ function PertView({
   onSelectTask,
   onOpenModal,
   onCloseModal,
+  agenticSettings,
   tasks,
   expanded = false,
 }: {
@@ -1336,10 +1527,11 @@ function PertView({
   onSelectTask: (id: string) => void;
   onOpenModal: () => void;
   onCloseModal?: () => void;
+  agenticSettings: AgenticEstimationSettings;
   tasks: TaskRecord[];
   expanded?: boolean;
 }) {
-  const diagram = useMemo(() => buildPertDiagram(tasks), [tasks]);
+  const diagram = useMemo(() => buildPertDiagram(tasks, agenticSettings), [agenticSettings, tasks]);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const INITIAL_ZOOM = 0.75;
   const dragStateRef = useRef({
@@ -1443,6 +1635,9 @@ function PertView({
               <div><span>Critical Path</span><strong>{diagram.criticalCount}</strong></div>
               <div><span>Total Slack</span><strong>{formatMinutes(diagram.totalSlack)}</strong></div>
               <div><span>ETA</span><strong>{formatMinutes(diagram.projectFinish)}</strong></div>
+              <div><span>AI ETA</span><strong>{formatMinutes(diagram.totalAiMinutes)}</strong></div>
+              <div><span>Tokens</span><strong>{diagram.totalTokenEstimate.toLocaleString()}</strong></div>
+              <div><span>Est. Cost</span><strong>${diagram.totalCostEstimateUsd.toFixed(3)}</strong></div>
             </div>
             {!expanded ? (
               <button type="button" className="tasks-toolbar__btn" onClick={onOpenModal}>
@@ -1543,6 +1738,11 @@ function PertView({
                 <div className="tasks-pert__node-footer">
                   <span>{node.task.estimate}</span>
                   <span>Slack {formatMinutes(node.slack)}</span>
+                </div>
+                <div className="tasks-pert__node-ai">
+                  <span>AI {formatMinutes(node.aiDuration)}</span>
+                  <span>{node.tokenEstimate.toLocaleString()} tok</span>
+                  <span>${node.costEstimateUsd.toFixed(3)}</span>
                 </div>
               </button>
             ))}
@@ -1748,15 +1948,42 @@ function ReplanView({
   selectedTaskId,
   onSelectTask,
   selectedMission,
+  tasks,
   onApplyReplan,
   busy,
 }: {
   selectedTaskId: string;
   onSelectTask: (id: string) => void;
   selectedMission?: MissionRecord;
+  tasks: TaskRecord[];
   onApplyReplan: () => void;
   busy: boolean;
 }) {
+  const missionTasks = tasks.filter((task) => !selectedMission || task.missionId === selectedMission.id);
+  const currentPlan = missionTasks
+    .filter((task) => task.state === "in_progress" || task.state === "blocked")
+    .sort((a, b) => {
+      if (a.state !== b.state) return a.state === "blocked" ? -1 : 1;
+      return parseEstimateMinutes(b.estimate) - parseEstimateMinutes(a.estimate);
+    })
+    .slice(0, 4);
+  const proposedPlan = [...currentPlan]
+    .sort((a, b) => {
+      const aScore = (a.state === "blocked" ? 10 : 0) + (a.priority === "high" ? 5 : 0) + a.dependencies.length;
+      const bScore = (b.state === "blocked" ? 10 : 0) + (b.priority === "high" ? 5 : 0) + b.dependencies.length;
+      return bScore - aScore;
+    })
+    .slice(0, 4);
+
+  const totalCurrentMinutes = currentPlan.reduce((sum, task) => sum + parseEstimateMinutes(task.estimate), 0);
+  const totalProposedMinutes = proposedPlan.reduce((sum, task) => sum + Math.max(15, parseEstimateMinutes(task.estimate) - 20), 0);
+  const deltaMinutes = Math.max(0, totalCurrentMinutes - totalProposedMinutes);
+  const blockedCurrent = currentPlan.filter((task) => task.state === "blocked").length;
+  const blockedProposed = proposedPlan.filter((task) => task.state === "blocked").length;
+  const riskShift = blockedCurrent > 0
+    ? Math.round(((blockedCurrent - blockedProposed) / blockedCurrent) * 100)
+    : 0;
+
   return (
     <div className="tasks-stack">
       <section className="tasks-panel">
@@ -1767,61 +1994,55 @@ function ReplanView({
           </div>
           <div className="tasks-kpis tasks-kpis--inline">
             <div><span>Active Mission</span><strong>{selectedMission?.name || "No mission selected"}</strong></div>
-            <div><span>Bottlenecks</span><strong>1 critical</strong></div>
-            <div><span>Delta ETA</span><strong>-14h 20m</strong></div>
-            <div><span>Risk Shift</span><strong>-22%</strong></div>
+            <div><span>Bottlenecks</span><strong>{blockedCurrent} blocked</strong></div>
+            <div><span>Delta ETA</span><strong>{deltaMinutes > 0 ? `-${formatMinutes(deltaMinutes)}` : "0m"}</strong></div>
+            <div><span>Risk Shift</span><strong>{riskShift > 0 ? `-${riskShift}%` : "0%"}</strong></div>
           </div>
         </div>
 
         <div className="tasks-replan">
           <div className="tasks-replan__plan">
             <h4>Current Plan</h4>
-            <button type="button" className={`tasks-replan__node tasks-replan__node--critical${selectedTaskId === "TASK-142" ? " tasks-replan__node--selected" : ""}`} onClick={() => onSelectTask("TASK-142")}>
-              <strong>TASK-142</strong>
-              <span>Verify auth middleware</span>
-              <span>security-lead · pi</span>
-            </button>
-            <button type="button" className={`tasks-replan__node${selectedTaskId === "TASK-160" ? " tasks-replan__node--selected" : ""}`} onClick={() => onSelectTask("TASK-160")}>
-              <strong>TASK-160</strong>
-              <span>Validate artifact sync</span>
-              <span>validation-lead · hermes</span>
-            </button>
+            {currentPlan.map((task) => (
+              <button
+                key={`current-${task.id}`}
+                type="button"
+                className={`tasks-replan__node${task.state === "blocked" ? " tasks-replan__node--critical" : ""}${selectedTaskId === task.id ? " tasks-replan__node--selected" : ""}`}
+                onClick={() => onSelectTask(task.id)}
+              >
+                <strong>{task.id}</strong>
+                <span>{task.title}</span>
+                <span>{task.owner} · {task.runtime}</span>
+              </button>
+            ))}
+            {currentPlan.length === 0 ? <p className="tasks-panel__copy">No active bottlenecks in current mission.</p> : null}
           </div>
           <div className="tasks-replan__plan">
             <h4>Proposed Replan</h4>
-            <button type="button" className={`tasks-replan__node tasks-replan__node--highlight${selectedTaskId === "TASK-142" ? " tasks-replan__node--selected" : ""}`} onClick={() => onSelectTask("TASK-142")}>
-              <strong>TASK-142</strong>
-              <span>Reassigned to eng-lead</span>
-              <span>runtime shift to pi/local</span>
-            </button>
-            <button type="button" className={`tasks-replan__node${selectedTaskId === "TASK-154" ? " tasks-replan__node--selected" : ""}`} onClick={() => onSelectTask("TASK-154")}>
-              <strong>TASK-154</strong>
-              <span>Parallelized with context prefetch</span>
-              <span>context-lead · openclaude</span>
-            </button>
+            {proposedPlan.map((task, index) => (
+              <button
+                key={`proposed-${task.id}`}
+                type="button"
+                className={`tasks-replan__node${index === 0 ? " tasks-replan__node--highlight" : ""}${selectedTaskId === task.id ? " tasks-replan__node--selected" : ""}`}
+                onClick={() => onSelectTask(task.id)}
+              >
+                <strong>{task.id}</strong>
+                <span>{index === 0 ? "Prioritize and unblock first" : "Parallelize after bottleneck release"}</span>
+                <span>{task.owner} · {task.runtime}</span>
+              </button>
+            ))}
+            {proposedPlan.length === 0 ? <p className="tasks-panel__copy">No replan recommendation available yet.</p> : null}
           </div>
         </div>
 
         <div className="tasks-callout">
-          Critical path impact: delaying TASK-142 by 1 day moves ETA to Oct 25. Replan lowers critical path from 12 to 8 nodes.
+          Replan impact: prioritize blocked/high-risk tasks first, then parallelize dependent tasks to reduce overall mission latency.
         </div>
 
         <div className="tasks-toolbar">
           <button type="button" className="tasks-toolbar__btn tasks-toolbar__btn--primary" onClick={onApplyReplan}>
             <Icon name="check_circle" size={16} />
             {busy ? "Applying..." : "Apply Replan"}
-          </button>
-          <button type="button" className="tasks-toolbar__btn">
-            <Icon name="alt_route" size={16} />
-            Simulate Another Option
-          </button>
-          <button type="button" className="tasks-toolbar__btn">
-            <Icon name="lock" size={16} />
-            Lock Assignment
-          </button>
-          <button type="button" className="tasks-toolbar__btn">
-            <Icon name="ios_share" size={16} />
-            Export Change Plan
           </button>
         </div>
       </section>
@@ -1831,15 +2052,29 @@ function ReplanView({
 
 function TaskInspector({
   task,
+  busyAction,
   onRunTask,
   onResumeTaskSession,
   onOpenSessions,
+  onCreateTask,
+  onEditTask,
+  onDeleteTask,
 }: {
   task?: TaskRecord;
+  busyAction: string;
   onRunTask: () => void;
   onResumeTaskSession: () => void;
   onOpenSessions: () => void;
+  onCreateTask: () => void;
+  onEditTask: () => void;
+  onDeleteTask: (taskId: string) => void;
 }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+  }, [task?.id]);
+
   if (!task) {
     return (
       <section className="inspector__body sessions-inspector__empty">
@@ -1849,6 +2084,7 @@ function TaskInspector({
     );
   }
   const badge = toneForState(task.state);
+  const isDeleting = busyAction === `delete-task-${task.id}`;
   return (
     <>
       <section className="inspector__header">
@@ -1862,10 +2098,10 @@ function TaskInspector({
       <section className="inspector__body">
         <div className="inspector-stats">
           <div><span>Status</span><strong><StatusBadge tone={badge.tone} label={badge.label} /></strong></div>
-          <div><span>Mission</span><strong>{task.missionId}</strong></div>
+          <div><span>Mission</span><strong>{task.missionId || "—"}</strong></div>
           <div><span>Owner</span><strong>{task.owner}</strong></div>
           <div><span>Runtime</span><strong>{task.runtime}</strong></div>
-          <div><span>Estimate</span><strong>{task.estimate}</strong></div>
+          <div><span>Estimate</span><strong>{task.estimate} (auto)</strong></div>
           <div><span>Confidence</span><strong>{task.confidence}%</strong></div>
           <div><span>Linked Session</span><strong>{task.sessionId ?? "—"}</strong></div>
           <div><span>Last Update</span><strong>{task.lastUpdate}</strong></div>
@@ -1883,6 +2119,29 @@ function TaskInspector({
           <button type="button" className="tasks-toolbar__btn" onClick={onOpenSessions}>
             <Icon name="history" size={16} />
             Open Sessions
+          </button>
+          <button type="button" className="tasks-toolbar__btn" onClick={onCreateTask}>
+            <Icon name="add" size={16} />
+            New Task
+          </button>
+          <button type="button" className="tasks-toolbar__btn" onClick={onEditTask}>
+            <Icon name="edit" size={16} />
+            Edit Task
+          </button>
+          <button
+            type="button"
+            className={`tasks-toolbar__btn${confirmDelete ? " tasks-toolbar__btn--danger" : ""}`}
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                return;
+              }
+              onDeleteTask(task.id);
+            }}
+            disabled={isDeleting}
+          >
+            <Icon name="delete" size={16} />
+            {isDeleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete"}
           </button>
         </div>
 
@@ -1955,7 +2214,7 @@ function MissionInspector({ mission }: { mission: MissionRecord }) {
 
         <div className="tasks-inspector__section">
           <h4>Readiness</h4>
-          <p>This mission is healthy when context imports land on time and the auth verification branch clears review without new blockers.</p>
+          <p>{mission.health}. Maintain progress above {Math.max(50, mission.progress - 10)}% while preventing new blocked tasks.</p>
         </div>
       </section>
     </>

@@ -753,6 +753,7 @@
 .tasks-pert__node-topline,
 .tasks-pert__node-meta,
 .tasks-pert__node-footer,
+.tasks-pert__node-ai,
 .tasks-pert__metrics {
   display: flex;
   align-items: center;
@@ -818,6 +819,12 @@
   color: var(--color-text-muted);
   font-size: 11px;
   font-weight: 700;
+}
+
+.tasks-pert__node-ai {
+  color: var(--color-text-dim);
+  font-size: 10px;
+  font-family: var(--font-mono);
 }
 
 .tasks-pert__node--critical,
@@ -1197,6 +1204,12 @@
   color: var(--color-error-strong);
 }
 
+.tasks-toast--delete {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(127, 29, 29, 0.2);
+  color: #fecaca;
+}
+
 .tasks-toast__close {
   display: inline-flex;
   align-items: center;
@@ -1212,6 +1225,17 @@
 
 .tasks-toast__close:hover {
   background: rgba(255, 255, 255, 0.96);
+}
+
+.tasks-toast__close--danger {
+  background: rgba(239, 68, 68, 0.22);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.tasks-toast__close--danger:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #dc2626;
 }
 
 .tasks-inbox {

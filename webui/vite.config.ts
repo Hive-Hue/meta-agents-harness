@@ -957,6 +957,122 @@ function handleWorkspaceApi(req: import("http").IncomingMessage, res: import("ht
   res.end(JSON.stringify({ ok: true, workspace: result }));
 }
 
+function handleBootstrapDetectApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  if (req.method !== "GET") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+
+  const configPath = path.join(workspaceRoot, CONFIG_FILENAME);
+  const runtimeMarkers = [".pi", ".claude", ".hermes", ".kilo", ".opencode", ".openclaude"].filter((name) =>
+    existsSync(path.join(workspaceRoot, name)),
+  );
+  const expertiseDir = path.join(workspaceRoot, ".mah", "expertise");
+  const expertiseCatalogDir = path.join(expertiseDir, "catalog");
+  const expertiseRegistryPath = path.join(expertiseDir, "registry.json");
+  const contextDir = path.join(workspaceRoot, ".mah", "context");
+
+  let gitBranch = "";
+  let gitClean = false;
+  let gitRepo = false;
+  try {
+    gitBranch = execSync("git rev-parse --abbrev-ref HEAD", {
+      cwd: workspaceRoot,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    const status = execSync("git status --porcelain", {
+      cwd: workspaceRoot,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    gitClean = status.length === 0;
+    gitRepo = true;
+  } catch {
+    gitRepo = false;
+  }
+
+  let mahVersion = "unknown";
+  try {
+    const pkg = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf-8")) as { version?: string };
+    mahVersion = pkg.version ? `v${pkg.version}` : "unknown";
+  } catch {
+    mahVersion = "unknown";
+  }
+
+  const countYamlRecursive = (dirPath: string): number => {
+    if (!existsSync(dirPath)) return 0;
+    let count = 0;
+    for (const entry of readdirSync(dirPath)) {
+      const full = path.join(dirPath, entry);
+      try {
+        const stat = statSync(full);
+        if (stat.isDirectory()) {
+          count += countYamlRecursive(full);
+        } else if (stat.isFile() && /\.(ya?ml)$/i.test(entry)) {
+          count += 1;
+        }
+      } catch {
+        // ignore unreadable entries
+      }
+    }
+    return count;
+  };
+
+  const expertiseEntries = countYamlRecursive(expertiseCatalogDir);
+  const hasExpertiseRegistry = existsSync(expertiseRegistryPath);
+  const hasContext = existsSync(contextDir) && statSync(contextDir).isDirectory();
+
+  const detections = [
+    { label: "Workspace Root", status: "found", detail: workspaceRoot },
+    {
+      label: "MAH Configuration",
+      status: existsSync(configPath) ? "found" : "warning",
+      detail: existsSync(configPath) ? `${CONFIG_FILENAME} found` : `No ${CONFIG_FILENAME} found`,
+    },
+    {
+      label: "Runtime Markers",
+      status: runtimeMarkers.length > 0 ? "found" : "warning",
+      detail: runtimeMarkers.length > 0 ? `${runtimeMarkers.join(", ")} detected` : "No runtime markers detected",
+    },
+    {
+      label: "Git Repository",
+      status: gitRepo ? "found" : "warning",
+      detail: gitRepo ? `${gitClean ? "Clean" : "Dirty"} working tree on ${gitBranch || "unknown"}` : "Not a git repository",
+    },
+    {
+      label: "MAH Version",
+      status: mahVersion === "unknown" ? "warning" : "found",
+      detail: mahVersion === "unknown" ? "Version not detected" : `${mahVersion} installed`,
+    },
+    {
+      label: "Expertise Registry",
+      status: hasExpertiseRegistry || expertiseEntries > 0 ? "found" : "warning",
+      detail: hasExpertiseRegistry || expertiseEntries > 0
+        ? `${expertiseEntries} catalog entries${hasExpertiseRegistry ? " + registry.json" : ""}`
+        : "No expertise entries found",
+    },
+    {
+      label: "Context Memory",
+      status: hasContext ? "found" : "missing",
+      detail: hasContext ? "Context corpus detected" : "No context memory corpus",
+    },
+  ];
+
+  res.statusCode = 200;
+  res.end(JSON.stringify({ ok: true, workspaceRoot, detections }));
+}
+
 function handleRunStart(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   res.setHeader("Content-Type", "application/json");
   if (req.method !== "POST") { res.statusCode = 405; res.end(JSON.stringify({ ok: false, error: "method not allowed" })); return; }
@@ -1394,6 +1510,10 @@ function mahApiMiddleware() {
 
         if (url === "/api/mah/config") {
           handleConfigApi(req, res);
+          return;
+        }
+        if (url === "/api/mah/bootstrap/detect") {
+          handleBootstrapDetectApi(req, res);
           return;
         }
 

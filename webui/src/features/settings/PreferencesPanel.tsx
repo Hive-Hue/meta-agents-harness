@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { SettingsSection } from "./SettingsSection";
 import { FormField } from "./FormField";
 import { ToggleSwitch } from "./ToggleSwitch";
+import {
+  DEFAULT_AGENTIC_ESTIMATION_SETTINGS,
+  getAgenticEstimationSettings,
+  setAgenticEstimationSettings,
+} from "../tasks/agenticEstimationSettings";
 
 type ThemeMode = "light" | "dark";
 
@@ -12,6 +17,7 @@ export function PreferencesPanel() {
   const [logLevel, setLogLevel] = useState("all");
   const [workspacePath, setWorkspacePath] = useState("");
   const [skillsPath, setSkillsPath] = useState("");
+  const [agentic, setAgentic] = useState(DEFAULT_AGENTIC_ESTIMATION_SETTINGS);
 
   useEffect(() => {
     const storedTheme = localStorage.getItem("mah:theme");
@@ -19,7 +25,17 @@ export function PreferencesPanel() {
     setTheme(currentTheme);
     setWorkspacePath(localStorage.getItem("workspace_path") || "");
     setSkillsPath(localStorage.getItem("skills_path") || "");
+    setAgentic(getAgenticEstimationSettings());
   }, []);
+
+  const updateAgentic = (field: keyof typeof agentic, value: string) => {
+    const next = {
+      ...agentic,
+      [field]: Number(value),
+    };
+    setAgentic(next);
+    setAgenticEstimationSettings(next);
+  };
 
   const onThemeChange = (value: string) => {
     const nextTheme: ThemeMode = value === "light" ? "light" : "dark";
@@ -97,6 +113,20 @@ export function PreferencesPanel() {
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.04em", display: "block" }}>UI Build</span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 14, fontWeight: 700, color: "var(--color-text)", marginTop: 4, display: "block" }}>2026-04-25</span>
           </div>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Agentic Estimation">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+          <FormField label="Base Minutes" type="number" value={String(agentic.baseMinutes)} onChange={(v) => updateAgentic("baseMinutes", v)} />
+          <FormField label="Minutes/Dependency" type="number" value={String(agentic.dependencyMinutes)} onChange={(v) => updateAgentic("dependencyMinutes", v)} />
+          <FormField label="Minutes/Word" type="number" value={String(agentic.summaryWordMinutes)} onChange={(v) => updateAgentic("summaryWordMinutes", v)} />
+          <FormField label="High Priority Minutes" type="number" value={String(agentic.priorityHighMinutes)} onChange={(v) => updateAgentic("priorityHighMinutes", v)} />
+          <FormField label="Medium Priority Minutes" type="number" value={String(agentic.priorityMediumMinutes)} onChange={(v) => updateAgentic("priorityMediumMinutes", v)} />
+          <FormField label="Token Base" type="number" value={String(agentic.tokenBase)} onChange={(v) => updateAgentic("tokenBase", v)} />
+          <FormField label="Tokens/Minute" type="number" value={String(agentic.tokenPerMinute)} onChange={(v) => updateAgentic("tokenPerMinute", v)} />
+          <FormField label="Tokens/Dependency" type="number" value={String(agentic.tokenPerDependency)} onChange={(v) => updateAgentic("tokenPerDependency", v)} />
+          <FormField label="Tokens/Word" type="number" value={String(agentic.tokenPerWord)} onChange={(v) => updateAgentic("tokenPerWord", v)} />
         </div>
       </SettingsSection>
     </>

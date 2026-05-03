@@ -28,6 +28,7 @@ mah mission replan --id <id> [--json]
 ## What They Manage
 
 - `mah task`: executable work items inside a mission, including owner, runtime, dependencies, session link, and current state.
+- Task mission linkage is optional (`missionId` may be empty) for unscoped/backlog work.
 - `mah mission`: planning containers for objective, delivery window, risk, capacity, and success criteria.
 - `mah mission replan`: applies the current replan heuristic to both mission state and related tasks.
 - `mah task run`: launches a real MAH run for the task and links the task to the most recent matching session when available.
@@ -42,6 +43,7 @@ mah mission replan --id q4-audit --json
 
 mah task list --mission q4-audit --json
 mah task create --payload '{"title":"Verify auth middleware","missionId":"q4-audit","crewId":"dev","runtime":"pi"}' --json
+mah task create --payload '{"title":"Investigate flaky sync artifact","crewId":"dev","runtime":"openclaude"}' --json
 mah task update TASK-142 --payload '{"state":"ready","owner":"eng-lead"}' --json
 mah task run --id TASK-142 --json
 ```
@@ -50,7 +52,7 @@ mah task run --id TASK-142 --json
 
 - Tasks are stored in `.mah/tasks/tasks.yaml`.
 - Missions are stored in `.mah/tasks/missions.yaml`.
-- Both CLIs seed default records when the workspace store does not exist yet.
+- Store files are bootstrapped empty when missing; no default demo missions/tasks are seeded.
 
 ## Integration Notes
 

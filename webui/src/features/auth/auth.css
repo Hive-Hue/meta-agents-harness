@@ -25,6 +25,10 @@
   gap: 12px;
 }
 
+.auth-card__brand img {
+  filter: invert(1);
+}
+
 .auth-card__brand h1 {
   margin: 0;
   font-size: 21px;

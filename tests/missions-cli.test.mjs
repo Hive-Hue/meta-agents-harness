@@ -19,9 +19,18 @@ function run(args, cwd) {
   })
 }
 
-test("mah mission list --json returns seeded missions", () => {
+test("mah mission list --json returns persisted missions", () => {
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-list-"))
   try {
+    const create = run([
+      "mission",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "q4-audit", name: "Q4 Audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
     const result = run(["mission", "list", "--json"], tempWorkspace)
     assert.equal(result.status, 0, result.stderr)
     const payload = JSON.parse(result.stdout)
@@ -80,13 +89,40 @@ test("mah mission commit-scope activates mission", () => {
 test("mah mission replan returns updated mission and tasks", () => {
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-replan-"))
   try {
+    const createMission = run([
+      "mission",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "q4-audit", name: "Q4 Audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createMission.status, 0, createMission.stderr)
+
+    const createTask1 = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-142", title: "Active task", missionId: "q4-audit", state: "in_progress" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createTask1.status, 0, createTask1.stderr)
+
+    const createTask2 = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-154", title: "Blocked task", missionId: "q4-audit", state: "blocked" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createTask2.status, 0, createTask2.stderr)
+
     const result = run(["mission", "replan", "--id", "q4-audit", "--json"], tempWorkspace)
     assert.equal(result.status, 0, result.stderr)
     const payload = JSON.parse(result.stdout)
     assert.equal(payload.ok, true)
     assert.equal(payload.mission.id, "q4-audit")
     assert.ok(Array.isArray(payload.tasks))
-    assert.match(payload.summary, /TASK-142/)
+    assert.match(payload.summary, /TASK-142|TASK-154/)
   } finally {
     rmSync(tempWorkspace, { recursive: true, force: true })
   }
@@ -126,6 +162,24 @@ test("mah mission update changes mission status and capacity", () => {
 test("mah mission delete requires cascade when mission has linked tasks", () => {
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-delete-guard-"))
   try {
+    const createMission = run([
+      "mission",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "q4-audit", name: "Q4 Audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createMission.status, 0, createMission.stderr)
+
+    const createTask = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-118", title: "Linked task", missionId: "q4-audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createTask.status, 0, createTask.stderr)
+
     const result = run(["mission", "delete", "--id", "q4-audit", "--json"], tempWorkspace)
     assert.equal(result.status, 1)
     const payload = JSON.parse(result.stdout)
@@ -139,6 +193,24 @@ test("mah mission delete requires cascade when mission has linked tasks", () => 
 test("mah mission delete --cascade removes mission and linked tasks", () => {
   const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-mission-delete-cascade-"))
   try {
+    const createMission = run([
+      "mission",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "q4-audit", name: "Q4 Audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createMission.status, 0, createMission.stderr)
+
+    const createTask = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-118", title: "Linked task", missionId: "q4-audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(createTask.status, 0, createTask.stderr)
+
     const result = run(["mission", "delete", "--id", "q4-audit", "--cascade", "--json"], tempWorkspace)
     assert.equal(result.status, 0, result.stderr)
     const payload = JSON.parse(result.stdout)
