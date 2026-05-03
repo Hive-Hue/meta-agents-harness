@@ -1491,7 +1491,7 @@ function PertView({
             <svg className="tasks-pert-editor__edges" viewBox={`0 0 ${diagram.width} ${diagram.height}`} preserveAspectRatio="none">
               <defs>
                 <marker id="tasks-pert-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-text-dim)" />
                 </marker>
                 <marker id="tasks-pert-arrow-critical" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
@@ -1676,12 +1676,13 @@ function TimelineView({
                       width: `${Math.max(8, toPercent(entry.start + entry.duration) - toPercent(entry.start))}%`,
                     }}
                     onClick={() => onSelectTask(entry.taskId)}
+                    data-title={entry.title}
                   >
                     <div className="tasks-gantt__bar-topline">
                       <strong>{entry.taskId}</strong>
                       <span>{entry.durationLabel}</span>
                     </div>
-                    <span>{entry.title}</span>
+                    <span className="tasks-gantt__bar-title">{entry.title}</span>
                     <div className="tasks-gantt__bar-meta">
                       <span>{entry.owner}</span>
                       <span>{formatClock(ganttStartMinutes + entry.start)} to {formatClock(ganttStartMinutes + entry.start + entry.duration)}</span>

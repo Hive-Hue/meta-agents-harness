@@ -432,7 +432,7 @@ export function SkillsManagement() {
                   )}
                 </>
               ) : (
-                <p style={{ color: "#94a3b8", fontSize: 12 }}>Loading skill details…</p>
+                <p style={{ color: "var(--color-text-dim)", fontSize: 12 }}>Loading skill details…</p>
               )}
               <div className="skills-inspector__actions">
                 <button type="button" onClick={() => openActionPopup("explain")}><Icon name="info" size={16} />Explain</button>

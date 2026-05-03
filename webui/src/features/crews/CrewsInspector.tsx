@@ -18,7 +18,7 @@ export function CrewsInspector({ agent, crewId }: CrewsInspectorProps) {
           <h3>Agent Inspector</h3>
         </section>
         <section className="inspector__body">
-          <p style={{ color: "#94a3b8", fontSize: 13 }}>Select an agent card to view details.</p>
+          <p style={{ color: "var(--color-text-dim)", fontSize: 13 }}>Select an agent card to view details.</p>
         </section>
       </>
     );
@@ -30,7 +30,7 @@ export function CrewsInspector({ agent, crewId }: CrewsInspectorProps) {
     <>
       <section className="inspector__header">
         <h3>Agent Inspector</h3>
-        <p style={{ margin: "4px 0 0", fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 800, color: "#1c1b1b" }}>
+        <p style={{ margin: "4px 0 0", fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 800, color: "var(--color-text)" }}>
           {agent.id}
         </p>
       </section>

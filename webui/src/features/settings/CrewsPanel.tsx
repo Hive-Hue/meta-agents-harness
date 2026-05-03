@@ -22,7 +22,7 @@ export function CrewsPanel() {
       </SettingsSection>
 
       {/* <SettingsSection title="Crew Runtimes">
-        <p style={{ margin: 0, fontSize: 13, color: "#94a3b8" }}>No runtime overrides configured for this crew.</p>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-dim)" }}>No runtime overrides configured for this crew.</p>
       </SettingsSection> */}
 
       <SettingsSection title="Teams" badge={String(crewList.length)}>

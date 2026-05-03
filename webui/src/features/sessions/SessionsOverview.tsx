@@ -295,17 +295,17 @@ function SessionInspector({ session, onClose }: { session: SessionInfo; onClose:
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#666" }}>Target Agent</span>
-                <input type="text" value={proposalAgent} onChange={e => setProposalAgent(e.target.value)} placeholder="e.g. backend-dev" style={{ border: "1px solid #e0e0e0", borderRadius: 4, padding: "6px 8px", fontSize: 12 }} />
+                <input type="text" value={proposalAgent} onChange={e => setProposalAgent(e.target.value)} placeholder="e.g. backend-dev" style={{ border: "1px solid var(--color-border-subtle)", borderRadius: 4, padding: "6px 8px", fontSize: 12 }} />
               </label>
               <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#666" }}>Stability</span>
-                <select value={proposalStability} onChange={e => setProposalStability(e.target.value)} style={{ border: "1px solid #e0e0e0", borderRadius: 4, padding: "6px 8px", fontSize: 12 }}>
+                <select value={proposalStability} onChange={e => setProposalStability(e.target.value)} style={{ border: "1px solid var(--color-border-subtle)", borderRadius: 4, padding: "6px 8px", fontSize: 12 }}>
                   <option value="draft">draft</option><option value="stable">stable</option><option value="curated">curated</option>
                 </select>
               </label>
               <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#666" }}>Summary</span>
-                <input type="text" value={proposalSummary} onChange={e => setProposalSummary(e.target.value)} placeholder="Brief description" style={{ border: "1px solid #e0e0e0", borderRadius: 4, padding: "6px 8px", fontSize: 12 }} />
+                <input type="text" value={proposalSummary} onChange={e => setProposalSummary(e.target.value)} placeholder="Brief description" style={{ border: "1px solid var(--color-border-subtle)", borderRadius: 4, padding: "6px 8px", fontSize: 12 }} />
               </label>
               <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#333" }}>
                 <input type="checkbox" checked={proposalAiPowered} onChange={e => setProposalAiPowered(e.target.checked)} />

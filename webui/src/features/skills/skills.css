@@ -3,7 +3,7 @@
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  background: #fff;
+  background: var(--color-surface);
   overflow: hidden;
   min-height: 0;
   height: 100%;
@@ -15,21 +15,21 @@
   gap: 10px;
   border-bottom: 1px solid var(--color-border-subtle);
   padding: 12px 32px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .skills-filter {
   width: 100%;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
-  background: #fff;
+  background: var(--color-surface);
   color: var(--color-text);
   padding: 8px 12px;
   font-size: 12px;
 }
 
 .skills-filter::placeholder {
-  color: #94a3b8;
+  color: var(--color-text-dim);
 }
 
 .skills-filter:focus {
@@ -92,7 +92,7 @@
 
 .skills-table tbody tr:hover,
 .skills-table tbody tr.is-selected {
-  background: #eefcff;
+  background: var(--color-cyan-surface);
 }
 
 .skill-name {
@@ -109,7 +109,7 @@
 }
 
 .skill-agent .material-symbols-outlined {
-  color: #94a3b8;
+  color: var(--color-text-dim);
 }
 
 .skill-usage {
@@ -155,8 +155,8 @@
   gap: 6px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
-  background: #fff;
-  color: #475569;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
   padding: 8px;
   font-size: 11px;
   font-weight: 800;
@@ -164,30 +164,30 @@
 }
 
 .skills-inspector__actions button:hover {
-  border-color: #94a3b8;
+  border-color: var(--color-text-dim);
 }
 
 .skills-inspector__remove {
   border-color: #fecaca !important;
-  color: #b91c1c !important;
-  background: #fff7f7 !important;
+  color: var(--color-error-strong) !important;
+  background: var(--color-surface)7f7 !important;
 }
 
 .skills-inspector__empty {
   margin: 0;
-  color: #94a3b8;
+  color: var(--color-text-dim);
   font-size: 12px;
 }
 
 .skills-inspector__prepared {
   margin: 14px 0 0;
-  color: #64748b;
+  color: var(--color-text-dim);
   font-size: 11px;
   line-height: 1.45;
 }
 
 .skills-inspector__prepared code {
-  color: #0f172a;
+  color: var(--color-terminal);
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
@@ -217,7 +217,7 @@
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .skills-action-modal__header {
@@ -284,10 +284,10 @@
 }
 
 .skills-action-log {
-  border: 1px solid #1e293b;
+  border: 1px solid var(--color-text);
   border-radius: var(--radius);
-  background: #0f172a;
-  color: #cbd5e1;
+  background: var(--color-terminal);
+  color: var(--color-outline);
   padding: 12px;
   font-family: var(--font-mono);
   font-size: 11px;
@@ -314,8 +314,8 @@
 .skills-action-modal__footer button {
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
-  background: #fff;
-  color: #475569;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
   padding: 8px 12px;
   font-size: 11px;
   font-weight: 800;
@@ -323,17 +323,17 @@
 }
 
 .skills-action-modal__footer button:hover {
-  border-color: #94a3b8;
+  border-color: var(--color-text-dim);
 }
 
 .skills-action-modal__run {
   border-color: #0a0a0a !important;
   background: #0a0a0a !important;
-  color: #fff !important;
+  color: var(--color-surface) !important;
 }
 
 .skills-action-modal__run:hover {
-  background: #333 !important;
+  background: var(--color-text) !important;
 }
 
 .skills-action-modal__run:disabled {
@@ -360,8 +360,8 @@
     gap: 6px;
     border: 1px solid var(--color-border-subtle);
     border-radius: var(--radius);
-    background: #fff;
-    color: #475569;
+    background: var(--color-surface);
+    color: var(--color-text-muted);
     padding: 8px;
     font-size: 11px;
     font-weight: 800;
@@ -375,8 +375,8 @@
 
   .skills-mobile-actions__remove {
     border-color: #fecaca !important;
-    color: #b91c1c !important;
-    background: #fff7f7 !important;
+    color: var(--color-error-strong) !important;
+    background: var(--color-surface)7f7 !important;
   }
 }
 
@@ -421,7 +421,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  background: #f1edec;
+  background: var(--color-panel);
   border-radius: 0.375rem;
   margin-bottom: 12px;
 }
@@ -431,7 +431,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #444748;
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
@@ -440,7 +440,7 @@
   font-family: var(--font-mono);
   font-size: 12px;
   padding: 6px 10px;
-  border: 1px solid #E0E0E0;
+  border: 1px solid var(--color-border-subtle);
   border-radius: 2px;
-  background: #fff;
+  background: var(--color-surface);
 }

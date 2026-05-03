@@ -20,7 +20,7 @@
 
 /* Toolbar */
 .context-toolbar {
-  background: #fff;
+  background: var(--color-surface);
   border-bottom: 1px solid var(--color-border-subtle);
   padding: 0 32px;
   display: flex;
@@ -85,7 +85,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
   padding: 6px 12px;
@@ -96,7 +96,7 @@
 }
 
 .context-action-btn:hover {
-  border-color: #94a3b8;
+  border-color: var(--color-text-dim);
 }
 
 .context-action-btn:disabled {
@@ -107,11 +107,12 @@
 .context-action-btn--primary {
   background: var(--color-primary);
   border-color: var(--color-primary);
-  color: #fff;
+  color: var(--color-text);
 }
 
 .context-action-btn--primary:hover {
-  background: #333;
+  background: var(--color-text);
+  color: var(--color-surface);
 }
 
 /* Table */
@@ -157,16 +158,16 @@
 }
 
 .context-table tr:hover td {
-  background: #f7f3f2;
+  background: var(--color-surface-neutral);
   cursor: pointer;
 }
 
 .context-table tr.is-selected td {
-  background: #eefcff;
+  background: #00a6c7;
 }
 
 .context-table tr.row-invalid td {
-  background: #fef2f2;
+  background: var(--color-error-surface);
 }
 
 /* Doc name cell */
@@ -179,7 +180,7 @@
 /* Chips */
 .agent-chip {
   display: inline-block;
-  background: #f1edec;
+  background: var(--color-secondary);
   border-radius: var(--radius);
   padding: 2px 6px;
   font-size: 11px;
@@ -213,14 +214,14 @@
 
 .cap-chip {
   font-size: 11px;
-  background: #f1edec;
+  background: var(--color-panel);
   padding: 2px 6px;
   border-radius: var(--radius);
 }
 
 .cap-chip--more {
-  background: #e0e0e0;
-  color: #666;
+  background: var(--color-border-subtle);
+  color: var(--color-text-dim);
 }
 
 .score-badge {
@@ -236,7 +237,7 @@
 
 /* Find form */
 .find-form {
-  background: #fafafa;
+  background: var(--color-surface-neutral);
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius);
   padding: 20px;
@@ -260,7 +261,7 @@
   flex: 1;
 }
 
-.find-form label > span {
+.find-form label>span {
   font-size: 11px;
   font-weight: 600;
   color: var(--color-text-muted);
@@ -271,7 +272,7 @@
   border-radius: var(--radius);
   padding: 6px 8px;
   font-size: 12px;
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .find-form input:focus {
@@ -305,7 +306,7 @@
 }
 
 .validate-card--invalid {
-  background: #fef2f2;
+  background: var(--color-error-surface);
 }
 
 .validate-card__num {
@@ -319,7 +320,7 @@
 }
 
 .validate-card--invalid .validate-card__num {
-  color: #dc2626;
+  color: var(--color-error);
 }
 
 .validate-card__label {
@@ -338,7 +339,7 @@
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: #94a3b8;
+  color: var(--color-text-dim);
   margin: 0 0 8px;
 }
 
@@ -369,7 +370,7 @@
   display: grid;
   gap: 6px;
   font-size: 11px;
-  color: #b91c1c;
+  color: var(--color-error-strong);
 }
 
 .context-inspector__hint {
@@ -425,16 +426,16 @@
 }
 
 .context-valid-icon {
-  color: #4caf50;
+  color: var(--color-success);
 }
 
 .context-invalid-icon {
-  color: #dc2626;
+  color: var(--color-error);
 }
 
 .context-error-cell {
   font-size: 11px;
-  color: #dc2626;
+  color: var(--color-error);
 }
 
 .context-summary-cell {
@@ -453,7 +454,9 @@
 }
 
 /* States */
-.loading-state, .error-state, .empty-state {
+.loading-state,
+.error-state,
+.empty-state {
   padding: 40px;
   text-align: center;
   color: var(--color-text-muted);
@@ -461,7 +464,7 @@
 }
 
 .error-state {
-  color: #dc2626;
+  color: var(--color-error);
 }
 
 .context-inspector__actions {
@@ -472,12 +475,40 @@
 }
 
 .context-action-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: #fff; border: 1px solid #e0e0e0; border-radius: 6px;
-  padding: 8px 14px; font-size: 12px; font-weight: 600; cursor: pointer; color: #333;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text);
 }
-.context-action-btn:hover { border-color: #94a3b8; }
-.context-action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.context-action-btn--primary { background: #0a0a0a; border-color: #0a0a0a; color: #fff; }
-.context-action-btn--primary:hover { background: #333; }
-.context-action-btn--compact { padding: 5px 10px; font-size: 11px; }
+
+.context-action-btn:hover {
+  border-color: var(--color-text-dim);
+}
+
+.context-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.context-action-btn--primary {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+  color: var(--color-text);
+}
+
+.context-action-btn--primary:hover {
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+
+.context-action-btn--compact {
+  padding: 5px 10px;
+  font-size: 11px;
+}

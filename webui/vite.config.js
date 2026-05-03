@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync, execSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
-import * as pty from "node-pty";
 import yaml from "js-yaml";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +27,38 @@ const WEBUI_AUTH_MAX_AGE_SECONDS = 60 * 60 * 8;
 const WEBUI_AUTH_USER = `${process.env.MAH_WEBUI_USER || "admin"}`;
 const WEBUI_AUTH_PASSWORD = `${process.env.MAH_WEBUI_PASSWORD || "mah"}`;
 const webUiSessions = new Set();
+let activeWorkspaceRoot = repoRoot;
+let nodePtyModulePromise = null;
+function getNodePtyModule() {
+    if (!nodePtyModulePromise)
+        nodePtyModulePromise = import("node-pty");
+    return nodePtyModulePromise;
+}
+async function spawnTerminal(command, args, options) {
+    const child = spawn(command, args, {
+        cwd: options.cwd,
+        env: options.env,
+        stdio: "pipe",
+    });
+    return {
+        write(data) {
+            child.stdin?.write(data);
+        },
+        resize() {
+            // No-op in process-stream fallback.
+        },
+        kill() {
+            child.kill();
+        },
+        onData(callback) {
+            child.stdout?.on("data", (chunk) => callback(String(chunk)));
+            child.stderr?.on("data", (chunk) => callback(String(chunk)));
+        },
+        onExit(callback) {
+            child.on("exit", (code) => callback({ exitCode: typeof code === "number" ? code : 0 }));
+        },
+    };
+}
 const terminalSessions = new Map();
 function sendTerminalSse(res, payload) {
     if (res.writableEnded)
@@ -57,7 +88,7 @@ function resolveWorkspaceRoot(req) {
     const rawHeader = req.headers["x-mah-workspace-path"];
     const requestedPath = typeof rawHeader === "string" ? rawHeader.trim() : "";
     if (!requestedPath || requestedPath === ".")
-        return repoRoot;
+        return activeWorkspaceRoot;
     return path.isAbsolute(requestedPath) ? path.resolve(requestedPath) : path.resolve(repoRoot, requestedPath);
 }
 function parseCookies(req) {
@@ -108,7 +139,7 @@ function handleAuthApi(req, res) {
     if (url === "/api/mah/auth/login" && req.method === "POST") {
         const chunks = [];
         req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-        req.on("end", () => {
+        req.on("end", async () => {
             try {
                 const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
                 const body = JSON.parse(raw);
@@ -199,7 +230,7 @@ function handleConfigApi(req, res) {
     if (req.method === "PUT") {
         const chunks = [];
         req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-        req.on("end", () => {
+        req.on("end", async () => {
             try {
                 const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
                 if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
@@ -370,7 +401,7 @@ function handleSecretsApi(req, res) {
     if (req.method === "PUT") {
         const chunks = [];
         req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-        req.on("end", () => {
+        req.on("end", async () => {
             try {
                 const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
                 const body = JSON.parse(bodyRaw);
@@ -784,6 +815,9 @@ function handleWorkspaceApi(req, res) {
     res.setHeader("Content-Type", "application/json");
     const workspaceRoot = resolveWorkspaceRoot(req);
     const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+    if (workspaceMeta.exists && workspaceMeta.isDirectory) {
+        activeWorkspaceRoot = workspaceRoot;
+    }
     const result = {
         path: workspaceRoot,
         name: path.basename(workspaceRoot) || path.basename(repoRoot),
@@ -947,7 +981,7 @@ function handleTerminalOpen(req, res) {
     }
     const chunks = [];
     req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    req.on("end", () => {
+    req.on("end", async () => {
         try {
             const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
             const body = JSON.parse(bodyRaw);
@@ -981,7 +1015,7 @@ function handleTerminalOpen(req, res) {
             if (runtime === "claude") {
                 resumeArgs.push("--policy", "enforce-domain");
             }
-            const terminal = pty.spawn(process.execPath, resumeArgs, {
+            const terminal = await spawnTerminal(process.execPath, resumeArgs, {
                 cwd: workspaceRoot,
                 env: { ...process.env, ...workspaceEnv },
                 cols: 120,
@@ -1018,7 +1052,7 @@ function handleTerminalOpen(req, res) {
         }
     });
 }
-function handleTerminalOpenShell(req, res) {
+async function handleTerminalOpenShell(req, res) {
     res.setHeader("Content-Type", "application/json");
     if (req.method !== "POST") {
         res.statusCode = 405;
@@ -1038,7 +1072,9 @@ function handleTerminalOpenShell(req, res) {
         const workspaceEnv = parseDotEnvContent(rawEnv);
         const terminalId = `terminal-${randomUUID()}`;
         const shellBin = `${process.env.SHELL || ""}`.trim() || "bash";
-        const terminal = pty.spawn(shellBin, [], {
+        const shellBase = path.basename(shellBin).toLowerCase();
+        const shellArgs = shellBase === "fish" ? [] : ["-i"];
+        const terminal = await spawnTerminal(shellBin, shellArgs, {
             cwd: workspaceRoot,
             env: { ...process.env, ...workspaceEnv },
             cols: 120,

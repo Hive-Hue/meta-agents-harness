@@ -126,7 +126,7 @@ export function DiffView() {
             Modified
           </div>
         </div>
-        <div style={{ padding: 32, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+        <div style={{ padding: 32, textAlign: "center", color: "var(--color-text-dim)", fontSize: 13 }}>
           No changes — working config matches saved state.
         </div>
       </div>

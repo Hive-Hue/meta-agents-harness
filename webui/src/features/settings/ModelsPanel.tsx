@@ -297,8 +297,8 @@ export function ModelsPanel() {
                       <option value="">Select model…</option>
                       {allModelStrings.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
-                    <button className="models-panel__add-confirm" type="button" onClick={() => confirmAddFallback(role)} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 2, cursor: "pointer", border: "1px solid #00BCD4" }}>Add</button>
-                    <button className="models-panel__add-cancel" type="button" onClick={() => { setAddingFallback(null); setNewFallback(""); }} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 2, cursor: "pointer", border: "1px solid #E0E0E0", background: "#fff" }}>Cancel</button>
+                    <button className="models-panel__add-confirm" type="button" onClick={() => confirmAddFallback(role)} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 2, cursor: "pointer", border: "1px solid var(--color-cyan)" }}>Add</button>
+                    <button className="models-panel__add-cancel" type="button" onClick={() => { setAddingFallback(null); setNewFallback(""); }} style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 2, cursor: "pointer", border: "1px solid var(--color-border-subtle)", background: "var(--color-surface)" }}>Cancel</button>
                   </div>
                 ) : (
                   <button className="settings-btn" type="button" onClick={() => { setAddingFallback(role); setNewFallback(""); }} style={{ marginTop: 4 }}>
@@ -311,7 +311,7 @@ export function ModelsPanel() {
           </div>
         ))}
         {Object.keys(fallbacks).length === 0 && (
-          <p style={{ color: "#94a3b8", fontSize: 13 }}>No fallbacks configured.</p>
+          <p style={{ color: "var(--color-text-dim)", fontSize: 13 }}>No fallbacks configured.</p>
         )}
       </SettingsSection>
     </>

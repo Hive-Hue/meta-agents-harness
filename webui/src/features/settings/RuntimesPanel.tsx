@@ -99,7 +99,7 @@ export function RuntimesPanel() {
                 <tr key={m.ref}>
                   <td className="settings-table__mono">{m.ref}</td>
                   <td className="settings-table__mono">{m.model}</td>
-                  <td style={{ fontSize: 11, color: "#444748" }}>{m.fallbacks}</td>
+                  <td style={{ fontSize: 11, color: "var(--color-text-muted)" }}>{m.fallbacks}</td>
                 </tr>
               ))}
             </tbody>
@@ -117,7 +117,7 @@ export function RuntimesPanel() {
                 <td style={{fontWeight:600}}>Playwright MCP</td>
                 <td><span className="settings-table__tag">Browser Automation</span></td>
                 <td className="settings-table__mono">npx @playwright/mcp-server</td>
-                <td><span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:"#94a3b8"}}><Icon name="info" size={14} />Not connected</span></td>
+                <td><span style={{display:"flex",alignItems:"center",gap:4,fontSize:12,color:"var(--color-text-dim)"}}><Icon name="info" size={14} />Not connected</span></td>
                 <td><button className="settings-table__action" type="button" onClick={() => alert("To connect Playwright MCP:\n1. Install: npm install -g @playwright/mcp-server\n2. Or use: npx @playwright/mcp-server\n3. Add to meta-agents.yaml under runtimes[].mcp_servers\n\nDocs: https://playwright.dev/docs/mcp")}>Connect</button></td>
               </tr>
             </tbody>

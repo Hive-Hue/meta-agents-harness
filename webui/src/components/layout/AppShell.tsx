@@ -28,13 +28,14 @@ const routeToNavItem: Record<string, string> = {
 export function AppShell() {
   const location = useLocation();
   const activeItem = routeToNavItem[location.pathname] ?? "Overview";
-  const { workspace, loading } = useWorkspace();
+  const { workspace, workspacePath, loading } = useWorkspace();
   const { logout } = useAuth();
   const allowWithoutConfig = location.pathname === "/settings" || location.pathname === "/bootstrap";
   const showEmptyWorkspace = !loading && !allowWithoutConfig && workspace?.configExists === false;
   const [terminalRuntime, setTerminalRuntime] = useState("");
   const [terminalSessionId, setTerminalSessionId] = useState("");
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [themeMode, setThemeMode] = useState<"light" | "dark">(() => (localStorage.getItem("mah:theme") === "light" ? "light" : "dark"));
   const [terminalMinimized, setTerminalMinimized] = useState(false);
   const [terminalId, setTerminalId] = useState("");
   const [terminalClosed, setTerminalClosed] = useState(false);
@@ -45,6 +46,24 @@ export function AppShell() {
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
   const xtermRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+
+  useEffect(() => {
+    const onThemeChanged = (event: Event) => {
+      const custom = event as CustomEvent<{ theme?: string }>;
+      const nextTheme = custom.detail?.theme === "light" ? "light" : "dark";
+      setThemeMode(nextTheme);
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== "mah:theme") return;
+      setThemeMode(event.newValue === "light" ? "light" : "dark");
+    };
+    window.addEventListener("mah:theme-changed", onThemeChanged as EventListener);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("mah:theme-changed", onThemeChanged as EventListener);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const closeTerminalStream = useCallback(() => {
     eventSourceRef.current?.close();
@@ -120,7 +139,10 @@ export function AppShell() {
 
     const resp = await fetch("/api/mah/terminal/open", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-mah-workspace-path": workspacePath,
+      },
       body: JSON.stringify({ runtime: nextRuntime, sessionId: nextSessionId }),
     });
     const data = await resp.json();
@@ -179,7 +201,7 @@ export function AppShell() {
         void sendTerminalResize(cols, rows, nextTerminalId);
       }
     }, 0);
-  }, [closeTerminalStream, sendTerminalResize, terminalId]);
+  }, [closeTerminalStream, sendTerminalResize, terminalId, workspacePath]);
 
   const openWorkspaceShellTerminal = useCallback(async () => {
     const previousTerminalId = terminalId;
@@ -192,7 +214,10 @@ export function AppShell() {
 
     const resp = await fetch("/api/mah/terminal/open-shell", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-mah-workspace-path": workspacePath,
+      },
     });
     const data = await resp.json();
     if (!resp.ok || !data.ok || !data.terminalId) {
@@ -249,7 +274,7 @@ export function AppShell() {
         void sendTerminalResize(cols, rows, nextTerminalId);
       }
     }, 0);
-  }, [closeTerminalStream, sendTerminalResize, terminalId]);
+  }, [closeTerminalStream, sendTerminalResize, terminalId, workspacePath]);
 
   useEffect(() => {
     const onOpenRequest = (event: Event) => {
@@ -276,7 +301,9 @@ export function AppShell() {
       cursorBlink: true,
       fontSize: 12,
       fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
-      theme: { background: "#0b1220", foreground: "#e2e8f0" },
+      theme: themeMode === "light"
+        ? { background: "#0b1220", foreground: "#e2e8f0", cursor: "#00bcd4", selectionBackground: "rgba(0, 188, 212, 0.18)" }
+        : { background: "#0b0d14", foreground: "#eef2ff", cursor: "#64e7ff", selectionBackground: "rgba(100, 231, 255, 0.18)" },
       scrollback: 2000,
     });
     const fitAddon = new FitAddon();
@@ -328,7 +355,7 @@ export function AppShell() {
       if (xtermRef.current === terminal) xtermRef.current = null;
       if (fitAddonRef.current === fitAddon) fitAddonRef.current = null;
     };
-  }, [sendTerminalInput, sendTerminalResize, terminalOpen]);
+  }, [sendTerminalInput, sendTerminalResize, terminalOpen, themeMode]);
 
   useEffect(() => {
     if (!terminalOpen || terminalMinimized) return;
@@ -387,7 +414,7 @@ export function AppShell() {
         <Sidebar activeItem={activeItem} />
         {showEmptyWorkspace ? (
           <main className="overview-main">
-            <div className="overview-proposals__empty" style={{ margin: 24, minHeight: 220 }}>
+            <div className="overview-proposals__empty app-shell__empty-workspace" style={{ margin: 24, minHeight: 220 }}>
               <Icon name="folder_open" size={18} />
               Workspace sem `meta-agents.yaml`. Configure o caminho em Settings ou execute Bootstrap.
             </div>

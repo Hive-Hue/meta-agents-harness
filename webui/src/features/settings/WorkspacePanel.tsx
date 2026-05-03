@@ -84,7 +84,7 @@ export function WorkspacePanel() {
             </button>
           </div>
           <span className="settings-field__hint">Root directory containing meta-agents.yaml</span>
-          <span className="settings-field__hint" style={{ color: "#94a3b8", fontSize: 11 }}>
+          <span className="settings-field__hint" style={{ color: "var(--color-text-dim)", fontSize: 11 }}>
             { !("showDirectoryPicker" in window) && "Directory picker requires Chrome. This browser shows file input dialog." }
           </span>
         </div>
@@ -129,7 +129,7 @@ export function WorkspacePanel() {
           <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4CAF50" }}>
             <Icon name="check_circle" size={16} /> Git Clean
           </span>
-          <span style={{ fontSize: 12, color: "#94a3b8" }}>Last validated: 2 minutes ago</span>
+          <span style={{ fontSize: 12, color: "var(--color-text-dim)" }}>Last validated: 2 minutes ago</span>
         </div>
         <div className="settings-btn-row">
           <button className="settings-btn" type="button">

@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync, execSync } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
-import * as pty from "node-pty";
 import yaml from "js-yaml";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,6 +37,7 @@ const WEBUI_AUTH_MAX_AGE_SECONDS = 60 * 60 * 8;
 const WEBUI_AUTH_USER = `${process.env.MAH_WEBUI_USER || "admin"}`;
 const WEBUI_AUTH_PASSWORD = `${process.env.MAH_WEBUI_PASSWORD || "mah"}`;
 const webUiSessions = new Set<string>();
+let activeWorkspaceRoot = repoRoot;
 type StoredTask = {
   id: string;
   title: string;
@@ -78,11 +78,61 @@ type TerminalEvent =
   | { type: "exit"; code?: number | null }
   | { type: "error"; message: string };
 
+type PtyLike = {
+  write(data: string): void;
+  resize(cols: number, rows: number): void;
+  kill(): void;
+  onData(callback: (data: string) => void): void;
+  onExit(callback: (event: { exitCode: number }) => void): void;
+};
+
+let nodePtyModulePromise: Promise<typeof import("node-pty")> | null = null;
+
+function getNodePtyModule(): Promise<typeof import("node-pty")> {
+  if (!nodePtyModulePromise) nodePtyModulePromise = import("node-pty");
+  return nodePtyModulePromise;
+}
+
+type TerminalSpawnOptions = {
+  cwd: string;
+  env: Record<string, string>;
+  cols: number;
+  rows: number;
+  name: string;
+};
+
+async function spawnTerminal(command: string, args: string[], options: TerminalSpawnOptions): Promise<PtyLike> {
+  const child = spawn(command, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: "pipe",
+  });
+
+  return {
+    write(data: string) {
+      child.stdin?.write(data);
+    },
+    resize() {
+      // No-op in process-stream fallback.
+    },
+    kill() {
+      child.kill();
+    },
+    onData(callback: (data: string) => void) {
+      child.stdout?.on("data", (chunk: Buffer | string) => callback(String(chunk)));
+      child.stderr?.on("data", (chunk: Buffer | string) => callback(String(chunk)));
+    },
+    onExit(callback: (event: { exitCode: number }) => void) {
+      child.on("exit", (code) => callback({ exitCode: typeof code === "number" ? code : 0 }));
+    },
+  };
+}
+
 const terminalSessions = new Map<string, {
   id: string;
   runtime: string;
   sessionId: string;
-  pty: pty.IPty;
+  pty: PtyLike;
   clients: Set<import("http").ServerResponse>;
   closed: boolean;
   exitCode: number | null;
@@ -114,7 +164,7 @@ function cleanupTerminalSession(terminalId: string): void {
 function resolveWorkspaceRoot(req: import("http").IncomingMessage): string {
   const rawHeader = req.headers["x-mah-workspace-path"];
   const requestedPath = typeof rawHeader === "string" ? rawHeader.trim() : "";
-  if (!requestedPath || requestedPath === ".") return repoRoot;
+  if (!requestedPath || requestedPath === ".") return activeWorkspaceRoot;
   return path.isAbsolute(requestedPath) ? path.resolve(requestedPath) : path.resolve(repoRoot, requestedPath);
 }
 
@@ -174,7 +224,7 @@ function handleAuthApi(req: import("http").IncomingMessage, res: import("http").
   if (url === "/api/mah/auth/login" && req.method === "POST") {
     const chunks: Buffer[] = [];
     req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    req.on("end", () => {
+    req.on("end", async () => {
       try {
         const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
         const body = JSON.parse(raw) as { username?: string; password?: string };
@@ -269,7 +319,7 @@ function handleConfigApi(req: import("http").IncomingMessage, res: import("http"
   if (req.method === "PUT") {
     const chunks: Buffer[] = [];
     req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    req.on("end", () => {
+    req.on("end", async () => {
       try {
         const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
         if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
@@ -444,7 +494,7 @@ function handleSecretsApi(req: import("http").IncomingMessage, res: import("http
   if (req.method === "PUT") {
     const chunks: Buffer[] = [];
     req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    req.on("end", () => {
+    req.on("end", async () => {
       try {
         const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
         const body = JSON.parse(bodyRaw) as { providerId?: string; apiKey?: string };
@@ -873,6 +923,9 @@ function handleWorkspaceApi(req: import("http").IncomingMessage, res: import("ht
   res.setHeader("Content-Type", "application/json");
   const workspaceRoot = resolveWorkspaceRoot(req);
   const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (workspaceMeta.exists && workspaceMeta.isDirectory) {
+    activeWorkspaceRoot = workspaceRoot;
+  }
   const result: Record<string, unknown> = {
     path: workspaceRoot,
     name: path.basename(workspaceRoot) || path.basename(repoRoot),
@@ -1021,7 +1074,7 @@ function handleTerminalOpen(req: import("http").IncomingMessage, res: import("ht
 
   const chunks: Buffer[] = [];
   req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-  req.on("end", () => {
+  req.on("end", async () => {
     try {
       const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
       const body = JSON.parse(bodyRaw) as { sessionId?: string; runtime?: string };
@@ -1060,7 +1113,7 @@ function handleTerminalOpen(req: import("http").IncomingMessage, res: import("ht
         resumeArgs.push("--policy", "enforce-domain");
       }
 
-      const terminal = pty.spawn(
+      const terminal = await spawnTerminal(
         process.execPath,
         resumeArgs,
         {
@@ -1103,7 +1156,7 @@ function handleTerminalOpen(req: import("http").IncomingMessage, res: import("ht
   });
 }
 
-function handleTerminalOpenShell(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+async function handleTerminalOpenShell(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
   res.setHeader("Content-Type", "application/json");
   if (req.method !== "POST") {
     res.statusCode = 405;
@@ -1125,10 +1178,12 @@ function handleTerminalOpenShell(req: import("http").IncomingMessage, res: impor
     const workspaceEnv = parseDotEnvContent(rawEnv);
     const terminalId = `terminal-${randomUUID()}`;
     const shellBin = `${process.env.SHELL || ""}`.trim() || "bash";
+    const shellBase = path.basename(shellBin).toLowerCase();
+    const shellArgs = shellBase === "fish" ? [] : ["-i"];
 
-    const terminal = pty.spawn(
+    const terminal = await spawnTerminal(
       shellBin,
-      [],
+      shellArgs,
       {
         cwd: workspaceRoot,
         env: { ...process.env, ...workspaceEnv } as Record<string, string>,

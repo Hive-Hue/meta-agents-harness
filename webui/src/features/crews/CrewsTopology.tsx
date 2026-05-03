@@ -16,14 +16,14 @@ export function CrewsTopology() {
 }
 
 const TEAM_COLORS: Record<string, string> = {
-  orchestration: "#1c1b1b",
-  planning: "#00BCD4",
+  orchestration: "var(--color-text)",
+  planning: "var(--color-cyan)",
   engineering: "#4CAF50",
-  validation: "#FFC107",
+  validation: "var(--color-warning)",
 };
 
 function hashColor(str: string): string {
-  const palette = ["#00BCD4", "#006876", "#4CAF50", "#FFC107", "#444748", "#8D6E63"];
+  const palette = ["var(--color-cyan)", "var(--color-secondary-cyan)", "#4CAF50", "var(--color-warning)", "var(--color-text-muted)", "#8D6E63"];
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
     hash = str.charCodeAt(i) + ((hash << 5) - hash);

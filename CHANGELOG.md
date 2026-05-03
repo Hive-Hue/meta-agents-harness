@@ -20,6 +20,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Overview Dashboard (`/`): real workspace name, git status, crew/agent/skill counts, sessions from `mah sessions list --json`
 - Skills Management (`/skills`): real skill list from `mah skills list --json` (19 skills), agent selector for add/remove actions
 - Settings (`/settings`): collapsible sections, Models submenu, Skills submenu, editable Workspace Path with folder picker
+- WebUI theme selector in `Settings > Display > Theme` (`Dark` / `Light`) with instant apply + local persistence via `localStorage` (`mah:theme`)
+- WebUI startup theme bootstrap now reads persisted theme before first render to avoid flash/mismatch on reload
 - `types/agent-execution-result.mjs` — canonical `AgentExecutionResult` type + `normalizeExecutionResult()` helper for runtime-agnostic execution results
 - `scripts/expertise/evidence/evidence-pipeline.mjs` — shared `recordDelegationEvidence()` used by both CLI and PI runtime (deduplicates `deriveTaskType` + evidence recording)
 - `tests/agent-execution-result.test.mjs` — 8 tests for normalization shape and field coercion
@@ -93,6 +95,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - WebUI sessions flow now resumes work through the shared global console instead of page-local terminal handling
 - WebUI header/sidebar/navigation updated to expose `Tasks`, move `Logout` to the far right, and keep task subviews synchronized with URL state
 - `Tasks` UX refined with expandable board and PERT modals, sticky board headers, scrollable lanes, gesture-based PERT pan/zoom, help-modal guidance, toast notifications, and Gantt timeline presentation
+- WebUI visual system updated with dark-mode-first styling across core surfaces (`header`, `sidebar`, `sessions`, `overview`, inspectors, modals, and task workspaces)
+- WebUI `/tasks` dark-theme consistency improved for board, selected cards, toolbar CTAs, routing/inspector blocks, and PERT/Gantt visual surfaces
 - Overview quick actions now deep-link into the real task workspace and command previews provide clipboard feedback/fallback behavior
 - `vite.config.js` and `vite.config.ts` now serve the same expanded MAH middleware surface for auth, terminal, tasks, missions, and shell/session orchestration
 - WebUI `Tasks` APIs now delegate task and mission state changes through `mah task` / `mah mission` instead of duplicating planning rules in Vite middleware
@@ -123,6 +127,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Console opening in the WebUI now falls back to creating a shell when no prior terminal exists and no longer flickers closed on first open
 - Workspace quick actions and command-copy controls in the WebUI now execute reliably
 - `/tasks` initial loading no longer crashes when mission/task data is not yet available, and board/task navigation remains stable across view changes
+- WebUI theme switcher now applies reliably to shared layout surfaces (including `header`, `sidebar`, `overview`, right inspector, and `/tasks` PERT-related views) when toggling light/dark mode
 
 ### Note
 

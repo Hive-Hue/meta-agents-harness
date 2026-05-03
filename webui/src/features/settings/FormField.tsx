@@ -75,7 +75,7 @@ export function FormField({
           max={max}
           style={{ flex: 1 }}
         />
-        {suffix && <span style={{ fontSize: 12, color: "#94a3b8" }}>{suffix}</span>}
+        {suffix && <span style={{ fontSize: 12, color: "var(--color-text-dim)" }}>{suffix}</span>}
         {copyable && (
           <button className="settings-field__copy-btn" type="button" aria-label="Copy">
             <Icon name="content_copy" size={14} />

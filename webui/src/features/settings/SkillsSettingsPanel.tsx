@@ -44,7 +44,7 @@ export function SkillsSettingsPanel() {
           <label className="settings-field__label">Skills Status</label>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             {loading ? (
-              <span style={{ fontSize: 13, color: "#94a3b8" }}>
+              <span style={{ fontSize: 13, color: "var(--color-text-dim)" }}>
                 <span className="config-loading__spinner" style={{ width: 14, height: 14, borderWidth: 2, display: "inline-block", verticalAlign: "middle", marginRight: 6 }} />
                 Scanning…
               </span>

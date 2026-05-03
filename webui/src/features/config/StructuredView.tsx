@@ -86,7 +86,7 @@ export function StructuredView() {
                 <td>
                   <select
                     className="config-table__mono"
-                    style={{ fontSize: 12, padding: '2px 6px', border: '1px solid #E0E0E0', borderRadius: 2, background: '#fff', fontFamily: 'var(--font-mono)' }}
+                    style={{ fontSize: 12, padding: '2px 6px', border: '1px solid var(--color-border-subtle)', borderRadius: 2, background: 'var(--color-surface)', fontFamily: 'var(--font-mono)' }}
                     value={m.model}
                     onChange={(e) => {
                       const next = { ...config?.catalog?.models, [m.role]: e.target.value };

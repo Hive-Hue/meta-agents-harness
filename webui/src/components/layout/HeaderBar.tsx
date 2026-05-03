@@ -2,7 +2,6 @@ import { Icon } from "../ui/Icon";
 
 const utilityActions = [
   { label: "Console", icon: "terminal" },
-  // { label: "Settings", icon: "settings" },
   { label: "Docs", icon: "help_outline" },
   { label: "Logout", icon: "logout" },
 ];
@@ -17,13 +16,15 @@ export function HeaderBar({ onConsoleClick, onLogoutClick, consoleActive = false
   return (
     <header className="header-bar">
       <div className="header-bar__brand" aria-label="MAH Operator Console">
-        <img                                                                                                                
-          className="header-bar__logo"                                                                                      
-          src="/mah_logo_bg.png"                                                                                            
-          alt="MAH"                                                                                                         
-          height={32}                                                                                                       
+        <img
+          className="header-bar__logo"
+          src="/mah_logo_bg.png"
+          alt="MAH"
+          height={32}
         />
-        <h1 className="header-bar__title">Operator Console</h1>
+        <div className="header-bar__brand-copy">
+          <h1 className="header-bar__title">Operator Console</h1>
+        </div>
       </div>
 
       <div className="header-bar__tools">
@@ -51,7 +52,7 @@ export function HeaderBar({ onConsoleClick, onLogoutClick, consoleActive = false
                     : undefined
               }
             >
-              <Icon name={action.icon} size={20} />
+              <Icon name={action.icon} size={18} />
               <span>{action.label}</span>
             </button>
           ))}

@@ -361,14 +361,14 @@ export function ContextManager() {
                 </div>
               </div>
               {showCreateProposal && (
-                <div className="create-proposal-form" style={{background:"#fafafa",border:"1px solid #eee",borderRadius:8,padding:16,marginBottom:16}}>
-                  <h4 style={{margin:"0 0 12px",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8"}}>New Proposal</h4>
+                <div className="create-proposal-form" style={{background:"var(--color-surface-neutral)",border:"1px solid var(--color-panel)",borderRadius:8,padding:16,marginBottom:16}}>
+                  <h4 style={{margin:"0 0 12px",fontSize:12,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.05em",color:"var(--color-text-dim)"}}>New Proposal</h4>
                   <div className="find-form__row">
-                    <label><span>Agent</span><input type="text" id="cp-agent" placeholder="e.g. backend-dev" style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}} /></label>
-                    <label><span>Stability</span><select id="cp-stability" style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}}><option value="experimental">experimental</option><option value="stable">stable</option><option value="curated">curated</option></select></label>
+                    <label><span>Agent</span><input type="text" id="cp-agent" placeholder="e.g. backend-dev" style={{border:"1px solid var(--color-border-subtle)",borderRadius:4,padding:"6px 8px",fontSize:12,background:"var(--color-surface)",width:"100%"}} /></label>
+                    <label><span>Stability</span><select id="cp-stability" style={{border:"1px solid var(--color-border-subtle)",borderRadius:4,padding:"6px 8px",fontSize:12,background:"var(--color-surface)",width:"100%"}}><option value="experimental">experimental</option><option value="stable">stable</option><option value="curated">curated</option></select></label>
                   </div>
-                  <label className="find-form__full"><span>Summary</span><input type="text" id="cp-summary" placeholder="Brief description..." style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}} /></label>
-                  <label className="find-form__full"><span>Rationale</span><input type="text" id="cp-rationale" placeholder="Why this proposal..." style={{border:"1px solid #e0e0e0",borderRadius:4,padding:"6px 8px",fontSize:12,background:"#fff",width:"100%"}} /></label>
+                  <label className="find-form__full"><span>Summary</span><input type="text" id="cp-summary" placeholder="Brief description..." style={{border:"1px solid var(--color-border-subtle)",borderRadius:4,padding:"6px 8px",fontSize:12,background:"var(--color-surface)",width:"100%"}} /></label>
+                  <label className="find-form__full"><span>Rationale</span><input type="text" id="cp-rationale" placeholder="Why this proposal..." style={{border:"1px solid var(--color-border-subtle)",borderRadius:4,padding:"6px 8px",fontSize:12,background:"var(--color-surface)",width:"100%"}} /></label>
                   <button className="context-action-btn context-action-btn--primary" style={{marginTop:8}} onClick={async () => {
                     const agent = (document.getElementById("cp-agent") as HTMLInputElement).value.trim();
                     const stability = (document.getElementById("cp-stability") as HTMLSelectElement).value;

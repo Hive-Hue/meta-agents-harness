@@ -24,12 +24,12 @@ export function ExpertiseGovernance() {
   const [crew] = useState("dev");
   const [step, setStep] = useState<WorkflowStep>("seed");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [tab, setTab] = useState<"catalog"|"evidence"|"proposals"|"lifecycle">("catalog");
+  const [tab, setTab] = useState<"catalog" | "evidence" | "proposals" | "lifecycle">("catalog");
   const [showSyncPreview, setShowSyncPreview] = useState(false);
   const [syncResults, setSyncResults] = useState<SyncChange[]>([]);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [createResult, setCreateResult] = useState<string|null>(null);
+  const [createResult, setCreateResult] = useState<string | null>(null);
   const [proposeAgent, setProposeAgent] = useState("");
   const [proposeLimit, setProposeLimit] = useState("5");
   const [proposeSummary, setProposeSummary] = useState("");
@@ -143,10 +143,10 @@ export function ExpertiseGovernance() {
           {WORKFLOW_STEPS.map((s, i) => {
             const done = i < currentIdx, active = i === currentIdx, future = i > currentIdx;
             return (
-              <div key={s.id} className={`workflow-step ${done?"workflow-step--done":""} ${active?"workflow-step--active":""} ${future?"workflow-step--future":""}`}>
-                <button className="workflow-step__btn" disabled={future} onClick={() => {}}>
+              <div key={s.id} className={`workflow-step ${done ? "workflow-step--done" : ""} ${active ? "workflow-step--active" : ""} ${future ? "workflow-step--future" : ""}`}>
+                <button className="workflow-step__btn" disabled={future} onClick={() => { }}>
                   <span className="workflow-step__num" style={{ display: "flex" }}>
-                    {done ? <Icon name="check" size={11} /> : i+1}
+                    {done ? <Icon name="check" size={11} /> : i + 1}
                   </span>
                   <span className="workflow-step__label">{s.label}</span>
                 </button>
@@ -196,7 +196,7 @@ export function ExpertiseGovernance() {
                 <Icon name="search" size={14} />Preview Changes
               </button>
               {syncMessage && (
-                <div className={syncMessage.toLowerCase().includes("failed") ? "propose-result propose-result--error" : "propose-result propose-result--ok"} style={{marginTop: 10}}>
+                <div className={syncMessage.toLowerCase().includes("failed") ? "propose-result propose-result--error" : "propose-result propose-result--ok"} style={{ marginTop: 10 }}>
                   {syncMessage}
                 </div>
               )}
@@ -218,12 +218,12 @@ export function ExpertiseGovernance() {
               <p className="workflow-panel__desc">Create governance proposals for agents with ≥5 evidence events.</p>
               {qualifying.length > 0 && (
                 <div className="qualifying-list">
-                  <p style={{fontSize:11,color:"#94a3b8",marginBottom:8}}>Qualifying ({qualifying.length}):</p>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  <p style={{ fontSize: 11, color: "var(--color-text-dim)", marginBottom: 8 }}>Qualifying ({qualifying.length}):</p>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {qualifying.map(id => (
                       <span key={id} className="agent-qualifies-chip">
-                        <Icon name="check_circle" size={12} />{id.includes(":")?id.split(":")[1]:id}
-                        <span style={{color:"#94a3b8",fontSize:10}}>({entries.find(e=>e.id===id)?.confidence?.evidence_count} ev)</span>
+                        <Icon name="check_circle" size={12} />{id.includes(":") ? id.split(":")[1] : id}
+                        <span style={{ color: "var(--color-text-dim)", fontSize: 10 }}>({entries.find(e => e.id === id)?.confidence?.evidence_count} ev)</span>
                       </span>
                     ))}
                   </div>
@@ -233,37 +233,37 @@ export function ExpertiseGovernance() {
                 <h4>Create Proposal</h4>
                 <div className="propose-form__row">
                   <label><span>Agent</span>
-                    <select value={proposeAgent} onChange={e=>setProposeAgent(e.target.value)}>
+                    <select value={proposeAgent} onChange={e => setProposeAgent(e.target.value)}>
                       <option value="">Select...</option>
                       {qualifying.map(id => <option key={id} value={id}>{id}</option>)}
                     </select>
                   </label>
                   <label><span>Evidence Limit</span>
-                    <input type="number" min="1" max="50" value={proposeLimit} onChange={e=>setProposeLimit(e.target.value)} style={{width:80}} />
+                    <input type="number" min="1" max="50" value={proposeLimit} onChange={e => setProposeLimit(e.target.value)} style={{ width: 80 }} />
                   </label>
-                <label
-                  className="propose-form__full"
-                  style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={proposeAiPowered}
-                    onChange={e => setProposeAiPowered(e.target.checked)}
-                  />
-                  <div style={{ fontSize: 12, color: "#444748" }}>AI-powered propose (rewrite summary/rationale/changes)</div>
-                </label>
+                  <label
+                    className="propose-form__full"
+                    style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8 }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={proposeAiPowered}
+                      onChange={e => setProposeAiPowered(e.target.checked)}
+                    />
+                    <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>AI-powered propose (rewrite summary/rationale/changes)</div>
+                  </label>
                 </div>
                 <label className="propose-form__full"><span>Summary</span>
-                  <input type="text" placeholder="Evidence-backed update..." value={proposeSummary} onChange={e=>setProposeSummary(e.target.value)} />
+                  <input type="text" placeholder="Evidence-backed update..." value={proposeSummary} onChange={e => setProposeSummary(e.target.value)} />
                 </label>
                 <label className="propose-form__full"><span>Output Path</span>
-                  <input type="text" value={proposeOutput || `.mah/expertise/proposals/proposal-<agent>.yaml`} onChange={e=>setProposeOutput(e.target.value)} style={{fontFamily:"var(--font-mono)",fontSize:12}} />
+                  <input type="text" value={proposeOutput || `.mah/expertise/proposals/proposal-<agent>.yaml`} onChange={e => setProposeOutput(e.target.value)} style={{ fontFamily: "var(--font-mono)", fontSize: 12 }} />
                 </label>
-                
+
                 <button className="workflow-action-btn workflow-action-btn--primary" onClick={handleCreateProposal} disabled={creating || !proposeAgent || !proposeSummary.trim()}>
                   <Icon name="description" size={14} />{creating ? "Generating..." : "Generate"}
                 </button>
-                {createResult && <div className={`propose-result ${createResult.startsWith("Written")?"propose-result--ok":"propose-result--error"}`}>{createResult}</div>}
+                {createResult && <div className={`propose-result ${createResult.startsWith("Written") ? "propose-result--ok" : "propose-result--error"}`}>{createResult}</div>}
               </div>
             </div>
           )}
@@ -287,11 +287,11 @@ export function ExpertiseGovernance() {
                     <div key={p.id} className="review-item">
                       <div className="review-item__header">
                         <strong>{p.target_expertise_id}</strong>
-                        <StatusBadge tone={p.status==="approved"?"completed":p.status==="rejected"?"failed":"running"} label={p.status} />
+                        <StatusBadge tone={p.status === "approved" ? "completed" : p.status === "rejected" ? "failed" : "running"} label={p.status} />
                       </div>
-                      <p style={{fontSize:12,margin:"6px 0"}}>{p.summary}</p>
+                      <p style={{ fontSize: 12, margin: "6px 0" }}>{p.summary}</p>
                       {p.status !== "applied" && (
-                        <button className="workflow-action-btn" style={{padding:"4px 10px",fontSize:11}} onClick={() => handleApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}>
+                        <button className="workflow-action-btn" style={{ padding: "4px 10px", fontSize: 11 }} onClick={() => handleApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}>
                           <Icon name="check" size={12} />Apply
                         </button>
                       )}
@@ -316,9 +316,9 @@ export function ExpertiseGovernance() {
                 </div>
               </div>
               <p className="workflow-panel__desc">Apply approved proposals. Registry rebuilt automatically.</p>
-              {proposals.filter(p=>p.status!=="applied").length === 0 ? <div className="empty-state">All applied.</div> : (
+              {proposals.filter(p => p.status !== "applied").length === 0 ? <div className="empty-state">All applied.</div> : (
                 <div className="apply-list">
-                  {proposals.filter(p=>p.status!=="applied").map(p => (
+                  {proposals.filter(p => p.status !== "applied").map(p => (
                     <div key={p.id} className="apply-item">
                       <strong>{p.target_expertise_id}</strong>
                       <button className="workflow-action-btn" onClick={() => handleApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={14} />Apply</button>
@@ -333,8 +333,8 @@ export function ExpertiseGovernance() {
           {/* Tabs */}
           {step !== "seed" && (
             <div className="expertise-tabs-inline">
-              {(["catalog","evidence","proposals","lifecycle"] as const).map(t => (
-                <button key={t} className={`expertise-tab expertise-tab--inline ${tab===t?"expertise-tab--active":""}`} onClick={()=>setTab(t)}>{t.charAt(0).toUpperCase()+t.slice(1)}</button>
+              {(["catalog", "evidence", "proposals", "lifecycle"] as const).map(t => (
+                <button key={t} className={`expertise-tab expertise-tab--inline ${tab === t ? "expertise-tab--active" : ""}`} onClick={() => setTab(t)}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
               ))}
             </div>
           )}
@@ -348,7 +348,7 @@ export function ExpertiseGovernance() {
         </div>
       </main>
       <aside className="inspector">
-        <ExpertiseInspector entry={entries.find(e=>e.id===selectedId)||null} onClose={()=>setSelectedId(null)} />
+        <ExpertiseInspector entry={entries.find(e => e.id === selectedId) || null} onClose={() => setSelectedId(null)} />
       </aside>
       {showSyncPreview && (
         <SyncPreviewModal
@@ -361,8 +361,8 @@ export function ExpertiseGovernance() {
   );
 }
 
-function CatalogTab({ entries, selectedId, onSelect, qualifying, syncResults }: { entries: ExpertiseEntry[]; selectedId: string|null; onSelect: (id:string)=>void; qualifying: string[]; syncResults: SyncChange[] }) {
-  const syncMap = Object.fromEntries(syncResults.map(r=>[r.agent,r]));
+function CatalogTab({ entries, selectedId, onSelect, qualifying, syncResults }: { entries: ExpertiseEntry[]; selectedId: string | null; onSelect: (id: string) => void; qualifying: string[]; syncResults: SyncChange[] }) {
+  const syncMap = Object.fromEntries(syncResults.map(r => [r.agent, r]));
 
   // Group entries by crew prefix
   const groups: Record<string, ExpertiseEntry[]> = {};
@@ -376,9 +376,9 @@ function CatalogTab({ entries, selectedId, onSelect, qualifying, syncResults }: 
   return (
     <div className="expertise-table">
       <table>
-        <thead><tr><th aria-label="Selected"/><th>Agent</th><th>Confidence</th><th>Band</th><th>Lifecycle</th><th>Evidence</th><th>Qualifies</th><th>Sync</th></tr></thead>
+        <thead><tr><th aria-label="Selected" /><th>Agent</th><th>Confidence</th><th>Band</th><th>Lifecycle</th><th>Evidence</th><th>Qualifies</th><th>Sync</th></tr></thead>
         <tbody>
-          {Object.entries(groups).sort(([a],[b]) => a.localeCompare(b)).map(([crew, crewEntries]) => [
+          {Object.entries(groups).sort(([a], [b]) => a.localeCompare(b)).map(([crew, crewEntries]) => [
             <tr key={`header-${crew}`} className="crew-group-header">
               <td colSpan={8}>
                 <div className="crew-group-label">
@@ -391,15 +391,15 @@ function CatalogTab({ entries, selectedId, onSelect, qualifying, syncResults }: 
             ...crewEntries.map(e => {
               const sync = syncMap[e.id];
               return (
-                <tr key={e.id} className={selectedId===e.id?"is-selected":""} onClick={()=>onSelect(e.id)}>
-                  <td><Icon name={selectedId===e.id?"radio_button_checked":"radio_button_unchecked"} size={18} filled={selectedId===e.id}/></td>
-                  <td className="agent-name-cell">{e.id.includes(":")?e.id.split(":")[1]:e.id}</td>
-                  <td><div style={{display:"flex",alignItems:"center",gap:8,minWidth:80}}><div style={{flex:1,height:4,background:"#eee",borderRadius:2}}><div style={{width:`${Math.round((e.confidence?.score||0)*100)}%`,height:"100%",background:"#0a0a0a",borderRadius:2}}/></div><span style={{fontSize:11,fontFamily:"var(--font-mono)",minWidth:32}}>{Math.round((e.confidence?.score||0)*100)}%</span></div></td>
-                  <td><span style={{fontSize:12}}>{e.confidence?.band?.charAt(0).toUpperCase()+e.confidence?.band?.slice(1)||"—"}</span></td>
-                  <td><StatusBadge tone={e.lifecycle==="active"?"completed":e.lifecycle==="experimental"?"running":e.lifecycle==="restricted"?"running":"failed"} label={e.lifecycle||"experimental"}/></td>
-                  <td><span style={{fontFamily:"var(--font-mono)",fontSize:12}}>{e.confidence?.evidence_count??0}</span></td>
-                  <td>{qualifying.includes(e.id)?<span className="qualifies-badge qualifies-badge--yes"><Icon name="check_circle" size={12}/>qualifies</span>:<span className="qualifies-badge qualifies-badge--no">—</span>}</td>
-                  <td>{sync?.changed?<div style={{display:"flex",gap:3}}>{sync.changes?.map(c=><span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>)}</div>:<span style={{fontSize:11,color:"#94a3b8"}}>—</span>}</td>
+                <tr key={e.id} className={selectedId === e.id ? "is-selected" : ""} onClick={() => onSelect(e.id)}>
+                  <td><Icon name={selectedId === e.id ? "radio_button_checked" : "radio_button_unchecked"} size={18} filled={selectedId === e.id} /></td>
+                  <td className="agent-name-cell">{e.id.includes(":") ? e.id.split(":")[1] : e.id}</td>
+                  <td><div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 80 }}><div style={{ flex: 1, height: 4, background: "var(--color-panel)", borderRadius: 2 }}><div style={{ width: `${Math.round((e.confidence?.score || 0) * 100)}%`, height: "100%", background: "var(--color-cyan)", borderRadius: 2 }} /></div><span style={{ fontSize: 11, fontFamily: "var(--font-mono)", minWidth: 32 }}>{Math.round((e.confidence?.score || 0) * 100)}%</span></div></td>
+                  <td><span style={{ fontSize: 12 }}>{e.confidence?.band?.charAt(0).toUpperCase() + e.confidence?.band?.slice(1) || "—"}</span></td>
+                  <td><StatusBadge tone={e.lifecycle === "active" ? "completed" : e.lifecycle === "experimental" ? "running" : e.lifecycle === "restricted" ? "running" : "failed"} label={e.lifecycle || "experimental"} /></td>
+                  <td><span style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>{e.confidence?.evidence_count ?? 0}</span></td>
+                  <td>{qualifying.includes(e.id) ? <span className="qualifies-badge qualifies-badge--yes"><Icon name="check_circle" size={12} />qualifies</span> : <span className="qualifies-badge qualifies-badge--no">—</span>}</td>
+                  <td>{sync?.changed ? <div style={{ display: "flex", gap: 3 }}>{sync.changes?.map(c => <span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>)}</div> : <span style={{ fontSize: 11, color: "var(--color-text-dim)" }}>—</span>}</td>
                 </tr>
               );
             })
@@ -410,29 +410,29 @@ function CatalogTab({ entries, selectedId, onSelect, qualifying, syncResults }: 
   );
 }
 
-function EvidenceTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntry[]; selectedId: string|null; onSelect: (id:string)=>void }) {
-  const [activeId, setActiveId] = useState<string|null>(selectedId);
-  const { events, loading, error } = useEvidenceData(activeId||"");
-  useEffect(()=>{ if(selectedId) setActiveId(selectedId); },[selectedId]);
+function EvidenceTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntry[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  const [activeId, setActiveId] = useState<string | null>(selectedId);
+  const { events, loading, error } = useEvidenceData(activeId || "");
+  useEffect(() => { if (selectedId) setActiveId(selectedId); }, [selectedId]);
   return (
     <div className="evidence-tab">
-      <div className="evidence-agent-list"><p style={{fontSize:11,color:"#94a3b8",padding:"8px 12px",margin:0}}>Select agent</p>
-        {entries.map(e=><button key={e.id} className={`evidence-agent-btn ${activeId===e.id?"is-active":""}`} onClick={()=>setActiveId(e.id)}>{e.id.includes(":")?e.id.split(":")[1]:e.id}<span style={{fontSize:10,color:"#94a3b8"}}>({e.confidence?.evidence_count??0})</span></button>)}
+      <div className="evidence-agent-list"><p style={{ fontSize: 11, color: "var(--color-text-dim)", padding: "8px 12px", margin: 0 }}>Select agent</p>
+        {entries.map(e => <button key={e.id} className={`evidence-agent-btn ${activeId === e.id ? "is-active" : ""}`} onClick={() => setActiveId(e.id)}>{e.id.includes(":") ? e.id.split(":")[1] : e.id}<span style={{ fontSize: 10, color: "var(--color-text-dim)" }}>({e.confidence?.evidence_count ?? 0})</span></button>)}
       </div>
       <div className="evidence-events">
-        {!activeId&&<div className="empty-state">Select agent.</div>}
-        {activeId&&loading&&<div className="loading-state">Loading...</div>}
-        {activeId&&error&&<div className="error-state">{error}</div>}
-        {activeId&&!loading&&!error&&events.length===0&&<div className="empty-state">No events.</div>}
-        {activeId&&!loading&&!error&&events.length>0&&events.map((ev,i)=>(
+        {!activeId && <div className="empty-state">Select agent.</div>}
+        {activeId && loading && <div className="loading-state">Loading...</div>}
+        {activeId && error && <div className="error-state">{error}</div>}
+        {activeId && !loading && !error && events.length === 0 && <div className="empty-state">No events.</div>}
+        {activeId && !loading && !error && events.length > 0 && events.map((ev, i) => (
           <div key={i} className="event-item">
-            <span className={`timeline__marker ${ev.outcome==="success"?"timeline__marker--active":""}`}/>
+            <span className={`timeline__marker ${ev.outcome === "success" ? "timeline__marker--active" : ""}`} />
             <div className="event-content">
               <div className="event-header">
-                <span style={{fontSize:10,fontWeight:800,textTransform:"uppercase",color:ev.outcome==="success"?"#4caf50":ev.outcome==="failure"?"#dc2626":"#ffc107"}}>{ev.outcome}</span>
-                <span style={{fontSize:11,color:"#666"}}>{ev.recorded_at?new Date(ev.recorded_at).toLocaleTimeString():"—"}</span>
+                <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: ev.outcome === "success" ? "var(--color-success)" : ev.outcome === "failure" ? "#dc2626" : "#ffc107" }}>{ev.outcome}</span>
+                <span style={{ fontSize: 11, color: "#666" }}>{ev.recorded_at ? new Date(ev.recorded_at).toLocaleTimeString() : "—"}</span>
               </div>
-              <p style={{fontSize:12,margin:"4px 0"}}>{ev.task_description||ev.task_type||"—"}</p>
+              <p style={{ fontSize: 12, margin: "4px 0" }}>{ev.task_description || ev.task_type || "—"}</p>
             </div>
           </div>
         ))}
@@ -441,7 +441,7 @@ function EvidenceTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntr
   );
 }
 
-function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApply: (path:string)=>void }) {
+function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApply: (path: string) => void }) {
   if (proposals.length === 0) {
     return (
       <div className="expertise-table expertise-table--empty">
@@ -455,13 +455,13 @@ function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApp
       <table>
         <thead><tr><th>Target</th><th>Summary</th><th>By</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>
-          {proposals.map(p=>(
+          {proposals.map(p => (
             <tr key={p.id}>
               <td className="agent-name-cell">{p.target_expertise_id}</td>
-              <td style={{fontSize:12,maxWidth:180}}>{p.summary}</td>
-              <td style={{fontSize:11}}>{p.generated_by?.actor}</td>
-              <td><StatusBadge tone={p.status==="approved"?"completed":p.status==="rejected"?"failed":"running"} label={p.status}/></td>
-              <td>{p.status!=="applied"&&<button className="workflow-action-btn" style={{padding:"4px 10px",fontSize:11}} onClick={()=>onApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={12}/>Apply</button>}</td>
+              <td style={{ fontSize: 12, maxWidth: 180 }}>{p.summary}</td>
+              <td style={{ fontSize: 11 }}>{p.generated_by?.actor}</td>
+              <td><StatusBadge tone={p.status === "approved" ? "completed" : p.status === "rejected" ? "failed" : "running"} label={p.status} /></td>
+              <td>{p.status !== "applied" && <button className="workflow-action-btn" style={{ padding: "4px 10px", fontSize: 11 }} onClick={() => onApply(p.file_path || `.mah/expertise/proposals/${p.id}`)}><Icon name="check" size={12} />Apply</button>}</td>
             </tr>
           ))}
         </tbody>
@@ -470,33 +470,33 @@ function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApp
   );
 }
 
-function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntry[]; selectedId: string|null; onSelect: (id:string)=>void }) {
-  const [sel, setSel] = useState<string|null>(selectedId);
-  useEffect(()=>{ if(selectedId) setSel(selectedId); },[selectedId]);
-  const trans: Record<string,string[]> = { experimental:["active"], active:["restricted","experimental"], restricted:["active","revoked"], revoked:[] };
-  const current = entries.find(e=>e.id===sel);
+function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntry[]; selectedId: string | null; onSelect: (id: string) => void }) {
+  const [sel, setSel] = useState<string | null>(selectedId);
+  useEffect(() => { if (selectedId) setSel(selectedId); }, [selectedId]);
+  const trans: Record<string, string[]> = { experimental: ["active"], active: ["restricted", "experimental"], restricted: ["active", "revoked"], revoked: [] };
+  const current = entries.find(e => e.id === sel);
   return (
     <div className="lifecycle-tab">
-      <div className="lifecycle-agent-list">{entries.map(e=><button key={e.id} className={`evidence-agent-btn ${sel===e.id?"is-active":""}`} onClick={()=>setSel(e.id)}>{e.id.includes(":")?e.id.split(":")[1]:e.id}</button>)}</div>
+      <div className="lifecycle-agent-list">{entries.map(e => <button key={e.id} className={`evidence-agent-btn ${sel === e.id ? "is-active" : ""}`} onClick={() => setSel(e.id)}>{e.id.includes(":") ? e.id.split(":")[1] : e.id}</button>)}</div>
       <div className="lifecycle-panel">
-        {!current&&<div className="empty-state">Select agent.</div>}
-        {current&&(
+        {!current && <div className="empty-state">Select agent.</div>}
+        {current && (
           <>
             <div className="lifecycle-current">
-              <StatusBadge tone={current.lifecycle==="active"?"completed":current.lifecycle==="experimental"?"running":current.lifecycle==="restricted"?"running":"failed"} label={current.lifecycle||"experimental"}/>
-              <span style={{fontSize:13,marginLeft:12}}>{current.id}</span>
+              <StatusBadge tone={current.lifecycle === "active" ? "completed" : current.lifecycle === "experimental" ? "running" : current.lifecycle === "restricted" ? "running" : "failed"} label={current.lifecycle || "experimental"} />
+              <span style={{ fontSize: 13, marginLeft: 12 }}>{current.id}</span>
             </div>
             <div className="lifecycle-transitions">
-              {(trans[current.lifecycle||"experimental"]||[]).map(s=>(
-                <button key={s} className="lifecycle-transition-btn" onClick={async()=>{ if(!confirm(`Transition ${current.id}→${s}?`))return; await runMah(["expertise","lifecycle",current.id,"--to",s,"--json"]); }}>
-                  <Icon name="arrow_forward" size={12}/>{s}
+              {(trans[current.lifecycle || "experimental"] || []).map(s => (
+                <button key={s} className="lifecycle-transition-btn" onClick={async () => { if (!confirm(`Transition ${current.id}→${s}?`)) return; await runMah(["expertise", "lifecycle", current.id, "--to", s, "--json"]); }}>
+                  <Icon name="arrow_forward" size={12} />{s}
                 </button>
               ))}
             </div>
-            <div style={{marginTop:16}}>
-              <div className="inspector-stats" style={{gridTemplateColumns:"1fr 1fr"}}>
-                <div><span>Confidence</span><strong>{Math.round((current.confidence?.score||0)*100)}%</strong></div>
-                <div><span>Evidence</span><strong>{current.confidence?.evidence_count??0}</strong></div>
+            <div style={{ marginTop: 16 }}>
+              <div className="inspector-stats" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <div><span>Confidence</span><strong>{Math.round((current.confidence?.score || 0) * 100)}%</strong></div>
+                <div><span>Evidence</span><strong>{current.confidence?.evidence_count ?? 0}</strong></div>
               </div>
             </div>
           </>
@@ -506,25 +506,25 @@ function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEnt
   );
 }
 
-function ExpertiseInspector({ entry, onClose }: { entry: ExpertiseEntry|null; onClose: ()=>void }) {
-  const { metrics } = useExpertiseDetail(entry?.id||"");
-  const { events } = useEvidenceData(entry?.id||"", 10);
-  if (!entry) return <section className="inspector__body" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"100%",gap:12}}><Icon name="info" size={32}/><p style={{color:"var(--color-text-muted)",fontSize:13}}>Select agent</p></section>;
+function ExpertiseInspector({ entry, onClose }: { entry: ExpertiseEntry | null; onClose: () => void }) {
+  const { metrics } = useExpertiseDetail(entry?.id || "");
+  const { events } = useEvidenceData(entry?.id || "", 10);
+  if (!entry) return <section className="inspector__body" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12 }}><Icon name="info" size={32} /><p style={{ color: "var(--color-text-muted)", fontSize: 13 }}>Select agent</p></section>;
   return (
     <>
       <section className="inspector__header">
-        <div className="inspector__title-row"><div><h3>Expertise Detail</h3><p>{entry.id}</p></div><button type="button" onClick={onClose} className="icon-button"><Icon name="close" size={16}/></button></div>
+        <div className="inspector__title-row"><div><h3>Expertise Detail</h3><p>{entry.id}</p></div><button type="button" onClick={onClose} className="icon-button"><Icon name="close" size={16} /></button></div>
       </section>
       <section className="inspector__body">
         <div className="inspector-stats">
-          <div><span>Lifecycle</span><strong><StatusBadge tone={entry.lifecycle==="active"?"completed":entry.lifecycle==="experimental"?"running":"failed"} label={entry.lifecycle||"experimental"}/></strong></div>
-          <div><span>Evidence</span><strong>{entry.confidence?.evidence_count??0}</strong></div>
-          <div><span>Trust Tier</span><strong>{entry.trust_tier||"internal"}</strong></div>
-          {metrics&&<><div><span>Invocations</span><strong>{metrics.total_invocations}</strong></div><div><span>Success Rate</span><strong>{Math.round(metrics.review_pass_rate*100)}%</strong></div></>}
+          <div><span>Lifecycle</span><strong><StatusBadge tone={entry.lifecycle === "active" ? "completed" : entry.lifecycle === "experimental" ? "running" : "failed"} label={entry.lifecycle || "experimental"} /></strong></div>
+          <div><span>Evidence</span><strong>{entry.confidence?.evidence_count ?? 0}</strong></div>
+          <div><span>Trust Tier</span><strong>{entry.trust_tier || "internal"}</strong></div>
+          {metrics && <><div><span>Invocations</span><strong>{metrics.total_invocations}</strong></div><div><span>Success Rate</span><strong>{Math.round(metrics.review_pass_rate * 100)}%</strong></div></>}
         </div>
-        {entry.capabilities?.length>0&&<div style={{marginTop:16}}><p style={{fontSize:11,fontWeight:800,textTransform:"uppercase",color:"#94a3b8",marginBottom:6}}>Capabilities</p><div className="cap-chips">{entry.capabilities.map(c=><span className="cap-chip" key={c}>{c}</span>)}</div></div>}
-        {events.length>0&&<div style={{marginTop:16}}><p style={{fontSize:11,fontWeight:800,textTransform:"uppercase",color:"#94a3b8",marginBottom:8}}>Recent Evidence</p>
-          {events.slice(0,5).map((ev,i)=><div key={i} style={{marginBottom:12}}><strong style={{fontSize:11,color:ev.outcome==="success"?"#4caf50":"#94a3b8"}}>{ev.outcome}</strong><p style={{fontSize:11,margin:0}}>{ev.task_description?.slice(0,60)}</p></div>)}
+        {entry.capabilities?.length > 0 && <div style={{ marginTop: 16 }}><p style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-dim)", marginBottom: 6 }}>Capabilities</p><div className="cap-chips">{entry.capabilities.map(c => <span className="cap-chip" key={c}>{c}</span>)}</div></div>}
+        {events.length > 0 && <div style={{ marginTop: 16 }}><p style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: "var(--color-text-dim)", marginBottom: 8 }}>Recent Evidence</p>
+          {events.slice(0, 5).map((ev, i) => <div key={i} style={{ marginBottom: 12 }}><strong style={{ fontSize: 11, color: ev.outcome === "success" ? "var(--color-success)" : "var(--color-text-dim)" }}>{ev.outcome}</strong><p style={{ fontSize: 11, margin: 0 }}>{ev.task_description?.slice(0, 60)}</p></div>)}
         </div>}
       </section>
     </>
@@ -540,41 +540,41 @@ function SyncPreviewModal({ results, onClose, onExecute }: { results: SyncChange
       <div className="modal-box" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Sync Preview — {changed.length} changed, {skipped.length} skipped</h3>
-          <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={16}/></button>
+          <button type="button" className="icon-button" onClick={onClose}><Icon name="close" size={16} /></button>
         </div>
-        <div className="sync-preview-table" style={{maxHeight: "360px", overflowY: "auto", border: "1px solid #eee", borderRadius: "6px", margin: "16px 0"}}>
+        <div className="sync-preview-table" style={{ maxHeight: "360px", overflowY: "auto", border: "1px solid var(--color-panel)", borderRadius: "6px", margin: "16px 0" }}>
           {noRows ? (
-            <div className="empty-state" style={{padding: 16}}>No sync rows returned by dry-run.</div>
+            <div className="empty-state" style={{ padding: 16 }}>No sync rows returned by dry-run.</div>
           ) : (
-          <table style={{width: "100%", fontSize: "12px"}}>
-            <thead>
-              <tr>
-                <th style={{textAlign:"left",padding:"8px 12px",background:"#fafafa",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8",position:"sticky",top:0}}>Agent</th>
-                <th style={{textAlign:"left",padding:"8px 12px",background:"#fafafa",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8",position:"sticky",top:0}}>Changes</th>
-                <th style={{textAlign:"left",padding:"8px 12px",background:"#fafafa",fontSize:"10px",textTransform:"uppercase",letterSpacing:"0.05em",color:"#94a3b8",position:"sticky",top:0}}>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map(r => (
-                <tr key={r.agent} className={r.skipped ? "row-skipped" : r.changed ? "row-changed" : ""} style={r.skipped ? {opacity:0.5} : {}}>
-                  <td style={{padding:"8px 12px",borderTop:"1px solid #f0f0f0"}} className="agent-name-cell">{r.agent}</td>
-                  <td style={{padding:"8px 12px",borderTop:"1px solid #f0f0f0"}}>
-                    {r.skipped ? <span style={{color:"#94a3b8"}}>skipped</span> :
-                     r.changed ? r.changes?.map(c => <span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>) :
-                     <span style={{color:"#94a3b8"}}>no change</span>}
-                  </td>
-                  <td style={{padding:"8px 12px",borderTop:"1px solid #f0f0f0",fontSize:"11px",color:"#666"}}>
-                    {r.changes?.map(c => c.type === "confidence" ? `${Math.round((c.from?.score||0)*100)}%→${Math.round((c.to?.score||0)*100)}% (${c.to?.invocations} inv)` : `+${c.added?.join(", ")}`).join(" | ")}
-                  </td>
+            <table style={{ width: "100%", fontSize: "12px" }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left", padding: "8px 12px", background: "var(--color-surface-neutral)", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-dim)", position: "sticky", top: 0 }}>Agent</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", background: "var(--color-surface-neutral)", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-dim)", position: "sticky", top: 0 }}>Changes</th>
+                  <th style={{ textAlign: "left", padding: "8px 12px", background: "var(--color-surface-neutral)", fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--color-text-dim)", position: "sticky", top: 0 }}>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {results.map(r => (
+                  <tr key={r.agent} className={r.skipped ? "row-skipped" : r.changed ? "row-changed" : ""} style={r.skipped ? { opacity: 0.5 } : {}}>
+                    <td style={{ padding: "8px 12px", borderTop: "1px solid #f0f0f0" }} className="agent-name-cell">{r.agent}</td>
+                    <td style={{ padding: "8px 12px", borderTop: "1px solid #f0f0f0" }}>
+                      {r.skipped ? <span style={{ color: "var(--color-text-dim)" }}>skipped</span> :
+                        r.changed ? r.changes?.map(c => <span key={c.type} className={`change-tag change-tag--${c.type}`}>{c.type}</span>) :
+                          <span style={{ color: "var(--color-text-dim)" }}>no change</span>}
+                    </td>
+                    <td style={{ padding: "8px 12px", borderTop: "1px solid #f0f0f0", fontSize: "11px", color: "#666" }}>
+                      {r.changes?.map(c => c.type === "confidence" ? `${Math.round((c.from?.score || 0) * 100)}%→${Math.round((c.to?.score || 0) * 100)}% (${c.to?.invocations} inv)` : `+${c.added?.join(", ")}`).join(" | ")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
-        <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"8px"}}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "8px" }}>
           <button type="button" className="workflow-action-btn" onClick={onClose}>Cancel</button>
-          <button type="button" className="workflow-action-btn workflow-action-btn--primary" onClick={() => { onExecute(); onClose(); }}><Icon name="check" size={14}/>Execute Sync</button>
+          <button type="button" className="workflow-action-btn workflow-action-btn--primary" onClick={() => { onExecute(); onClose(); }}><Icon name="check" size={14} />Execute Sync</button>
         </div>
       </div>
     </div>

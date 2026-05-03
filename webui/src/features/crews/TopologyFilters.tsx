@@ -32,7 +32,7 @@ export function TopologyFilters({
         <option value="worker">Worker</option>
       </select>
       <input
-        className="crews-filter"
+        className="crews-filter input"
         type="text"
         placeholder="Filter by capability..."
         value={capability}
