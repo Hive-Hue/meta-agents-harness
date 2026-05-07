@@ -4285,25 +4285,27 @@ function isLivenessTask(task: string): boolean {
 		},
 	});
 
-	pi.registerShortcut("alt+c", {
-		description: "Cycle visible widget crew (only in --full-crews mode)",
-		handler: async (ctx) => {
-			if (!runtime) return;
-			if (!isFullCrewsMode()) {
-				ctx.ui.notify("Crew widget toggle available only in --full-crews mode.", "warning");
-				return;
-			}
-			const options = widgetCrewOptions(Array.from(cards.values()));
-			if (options.length <= 1) {
-				ctx.ui.notify("No additional crews available in current widget set.", "info");
-				return;
-			}
-			const currentIndex = Math.max(0, options.indexOf(widgetCrewFilter));
-			widgetCrewFilter = options[(currentIndex + 1) % options.length];
-			updateWidget();
-			ctx.ui.notify(`Widget crew filter: ${widgetCrewFilter}`, "info");
-		},
-	});
+	if (typeof pi.registerShortcut === "function") {
+		pi.registerShortcut("alt+c", {
+			description: "Cycle visible widget crew (only in --full-crews mode)",
+			handler: async (ctx) => {
+				if (!runtime) return;
+				if (!isFullCrewsMode()) {
+					ctx.ui.notify("Crew widget toggle available only in --full-crews mode.", "warning");
+					return;
+				}
+				const options = widgetCrewOptions(Array.from(cards.values()));
+				if (options.length <= 1) {
+					ctx.ui.notify("No additional crews available in current widget set.", "info");
+					return;
+				}
+				const currentIndex = Math.max(0, options.indexOf(widgetCrewFilter));
+				widgetCrewFilter = options[(currentIndex + 1) % options.length];
+				updateWidget();
+				ctx.ui.notify(`Widget crew filter: ${widgetCrewFilter}`, "info");
+			},
+		});
+	}
 
 	async function stopAllAgents(target: string | undefined, ctx: ExtensionContext) {
 		if (!runtime) return;

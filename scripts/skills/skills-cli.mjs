@@ -1,10 +1,14 @@
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { findMahSkillFile, resolveMahHome } from "../core/mah-home.mjs"
 import { resolveWorkspaceRoot } from "../core/workspace-root.mjs"
 
-const repoRoot = resolveWorkspaceRoot(process.cwd())
+const scriptPath = fileURLToPath(import.meta.url)
+const packageRoot = resolveWorkspaceRoot(path.join(path.dirname(scriptPath), "..", ".."))
+const cwdRoot = resolveWorkspaceRoot(process.cwd())
+const repoRoot = existsSync(path.join(cwdRoot, "skills")) ? cwdRoot : packageRoot
 
 function parseValueArg(argv, flag, short = "") {
   for (let i = 0; i < argv.length; i += 1) {

@@ -347,7 +347,7 @@ test("kilo explain run resolves to direct cli with injected crew context", () =>
   assert.match(kiloConfig.agent.orchestrator.prompt, /Current crew id: dev/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Crew name: DevMultiTeam/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Current role: orchestrator/)
-  assert.match(kiloConfig.agent.orchestrator.prompt, /Mission: Finish bounded v0\.8\.0 Context Memory for Meta Agents Harness/)
+  assert.match(kiloConfig.agent.orchestrator.prompt, /Mission: Deliver bounded v0\.8\.0 Context Memory evolution for Meta Agents Harness/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Sprint: v0\.8\.0-context-memory/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Target release: v0\.8\.0/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Prompt source: \.kilo\/crew\/dev\/agents\/orchestrator\.md/)

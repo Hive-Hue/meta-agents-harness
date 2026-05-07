@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { RUNTIME_ORDER } from "./runtime/runtime-adapters.mjs"
 import { validateRuntimeAdapterContract } from "./runtime/runtime-adapter-contract.mjs"
-import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./session/m3-ops.mjs"
+import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, recordLifecycleEvent, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./session/m3-ops.mjs"
 import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./runtime/plugin-loader.mjs"
 import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime/runtime-core-ops.mjs"
 import { resolveMahHome } from "./core/mah-home.mjs"
@@ -2408,7 +2408,7 @@ function stripHermesSplash(text) {
   return result || clean.trim()
 }
 
-async function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
+function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
   const adapter = runtimeProfiles[runtime]
   if (!adapter) {
     return {
@@ -2419,36 +2419,30 @@ async function dispatchHeadless(runtime, command, passthrough, outputMode = "tex
     }
   }
 
-  // Check if adapter supports headless execution
   const supportsHeadless = typeof adapter.prepareHeadlessRunContext === "function"
   if (!supportsHeadless) {
-    // Fall back to dispatchCapture for non-headless-aware adapters
     const captured = dispatchCapture(runtime, command, passthrough)
     return captured
   }
 
-  // Normalize args - strip headless/output flags for passthrough
   const normalizedPassthrough = stripHeadlessArgs(passthrough)
   const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
   const envOverrides = { ...normalized.envOverrides }
   const crew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
-  const task = parseValueArg(normalizedPassthrough, "--task") || normalized.args.join(" ")
-  const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
   const headlessSessionId = `${runtime}:mah:headless-${Date.now()}`
-  recordLifecycleEvent(repoRoot, headlessSessionId, {
-    event: "running",
-    details: { task: (normalized?.args?.join(" ") || "").substring(0, 100), runtime }
-  })
-
-  // Get headless execution plan from adapter
-  const headlessPlan = await adapter.prepareHeadlessRunContext({
+  const headlessPlan = adapter.prepareHeadlessRunContext({
+    task: normalized.args.join(" "),
     repoRoot,
     runtime,
     adapter,
     crew,
-    task,
     argv: normalized.args,
     envOverrides
+  })
+
+  recordLifecycleEvent(repoRoot, headlessSessionId, {
+    event: "running",
+    details: { task: (normalized?.args?.join(" ") || "").substring(0, 100), runtime }
   })
 
   if (!headlessPlan || headlessPlan.error) {
@@ -2735,7 +2729,9 @@ async function runDelegate(passthrough, options = {}) {
   })
 
   if (
+    execute &&
     (sourceRuntime === "opencode" && effectiveTargetRuntime === "opencode" && effectiveTarget !== "orchestrator") ||
+    execute &&
     (sourceRuntime === "kilo" && effectiveTargetRuntime === "kilo" && effectiveTarget !== "orchestrator")
   ) {
     console.error(`ERROR: ${sourceRuntime} runtime cannot launch subagents as primary agents in same-runtime delegation.`)
@@ -2855,12 +2851,12 @@ async function runDelegate(passthrough, options = {}) {
     }
   }
 
-  if (verbose || !execute || !quiet) {
+  if (headless || verbose || !execute || !quiet) {
     // Structured output (key=value, consistent with other mah commands)
     console.log("ok=true")
     console.log(`logical_target=${effectiveTarget}`)
     console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
-    console.log(`mode=${result.context.mode}`)
+    console.log(`mode=${headless ? "headless" : result.context.mode}`)
     console.log(`source_runtime=${result.context.sourceRuntime}`)
     console.log(`target_runtime=${result.context.targetRuntime}`)
     console.log(`exec=${result.plan.exec}`)
@@ -2894,7 +2890,7 @@ async function runDelegate(passthrough, options = {}) {
   }
 
   if (execute) {
-    if (verbose || !quiet) console.log("--- executing ---")
+    if (headless || verbose || !quiet) console.log("--- executing ---")
     const { spawnSync } = await import("node:child_process")
     const forceCanonicalModelOutput = modelIdentityTask && Boolean(canonicalTargetModel)
     const child = spawnSync(result.plan.exec, [...(result.plan.args || []), ...(result.plan.passthrough || [])], {
@@ -3950,8 +3946,15 @@ Examples:
 
     if (!confidence) confidence = entry.confidence || null
 
+    const entryWithDefaults = {
+      ...entry,
+      allowed_environments: Array.isArray(entry?.allowed_environments) && entry.allowed_environments.length > 0
+        ? entry.allowed_environments
+        : ["development"],
+    }
+
     if (jsonMode) {
-      console.log(JSON.stringify({ expertise: entry, metrics, confidence }, null, 2))
+      console.log(JSON.stringify({ expertise: entryWithDefaults, metrics, confidence }, null, 2))
       return 0
     }
 
@@ -3965,7 +3968,7 @@ Examples:
       console.log(`Confidence:  no evidence yet`)
     }
     console.log(`Owner:        ${entry.owner?.agent || entry.owner?.team || '—'}`)
-    console.log(`Environments: ${(entry.allowed_environments || []).join(', ') || 'all'}`)
+    console.log(`Environments: ${(entryWithDefaults.allowed_environments || []).join(', ') || 'all'}`)
     console.log(`Trust tier:   ${entry.trust_tier || 'internal'}`)
     if (entry.domains?.length) console.log(`Domains:      ${entry.domains.join(', ')}`)
     if (entry.capabilities?.length) console.log(`Capabilities: ${entry.capabilities.map(c => c.name || c).join(', ')}`)
@@ -4064,7 +4067,8 @@ Examples:
     const sortedScores = Object.entries(scoringResult.scores || {})
       .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
 
-    if (verbose) {
+    const verboseTrace = verbose || (!json && !jsonMode)
+    if (verboseTrace) {
       console.log(`=== Expertise Recommendation ===\n`)
       console.log(`Task: "${task}"`)
       console.log(`Crew: ${effectiveCrew}\n`)
@@ -4254,7 +4258,8 @@ Examples:
     const sorted = Object.entries(scoringResult.scores || {})
       .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
 
-    if (verbose) {
+    const verboseTrace = verbose || (!json && !jsonMode)
+    if (verboseTrace) {
       console.log(`=== Expertise Routing Trace ===\n`)
       console.log(`Task: "${task}"`)
       console.log(`Source: ${sourceAgent}  |  Crew: ${effectiveCrew}\n`)
@@ -5110,8 +5115,9 @@ async function main() {
 
   if (first === "validate:expertise") {
     const expertiseArgs = argv.slice(1).filter((arg) => arg !== "--json")
+    const validateScript = path.join("scripts", "expertise", "expertise-validate.mjs")
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "expertise-validate.mjs"), [...expertiseArgs, "--json"])
+      const captured = runLocalScriptCapture(validateScript, [...expertiseArgs, "--json"])
       let jsonPayload = null
       try { jsonPayload = JSON.parse(captured.stdout || "{}") } catch { jsonPayload = null }
       printDiagnosticPayload(createDiagnosticPayload("validate:expertise", {
@@ -5122,7 +5128,7 @@ async function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "expertise-validate.mjs"), expertiseArgs)
+    process.exitCode = runLocalScript(validateScript, expertiseArgs)
     return
   }
 
@@ -5810,6 +5816,7 @@ async function main() {
 
   // Check for headless mode on run command
   if (command === "run" && hasHeadlessFlag(argv)) {
+    // headless branch exits via process.exit(exitCode) after dispatchHeadless completes.
     const outputMode = parseOutputMode(argv)
     const lifecycleSessionId = command === "run" && cooperativeDecision?.ok
       ? `${runtimeResult.runtime}:${cooperativeDecision.sourceCrew}:coop-${Date.now()}`
@@ -5836,7 +5843,7 @@ async function main() {
         candidate_crews: cooperativeDecision.candidateCrews
       })
     }
-    const result = await dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
+    const result = dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
     if (outputMode === "json") {
       console.log(JSON.stringify({
         ...result,

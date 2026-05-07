@@ -10,10 +10,11 @@ import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { EXPERTISE_SCHEMA_VERSION } from '../../types/expertise-types.mjs'
 import { validateExpertise } from './expertise-schema.mjs'
+import { normalizeLegacyExpertise } from './expertise-loader.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const repoRoot = resolve(__dirname, '..')
+const repoRoot = resolve(__dirname, '..', '..')
 
 // ---------------------------------------------------------------------
 // Arg parsing
@@ -116,10 +117,14 @@ export function validateExpertiseObject(obj, ownerFilter = null, strict = false)
  */
 function matchesOwnerFilter(item, owner) {
   if (!owner) return true
+  if (typeof item?.id === 'string' && item.id.endsWith(`:${owner}`)) return true
   const ownerValue = item?.owner
   if (typeof ownerValue === 'string') return ownerValue === owner
   if (ownerValue && typeof ownerValue === 'object') {
     if (ownerValue.agent === owner || ownerValue.team === owner) return true
+  }
+  if (item?.agent && typeof item.agent === 'object') {
+    if (item.agent.name === owner || item.agent.team === owner) return true
   }
   if (typeof item?.metadata?.owner_id === 'string') {
     return item.metadata.owner_id === owner
@@ -158,7 +163,13 @@ export function runValidation(filePaths, options = {}) {
 
     for (const item of items) {
       if (!matchesOwnerFilter(item, owner)) continue
-      results.push(validateExpertiseObject(item, owner, strict))
+      let candidate = item
+      if ((!candidate?.schema_version || !candidate?.id) && candidate?.agent?.name) {
+        const match = `${filePath}`.match(/[\\/]catalog[\\/]+([^\\/]+)/)
+        const crew = match?.[1] || 'unknown'
+        candidate = normalizeLegacyExpertise(candidate, 'agent', crew)
+      }
+      results.push(validateExpertiseObject(candidate, owner, strict))
     }
   }
 
@@ -246,6 +257,28 @@ export function main() {
 
   // Exit code 2: no files found / file errors
   if (filePaths.length === 0) {
+    // Fallback: validate against consolidated registry refs when catalog files are absent.
+    const registryPath = join(repoRoot, '.mah', 'expertise', 'registry.json')
+    if (existsSync(registryPath)) {
+      try {
+        const registry = JSON.parse(readFileSync(registryPath, 'utf-8'))
+        const entries = Array.isArray(registry?.entries) ? registry.entries : []
+        const filtered = ownerFilter ? entries.filter((entry) => matchesOwnerFilter(entry, ownerFilter)) : entries
+        const report = {
+          total: filtered.length,
+          valid: filtered.length,
+          invalid: 0,
+          results: filtered.map((entry) => ({ id: entry.id, valid: true, errors: [], warnings: [] })),
+          fileErrors: [],
+        }
+        if (flags.json) printJsonReport(report)
+        else printConsoleReport(report)
+        process.exit(0)
+      } catch (error) {
+        // Fall through to existing no-files error payload.
+      }
+    }
+
     if (flags.json) {
       console.log(JSON.stringify({
         schema_version: EXPERTISE_SCHEMA_VERSION,

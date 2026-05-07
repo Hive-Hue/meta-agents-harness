@@ -246,7 +246,7 @@ export const runtimePlugin = {
       }
     },
 
-    async prepareHeadlessRunContext({ repoRoot, crew, task = "", argv = [], envOverrides = {} }) {
+    prepareHeadlessRunContext({ repoRoot, crew, task = "", argv = [], envOverrides = {} }) {
       if (!task && (!argv || argv.length === 0)) {
         return {
           ok: false,

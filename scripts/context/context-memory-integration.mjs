@@ -16,7 +16,7 @@ import {
   DEFAULT_RETRIEVAL_TOP_N,
 } from "../../types/context-memory-types.mjs"
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..")
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
 
 /**
  * Determine if context memory injection is enabled.

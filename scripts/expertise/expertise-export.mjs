@@ -173,7 +173,7 @@ export function checkExportPolicy(expertise, options = {}) {
  * @param {{ domain?: string, skipPolicy?: boolean }} [options]
  * @returns {{ ok: boolean, payload?: Object, error?: string, warnings?: string[] }}
  */
-export async function exportExpertise(expertise, options = {}) {
+export function exportExpertise(expertise, options = {}) {
   /** @type {string[]} */
   const warnings = []
 
@@ -216,7 +216,12 @@ export async function exportExpertise(expertise, options = {}) {
     },
   }
 
-  if (options.includeEvidence) {
+  if (!options.includeEvidence) {
+    return { ok: true, payload, warnings }
+  }
+
+  // Keep default export path synchronous for contract compatibility.
+  return (async () => {
     const { loadEvidenceFor, computeMetrics } = await import('./evidence/expertise-evidence-store.mjs')
     await loadEvidenceFor(expertise.id, { limit: 10 })
     const metrics = await computeMetrics(expertise.id, { evidenceRoot: options.evidenceRoot })
@@ -228,9 +233,8 @@ export async function exportExpertise(expertise, options = {}) {
       avg_latency_ms: Math.round(metrics.avg_duration_ms),
       last_invoked: metrics.last_invoked,
     }
-  }
-
-  return { ok: true, payload, warnings }
+    return { ok: true, payload, warnings }
+  })()
 }
 
 /**
@@ -240,14 +244,17 @@ export async function exportExpertise(expertise, options = {}) {
  * @param {{ domain?: string }} [options]
  * @returns {{ ok: boolean, bundle?: Object, errors: string[], exported: Object[] }}
  */
-export async function exportExpertiseBundle(expertiseList, options = {}) {
+export function exportExpertiseBundle(expertiseList, options = {}) {
   /** @type {Object[]} */
   const exported = []
   /** @type {string[]} */
   const errors = []
 
   for (const exp of expertiseList) {
-    const result = await exportExpertise(exp, options)
+    const result = exportExpertise(exp, options)
+    if (result && typeof result.then === 'function') {
+      throw new Error("exportExpertiseBundle does not support includeEvidence async mode; export entries individually with await exportExpertise(...)")
+    }
     if (result.ok) {
       exported.push(result.payload)
       if (result.warnings?.length) errors.push(...result.warnings)

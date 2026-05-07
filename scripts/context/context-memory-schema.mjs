@@ -17,7 +17,7 @@ import {
 // Module-level path computation
 const __schemaFilename = fileURLToPath(import.meta.url)
 const __schemaDir = dirname(__schemaFilename)
-const REPO_ROOT = resolve(__schemaDir, "..")
+const REPO_ROOT = resolve(__schemaDir, "..", "..")
 
 // ---------------------------------------------------------------------------
 // Frontmatter parsing
@@ -338,6 +338,14 @@ export function buildOperationalIndex(rootPath, options = {}) {
         const parsed = parseContextFile(file)
         if (parsed.error) {
           errors.push(file + ": " + parsed.error)
+          continue
+        }
+
+        // Keep the operational index focused on curated, human-authored corpus.
+        // Derived session memories remain accessible via raw files but are excluded
+        // from primary retrieval/index explain flows.
+        const sourceType = `${parsed.frontmatter?.source_type || ""}`.trim().toLowerCase()
+        if (sourceType && sourceType !== "human-authored") {
           continue
         }
 
