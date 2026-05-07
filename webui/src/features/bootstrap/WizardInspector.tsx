@@ -26,7 +26,7 @@ const stepTips: Record<number, { title: string; tip: string }> = {
   },
   5: {
     title: "Topology Preview",
-    tip: "Review the generated agent topology before writing. Teams and agents are derived from your project configuration.",
+    tip: "Customize teams and agent density. The wizard updates topology and YAML in real time.",
   },
   6: {
     title: "Review & Write",
@@ -35,12 +35,25 @@ const stepTips: Record<number, { title: string; tip: string }> = {
 };
 
 function getCommand(step: number, data: WizardData): string {
-  const parts = ["mah bootstrap"];
+  const normalizeRuntime = (value?: string) => {
+    const raw = `${value || ""}`.trim();
+    if (!raw) return "";
+    if (raw === ".pi/") return "pi";
+    if (raw === ".claude/") return "claude";
+    if (raw === ".opencode/") return "opencode";
+    if (raw === ".openclaude/") return "openclaude";
+    if (raw === ".hermes/") return "hermes";
+    if (raw === ".kilo/") return "kilo";
+    if (raw === ".codex/") return "codex";
+    return raw.replace(/^\.|\/$/g, "");
+  };
+
+  const parts = ["mah init"];
   if (data.setupMode === "ai-assisted") parts.push("--ai");
   if (data.provider) parts.push("--provider " + data.provider);
-  if (data.runtime) parts.push("--runtime " + data.runtime);
+  const runtime = normalizeRuntime(data.runtime);
+  if (runtime) parts.push("--runtime " + runtime);
   if (data.projectName) parts.push('--name "' + data.projectName + '"');
-  if (step === 6) parts.push("--write");
   return parts.join(" ");
 }
 

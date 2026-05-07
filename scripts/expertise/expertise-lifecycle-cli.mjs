@@ -39,10 +39,11 @@ function checkTransitionRequirements(_expertise, metrics, from, to) {
 }
 
 export async function transitionLifecycle(id, targetState, options = {}) {
-  const { actor = 'orchestrator', reason = '' } = options
+  const { actor = 'orchestrator', reason = '', catalogRoot: inputCatalogRoot, evidenceRoot: inputEvidenceRoot } = options
 
   const resolvedId = id?.includes(':') ? id : `dev:${id}`
-  const entry = await loadExpertiseById(resolvedId)
+  const catalogRoot = inputCatalogRoot || join(workspaceRoot, '.mah', 'expertise', 'catalog')
+  const entry = await loadExpertiseById(resolvedId, catalogRoot)
 
   if (!entry) return { ok: false, error: `Expertise not found: ${resolvedId}` }
 
@@ -56,7 +57,7 @@ export async function transitionLifecycle(id, targetState, options = {}) {
   const auth = isAuthorizedTransition({ agent: actor, role: actor }, currentState, targetState)
   if (!auth.authorized) return { ok: false, error: `Unauthorized: ${auth.reason}` }
 
-  const metrics = await computeMetrics(resolvedId)
+  const metrics = await computeMetrics(resolvedId, { evidenceRoot: inputEvidenceRoot })
   computeConfidence(metrics)
   const reqCheck = checkTransitionRequirements(entry, metrics, currentState, targetState)
 
@@ -75,13 +76,13 @@ export async function transitionLifecycle(id, targetState, options = {}) {
     at: new Date().toISOString(),
   }
 
-  const catalogRoot = join(workspaceRoot, '.mah', 'expertise', 'catalog')
   const [crew, name] = resolvedId.split(':')
   const catalogPath = join(catalogRoot, crew, `${name}.yaml`)
 
   writeFileSync(catalogPath, stringifyYaml(entry, { indent: 2, lineWidth: 0 }), 'utf-8')
 
-  const registry = await buildRegistry()
+  const outputPath = inputCatalogRoot ? join(inputCatalogRoot, '..', 'registry.json') : undefined
+  const registry = await buildRegistry({ catalogPath: inputCatalogRoot, outputPath })
 
   return {
     ok: true,

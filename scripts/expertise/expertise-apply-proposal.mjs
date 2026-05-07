@@ -11,13 +11,19 @@ import { loadExpertiseById } from './expertise-loader.mjs'
 import { buildRegistry } from './expertise-registry.mjs'
 import { resolveWorkspaceRoot } from '../core/workspace-root.mjs'
 
-const workspaceRoot = resolveWorkspaceRoot()
 const ALLOWED_APPLY_ACTORS = new Set(['orchestrator', 'validation-lead'])
 
 export async function applyProposalFromFile(proposalPath, options = {}) {
-  const { force = false, actor = 'orchestrator' } = options
+  const {
+    force = false,
+    actor = 'orchestrator',
+    workspaceRoot: inputWorkspaceRoot,
+    proposalsRoot: inputProposalsRoot,
+    catalogRoot: inputCatalogRoot,
+  } = options
+  const workspaceRoot = inputWorkspaceRoot || resolveWorkspaceRoot()
 
-  const proposalsRoot = join(workspaceRoot, '.mah', 'expertise', 'proposals')
+  const proposalsRoot = inputProposalsRoot || join(workspaceRoot, '.mah', 'expertise', 'proposals')
   const absoluteInputPath = isAbsolute(proposalPath) ? resolve(proposalPath) : resolve(workspaceRoot, proposalPath)
   const normalizedRoot = `${resolve(proposalsRoot)}${sep}`
   const isInsideProposalsDir = absoluteInputPath === resolve(proposalsRoot) || absoluteInputPath.startsWith(normalizedRoot)
@@ -52,7 +58,8 @@ export async function applyProposalFromFile(proposalPath, options = {}) {
   }
 
   const targetId = proposal.target_expertise_id
-  const currentEntry = await loadExpertiseById(targetId)
+  const catalogRoot = inputCatalogRoot || join(workspaceRoot, '.mah', 'expertise', 'catalog')
+  const currentEntry = await loadExpertiseById(targetId, catalogRoot)
   if (!currentEntry) {
     return { ok: false, error: `Expertise not found: ${targetId}` }
   }
@@ -87,13 +94,12 @@ export async function applyProposalFromFile(proposalPath, options = {}) {
   currentEntry.metadata._extra = currentEntry.metadata._extra || {}
   currentEntry.metadata._extra.last_applied_proposal = proposal.id
 
-  const catalogRoot = join(workspaceRoot, '.mah', 'expertise', 'catalog')
   const [crew, name] = targetId.split(':')
   const catalogPath = join(catalogRoot, crew, `${name}.yaml`)
 
   writeFileSync(catalogPath, stringifyYaml(currentEntry, { indent: 2, lineWidth: 0 }), 'utf-8')
 
-  const registry = await buildRegistry()
+  const registry = await buildRegistry({ catalogPath: catalogRoot, outputPath: join(workspaceRoot, '.mah', 'expertise', 'registry.json') })
 
   const nextProposal = {
     ...proposal,

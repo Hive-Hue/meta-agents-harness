@@ -53,10 +53,10 @@ export function extractCapabilitiesFromSystemA(systemA) {
 }
 
 export async function syncExpertiseEntry(crew, agentId, options = {}) {
-  const { dryRun = false, evidenceRoot: externalEvidenceRoot } = options
+  const { dryRun = false, evidenceRoot: externalEvidenceRoot, catalogRoot: externalCatalogRoot } = options
   const expertiseId = `${crew}:${agentId}`
 
-  const workspaceCatalogRoot = join(workspaceRoot, '.mah', 'expertise', 'catalog')
+  const workspaceCatalogRoot = externalCatalogRoot || join(workspaceRoot, '.mah', 'expertise', 'catalog')
   const mahHomeCatalogRoot = join(resolveMahHome(), 'expertise', 'catalog')
   const catalogRoot = existsSync(join(workspaceCatalogRoot, crew, `${agentId}.yaml`))
     ? workspaceCatalogRoot
@@ -143,11 +143,11 @@ export async function syncExpertiseEntry(crew, agentId, options = {}) {
 }
 
 export async function syncExpertise(options = {}) {
-  const { crew = 'dev', dryRun = false, evidenceRoot: externalEvidenceRoot } = options
+  const { crew = 'dev', dryRun = false, evidenceRoot: externalEvidenceRoot, catalogRoot: externalCatalogRoot, configPath: externalConfigPath } = options
   const errors = []
   const results = []
 
-  const configPath = join(workspaceRoot, 'meta-agents.yaml')
+  const configPath = externalConfigPath || join(workspaceRoot, 'meta-agents.yaml')
   if (!existsSync(configPath)) {
     throw new Error(`meta-agents.yaml not found at ${configPath}`)
   }
@@ -160,14 +160,21 @@ export async function syncExpertise(options = {}) {
 
   for (const agent of crewDef.agents || []) {
     try {
-      const result = await syncExpertiseEntry(crew, agent.id, { dryRun, evidenceRoot: externalEvidenceRoot })
+      const result = await syncExpertiseEntry(crew, agent.id, {
+        dryRun,
+        evidenceRoot: externalEvidenceRoot,
+        catalogRoot: externalCatalogRoot,
+      })
       results.push({ agent: `${crew}:${agent.id}`, ...result })
     } catch (err) {
       errors.push(`${agent.id}: ${err.message}`)
     }
   }
 
-  if (!dryRun) await buildRegistry()
+  if (!dryRun) {
+    const outputPath = externalCatalogRoot ? join(externalCatalogRoot, '..', 'registry.json') : undefined
+    await buildRegistry({ catalogPath: externalCatalogRoot, outputPath })
+  }
 
   return { results, errors, dryRun }
 }

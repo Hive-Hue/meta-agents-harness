@@ -69,6 +69,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  useEffect(() => {
+    const onWorkspaceUpdated = () => { void refresh(); };
+    window.addEventListener("mah:workspace-updated", onWorkspaceUpdated);
+    return () => window.removeEventListener("mah:workspace-updated", onWorkspaceUpdated);
+  }, [refresh]);
+
   return (
     <WorkspaceContext.Provider value={{ workspacePath, setWorkspacePath, workspace, loading, refresh }}>
       {children}

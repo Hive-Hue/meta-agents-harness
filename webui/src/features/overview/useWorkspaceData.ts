@@ -141,6 +141,15 @@ export function useWorkspaceData(): WorkspaceData {
     void refresh();
   }, [refresh, workspacePath]);
 
+  useEffect(() => {
+    const onWorkspaceUpdated = () => {
+      workspaceDataCache.delete(workspacePath);
+      void refresh();
+    };
+    window.addEventListener("mah:workspace-updated", onWorkspaceUpdated);
+    return () => window.removeEventListener("mah:workspace-updated", onWorkspaceUpdated);
+  }, [refresh, workspacePath]);
+
   const showWorkspaceLoading = wsLoading && !workspaceDataCache.has(workspacePath) && !workspace;
   return { workspace, config, sessions, loading: loading || showWorkspaceLoading, error, refresh };
 }

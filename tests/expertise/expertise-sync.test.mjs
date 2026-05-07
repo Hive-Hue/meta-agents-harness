@@ -1,8 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdtempSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { extractCapabilitiesFromSystemA, syncExpertiseEntry } from '../../scripts/expertise/expertise-sync.mjs'
+import { seedExpertiseCatalog } from '../../scripts/expertise/expertise-seed.mjs'
 
 const repoRoot = process.cwd()
 
@@ -26,11 +28,16 @@ test('System A keyword extraction → capability appended', () => {
 })
 
 test('dry-run → catalog files unchanged', async () => {
-  const catalogPath = join(repoRoot, '.mah', 'expertise', 'catalog', 'dev', 'backend-dev.yaml')
+  const tempRoot = mkdtempSync(join(tmpdir(), 'mah-expertise-sync-'))
+  const catalogRoot = join(tempRoot, '.mah', 'expertise', 'catalog')
+  mkdirSync(catalogRoot, { recursive: true })
+  await seedExpertiseCatalog(null, { crew: 'dev', force: true, catalogRoot })
+  const catalogPath = join(catalogRoot, 'dev', 'backend-dev.yaml')
   const before = readFileSync(catalogPath, 'utf-8')
-  await syncExpertiseEntry('dev', 'backend-dev', { dryRun: true })
+  await syncExpertiseEntry('dev', 'backend-dev', { dryRun: true, catalogRoot })
   const after = readFileSync(catalogPath, 'utf-8')
   assert.equal(after, before)
+  rmSync(tempRoot, { recursive: true, force: true })
 })
 
 test('idempotent dry-run → repeated result shape stable', async () => {

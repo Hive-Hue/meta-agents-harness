@@ -1087,6 +1087,35 @@ function printExplain(traceMode, payload) {
 }
 
 function runInit(argv) {
+  if (argv.includes("--help") || argv.includes("-h") || argv.includes("help")) {
+    const runtimes = orderedRuntimeNames(runtimeProfiles).join(", ")
+    console.log("")
+    console.log("mah init — Bootstrap MAH configuration")
+    console.log("")
+    console.log("Usage:")
+    console.log("  mah init [options]")
+    console.log("")
+    console.log("Options:")
+    console.log("  --yes, --non-interactive     Run without interactive prompts")
+    console.log("  --force                      Overwrite existing generated files when needed")
+    console.log("  --crew <name>                Crew id to seed in generated config (default: dev)")
+    console.log(`  --runtime <name>             Runtime marker to create (${runtimes})`)
+    console.log("  --name <name>                Project name")
+    console.log("  --description <text>         Project description")
+    console.log("  --brief <text>               Mission/domain brief used for topology generation")
+    console.log("  --ai, --ai-assisted          Enable AI-assisted topology generation")
+    console.log("  --provider <id>              AI provider (zai|openrouter|codex-oauth|minimax)")
+    console.log("  --model <id>                 AI model identifier")
+    console.log("  --api-key <key>              API key for AI provider")
+    console.log("  --base-url <url>             Custom AI base URL")
+    console.log("  -h, --help                   Show this help")
+    console.log("")
+    console.log("Examples:")
+    console.log('  mah init --name "bootstrap-team" --crew dev --runtime pi')
+    console.log('  mah init --ai --provider zai --model glm-5 --name "bootstrap-team" --brief "Mobile app development"')
+    return 0
+  }
+
   const runtime = parseValueArg(argv, "--runtime")
   const crew = parseValueArg(argv, "--crew")
   const aiFlag = argv.includes("--ai") || argv.includes("--ai-assisted")
@@ -2097,10 +2126,10 @@ async function runPlugins(argv, jsonMode = false) {
           if (validation.adapter?.runtimePackage === false) {
             console.log(`runtime provisioning skipped=${directCli}`)
           } else {
-          // Derive npm package name: directCli or runtimePackage override
+            // Derive npm package name: directCli or runtimePackage override
             let npmPackage = validation.adapter?.runtimePackage
             if (!npmPackage) {
-            // Convention: kilo -> @kilocode/cli, opencode -> @opencodeai/cli
+              // Convention: kilo -> @kilocode/cli, opencode -> @opencodeai/cli
               if (directCli === "kilo") {
                 npmPackage = "@kilocode/cli"
               } else if (directCli === "opencode") {
@@ -3128,7 +3157,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           if (entry.isDirectory()) { walk(full); continue }
           if (entry.name.endsWith(".md") || entry.name.endsWith(".qmd")) files.push(full)
         }
-      } catch {}
+      } catch { }
     }
     walk(targetPath)
 
@@ -3187,7 +3216,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           }
         }
         walk(dir)
-      } catch {}
+      } catch { }
     }
 
     const docs = []
@@ -3233,7 +3262,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           }
         }
         walk(dir)
-      } catch {}
+      } catch { }
     }
 
     for (const file of files) {
@@ -4525,16 +4554,16 @@ Examples:
 
     const result = fromEvidence
       ? await generateProposalFromEvidenceById({
-          ...proposalArgs,
-          limit: Number.isFinite(evidenceLimit) && evidenceLimit > 0 ? evidenceLimit : 5,
-        })
+        ...proposalArgs,
+        limit: Number.isFinite(evidenceLimit) && evidenceLimit > 0 ? evidenceLimit : 5,
+      })
       : await generateProposalById({
-          ...proposalArgs,
-          summary: summary || `Propose catalog update for ${targetId}`,
-          rationale,
-          proposedChanges,
-          evidenceRefs,
-        })
+        ...proposalArgs,
+        summary: summary || `Propose catalog update for ${targetId}`,
+        rationale,
+        proposedChanges,
+        evidenceRefs,
+      })
 
     if (!result.ok) {
       console.error(`ERROR: proposal generation failed: ${result.error}`)
@@ -4987,7 +5016,7 @@ async function main() {
   }
 
   if (first === "sessions") {
-    ;(async () => {
+    ; (async () => {
       // Use original argv (not normalizedArgv) because sessions subcommands use --runtime
       // as a first-class flag (filter/target runtime) and stripping it breaks parsing.
       const sessionsCommandIndex = argv.findIndex((arg) => arg === "sessions")
@@ -5019,7 +5048,7 @@ async function main() {
   }
 
   if (first === "plugins") {
-    ;(async () => {
+    ; (async () => {
       process.exitCode = await runPlugins(normalizedArgv.slice(1), jsonMode)
     })()
     return
@@ -5031,7 +5060,7 @@ async function main() {
   }
 
   if (first === "delegate") {
-    ;(async () => {
+    ; (async () => {
       // Use original argv (not normalizedArgv) because delegate needs --runtime for target runtime,
       // not for MAH's own runtime detection. normalizedArgv strips --runtime.
       // argv = process.argv.slice(2), so argv[0] = 'delegate'. Skip it.
@@ -5043,7 +5072,7 @@ async function main() {
   }
 
   if (first === "context") {
-    ;(async () => {
+    ; (async () => {
       process.exitCode = await runContext(argv.slice(1), jsonMode)
     })()
     return
@@ -5055,7 +5084,7 @@ async function main() {
   }
 
   if (first === "expertise") {
-    ;(async () => {
+    ; (async () => {
       process.exitCode = await runExpertise(argv.slice(1), jsonMode)
     })()
     return
@@ -5334,9 +5363,9 @@ async function main() {
       }
     }
 
-// --- explain delegate ---
+    // --- explain delegate ---
     if (explainCommand === "delegate") {
-      ;(async () => {
+      ; (async () => {
         const target = parseValueArg(normalizedArgv.slice(2), "--target")
         const task = parseValueArg(normalizedArgv.slice(2), "--task")
         const crew = parseValueArg(normalizedArgv.slice(2), "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
@@ -5538,21 +5567,21 @@ async function main() {
       const passthrough = normalizedArgv.slice(2)
       const explainRoutingResolver = explainCommand === "run"
         ? resolveWorkspaceCandidates({
-            repoRoot,
-            runtime: runtimeResult.runtime,
-            sourceCrew: explainFilters.crew || process.env.MAH_ACTIVE_CREW || "dev",
-            routingScope,
-            runtimeProfile: runtimeProfiles[runtimeResult.runtime]
-          })
+          repoRoot,
+          runtime: runtimeResult.runtime,
+          sourceCrew: explainFilters.crew || process.env.MAH_ACTIVE_CREW || "dev",
+          routingScope,
+          runtimeProfile: runtimeProfiles[runtimeResult.runtime]
+        })
         : null
       const explainRouting = explainRoutingResolver
         ? {
-            routing_scope: explainRoutingResolver.routingScope,
-            source_crew: explainRoutingResolver.sourceCrew,
-            candidate_crews_count: explainRoutingResolver.candidateCrews.length,
-            candidate_agents_count: explainRoutingResolver.candidates.length,
-            candidate_crews: explainRoutingResolver.candidateCrews
-          }
+          routing_scope: explainRoutingResolver.routingScope,
+          source_crew: explainRoutingResolver.sourceCrew,
+          candidate_crews_count: explainRoutingResolver.candidateCrews.length,
+          candidate_agents_count: explainRoutingResolver.candidates.length,
+          candidate_crews: explainRoutingResolver.candidateCrews
+        }
         : {}
       let cooperativeRanking = null
       if (explainCommand === "run" && explainRoutingResolver) {
@@ -5849,12 +5878,12 @@ async function main() {
         ...result,
         routing: cooperativeDecision?.ok
           ? {
-              routing_scope: cooperativeDecision.routingScope,
-              source_crew: cooperativeDecision.sourceCrew,
-              selected_crew: cooperativeDecision.selectedCrew,
-              selected_agent: cooperativeDecision.selectedAgent,
-              candidate_crews: cooperativeDecision.candidateCrews
-            }
+            routing_scope: cooperativeDecision.routingScope,
+            source_crew: cooperativeDecision.sourceCrew,
+            selected_crew: cooperativeDecision.selectedCrew,
+            selected_agent: cooperativeDecision.selectedAgent,
+            candidate_crews: cooperativeDecision.candidateCrews
+          }
           : undefined
       }, null, 2))
     }

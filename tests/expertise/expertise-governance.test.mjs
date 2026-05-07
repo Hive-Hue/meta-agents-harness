@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { writeFileSync, rmSync, mkdtempSync } from 'node:fs'
+import { writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { stringify as stringifyYaml } from 'yaml'
 
 test('apply-proposal with valid proposal → catalog updated', async () => {
   const tmp = mkdtempSync(join(tmpdir(), 'mah-test-'))
@@ -23,13 +24,16 @@ test('apply-proposal with valid proposal → catalog updated', async () => {
     reviewers: [],
     source: { catalog_path: null },
   }
-  const p = join(tmp, 'proposal.json')
-  writeFileSync(p, JSON.stringify(proposal))
+  const proposalsRoot = join(process.cwd(), '.mah', 'expertise', 'proposals')
+  mkdirSync(proposalsRoot, { recursive: true })
+  const p = join(proposalsRoot, `test-proposal-${Date.now()}-1.yaml`)
+  writeFileSync(p, stringifyYaml(proposal), 'utf-8')
 
   const { applyProposalFromFile } = await import('../../scripts/expertise/expertise-apply-proposal.mjs')
   const result = await applyProposalFromFile(p, { force: true, actor: 'orchestrator' })
 
   assert.equal(result.ok, true)
+  rmSync(p, { force: true })
   rmSync(tmp, { recursive: true, force: true })
 })
 
@@ -52,14 +56,17 @@ test('apply-proposal with unauthorized actor → rejected', async () => {
     reviewers: [],
     source: { catalog_path: null },
   }
-  const p = join(tmp, 'proposal.json')
-  writeFileSync(p, JSON.stringify(proposal))
+  const proposalsRoot = join(process.cwd(), '.mah', 'expertise', 'proposals')
+  mkdirSync(proposalsRoot, { recursive: true })
+  const p = join(proposalsRoot, `test-proposal-${Date.now()}-2.yaml`)
+  writeFileSync(p, stringifyYaml(proposal), 'utf-8')
 
   const { applyProposalFromFile } = await import('../../scripts/expertise/expertise-apply-proposal.mjs')
   const result = await applyProposalFromFile(p, { actor: 'frontend-dev' })
 
   assert.equal(result.ok, false)
   assert.match(result.error, /not authorized/)
+  rmSync(p, { force: true })
   rmSync(tmp, { recursive: true, force: true })
 })
 

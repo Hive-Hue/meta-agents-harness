@@ -6,7 +6,7 @@ import { createInterface } from "node:readline/promises"
 import { spawnSync } from "node:child_process"
 import YAML from "yaml"
 import { RUNTIME_ADAPTERS } from "../runtime/runtime-adapters.mjs"
-import { findMahSkillFile, getMahPluginSearchPaths, resolveMahHome } from "../core/mah-home.mjs"
+import { getMahPluginSearchPaths, resolveMahHome } from "../core/mah-home.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -17,7 +17,7 @@ const AI_PROVIDER_PRESETS = [
   {
     id: "zai",
     label: "Z.ai",
-    baseUrl: "https://api.z.ai/api/paas/v4",
+    baseUrl: "https://api.z.ai/api/coding/paas/v4",
     endpoint: "/chat/completions",
     defaultModel: "glm-5",
     authPrompt: "Z.ai API key"
@@ -252,7 +252,7 @@ function ensureDefaults(doc) {
       "nvidia/nemotron-3-super-120b-a12b:free"
     ]
   }
-  next.domain_profiles = {
+  const defaultDomainProfiles = {
     read_only_cwd: [{ path: ".", read: true }],
     write_cwd: [{ path: ".", read: true, edit: true, bash: true, recursive: true }],
     write_user_home_with_approval: [
@@ -267,6 +267,35 @@ function ensureDefaults(doc) {
         grant_scope: "subtree"
       }
     ]
+  }
+  const existingDomainProfiles =
+    next.domain_profiles && typeof next.domain_profiles === "object" && !Array.isArray(next.domain_profiles)
+      ? next.domain_profiles
+      : {}
+  next.domain_profiles = {
+    ...defaultDomainProfiles,
+    ...existingDomainProfiles
+  }
+
+  // Ensure every referenced agent domain_profile exists in domain_profiles.
+  const referencedProfiles = new Set()
+  for (const crew of Array.isArray(next.crews) ? next.crews : []) {
+    for (const agent of Array.isArray(crew?.agents) ? crew.agents : []) {
+      const profile = `${agent?.domain_profile || ""}`.trim()
+      if (profile) referencedProfiles.add(profile)
+    }
+  }
+  for (const profile of referencedProfiles) {
+    if (next.domain_profiles[profile]) continue
+    const isWriter =
+      profile.includes("write") ||
+      profile.includes("dev") ||
+      profile.includes("engineer") ||
+      profile.includes("backend") ||
+      profile.includes("frontend")
+    next.domain_profiles[profile] = isWriter
+      ? [{ path: ".", read: true, edit: true, bash: true, recursive: true }]
+      : [{ path: ".", read: true }]
   }
 
   return next
@@ -366,12 +395,17 @@ CRITICAL OUTPUT REQUIREMENTS:
 1. Output ONLY the raw YAML content - no explanations, no markdown code fences, no introductory text
 2. Start directly with: version: 1
 3. The output must be valid, parseable YAML
-4. MUST include all required sections:
+4. MUST include required top-level fields:
+   - version: 1
+   - name: ${inputs.projectName}
+   - description: ${inputs.description}
+5. MUST include all required sections:
    - runtimes (pi, claude, kilo, opencode, hermes, openclaude, codex as override maps only)
    - catalog (models)
    - domain_profiles (at minimum: read_only_cwd)
    - crews (id, display_name, mission, topology, agents)
-5. Do NOT emit legacy runtime wiring fields such as:
+6. Every agents[].domain_profile value MUST exist as a key in domain_profiles.
+7. Do NOT emit legacy runtime wiring fields such as:
    - wrapper
    - config_root
    - extension_root
@@ -379,12 +413,12 @@ CRITICAL OUTPUT REQUIREMENTS:
    - route_map
    - task_policy
    - default_extensions
-5. Do NOT include runtime_detection; MAH applies runtime detection defaults internally
-6. Do NOT include a per-runtime skills path matrix; skill paths are resolved internally by convention
-7. Do NOT include an adapters block; MAH applies adapter mappings internally
-8. Follow the skill guidelines for config quality
-9. Use appropriate topology based on project complexity
-10. Configure all runtimes (pi, claude, kilo, opencode, hermes) based on detected markers
+8. Do NOT include runtime_detection; MAH applies runtime detection defaults internally
+9. Do NOT include a per-runtime skills path matrix; skill paths are resolved internally by convention
+10. Do NOT include an adapters block; MAH applies adapter mappings internally
+11. Follow the skill guidelines for config quality
+12. Use appropriate topology based on project complexity
+13. Configure all runtimes (pi, claude, kilo, opencode, hermes) based on detected markers
 
 Generate the complete meta-agents.yaml now:`
   return prompt
@@ -444,12 +478,15 @@ function extractYamlFromAiOutput(output) {
   }).join("\n").trim()
 }
 
-function parseAndNormalizeAiYaml(output) {
+function parseAndNormalizeAiYaml(output, fallbackMeta = {}) {
   const yamlContent = extractYamlFromAiOutput(output)
   const parsed = YAML.parse(yamlContent)
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Parsed YAML is not a valid object")
   }
+  if (!parsed.version && fallbackMeta.version) parsed.version = fallbackMeta.version
+  if (!parsed.name && fallbackMeta.name) parsed.name = fallbackMeta.name
+  if (!parsed.description && fallbackMeta.description) parsed.description = fallbackMeta.description
   if (!parsed.version || !parsed.name) {
     throw new Error("YAML missing required fields (version, name)")
   }
@@ -499,11 +536,39 @@ function extractDirectAiText(payload) {
   return parts.join("\n").trim()
 }
 
+function extractProviderErrorText(payload) {
+  if (!payload || typeof payload !== "object") return ""
+  const directError = payload.error
+  if (typeof directError === "string" && directError.trim()) return directError.trim()
+  if (directError && typeof directError === "object") {
+    const msg = `${directError.message || directError.msg || directError.detail || ""}`.trim()
+    if (msg) return msg
+    try {
+      return JSON.stringify(directError)
+    } catch {
+      return ""
+    }
+  }
+  const code = `${payload.code || payload.status || ""}`.trim()
+  const message = `${payload.message || payload.msg || payload.detail || ""}`.trim()
+  if (code || message) return `${code}${code && message ? ": " : ""}${message}`.trim()
+  return ""
+}
+
 async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
   const options = resolveDirectAiOptions(inputs, env)
   if (!options.apiKey) {
     console.log(`bootstrap: no ${options.provider.authPrompt} provided for direct HTTP mode`)
-    return { success: false, reason: "no_api_key" }
+    return {
+      success: false,
+      reason: "no_api_key",
+      providerLabel: options.provider.label,
+      keyHints: [
+        `MAH_AI_${options.provider.id.toUpperCase().replaceAll("-", "_")}_API_KEY`,
+        `${options.provider.id.toUpperCase().replaceAll("-", "_")}_API_KEY`,
+        "MAH_AI_API_KEY",
+      ],
+    }
   }
   if (!options.model) {
     console.log("bootstrap: no AI model provided for direct HTTP mode")
@@ -520,7 +585,11 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
   }
   if (env.MAH_TEST_AI_HTTP_RESPONSE) {
     try {
-      const yamlContent = parseAndNormalizeAiYaml(env.MAH_TEST_AI_HTTP_RESPONSE)
+      const yamlContent = parseAndNormalizeAiYaml(env.MAH_TEST_AI_HTTP_RESPONSE, {
+        version: 1,
+        name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
+        description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
+      })
       mkdirSync(path.dirname(targetPath), { recursive: true })
       writeFileSync(targetPath, yamlContent)
       return { success: true, runtime: "direct-http" }
@@ -553,6 +622,11 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
       console.log(`bootstrap: direct HTTP AI response is not JSON: ${error.message}`)
       return { success: false, reason: "invalid_json", error, output: bodyText }
     }
+    const providerError = extractProviderErrorText(payload)
+    if (providerError) {
+      console.log(`bootstrap: provider returned error payload: ${providerError}`)
+      return { success: false, reason: "provider_error_payload", output: bodyText, providerError }
+    }
     const output = extractDirectAiText(payload)
     if (!output) {
       console.log("bootstrap: direct HTTP AI model returned empty output")
@@ -560,10 +634,14 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
     }
     let yamlContent
     try {
-      yamlContent = parseAndNormalizeAiYaml(output)
+      yamlContent = parseAndNormalizeAiYaml(output, {
+        version: 1,
+        name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
+        description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
+      })
     } catch (parseError) {
       console.log(`bootstrap: direct HTTP AI output is not valid YAML: ${parseError.message}`)
-      return { success: false, reason: "invalid_yaml", error: parseError, output }
+      return { success: false, reason: "invalid_yaml", error: parseError, output, parseMessage: `${parseError.message || ""}`.trim() }
     }
     mkdirSync(path.dirname(targetPath), { recursive: true })
     writeFileSync(targetPath, yamlContent)
@@ -608,7 +686,7 @@ ${prompt}`
   if (result.status !== 0) {
     console.log(`bootstrap: ${runtime.name} exited with status ${result.status}`)
     if (result.stderr) console.log(result.stderr)
-    return { success: false, reason: "exit_code", code: result.status }
+    return { success: false, reason: "exit_code", code: result.status, stderr: `${result.stderr || ""}`.trim() }
   }
   const output = result.stdout.trim()
   if (!output) {
@@ -617,7 +695,11 @@ ${prompt}`
   }
   let yamlContent
   try {
-    yamlContent = parseAndNormalizeAiYaml(output)
+    yamlContent = parseAndNormalizeAiYaml(output, {
+      version: 1,
+      name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
+      description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
+    })
   } catch (parseError) {
     console.log(`bootstrap: AI output is not valid YAML: ${parseError.message}`)
     return { success: false, reason: "invalid_yaml", error: parseError, output }
@@ -627,30 +709,95 @@ ${prompt}`
   return { success: true, runtime: runtime.name }
 }
 
+function formatAiFailureReason(result) {
+  if (!result || typeof result !== "object") return "unknown failure"
+  if (result.reason === "no_api_key") {
+    const providerLabel = result.providerLabel || "selected provider"
+    const keyHints = Array.isArray(result.keyHints) && result.keyHints.length > 0 ? result.keyHints.join(", ") : "provider-specific *_API_KEY"
+    return `missing API key for ${providerLabel}. Set one of: ${keyHints}`
+  }
+  if (result.reason === "no_model") return "missing AI model"
+  if (result.reason === "http_status") {
+    const code = result.code || "unknown"
+    if (Number(code) === 429) {
+      const body = `${result.output || ""}`.toLowerCase()
+      if (body.includes("quota") || body.includes("insufficient") || body.includes("billing")) {
+        return "direct HTTP returned 429 (quota/billing limit reached)"
+      }
+      return "direct HTTP returned 429 (rate limited)"
+    }
+    return `direct HTTP returned status ${code}`
+  }
+  if (result.reason === "timeout") return "direct HTTP request timed out"
+  if (result.reason === "network_error") return `network error: ${result.error?.message || "request failed"}`
+  if (result.reason === "invalid_json") return "provider returned non-JSON response"
+  if (result.reason === "provider_error_payload") {
+    const msg = `${result.providerError || ""}`.trim()
+    return msg ? `provider returned error payload: ${msg}` : "provider returned error payload"
+  }
+  if (result.reason === "invalid_yaml") return "AI output was not valid YAML"
+  if (result.reason === "empty_output") return "AI returned empty output"
+  if (result.reason === "spawn_error") return `failed to start runtime: ${result.error?.message || "spawn error"}`
+  if (result.reason === "exit_code") return `runtime exited with code ${result.code ?? "unknown"}`
+  if (result.reason === "no_runtime") return "no compatible local runtime available"
+  return `${result.reason || "unknown_failure"}`
+}
+
+function printAiFallbackSummary(failure) {
+  if (!failure) return
+  console.log(`bootstrap: fallback reason: ${formatAiFailureReason(failure)}`)
+  if (Array.isArray(failure.attempts) && failure.attempts.length > 0) {
+    const attemptSummary = failure.attempts.map((attempt) => {
+      const channel = attempt.channel || "runtime"
+      const target = attempt.target || "unknown"
+      const reason = formatAiFailureReason(attempt)
+      return `${channel}:${target} -> ${reason}`
+    })
+    console.log(`bootstrap: attempted chain: ${attemptSummary.join(" | ")}`)
+  }
+  if (failure.reason === "exit_code" && failure.stderr) {
+    const snippet = `${failure.stderr}`.split("\n").slice(0, 3).join(" ").trim()
+    if (snippet) console.log(`bootstrap: last runtime stderr: ${snippet}`)
+  }
+  if (failure.reason === "http_status" && failure.output) {
+    const bodySnippet = `${failure.output}`.replace(/\s+/g, " ").trim().slice(0, 240)
+    if (bodySnippet) console.log(`bootstrap: HTTP response snippet: ${bodySnippet}`)
+  }
+  if (failure.reason === "invalid_yaml" && failure.output) {
+    const parseHint = `${failure.parseMessage || ""}`.trim()
+    if (parseHint) console.log(`bootstrap: YAML parse detail: ${parseHint}`)
+    const outputSnippet = `${failure.output}`.replace(/\s+/g, " ").trim().slice(0, 240)
+    if (outputSnippet) console.log(`bootstrap: model output snippet: ${outputSnippet}`)
+  }
+}
+
 async function runAiAssistedGeneration(inputs, repoContext, skillPath) {
   let env = loadDotEnv(process.env)
+  const attempts = []
   const directResult = await invokeDirectAiHttp(inputs, repoContext, skillPath, env)
+  attempts.push({ channel: "direct-http", target: directResult.providerLabel || inputs.provider || "provider", ...directResult })
   if (directResult.success) return directResult
   if (!["no_api_key", "no_model"].includes(directResult.reason)) {
-    return directResult
+    return { ...directResult, attempts }
   }
 
   const runtimes = detectAvailableRuntimes()
   if (runtimes.length === 0) {
     console.log("bootstrap: no AI runtime available (opencode, codex, kilo or pi required for AI-assisted mode)")
-    return { success: false, reason: "no_runtime" }
+    return { success: false, reason: "no_runtime", attempts }
   }
 
   let lastFailure = null
   for (const runtime of runtimes) {
     const result = await invokeAiRuntime(runtime, inputs, repoContext, skillPath, env)
+    attempts.push({ channel: "runtime", target: runtime.name, ...result })
     if (result.success) return result
     lastFailure = result
     if (result.reason === "spawn_error" || result.reason === "exit_code" || result.reason === "empty_output" || result.reason === "invalid_yaml") {
       continue
     }
   }
-  return lastFailure || { success: false, reason: "unknown_failure" }
+  return { ...(lastFailure || { success: false, reason: "unknown_failure" }), attempts }
 }
 
 function renderProviderMenu(selectedIndex) {
@@ -820,6 +967,10 @@ async function main() {
     if (options.baseUrl) inputs.baseUrl = normalizeTextOption(options.baseUrl)
     if (options.ai) {
       console.log("bootstrap: --ai flag specified, attempting AI-assisted generation")
+      if (!inputs.apiKey) {
+        console.log("bootstrap: stdin is not TTY; API key prompt is disabled in non-interactive mode")
+        console.log("bootstrap: provide --api-key or set ZAI_API_KEY/MAH_AI_ZAI_API_KEY in the target workspace .env")
+      }
     }
   } else if (options.ai) {
     console.log("bootstrap: --ai flag specified, using AI-assisted mode")
@@ -837,13 +988,16 @@ async function main() {
   }
 
     if (inputs.mode === "2") {
-    const skillPath =
-      findMahSkillFile("bootstrap", { repoRoot }) ||
-      findMahSkillFile("bootstrap-config-architect", { repoRoot })
+    const skillPath = path.join(resolveMahHome(), "skills", "bootstrap", "SKILL.md")
     if (!skillPath) {
       console.log("bootstrap: bootstrap skill not found, falling back to logical mode")
       inputs.mode = "1"
+    } else if (!existsSync(skillPath)) {
+      console.log(`bootstrap: required global skill not found at ${skillPath}`)
+      console.log("bootstrap: run `mah sync` (or reinstall MAH skills) and retry")
+      inputs.mode = "1"
     } else {
+      console.log(`bootstrap: using global skill ${skillPath}`)
       const repoContext = getRepoContext()
       const result = await runAiAssistedGeneration(inputs, repoContext, skillPath)
       if (result.success) {
@@ -853,6 +1007,7 @@ async function main() {
         console.log("bootstrap: see .mah/expertise/ for the catalog")
         return
       }
+      printAiFallbackSummary(result)
       console.log("bootstrap: ai-assisted generation failed, falling back to logical mode")
       inputs.mode = "1"
     }

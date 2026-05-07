@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync, execSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, statSync, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, statSync, readdirSync, mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
 import yaml from "js-yaml";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -959,6 +960,145 @@ function handleBootstrapDetectApi(req, res) {
     res.statusCode = 200;
     res.end(JSON.stringify({ ok: true, workspaceRoot, detections }));
 }
+function handleBootstrapTopologyApi(req, res) {
+    res.setHeader("Content-Type", "application/json");
+    if (req.method !== "POST") {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+        return;
+    }
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+        let tempDir = "";
+        try {
+            const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
+            const body = JSON.parse(raw);
+            const setupMode = `${body.setupMode || ""}`;
+            const apiKey = `${body.apiKey || ""}`.trim();
+            if (setupMode !== "ai-assisted") {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ ok: false, error: "ai-assisted mode required" }));
+                return;
+            }
+            if (!apiKey) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ ok: false, error: "missing api key" }));
+                return;
+            }
+            tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-ai-"));
+            const bootstrapScript = path.join(repoRoot, "scripts", "bootstrap", "bootstrap-meta-agents.mjs");
+            const args = [
+                bootstrapScript,
+                "--ai",
+                "--yes",
+                "--force",
+                "--name", `${body.projectName || "bootstrap-project"}`,
+                "--description", `${body.description || ""}`,
+                "--brief", `${body.reviewPrompt || body.missionStatement || body.description || "project bootstrap"}`,
+                "--crew", `${body.crewId || "dev"}`,
+                "--provider", `${body.provider || "zai"}`,
+                "--model", `${body.model || "glm-5"}`,
+                "--api-key", apiKey,
+            ];
+            const child = spawnSync(process.execPath, args, {
+                cwd: tempDir,
+                env: { ...process.env },
+                encoding: "utf-8",
+                stdio: ["ignore", "pipe", "pipe"],
+            });
+            if (child.status !== 0) {
+                res.statusCode = 502;
+                res.end(JSON.stringify({
+                    ok: false,
+                    error: "ai generation failed",
+                    stderr: child.stderr || "",
+                    stdout: child.stdout || "",
+                }));
+                return;
+            }
+            const generatedPath = path.join(tempDir, "meta-agents.yaml");
+            if (!existsSync(generatedPath)) {
+                res.statusCode = 500;
+                res.end(JSON.stringify({ ok: false, error: "generated meta-agents.yaml not found" }));
+                return;
+            }
+            const doc = yaml.load(readFileSync(generatedPath, "utf-8"));
+            const crewId = `${body.crewId || "dev"}`;
+            const crews = Array.isArray(doc?.crews) ? doc.crews : [];
+            const selectedCrew = crews.find((item) => `${item?.id || ""}` === crewId) || crews[0];
+            const topology = (selectedCrew?.topology || {});
+            const leads = (topology.leads || {});
+            const workers = (topology.workers || {});
+            const teams = Object.keys(workers).map((teamId) => {
+                const leadName = leads?.[teamId];
+                const workerNames = Array.isArray(workers[teamId]) ? workers[teamId] : [];
+                const workerBase = (workerNames[0] || `${teamId}-worker`).replace(/-\d+$/, "");
+                return {
+                    id: teamId,
+                    name: teamId.charAt(0).toUpperCase() + teamId.slice(1),
+                    workerBase,
+                    workers: workerNames.length || 1,
+                    workerNames: workerNames.length > 0 ? workerNames : [`${workerBase}-1`],
+                    leadName: leadName || null,
+                };
+            });
+            res.statusCode = 200;
+            res.end(JSON.stringify({
+                ok: true,
+                source: "ai-assisted",
+                topology: {
+                    teams,
+                    includeLeads: Object.keys(leads).length > 0,
+                },
+            }));
+        }
+        catch (error) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+        finally {
+            if (tempDir)
+                rmSync(tempDir, { recursive: true, force: true });
+        }
+    });
+}
+function handleBootstrapWriteApi(req, res) {
+    res.setHeader("Content-Type", "application/json");
+    if (req.method !== "POST") {
+        res.statusCode = 405;
+        res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+        return;
+    }
+    const workspaceRoot = resolveWorkspaceRoot(req);
+    const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+    if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+        return;
+    }
+    readJsonBody(req, (body) => {
+        try {
+            const content = typeof body?.content === "string" ? body.content.trim() : "";
+            if (!content) {
+                res.statusCode = 400;
+                res.end(JSON.stringify({ ok: false, error: "request body must include non-empty 'content'" }));
+                return;
+            }
+            const configPath = path.join(workspaceRoot, CONFIG_FILENAME);
+            writeFileSync(configPath, `${content}\n`, "utf-8");
+            res.statusCode = 200;
+            res.end(JSON.stringify({ ok: true, path: configPath }));
+        }
+        catch (error) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+    }, (error) => {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    });
+}
 function handleRunStart(req, res) {
     res.setHeader("Content-Type", "application/json");
     if (req.method !== "POST") {
@@ -1386,6 +1526,14 @@ function mahApiMiddleware() {
                 }
                 if (url === "/api/mah/bootstrap/detect") {
                     handleBootstrapDetectApi(req, res);
+                    return;
+                }
+                if (url === "/api/mah/bootstrap/topology") {
+                    handleBootstrapTopologyApi(req, res);
+                    return;
+                }
+                if (url === "/api/mah/bootstrap/write") {
+                    handleBootstrapWriteApi(req, res);
                     return;
                 }
                 if (url === "/api/mah/exec") {

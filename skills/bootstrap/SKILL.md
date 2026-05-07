@@ -157,100 +157,29 @@ Layer 3: Workers       (execution, constrained to owned paths)
 
 ## 3. Output Contract
 
-Always generate these artifacts:
+Always generate canonical `meta-agents.yaml` compatible with `mah validate:config`.
 
-### 3.1 multi-team.yaml
+Required shape (non-negotiable):
+- `version: 1`
+- `name: <string>`
+- `runtimes: { <runtime>: {} }` (map entries, no legacy adapter blocks)
+- `catalog.models`: flat map of `string -> string` only
+- `crews[].topology`:
+  - `orchestrator: <agent-id>`
+  - `leads: { <team>: <lead-agent-id> }`
+  - `workers: { <team>: [<worker-agent-id>, ...] }`
+- `crews[].agents[]`:
+  - must use `id` (not `name`)
+  - `role`: `orchestrator|lead|worker`
+  - `team`: non-empty string
+  - `model_ref` (or `model`) and optional `skills`, `domain_profile`
 
-Topology with version, crew, teams, ownership. Example:
+Never emit:
+- nested objects in `catalog.models` values
+- `team: null`
+- agents referenced in topology that are missing from `agents[]`
 
-```yaml
-version: "1"
-crew: <crew_id>
-teams:
-  - name: Planning
-    leads: [planning-lead]
-    workers: [repo-analyst, solution-architect]
-    ownership:
-      read: [repo_root]
-      upsert: [specs/, plans/]
-      delete: []
-  - name: Engineering
-    leads: [engineering-lead]
-    workers: [frontend-dev, backend-dev]
-    ownership:
-      read: [repo_root]
-      upsert: [<stream-owned-paths>]
-      delete: [<stream-owned-paths>]
-  - name: Validation
-    leads: [validation-lead]
-    workers: [qa-reviewer, security-reviewer]
-    ownership:
-      read: [repo_root]
-      upsert: []
-      delete: []
-```
-
-### 3.2 Agent Prompts
-
-One .md file per agent under `<runtime>/crew/<crew>/agents/`. Each includes:
-- **Frontmatter**: name, role, team, sprint_mode, tools, skills, domain
-- **Body**: responsibilities, boundaries, quality gates, output expectations
-
-#### Example Frontmatter
-
-```yaml
----
-name: engineering-lead
-role: lead
-team: Engineering
-sprint_mode:
-  name: v0.6.0-headless-and-sessions
-  active: true
-  target_release: v0.6.0
-  objective: Deliver bounded v0.6.0 runtime evolution
-  execution_mode: spec-bound-slice-driven
-  directives:
-    - spec-bound execution
-    - no architecture-wave expansion
-    - PR-sized slices
-    - mandatory validation at each slice
-  do:
-    - Headless support matrix across runtimes
-    - Explicit headless capability and adapter contract
-  avoid:
-    - full transcript replay portability
-    - full multi-runtime parity
-tools: [delegate_agent, delegate_agents_parallel, read, grep, find, ls, update_expertise_model]
-domain:
-  - path: .
-    read: true
-    upsert: false
-    delete: false
----
-```
-
-### 3.3 Expertise Files
-
-One YAML file per agent:
-
-```yaml
-agent:
-  name: "<agent-name>"
-  role: "<lead|worker>"
-  team: "<team-name>"
-meta:
-  version: "1"
-  max_lines: "120"
-  last_updated: "<ISO-8601>"
-patterns: []
-risks: []
-tools: []
-workflows: []
-decisions: []
-lessons: []
-observations: []
-open_questions: []
-```
+Additional artifacts (multi-team, prompts, expertise) are out of scope for this bootstrap path unless explicitly requested by the caller.
 
 ---
 

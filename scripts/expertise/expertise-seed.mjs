@@ -180,11 +180,11 @@ function generateExpertiseEntry(agent, crewId) {
  * Seed expertise catalog from meta-agents.yaml.
  *
  * @param {string} [configPath] - Optional path to meta-agents.yaml
- * @param {{ crew?: string, force?: boolean }} [options]
+ * @param {{ crew?: string, force?: boolean, catalogRoot?: string }} [options]
  * @returns {Promise<{ seeded: number, skipped: number, errors: string[], catalogPath: string }>}
  */
 export async function seedExpertiseCatalog(configPath, options = {}) {
-  const { crew: targetCrew, force = false } = options
+  const { crew: targetCrew, force = false, catalogRoot: inputCatalogRoot } = options
   const errors = []
   let seeded = 0
   let skipped = 0
@@ -213,7 +213,7 @@ export async function seedExpertiseCatalog(configPath, options = {}) {
   }
 
   // Determine catalog root (use workspace .mah directory, not global ~/.mah)
-  const catalogRoot = join(workspaceRoot, '.mah', 'expertise', 'catalog')
+  const catalogRoot = inputCatalogRoot || join(workspaceRoot, '.mah', 'expertise', 'catalog')
 
   // Process each crew and agent
   for (const crewDef of crewsToProcess) {
