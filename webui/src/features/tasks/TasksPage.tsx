@@ -727,9 +727,12 @@ export function TasksPage() {
       if (updated) {
         updateTasksParams({ task: updated.id, mission: updated.missionId }, true);
         setToast({ message: `Task ${updated.id} updated.`, tone: "info" });
+        return true;
       }
+      return false;
     } catch (nextError) {
       setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
+      return false;
     }
   };
 
@@ -1161,8 +1164,8 @@ export function TasksPage() {
                   type="button"
                   className="tasks-toolbar__btn tasks-toolbar__btn--primary"
                   onClick={async () => {
-                    await handleUpdateTask(selectedTask.id, taskEditDraft);
-                    setIsTaskEditOpen(false);
+                    const ok = await handleUpdateTask(selectedTask.id, taskEditDraft);
+                    if (ok) setIsTaskEditOpen(false);
                   }}
                   disabled={busyAction === `update-task-${selectedTask.id}`}
                 >

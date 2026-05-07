@@ -62,6 +62,24 @@ The theme is applied immediately and persisted locally (`mah:theme`) for future 
 
 Bootstrap `Workspace Detection` scans the active **Workspace Path** (from Settings) and reports live state for config/runtime markers/git/expertise/context.
 
+### 6. MCP Registry and Sync (v0.9.0 line)
+
+MAH now uses a canonical MCP registry (`.mah/mcp/servers.json`) plus runtime-specific generated files.
+
+```bash
+# Inspect current MCP registry
+mah mcp list
+
+# Add or update servers
+mah mcp add playwright --type stdio --command npx --arg -y --arg @playwright/mcp@latest
+mah mcp update github --type stdio --command /usr/bin/github-mcp-server --arg stdio
+
+# Sync canonical registry to runtime-specific config files
+mah mcp sync
+```
+
+In WebUI, MCP management is available in **Settings → MCP Servers** (dedicated submenu).
+
 ---
 
 ## Bootstrap CLI Overview

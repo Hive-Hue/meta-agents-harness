@@ -3,6 +3,7 @@ import { ConfigProvider } from "../config/useConfigStore";
 import { SettingsSidebar, type SettingsTab } from "./SettingsSidebar";
 import { WorkspacePanel } from "./WorkspacePanel";
 import { RuntimesPanel } from "./RuntimesPanel";
+import { McpPanel } from "./McpPanel";
 import { CrewsPanel } from "./CrewsPanel";
 import { ExpertisePanel } from "./ExpertisePanel";
 import { ContextPanel } from "./ContextPanel";
@@ -20,6 +21,7 @@ export function SettingsPage() {
     switch (activeTab) {
       case "workspace": return <WorkspacePanel />;
       case "runtimes": return <RuntimesPanel />;
+      case "mcp": return <McpPanel />;
       case "crews": return <CrewsPanel />;
       case "expertise": return <ExpertisePanel />;
       case "models": return <ModelsPanel />;

@@ -4,6 +4,7 @@ import { SettingsSection } from "./SettingsSection";
 import { FormField } from "./FormField";
 import { ToggleSwitch } from "./ToggleSwitch";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { useConfig } from "../config/useConfigStore";
 
 export function WorkspacePanel() {
   const [desc, setDesc] = useState("Multi-agent orchestration harness");
@@ -13,7 +14,18 @@ export function WorkspacePanel() {
   const [syncOnStartup, setSyncOnStartup] = useState(true);
   const [validateOnSync, setValidateOnSync] = useState(true);
   const { workspacePath, setWorkspacePath } = useWorkspace();
+  const { config } = useConfig();
   const [workspacePathDraft, setWorkspacePathDraft] = useState(workspacePath);
+  const crewOptions = (config?.crews ?? [])
+    .map((c) => ({ value: c.id, label: c.display_name?.trim() ? `${c.id} (${c.display_name})` : c.id }))
+    .filter((c) => c.value.trim().length > 0);
+
+  useEffect(() => {
+    if (crewOptions.length === 0) return;
+    if (!crewOptions.some((option) => option.value === crew)) {
+      setCrew(crewOptions[0].value);
+    }
+  }, [crew, crewOptions]);
 
   useEffect(() => {
     setWorkspacePathDraft(workspacePath);
@@ -57,8 +69,9 @@ export function WorkspacePanel() {
   };
 
   return (
-    <>
-      <SettingsSection title="Project & Configuration">
+    <div className="workspace-panel-layout">
+      <div className="workspace-panel-layout__project">
+        <SettingsSection title="Project & Configuration">
         <FormField label="Project Name" value="meta-agents-harness" disabled />
         <div className="settings-field">
           <label className="settings-field__label">Workspace Path</label>
@@ -99,7 +112,7 @@ export function WorkspacePanel() {
             type="select"
             value={crew}
             onChange={setCrew}
-            options={[{ value: "dev", label: "dev" }, { value: "staging", label: "staging" }, { value: "prod", label: "prod" }]}
+            options={crewOptions.length > 0 ? crewOptions : [{ value: "dev", label: "dev" }]}
           />
           <FormField
             label="Default Runtime"
@@ -119,27 +132,30 @@ export function WorkspacePanel() {
         <FormField label="Auto-sync Interval" type="number" value={syncInterval} onChange={setSyncInterval} min={10} max={300} suffix="seconds" />
         <ToggleSwitch checked={syncOnStartup} onChange={setSyncOnStartup} label="Sync on Startup" />
         <ToggleSwitch checked={validateOnSync} onChange={setValidateOnSync} label="Validate on Sync" />
-      </SettingsSection>
+        </SettingsSection>
+      </div>
 
-      <SettingsSection title="Workspace Health">
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4CAF50" }}>
-            <Icon name="check_circle" size={16} /> Config Valid
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4CAF50" }}>
-            <Icon name="check_circle" size={16} /> Git Clean
-          </span>
-          <span style={{ fontSize: 12, color: "var(--color-text-dim)" }}>Last validated: 2 minutes ago</span>
-        </div>
-        <div className="settings-btn-row">
-          <button className="settings-btn" type="button">
-            <Icon name="verified" size={14} /> Validate Now
-          </button>
-          <button className="settings-btn settings-btn--primary" type="button">
-            <Icon name="sync" size={14} /> Sync All
-          </button>
-        </div>
-      </SettingsSection>
-    </>
+      <div className="workspace-panel-layout__health">
+        <SettingsSection title="Workspace Health">
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4CAF50" }}>
+              <Icon name="check_circle" size={16} /> Config Valid
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "#4CAF50" }}>
+              <Icon name="check_circle" size={16} /> Git Clean
+            </span>
+            <span style={{ fontSize: 12, color: "var(--color-text-dim)" }}>Last validated: 2 minutes ago</span>
+          </div>
+          <div className="settings-btn-row">
+            <button className="settings-btn" type="button">
+              <Icon name="verified" size={14} /> Validate Now
+            </button>
+            <button className="settings-btn settings-btn--primary" type="button">
+              <Icon name="sync" size={14} /> Sync All
+            </button>
+          </div>
+        </SettingsSection>
+      </div>
+    </div>
   );
 }

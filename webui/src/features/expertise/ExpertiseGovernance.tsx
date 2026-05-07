@@ -348,7 +348,7 @@ export function ExpertiseGovernance() {
             {tab === "catalog" && <CatalogTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} qualifying={qualifying} syncResults={syncResults} />}
             {tab === "evidence" && <EvidenceTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} />}
             {tab === "proposals" && <ProposalsTab proposals={proposals} onApply={handleApply} />}
-            {tab === "lifecycle" && <LifecycleTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} />}
+            {tab === "lifecycle" && <LifecycleTab entries={entries} selectedId={selectedId} onSelect={setSelectedId} onReload={reload} />}
           </div>
         </div>
       </main>
@@ -475,7 +475,7 @@ function ProposalsTab({ proposals, onApply }: { proposals: ProposalInfo[]; onApp
   );
 }
 
-function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEntry[]; selectedId: string | null; onSelect: (id: string) => void }) {
+function LifecycleTab({ entries, selectedId, onSelect, onReload }: { entries: ExpertiseEntry[]; selectedId: string | null; onSelect: (id: string) => void; onReload: () => Promise<void> | void }) {
   const { workspacePath } = useWorkspace();
   const [sel, setSel] = useState<string | null>(selectedId);
   useEffect(() => { if (selectedId) setSel(selectedId); }, [selectedId]);
@@ -499,11 +499,17 @@ function LifecycleTab({ entries, selectedId, onSelect }: { entries: ExpertiseEnt
                   className="lifecycle-transition-btn"
                   onClick={async () => {
                     if (!confirm(`Transition ${current.id}→${s}?`)) return;
-                    await fetch("/api/mah/exec", {
+                    const resp = await fetch("/api/mah/exec", {
                       method: "POST",
                       headers: { "Content-Type": "application/json", "x-mah-workspace-path": workspacePath },
                       body: JSON.stringify({ args: ["expertise", "lifecycle", current.id, "--to", s, "--json"] }),
                     });
+                    const payload = await resp.json().catch(() => ({}));
+                    if (!resp.ok || payload?.ok === false) {
+                      alert(payload?.stderr || payload?.error || `Transition failed (${resp.status})`);
+                      return;
+                    }
+                    await onReload();
                   }}
                 >
                   <Icon name="arrow_forward" size={12} />{s}

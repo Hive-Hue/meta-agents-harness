@@ -1,10 +1,11 @@
 import { Icon } from "../../components/ui/Icon";
 
-export type SettingsTab = "workspace" | "runtimes" | "crews" | "models" | "skills" | "expertise" | "context" | "secrets" | "preferences" | "sync";
+export type SettingsTab = "workspace" | "runtimes" | "mcp" | "crews" | "models" | "skills" | "expertise" | "context" | "secrets" | "preferences" | "sync";
 
 const tabs: { id: SettingsTab; icon: string; label: string }[] = [
   { id: "workspace", icon: "folder", label: "Workspace" },
   { id: "runtimes", icon: "terminal", label: "Runtimes" },
+  { id: "mcp", icon: "hub", label: "MCP Servers" },
   { id: "crews", icon: "groups", label: "Crews" },
   { id: "models", icon: "smart_toy", label: "Models" },
   { id: "skills", icon: "build", label: "Skills" },

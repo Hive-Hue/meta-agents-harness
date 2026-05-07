@@ -490,6 +490,29 @@
 
 .expertise-table tr.is-selected td {
   background: var(--color-cyan-surface);
+  color: var(--color-background);
+}
+
+.expertise-table tr.is-selected .agent-name-cell {
+  color: var(--color-background);
+}
+
+.expertise-table tr.is-selected .qualifies-badge--yes {
+  color: #0f5132;
+}
+
+.expertise-table tr.is-selected .qualifies-badge--no {
+  color: #334155;
+}
+
+.expertise-table tr.is-selected .change-tag--confidence {
+  background: #bfdbfe;
+  color: #1e3a8a;
+}
+
+.expertise-table tr.is-selected .change-tag--capabilities {
+  background: #bbf7d0;
+  color: #14532d;
 }
 
 .agent-name-cell {

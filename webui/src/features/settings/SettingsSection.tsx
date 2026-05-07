@@ -12,7 +12,7 @@ export function SettingsSection({ title, badge, defaultOpen = true, children }: 
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="settings-section">
+    <div className={`settings-section ${open ? "settings-section--open" : "settings-section--closed"}`}>
       <button
         className="settings-section__header"
         type="button"

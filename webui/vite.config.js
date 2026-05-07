@@ -777,10 +777,10 @@ function handleExecApi(req, res) {
             const body = JSON.parse(raw);
             const args = Array.isArray(body?.args) ? body.args.filter((item) => typeof item === "string" && item.trim()) : [];
             const redactedArgs = redactSensitiveArgs(args);
-            const ALLOWED_COMMANDS = ["skills", "sessions", "expertise", "context"];
+            const ALLOWED_COMMANDS = ["skills", "sessions", "expertise", "context", "mcp"];
             if (args.length === 0 || !ALLOWED_COMMANDS.includes(args[0])) {
                 res.statusCode = 400;
-                res.end(JSON.stringify({ ok: false, error: "only 'mah skills/sessions/expertise/context ...' commands are allowed" }));
+                res.end(JSON.stringify({ ok: false, error: "only 'mah skills/sessions/expertise/context/mcp ...' commands are allowed" }));
                 return;
             }
             const envPath = path.join(workspaceRoot, ENV_FILENAME);

@@ -24,19 +24,21 @@
         "-y",
         "@upstash/context7-mcp",
         "--api-key",
-        "{env:CONTEXT7_API_KEY}"
+        "${CONTEXT7_API_KEY}"
       ],
       "enabled": true,
       "timeout": 60000
     },
     "stitch": {
-      "url": "https://stitch.googleapis.com/mcp",
       "type": "remote",
+      "url": "https://stitch.googleapis.com/mcp",
       "headers": {
         "Accept": "application/json",
-        "Authorization": "Bearer {env:STITCH_ACCESS_TOKEN}",
-        "X-Goog-User-Project": "{env:GOOGLE_CLOUD_PROJECT}"
-      }
+        "Authorization": "Bearer ${STITCH_ACCESS_TOKEN}",
+        "X-Goog-User-Project": "${GOOGLE_CLOUD_PROJECT}"
+      },
+      "enabled": true,
+      "timeout": 300000
     },
     "clickup": {
       "type": "local",
@@ -44,11 +46,10 @@
         "npx",
         "-y",
         "mcp-remote",
-        "https://mcp.clickup.com/mcp",
-        "19876"
+        "https://mcp.clickup.com/mcp"
       ],
       "enabled": true,
-      "timeout": 120000
+      "timeout": 30000
     },
     "github": {
       "type": "local",
@@ -57,10 +58,69 @@
         "stdio"
       ],
       "environment": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_PAT}",
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "",
         "GITHUB_TOOLSETS": "repos,issues,pull_requests"
       },
-      "enabled": true
+      "enabled": true,
+      "timeout": 60000
+    },
+    "brave-search": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@brave/brave-search-mcp-server"
+      ],
+      "environment": {
+        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
+      },
+      "enabled": true,
+      "timeout": 60000
+    },
+    "expertise-model": {
+      "type": "local",
+      "command": [
+        "node",
+        ".claude/scripts/update-expertise-model-mcp.mjs"
+      ],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "firecrawl": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "firecrawl-mcp"
+      ],
+      "environment": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      },
+      "enabled": true,
+      "timeout": 120000
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true,
+      "timeout": 60000
+    },
+    "zeplin": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@zeplin/mcp-server@latest"
+      ],
+      "environment": {
+        "ZEPLIN_ACCESS_TOKEN": "${ZEPLIN_ACCESS_TOKEN}"
+      },
+      "enabled": true,
+      "timeout": 60000
     }
   }
 }

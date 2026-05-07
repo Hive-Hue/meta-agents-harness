@@ -203,6 +203,8 @@ function printHelp() {
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  task [list|show|create|update|run] [args]")
   console.log("  mission [list|show|create|update|commit-scope|replan] [args]")
+  console.log("  mcp [list|add|remove|sync] [args]  MCP registry and runtime sync")
+  console.log("  webui [vite-args]  start WebUI dev server")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -501,6 +503,25 @@ function runLocalScriptCapture(scriptPath, scriptArgs = []) {
     stdout: child.stdout || "",
     stderr: child.stderr || ""
   }
+}
+
+function runWebUi(argv = []) {
+  const webuiDir = path.join(packageRoot, "webui")
+  if (!existsSync(webuiDir)) {
+    console.error(`ERROR: webui directory not found at ${webuiDir}`)
+    return 1
+  }
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
+  const child = spawnSync(npmCmd, ["run", "dev", "--prefix", webuiDir, "--", ...argv], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: "inherit",
+  })
+  if (typeof child.status === "number") return child.status
+  if (child.error) {
+    console.error(`ERROR: failed to start WebUI: ${child.error.message}`)
+  }
+  return 1
 }
 
 function readConfiguredMcpServers() {
@@ -4979,6 +5000,16 @@ async function main() {
 
   if (first === "mission") {
     process.exitCode = runLocalScript(path.join("scripts", "./tasks/missions-cli.mjs"), argv.slice(1))
+    return
+  }
+
+  if (first === "mcp") {
+    process.exitCode = runLocalScript(path.join("scripts", "./mcp/mcp-cli.mjs"), argv.slice(1))
+    return
+  }
+
+  if (first === "webui") {
+    process.exitCode = runWebUi(argv.slice(1))
     return
   }
 

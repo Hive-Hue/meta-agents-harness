@@ -163,7 +163,30 @@
 }
 
 .context-table tr.is-selected td {
-  background: #00a6c7;
+  background: var(--color-cyan-surface);
+  color: var(--color-background);
+}
+
+.context-table tr.is-selected .doc-name-cell,
+.context-table tr.is-selected .context-cell-muted,
+.context-table tr.is-selected .context-summary-cell,
+.context-table tr.is-selected .context-mono-cell {
+  color: var(--color-background);
+}
+
+.context-table tr.is-selected .source-tag--operational {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+.context-table tr.is-selected .source-tag--proposal {
+  background: #fde68a;
+  color: #713f12;
+}
+
+.context-table tr.is-selected .agent-chip {
+  background: #0f172a;
+  color: #e2e8f0;
 }
 
 .context-table tr.row-invalid td {

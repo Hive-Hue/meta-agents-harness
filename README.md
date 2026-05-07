@@ -377,18 +377,26 @@ For detailed onboarding documentation, see [`docs/onboarding.md`](./docs/onboard
 
 ## MCP configuration
 
-The repository uses two MCP-related files:
+MAH now supports a canonical MCP registry plus runtime-specific generated files:
 
+- `.mah/mcp/servers.json` — canonical MCP server registry (tracked)
 - `.mcp.example.json` — tracked repository template
-- `.mcp.json` — local active configuration (gitignored)
+- `.mcp.json` — local/generated active configuration (gitignored)
 
 Recommended flow:
 
 ```bash
-cp .mcp.example.json .mcp.json
+mah mcp list
+mah mcp add playwright --type stdio --command npx --arg -y --arg @playwright/mcp@latest
+mah mcp sync
 ```
 
-Then adjust local values and secrets as needed.
+This syncs runtime-specific targets currently used by MAH:
+
+- `.mcp.json`
+- `.pi/mcp-servers.json`
+- `.claude/settings.local.json` (`enabledMcpjsonServers`)
+- `.opencode/opencode.json` (`mcp` block)
 
 ---
 

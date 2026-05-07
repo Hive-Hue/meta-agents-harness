@@ -9,6 +9,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Added
 
+- New MCP registry CLI namespace: `mah mcp list|add|update|remove|sync` backed by canonical `.mah/mcp/servers.json`
+- Runtime MCP sync pipeline from canonical registry now materializes `.mcp.json`, `.pi/mcp-servers.json`, `.claude/settings.local.json` (`enabledMcpjsonServers`), and `.opencode/opencode.json` (`mcp`)
+- WebUI Settings now has a dedicated `MCP Servers` submenu with full lifecycle management (add, edit, remove, sync)
+- MCP editor modal in WebUI supports `stdio`/`http`, `args`, `env`, and `headers` with inline key/value validation
+
 - WebUI `Tasks` now supports full Task Inspector CRUD flow with themed modal editing (`Edit Task`), inline create shortcut, and guarded delete confirmation
 - WebUI `/tasks` PERT/CPM view now includes agentic execution overlays (AI ETA, token estimate, and cost estimate) plus configurable estimation coefficients in `Settings > Preferences > Agentic Estimation`
 - WebUI Bootstrap `Workspace Detection` now performs real backend scanning via `/api/mah/bootstrap/detect` using current `Workspace Path` (no mocked detection cards)
@@ -73,6 +78,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 
 ### Changed
 
+- WebUI `/settings` navigation now separates MCP management from `Runtimes`; `Runtimes` focuses on runtime/model catalog while MCP has a dedicated panel
+- `Workspace > Default Crew` selector now resolves from real `meta-agents.yaml` crew definitions instead of static mocked options
+- Workspace settings layout now distributes vertical space between `Project & Configuration` and `Workspace Health`, with section-local scrolling when expanded
+
 - WebUI task creation no longer requires mission assignment; tasks can be created with `missionId=""` and render as mission-unscoped work items
 - Task estimate input was removed from `/tasks` `New Task`; `estimate` is now automatically derived by task-store heuristics when omitted
 - Expertise screen actions now use workspace-aware API requests (`x-mah-workspace-path`) so catalog/proposals/evidence/lifecycle resolve against the active workspace instead of implicit default pathing
@@ -113,6 +122,10 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `development` package metadata now tracks the upcoming `v0.9.0` release line in both the root package and WebUI package
 
 ### Fixed
+
+- WebUI `/api/mah/exec` command allowlist now includes `mah mcp ...`, unblocking MCP operations from `/settings`
+- Workspace settings collapsed sections no longer keep reserved proportional height, removing large empty gaps after collapse
+- MCP canonicalization now restores/keeps remote HTTP server definitions (e.g. Stitch) when deriving from mixed runtime-specific config shapes
 
 - Workspace Detection expertise indicator no longer produces false `No expertise entries found` when catalog files exist under `.mah/expertise/catalog/**` or when `.mah/expertise/registry.json` is present
 - Expertise governance data loading now consistently points to the selected workspace path, fixing false-empty catalog/proposal states in multi-workspace use
