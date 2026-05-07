@@ -94,6 +94,13 @@ function run(args, options = {}) {
   }
 }
 
+function requireGeneratedWorkspaceArtifacts(t, ...pathsToCheck) {
+  const missing = pathsToCheck.filter((candidate) => !existsSync(candidate))
+  if (missing.length > 0) {
+    t.skip(`requires generated workspace artifacts: ${missing.join(", ")}`)
+  }
+}
+
 test("global install does not seed expertise catalog under ~/.mah", () => {
   const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-home-layout-"))
   try {
@@ -668,7 +675,12 @@ test("ensurePiGlobalSettings points PI theme discovery at the MAH overlay", () =
   }
 })
 
-test("claude explain run resolves to direct cli with generated agent context", () => {
+test("claude explain run resolves to direct cli with generated agent context", (t) => {
+  requireGeneratedWorkspaceArtifacts(
+    t,
+    path.join(repoRoot, "meta-agents.yaml"),
+    path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
+  )
   const result = run(["--runtime", "claude", "explain", "run", "--trace", "--crew", "dev", "--dry-run"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -678,8 +690,9 @@ test("claude explain run resolves to direct cli with generated agent context", (
   assert.ok(payload.execArgs.includes("--agents"))
 })
 
-test("prepareClaudeRunContext exposes declared domain rules in subagent prompts", () => {
+test("prepareClaudeRunContext exposes declared domain rules in subagent prompts", (t) => {
   const configPath = path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
+  requireGeneratedWorkspaceArtifacts(t, path.join(repoRoot, "meta-agents.yaml"), configPath)
   const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: [] })
   assert.equal(result.ok, true, result.error)
   assert.ok((result.warnings || []).some((item) => /domain rules are declarative/i.test(item)))
@@ -689,8 +702,9 @@ test("prepareClaudeRunContext exposes declared domain rules in subagent prompts"
   assert.ok(agents["repo-analyst"]?.prompt.includes("Declared domain rules:"))
 })
 
-test("prepareClaudeRunContext fails with --policy enforce-domain when granular domains exist", () => {
+test("prepareClaudeRunContext fails with --policy enforce-domain when granular domains exist", (t) => {
   const configPath = path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
+  requireGeneratedWorkspaceArtifacts(t, path.join(repoRoot, "meta-agents.yaml"), configPath)
   const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: ["--policy", "enforce-domain"] })
   assert.equal(result.ok, false)
   assert.match(result.error || "", /cannot enforce per-agent domain path ACLs/i)
@@ -756,7 +770,12 @@ test("executeOpenclaudePreparedRun tracks latest session after run", () => {
   }
 })
 
-test("opencode explain run resolves to direct cli without wrapper plan", () => {
+test("opencode explain run resolves to direct cli without wrapper plan", (t) => {
+  requireGeneratedWorkspaceArtifacts(
+    t,
+    path.join(repoRoot, "meta-agents.yaml"),
+    path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml")
+  )
   const result = run(["--runtime", "opencode", "explain", "run", "--trace", "--crew", "dev", "--hierarchy"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -765,7 +784,12 @@ test("opencode explain run resolves to direct cli without wrapper plan", () => {
   assert.deepEqual(payload.execArgs, ["-m", "minimax-coding-plan/MiniMax-M2.7"])
 })
 
-test("opencode explain run uses run subcommand when task prompt is provided", () => {
+test("opencode explain run uses run subcommand when task prompt is provided", (t) => {
+  requireGeneratedWorkspaceArtifacts(
+    t,
+    path.join(repoRoot, "meta-agents.yaml"),
+    path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml")
+  )
   const result = run(["--runtime", "opencode", "explain", "run", "--trace", "--crew", "dev", "--agent", "planning-lead", "test task"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -775,7 +799,12 @@ test("opencode explain run uses run subcommand when task prompt is provided", ()
   assert.deepEqual(payload.passthrough, ["test task", "--agent", "planning-lead"])
 })
 
-test("hermes explain run resolves to hermes chat with MAH bootstrap env", () => {
+test("hermes explain run resolves to hermes chat with MAH bootstrap env", (t) => {
+  requireGeneratedWorkspaceArtifacts(
+    t,
+    path.join(repoRoot, "meta-agents.yaml"),
+    path.join(repoRoot, ".hermes", "crew", "dev", "multi-team.yaml")
+  )
   const result = run(["--runtime", "hermes", "explain", "run", "--trace", "--crew", "dev"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -787,7 +816,12 @@ test("hermes explain run resolves to hermes chat with MAH bootstrap env", () => 
   assert.ok(payload.env?.MAH_HERMES_MULTI_TEAM)
 })
 
-test("hermes explain run strips MAH context-memory flags before spawning hermes", () => {
+test("hermes explain run strips MAH context-memory flags before spawning hermes", (t) => {
+  requireGeneratedWorkspaceArtifacts(
+    t,
+    path.join(repoRoot, "meta-agents.yaml"),
+    path.join(repoRoot, ".hermes", "crew", "dev", "multi-team.yaml")
+  )
   const result = run([
     "--runtime",
     "hermes",
