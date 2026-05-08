@@ -71,6 +71,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - WebUI `Tasks` workspace with missions, kanban board, PERT/CPM view, Gantt timeline, inbox, replan flows, YAML-backed persistence under `.mah/tasks/`, and Vite API endpoints for task/mission operations
 - `mah task` CLI namespace with `list`, `show`, `create`, `update`, and `run` for workspace task orchestration
 - `mah mission` CLI namespace with `list`, `show`, `create`, `update`, `commit-scope`, and `replan` for workspace planning orchestration
+- `skills/backlog-operator/SKILL.md` to run mission/task backlog loops inside active sessions with explicit state reconciliation (`ready -> in_progress -> done|blocked`)
 - `webui/src/features/tasks/*`, `webui/src/features/auth/*`, and `webui/src/features/console/consoleBridge.ts` as new feature modules for task orchestration, authentication, and console integration
 - `tests/runtime-core-integration.test.mjs` expanded with MAH overlay, OpenClaude session alias, and runtime activation coverage
 - `tests/sessions-operations.test.mjs` expanded with OpenClaude session resume and alias-tracking coverage
@@ -120,6 +121,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - `vite.config.js` and `vite.config.ts` now serve the same expanded MAH middleware surface for auth, terminal, tasks, missions, and shell/session orchestration
 - WebUI `Tasks` APIs now delegate task and mission state changes through `mah task` / `mah mission` instead of duplicating planning rules in Vite middleware
 - `development` package metadata now tracks the upcoming `v0.9.0` release line in both the root package and WebUI package
+- Bootstrap defaults now include `backlog_operator` for orchestrator and lead agents, and sync metadata now emits a specific `use_when` hint for this skill
+- Crew examples and onboarding/getting-started docs now document backlog execution through `mah task` / `mah mission`
 
 ### Fixed
 
@@ -154,6 +157,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Workspace quick actions and command-copy controls in the WebUI now execute reliably
 - `/tasks` initial loading no longer crashes when mission/task data is not yet available, and board/task navigation remains stable across view changes
 - WebUI theme switcher now applies reliably to shared layout surfaces (including `header`, `sidebar`, `overview`, right inspector, and `/tasks` PERT-related views) when toggling light/dark mode
+- `tests/runtime-core-integration.test.mjs` now skips runtime-specific integration assertions when generated workspace artifacts are missing, avoiding false CI failures on clean checkouts
 
 ### Note
 

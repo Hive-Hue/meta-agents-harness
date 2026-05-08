@@ -125,6 +125,7 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - backlog_operator
       - id: planning-lead
         role: lead
         team: planning
@@ -133,6 +134,7 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - backlog_operator
       - id: repo-analyst
         role: worker
         team: planning

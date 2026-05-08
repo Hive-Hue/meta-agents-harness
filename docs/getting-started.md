@@ -322,6 +322,7 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - backlog_operator
         domain_profile: read_only_cwd
       - id: planning-lead
         role: lead
@@ -331,6 +332,7 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - backlog_operator
         # Stack multiple profiles to merge domain rules
         domain_profile:
           - read_only_cwd

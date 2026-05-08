@@ -59,3 +59,27 @@ mah task run --id TASK-142 --json
 - The WebUI `Tasks` page now consumes these CLIs through `/api/mah/tasks` and `/api/mah/missions`.
 - Prefer `--json` for automations, scripts, and UI adapters.
 - Payload fields are intentionally shallow and map directly to stored task/mission records.
+- For crew-driven backlog execution, assign the `backlog_operator` skill to orchestrator/leads so session behavior stays aligned with task state transitions.
+
+## Crew Backlog Loop (CLI)
+
+Use this pattern when a crew should execute backlog items and keep state synchronized:
+
+```bash
+# 1) inspect mission/task queue
+mah mission list --json
+mah task list --json
+
+# 2) pick a ready task and mark start
+mah task update TASK-142 --payload '{"state":"in_progress"}' --json
+
+# 3) execute real work
+mah task run --id TASK-142 --json
+
+# 4) reconcile terminal state from outcome
+mah task update TASK-142 --payload '{"state":"done"}' --json
+# or, on blockage:
+mah task update TASK-142 --payload '{"state":"blocked","blockedReason":"<reason>"}' --json
+```
+
+Guardrail: never mark `done` without executing the task and validating command results.

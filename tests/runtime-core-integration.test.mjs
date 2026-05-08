@@ -101,6 +101,21 @@ function requireGeneratedWorkspaceArtifacts(t, ...pathsToCheck) {
   }
 }
 
+function runtimeConfigPath(runtime) {
+  if (`${runtime}` === "hermes") {
+    return path.join(repoRoot, ".hermes", "crew", "dev", "config.yaml")
+  }
+  return path.join(repoRoot, `.${runtime}`, "crew", "dev", "multi-team.yaml")
+}
+
+function requireRuntimeArtifacts(t, runtime, options = {}) {
+  const includeMeta = options.includeMeta === true
+  const extra = Array.isArray(options.extra) ? options.extra : []
+  const required = [runtimeConfigPath(runtime), ...extra]
+  if (includeMeta) required.unshift(path.join(repoRoot, "meta-agents.yaml"))
+  requireGeneratedWorkspaceArtifacts(t, ...required)
+}
+
 test("global install does not seed expertise catalog under ~/.mah", () => {
   const tempHome = mkdtempSync(path.join(os.tmpdir(), "mah-home-layout-"))
   try {
@@ -227,14 +242,21 @@ test("expertise list from a nested workspace directory resolves the workspace ro
 })
 
 for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo", "codex"]) {
-  test(`${runtime} list:crews is handled by MAH core without wrapper`, () => {
+  test(`${runtime} list:crews is handled by MAH core without wrapper`, (t) => {
+    requireRuntimeArtifacts(t, runtime)
     const result = run(["--runtime", runtime, "list:crews"])
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /crew=dev/)
   })
 }
 
-test("kilo use persists active crew via MAH core state", () => {
+test("kilo use persists active crew via MAH core state", (t) => {
+  requireRuntimeArtifacts(t, "kilo", {
+    extra: [
+      path.join(repoRoot, ".kilo", "crew", "dev", "agents"),
+      path.join(repoRoot, ".kilo", "crew", "dev", "expertise")
+    ]
+  })
   const previous = existsSync(kiloActiveCrewFile) ? readFileSync(kiloActiveCrewFile, "utf-8") : null
   const restoreAgents = snapshotPath(path.join(repoRoot, ".kilo", "agents"))
   try {
@@ -252,7 +274,13 @@ test("kilo use persists active crew via MAH core state", () => {
   }
 })
 
-test("codex use persists active crew and runtime artifacts via MAH core state", () => {
+test("codex use persists active crew and runtime artifacts via MAH core state", (t) => {
+  requireRuntimeArtifacts(t, "codex", {
+    extra: [
+      path.join(repoRoot, ".codex", "crew", "dev", "agents"),
+      path.join(repoRoot, ".codex", "crew", "dev", "expertise")
+    ]
+  })
   const restore = () => { }
   try {
     const result = run(["--runtime", "codex", "use", "dev"])
@@ -286,7 +314,8 @@ test("pi use persists active crew and session root via MAH core state", () => {
   }
 })
 
-test("claude use persists active crew via MAH core state", () => {
+test("claude use persists active crew via MAH core state", (t) => {
+  requireRuntimeArtifacts(t, "claude")
   const restore = snapshotPaths([
     path.join(repoRoot, ".claude", ".active-crew.json"),
     path.join(repoRoot, ".claude", "crew", "dev", "sessions")
@@ -302,7 +331,13 @@ test("claude use persists active crew via MAH core state", () => {
   }
 })
 
-test("opencode use materializes active runtime tree via MAH core state", () => {
+test("opencode use materializes active runtime tree via MAH core state", (t) => {
+  requireRuntimeArtifacts(t, "opencode", {
+    extra: [
+      path.join(repoRoot, ".opencode", "crew", "dev", "agents"),
+      path.join(repoRoot, ".opencode", "crew", "dev", "expertise")
+    ]
+  })
   const restore = snapshotPaths([
     path.join(repoRoot, ".opencode", ".active-crew.json"),
     path.join(repoRoot, ".opencode", "multi-team.yaml"),
@@ -338,7 +373,8 @@ test("hermes use persists active crew via MAH core state", () => {
   }
 })
 
-test("kilo explain run resolves to direct cli with injected crew context", () => {
+test("kilo explain run resolves to direct cli with injected crew context", (t) => {
+  requireRuntimeArtifacts(t, "kilo", { includeMeta: true })
   const result = run(["--runtime", "kilo", "explain", "run", "--trace", "--crew", "dev"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -365,7 +401,8 @@ test("kilo explain run resolves to direct cli with injected crew context", () =>
   assert.equal(kiloConfig.agent["backend-dev"].mode, "subagent")
 })
 
-test("codex explain run resolves to interactive codex session with injected crew context", () => {
+test("codex explain run resolves to interactive codex session with injected crew context", (t) => {
+  requireRuntimeArtifacts(t, "codex", { includeMeta: true })
   const result = run(["--runtime", "codex", "explain", "run", "--trace", "--crew", "dev", "--agent", "planning-lead"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -387,7 +424,8 @@ test("codex explain run resolves to interactive codex session with injected crew
   assert.match(payload.execArgs.join(" "), /Prompt source: \.codex\/crew\/dev\/agents\/planning_lead\.md/)
 })
 
-test("codex explain run switches to full-auto only in autonomous subagent mode", () => {
+test("codex explain run switches to full-auto only in autonomous subagent mode", (t) => {
+  requireRuntimeArtifacts(t, "codex", { includeMeta: true })
   const result = run([
     "--runtime",
     "codex",
@@ -421,7 +459,8 @@ test("codex explain run switches to full-auto only in autonomous subagent mode",
   assert.match(payload.execArgs.join(" "), /initial_messages=\[\{ role = "system"/)
 })
 
-test("pi explain run resolves to direct cli with MAH session env", () => {
+test("pi explain run resolves to direct cli with MAH session env", (t) => {
+  requireRuntimeArtifacts(t, "pi", { includeMeta: true })
   const result = run(["--runtime", "pi", "explain", "run", "--trace", "--crew", "dev"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)

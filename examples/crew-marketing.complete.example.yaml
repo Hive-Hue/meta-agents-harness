@@ -27,28 +27,28 @@ crews:
         team: "orchestration"
         model_ref: "orchestrator_default"
         expertise: "orchestrator-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"]
         domain_profile: "read_only_repo"
       - id: "planning-lead"
         role: "lead"
         team: "planning"
         model_ref: "lead_default"
         expertise: "planning-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"]
         domain_profile: "marketing_assets"
       - id: "creative-lead"
         role: "lead"
         team: "creative"
         model_ref: "lead_default"
         expertise: "creative-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"]
         domain_profile: "marketing_assets"
       - id: "validation-lead"
         role: "lead"
         team: "validation"
         model_ref: "lead_default"
         expertise: "validation-lead-expertise-model"
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"]
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"]
         domain_profile: "marketing_assets"
       - id: "market-researcher"
         role: "worker"

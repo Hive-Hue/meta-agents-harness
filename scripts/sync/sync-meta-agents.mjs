@@ -758,10 +758,19 @@ function runtimeSkillPaths(meta, skillRefs, runtime) {
   return result
 }
 
+function resolveSkillUseWhen(skillPath = "") {
+  const match = `${skillPath || ""}`.match(/\/skills\/([^/]+)\/SKILL\.md$/)
+  const slug = `${match?.[1] || ""}`.trim().toLowerCase()
+  if (slug === "backlog-operator") {
+    return "When the user asks to execute MAH backlog work via mah mission/mah task and keep task status synchronized."
+  }
+  return "Use when relevant to current task."
+}
+
 function runtimeSkillEntries(meta, skillRefs, runtime) {
   return runtimeSkillPaths(meta, skillRefs, runtime).map((item) => ({
     path: item,
-    use_when: "Use when relevant to current task."
+    use_when: resolveSkillUseWhen(item)
   }))
 }
 

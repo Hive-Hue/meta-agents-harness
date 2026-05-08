@@ -435,7 +435,7 @@ function ensureDefaults(doc, options = {}) {
         team: "orchestration",
         model_ref: "orchestrator_default",
         expertise: "orchestrator-expertise-model",
-        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"],
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"],
         domain_profile: "read_only_cwd",
       })
       if (!crew.topology || typeof crew.topology !== "object") crew.topology = {}
@@ -469,10 +469,10 @@ function buildDefaultCrew(crewId, mission) {
       }
     },
     agents: [
-      { id: "orchestrator", role: "orchestrator", team: "orchestration", model_ref: "orchestrator_default", expertise: "orchestrator-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "read_only_cwd" },
-      { id: "planning-lead", role: "lead", team: "planning", model_ref: "lead_default", expertise: "planning-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "read_only_cwd" },
-      { id: "engineering-lead", role: "lead", team: "engineering", model_ref: "lead_default", expertise: "engineering-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "read_only_cwd" },
-      { id: "validation-lead", role: "lead", team: "validation", model_ref: "qa_default", expertise: "validation-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"], domain_profile: "read_only_cwd" },
+      { id: "orchestrator", role: "orchestrator", team: "orchestration", model_ref: "orchestrator_default", expertise: "orchestrator-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"], domain_profile: "read_only_cwd" },
+      { id: "planning-lead", role: "lead", team: "planning", model_ref: "lead_default", expertise: "planning-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"], domain_profile: "read_only_cwd" },
+      { id: "engineering-lead", role: "lead", team: "engineering", model_ref: "lead_default", expertise: "engineering-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"], domain_profile: "read_only_cwd" },
+      { id: "validation-lead", role: "lead", team: "validation", model_ref: "qa_default", expertise: "validation-lead-expertise-model", skills: ["delegate_bounded", "zero_micromanagement", "expertise_model", "backlog_operator"], domain_profile: "read_only_cwd" },
       { id: "repo-analyst", role: "worker", team: "planning", model_ref: "worker_default", expertise: "repo-analyst-expertise-model", skills: ["expertise_model"], domain_profile: "read_only_cwd" },
       { id: "solution-architect", role: "worker", team: "planning", model_ref: "worker_default", expertise: "solution-architect-expertise-model", skills: ["expertise_model"], domain_profile: "read_only_cwd" },
       { id: "frontend-dev", role: "worker", team: "engineering", model_ref: "worker_default", expertise: "frontend-dev-expertise-model", skills: ["expertise_model"], domain_profile: "write_cwd" },
