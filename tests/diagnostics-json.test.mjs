@@ -1,6 +1,8 @@
-import test from "node:test"
+import test, { after } from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -8,10 +10,17 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
+const workspaceRoot = mkdtempSync(path.join(os.tmpdir(), "mah-diagnostics-workspace-"))
+
+copyFileSync(path.join(repoRoot, "meta-agents.example.yaml"), path.join(workspaceRoot, "meta-agents.yaml"))
+
+after(() => {
+  rmSync(workspaceRoot, { recursive: true, force: true })
+})
 
 function runJson(args) {
   const result = spawnSync(process.execPath, [cliPath, ...args], {
-    cwd: repoRoot,
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
@@ -42,7 +51,7 @@ test("validate:config --json follows diagnostics schema", () => {
 
 test("validate:config completes successfully without ReferenceError", () => {
   const result = spawnSync(process.execPath, [cliPath, "validate:config"], {
-    cwd: repoRoot,
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
