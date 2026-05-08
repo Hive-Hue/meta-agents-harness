@@ -25,6 +25,13 @@ jobs:
       - name: Install OpenCode runtime dependencies
         run: (cd .opencode && npm install)
 
+      - name: Prepare canonical workspace artifacts
+        run: |
+          if [ ! -f meta-agents.yaml ]; then
+            cp meta-agents.example.yaml meta-agents.yaml
+          fi
+          npm run sync:meta
+
       - name: Run smoke tests
         run: npm run test:smoke
 

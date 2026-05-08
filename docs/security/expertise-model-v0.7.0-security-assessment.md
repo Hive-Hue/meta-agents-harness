@@ -11,7 +11,7 @@ The expertise model is directionally strong on schema validation and export reda
 ## Findings
 
 #### [CRITICAL] Arbitrary file write via `recordEvidence()` expertise_id path join
-- **File**: `scripts/expertise-evidence-store.mjs`
+- **File**: `scripts/expertise/evidence/expertise-evidence-store.mjs`
 - **Line**: ~87-100
 - **Description**: `recordEvidence()` builds the evidence directory with `resolvePath('.mah/expertise/evidence/${expertise_id}')` and then writes a JSON file there without validating or normalizing `expertise_id`. A crafted value like `../../.ssh` or an absolute path component can escape the intended evidence store.
 - **Impact**: Arbitrary file creation/overwrite within the process permissions. This can corrupt repository files, plant malicious JSON, or overwrite sensitive files if the runtime has write access.
@@ -19,7 +19,7 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Validate `expertise_id` against a strict identifier regex (for example `^[a-z0-9._-]+:[a-z0-9._-]+$`), reject path separators and `..`, and resolve/verify the final path stays under the evidence root before writing.
 
 #### [HIGH] Arbitrary file write via `exportExpertiseToFile()` output path
-- **File**: `scripts/expertise-export.mjs`
+- **File**: `scripts/expertise/expertise-export.mjs`
 - **Line**: ~500-525
 - **Description**: `exportExpertiseToFile()` writes to `outputPath` directly after only extracting a parent directory with `substring()`. There is no check that the output path stays within a safe export directory.
 - **Impact**: A user can write exported JSON to any writable path, including overwriting project files or dropping artifacts into locations that later get executed or committed.
@@ -27,7 +27,7 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Restrict export destinations to an allowlisted export directory, or require explicit confirmation for absolute/parent-traversal paths. Resolve the path and reject if it escapes the intended base.
 
 #### [HIGH] Path traversal in expertise lookup by ID
-- **File**: `scripts/expertise-loader.mjs`
+- **File**: `scripts/expertise/expertise-loader.mjs`
 - **Line**: ~155-186
 - **Description**: `findExpertiseFileById()` splits an expertise ID on `:` and uses the second segment as a filename in `join(catalogRoot, crew, `${name}${ext}`)`. No sanitization prevents `../` or path separators in `crew` or `name`.
 - **Impact**: An attacker can coerce the loader into probing and potentially loading files outside the catalog tree, depending on filesystem layout and matching IDs.
@@ -43,7 +43,7 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Enforce a safe base directory for CLI file operations, canonicalize with `resolve()`, and reject paths that escape the repository or export/import sandbox.
 
 #### [MEDIUM] Unbounded evidence loading can cause memory/CPU denial of service
-- **File**: `scripts/expertise-evidence-store.mjs`
+- **File**: `scripts/expertise/evidence/expertise-evidence-store.mjs`
 - **Line**: ~120-216
 - **Description**: `loadEvidenceFor()` reads every JSON file in the evidence directory, parses them all into memory, and `computeMetrics()` then iterates the full set. There is no cap on file count, file size, or parse time.
 - **Impact**: Large evidence directories can trigger high memory use, long blocking reads, and slow routing/CLI operations.
@@ -51,15 +51,15 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Add bounded pagination/limits, file size caps, and streaming aggregation. Consider storing precomputed metrics and refusing to scan directories over a configured threshold.
 
 #### [MEDIUM] Registry/catalog build is recursively unbounded and trusts directory contents
-- **File**: `scripts/expertise-loader.mjs`
-- **Line**: ~30-47, ~86-99; `scripts/expertise-registry.mjs` ~150-180
+- **File**: `scripts/expertise/expertise-loader.mjs`
+- **Line**: ~30-47, ~86-99; `scripts/expertise/expertise-registry.mjs` ~150-180
 - **Description**: The catalog loader recursively walks every matching file under the catalog path and the registry builder materializes all entries in memory. There is no depth, entry-count, or symlink safeguard visible here.
 - **Impact**: Large or malicious catalog trees can force expensive recursive traversal and registry generation. If symlinks are present, path surprises may arise depending on the environment.
 - **PoC/Scenario**: A nested catalog with thousands of files or recursive directory structure causes `buildRegistry()` to consume significant time and memory.
 - **Recommendation**: Limit recursion depth and total files processed, ignore symlinks unless explicitly needed, and introduce a cached incremental index rather than full rebuilds on every stale read.
 
 #### [MEDIUM] Trust tier is not enforced in routing, despite spec expectations
-- **File**: `scripts/expertise-routing.mjs`
+- **File**: `scripts/expertise/expertise-routing.mjs`
 - **Line**: ~170-260; `scripts/meta-agents-harness.mjs` ~1946-2074, ~2528-2582
 - **Description**: The routing algorithm filters by `allowed_environments` and `validation_status`, but trust tier is only displayed and never used as a gating or scoring factor. The harness comments describe trust-tier awareness, but no actual trust-tier requirement is applied in scoring.
 - **Impact**: Lower-trust expertise can be selected for tasks that should require stricter trust boundaries, weakening policy-based delegation.
@@ -67,7 +67,7 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Add explicit trust-tier compatibility checks before scoring and/or a trust-tier penalty or threshold policy. Make the requirement part of the candidate filter, not just the UI.
 
 #### [MEDIUM] Lifecycle state transitions are not authorization-aware
-- **File**: `scripts/expertise-lifecycle.mjs`
+- **File**: `scripts/expertise/expertise-lifecycle.mjs`
 - **Line**: ~137-188
 - **Description**: `transitionExpertise()` validates state transitions and evidence requirements, but there is no authorization check or actor context. Any caller with access to the function can promote/restrict/deprecate expertise objects.
 - **Impact**: A compromised caller or misused internal script can change lifecycle state without governance approval.
@@ -75,7 +75,7 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Require an actor/authority context and enforce an authorization policy for sensitive transitions, especially `restricted -> active` and any promotion to `active`.
 
 #### [LOW] Confidence scoring is easily influenced by fabricated evidence records
-- **File**: `scripts/expertise-confidence.mjs`
+- **File**: `scripts/expertise/expertise-confidence.mjs`
 - **Line**: ~35-90
 - **Description**: `computeConfidence()` uses `successful_invocations`, `review_pass_rate`, and `rejection_rate` as direct inputs. If the evidence pipeline is polluted, the score can be artificially inflated or depressed.
 - **Impact**: Confidence manipulation may bias routing toward untrusted expertise.
@@ -83,7 +83,7 @@ The expertise model is directionally strong on schema validation and export reda
 - **Recommendation**: Treat metrics as untrusted input, derive them from signed/verified evidence, and add sanity checks or provenance requirements before score computation.
 
 #### [LOW] Import validation accepts unknown fields with warnings only
-- **File**: `scripts/expertise-export.mjs`
+- **File**: `scripts/expertise/expertise-export.mjs`
 - **Line**: ~249-360, ~401-490
 - **Description**: `validateImportPayload()` warns on unknown fields instead of rejecting them. That is intentional for forward compatibility, but it means hostile payloads can smuggle extra data into downstream consumers that do not re-validate.
 - **Impact**: Extra fields may survive import and later influence insecure consumers or logs.
@@ -113,9 +113,9 @@ This assessment intentionally reviewed the listed expertise files as a system, b
 
 ## Supplementary QA Review — No Additional Findings
 
-The additional gap review covered `scripts/expertise-validate.mjs`, `types/expertise-types.mjs`, `scripts/expertise-evidence-store.mjs`, `scripts/expertise-routing.mjs`, `scripts/meta-agents-harness.mjs` (delegate path), and `scripts/expertise-loader.mjs`.
+The additional gap review covered `scripts/expertise/expertise-validate.mjs`, `types/expertise-types.mjs`, `scripts/expertise/evidence/expertise-evidence-store.mjs`, `scripts/expertise/expertise-routing.mjs`, `scripts/meta-agents-harness.mjs` (delegate path), and `scripts/expertise/expertise-loader.mjs`.
 
-- **Schema validation depth**: `validateExpertise()` is not implemented in the files reviewed here; the CLI wrapper only forwards to `scripts/expertise-schema.mjs`. The exposed wrapper handles missing/optional fields by delegating validation, but no new bypass was identified in the reviewed wrapper file itself.
+- **Schema validation depth**: `validateExpertise()` is not implemented in the files reviewed here; the CLI wrapper only forwards to `scripts/expertise/expertise-schema.mjs`. The exposed wrapper handles missing/optional fields by delegating validation, but no new bypass was identified in the reviewed wrapper file itself.
 - **Race conditions**: `recordEvidence()` still uses a single `writeFileSync()` after `mkdirSync()` with no lock or atomic temp-file rename, so concurrent writers may race; this is already an inherent limitation of the current design and remains covered by the existing file-system risk findings.
 - **Graceful degradation**: routing and `mah delegate` both catch scoring failures and fall back to policy-allowed targets or explicit targets where possible, so failure handling is intentionally best-effort rather than fail-closed.
 - **YAML/JSON injection**: the loader uses `yaml.parse()` and `JSON.parse()` with warning-based error handling. No separate parser escape was identified in this review beyond the already noted unbounded parse/traversal concerns.

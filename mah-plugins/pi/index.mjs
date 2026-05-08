@@ -13,7 +13,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { spawnSync } from "node:child_process"
-import { normalizeModelId } from "../shared-model-normalize.mjs"
 
 function variantPathExists(candidatePath) {
   if (!candidatePath || typeof candidatePath !== "string") return false
@@ -175,7 +174,14 @@ export const runtimePlugin = {
       sessionMirrorFlag: false,
       sessionNewArgs: ["--new-session"],
       sessionContinueArgs: ["-c"],
-      sessionNoneArgs: ["--no-session"]
+      sessionNoneArgs: ["--no-session"],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
 
     supportsSessions: true,
@@ -235,6 +241,50 @@ export const runtimePlugin = {
           sessionBaseRoot: session.sessionBaseRoot,
           sessionId: session.sessionId,
           sessionMode: session.sessionMode
+        }
+      }
+    },
+
+    prepareHeadlessRunContext({ repoRoot, crew, task = "", argv = [], envOverrides = {} }) {
+      if (!task && (!argv || argv.length === 0)) {
+        return {
+          ok: false,
+          error: "PI headless requires a task prompt"
+        }
+      }
+
+      const extensionParse = parsePiExtensionArgs(repoRoot, argv)
+      const extensionPaths = extensionParse.extensionPaths.length > 0
+        ? extensionParse.extensionPaths
+        : loadPiDefaultExtensions(repoRoot).map((item) => resolveFromRepo(repoRoot, item))
+
+      const missingExtension = extensionPaths.find((item) => !existsSync(item))
+      if (missingExtension) {
+        return { ok: false, error: `PI extension not found: ${rel(repoRoot, missingExtension)}` }
+      }
+
+      // Activate crew so PI has crew context
+      if (crew) {
+        this.activateCrew({ repoRoot, crewId: crew })
+      }
+
+      return {
+        ok: true,
+        exec: "pi",
+        args: [...extensionPaths.flatMap((item) => ["-e", item]), "-p"],
+        passthrough: task ? [task] : extensionParse.remaining,
+        envOverrides: {
+          ...envOverrides,
+          PI_MULTI_HEADLESS: "1",
+          PI_CREW: crew || "",
+          MAH_ACTIVE_CREW: crew || ""
+        },
+        crew,
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "pi"
         }
       }
     },

@@ -24,6 +24,13 @@ Optional standalone installation remains available if you want the same server o
 codex mcp add mah -- /home/alysson/.nvm/versions/node/v22.19.0/bin/node /home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs
 ```
 
+If your Stitch or other MCP credentials live in a shared `.env`, start Codex through the wrapper so those variables are loaded before the session begins:
+
+```bash
+MAH_CODEX_ENV_FILE=/home/alysson/Github/meta-agents-harness/.env \
+  /home/alysson/Github/meta-agents-harness/scripts/codex-with-env.sh
+```
+
 ## Usage
 
 Select the crew and open the Codex runtime:

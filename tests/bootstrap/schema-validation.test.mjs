@@ -10,7 +10,7 @@ import YAML from "yaml"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..", "..")
-const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+const bootstrapPath = path.join(repoRoot, "scripts", "../../scripts/bootstrap/bootstrap-meta-agents.mjs")
 
 function bootstrap(args, cwd) {
   return spawnSync(process.execPath, [bootstrapPath, ...args], {
@@ -104,6 +104,10 @@ test.describe("Schema Validation - Generated Structure", () => {
       assert.ok(config.runtimes.claude)
       assert.ok(config.runtimes.opencode)
       assert.ok(config.runtimes.hermes)
+      assert.equal(config.runtimes.pi.wrapper, undefined)
+      assert.equal(config.runtimes.pi.config_root, undefined)
+      assert.equal(config.runtimes.opencode.wrapper, undefined)
+      assert.equal(config.runtimes.opencode.task_policy, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -143,8 +147,12 @@ test.describe("Schema Validation - Generated Structure", () => {
     try {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
-      assert.ok(config.catalog.domain_profiles)
-      assert.ok(config.catalog.domain_profiles.read_only_repo)
+      assert.ok(config.domain_profiles)
+      assert.ok(config.domain_profiles.read_only_cwd)
+      assert.ok(config.domain_profiles.write_user_home_with_approval)
+      assert.equal(config.domain_profiles.bootstrap_generation, undefined)
+      assert.equal(config.domain_profiles.runtime_assets_sync, undefined)
+      assert.equal(config.domain_profiles.docs_authoring, undefined)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -292,7 +300,7 @@ test.describe("Optional Fields Default Values", () => {
     try {
       bootstrap(["--non-interactive", "--crew", "dev"], tempDir)
       const config = readConfig(tempDir)
-      assert.equal(config.crews[0].display_name, "Dev Crew")
+      assert.equal(config.crews[0].display_name, "Development Crew")
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }
@@ -310,7 +318,19 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-004: Model refs use catalog", () => {
+  test("OF-004: Source configs and session paths are implicit defaults", () => {
+    const tempDir = tmpDir()
+    try {
+      bootstrap(["--non-interactive"], tempDir)
+      const config = readConfig(tempDir)
+      assert.equal(config.crews[0].source_configs, undefined)
+      assert.equal(config.crews[0].session, undefined)
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  test("OF-005: Model refs use catalog", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -327,7 +347,7 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-005: Skills refs use canonical skill paths", () => {
+  test("OF-006: Skills refs use canonical skill paths", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -350,7 +370,7 @@ test.describe("Optional Fields Default Values", () => {
     }
   })
 
-  test("OF-006: Domain profile refs valid", () => {
+  test("OF-007: Domain profile refs valid", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -358,7 +378,7 @@ test.describe("Optional Fields Default Values", () => {
       for (const crew of config.crews) {
         for (const agent of crew.agents) {
           if (agent.domain_profile) {
-            assert.ok(config.catalog.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} must exist in catalog`)
+            assert.ok(config.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} must exist in domain_profiles`)
           }
         }
       }
@@ -411,7 +431,7 @@ test.describe("Data Type Validation", () => {
       bootstrap(["--non-interactive"], tempDir)
       const config = readConfig(tempDir)
       // Check boolean fields in domain profiles
-      const profile = config.catalog.domain_profiles.read_only_repo[0]
+      const profile = config.domain_profiles.read_only_cwd[0]
       if (profile.read !== undefined) assert.equal(typeof profile.read, "boolean")
       if (profile.edit !== undefined) assert.equal(typeof profile.edit, "boolean")
       if (profile.bash !== undefined) assert.equal(typeof profile.bash, "boolean")
@@ -487,7 +507,7 @@ test.describe("Reference Integrity", () => {
     }
   })
 
-  test("RI-003: Domain profile refs resolve to catalog", () => {
+  test("RI-003: Domain profile refs resolve to domain_profiles", () => {
     const tempDir = tmpDir()
     try {
       bootstrap(["--non-interactive"], tempDir)
@@ -495,7 +515,7 @@ test.describe("Reference Integrity", () => {
       for (const crew of config.crews) {
         for (const agent of crew.agents) {
           if (agent.domain_profile) {
-            assert.ok(config.catalog.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} not found`)
+            assert.ok(config.domain_profiles[agent.domain_profile], `Domain profile ${agent.domain_profile} not found`)
           }
         }
       }

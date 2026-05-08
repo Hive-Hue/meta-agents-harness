@@ -148,7 +148,7 @@ export const runtimePlugin = {
       sessionModeNew: false,
       sessionModeContinue: true,
       sessionModeNone: false,
-      sessionIdFlag: "--session-id",
+      sessionIdFlag: "--session",
       sessionRootFlag: false,
       sessionMirrorFlag: false,
       sessionContinueArgs: ["-c"],
@@ -162,7 +162,7 @@ export const runtimePlugin = {
     },
 
     supportsSessions: true,
-    sessionListCommand: null,
+    sessionListCommand: ["opencode", "session", "list", "--format", "json"],
     sessionExportCommand: null,
     sessionDeleteCommand: null,
     supportsSessionNew: false,

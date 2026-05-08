@@ -126,19 +126,19 @@ For sessions created before v0.6.0:
 - `DEFAULT_FIDELITY_LEVEL`
 - `MahSession`, `MahJsonExport`, `InjectionPayload`, etc.
 
-### Session Export (`scripts/session-export.mjs`)
+### Session Export (`scripts/session/session-export.mjs`)
 
 - `exportSession(repoRoot, sessionId, format)` — unified export
 - `exportSessionMahJson(repoRoot, sessionId)` — canonical JSON
 - `exportSessionSummaryMd(repoRoot, sessionId)` — markdown summary
 - `buildMahSessionEnvelope(sessionRef)` — build canonical envelope
 
-### Session Injection (`scripts/session-injection.mjs`)
+### Session Injection (`scripts/session/session-injection.mjs`)
 
 - `injectSessionContext(repoRoot, session, targetRuntime, fidelityLevel)` — inject context
 - `buildInjectionPayload(repoRoot, session, targetRuntime, fidelityLevel)` — build payload
 - `determineInjectionStrategy(fidelityLevel, targetRuntime, adapter)` — determine strategy
 
-### Session Bridge (`scripts/session-bridge.mjs`)
+### Session Bridge (`scripts/session/session-bridge.mjs`)
 
 - `bridgeSession(repoRoot, sourceSessionId, targetRuntime, options)` — high-level bridge

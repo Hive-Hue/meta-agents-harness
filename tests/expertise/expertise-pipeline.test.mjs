@@ -8,19 +8,22 @@ import assert from 'node:assert'
 import { join } from 'node:path'
 import { existsSync, mkdirSync, rmSync, readFileSync, writeFileSync, cpSync } from 'node:fs'
 import { parse as parseYaml } from 'yaml'
-import { seedExpertiseCatalog } from '../../scripts/expertise-seed.mjs'
-import { syncExpertise } from '../../scripts/expertise-sync.mjs'
-import { buildRegistry } from '../../scripts/expertise-registry.mjs'
-import { generateProposalFromEvidenceById } from '../../scripts/expertise-proposal.mjs'
-import { applyProposalFromFile } from '../../scripts/expertise-apply-proposal.mjs'
-import { transitionLifecycle } from '../../scripts/expertise-lifecycle-cli.mjs'
-import { exportExpertise } from '../../scripts/expertise-export.mjs'
-import { recordEvidence } from '../../scripts/expertise-evidence-store.mjs'
-import { loadExpertiseById } from '../../scripts/expertise-loader.mjs'
+import { stringify as stringifyYaml } from 'yaml'
+import { seedExpertiseCatalog } from '../../scripts/expertise/expertise-seed.mjs'
+import { syncExpertise } from '../../scripts/expertise/expertise-sync.mjs'
+import { buildRegistry } from '../../scripts/expertise/expertise-registry.mjs'
+import { generateProposalFromEvidenceById } from '../../scripts/expertise/expertise-proposal.mjs'
+import { applyProposalFromFile } from '../../scripts/expertise/expertise-apply-proposal.mjs'
+import { transitionLifecycle } from '../../scripts/expertise/expertise-lifecycle-cli.mjs'
+import { exportExpertise } from '../../scripts/expertise/expertise-export.mjs'
+import { recordEvidence } from '../../scripts/expertise/evidence/expertise-evidence-store.mjs'
+import { loadExpertiseById } from '../../scripts/expertise/expertise-loader.mjs'
+import { loadExpertiseCatalog } from '../../scripts/expertise/expertise-loader.mjs'
 
 const tmpDir = join(process.env.TEMP || '/tmp', `mah-pipeline-test-${process.pid}`)
 const catalogRoot = join(tmpDir, '.mah', 'expertise', 'catalog')
 const evidenceRoot = join(tmpDir, '.mah', 'expertise', 'evidence')
+const testConfigPath = join(tmpDir, 'meta-agents.test.yaml')
 
 // Snapshot real catalog before any test runs
 const REAL_CATALOG = join(process.cwd(), '.mah', 'expertise', 'catalog', 'dev')
@@ -33,6 +36,24 @@ for (const fname of ['backend-dev.yaml', 'frontend-dev.yaml']) {
 beforeEach(() => {
   mkdirSync(catalogRoot, { recursive: true })
   mkdirSync(evidenceRoot, { recursive: true })
+  writeFileSync(testConfigPath, [
+    'version: 1',
+    'name: expertise-test-config',
+    'description: deterministic expertise pipeline test',
+    'crews:',
+    '  - id: dev',
+    '    mission: test mission',
+    '    agents:',
+    '      - id: backend-dev',
+    '        role: worker',
+    '        team: Engineering',
+    '      - id: frontend-dev',
+    '        role: worker',
+    '        team: Engineering',
+    '      - id: orchestrator',
+    '        role: orchestrator',
+    '        team: orchestration',
+  ].join('\n'), 'utf-8')
 })
 
 // Restore real catalog after each test so sync tests aren't polluted
@@ -51,15 +72,18 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 test('Full pipeline: seed → evidence → sync → apply-proposal → export --with-evidence', async () => {
   // 1. Seed catalog for dev crew into temp dir
-  const seedResult = await seedExpertiseCatalog(null, {
+  const seedResult = await seedExpertiseCatalog(testConfigPath, {
     crew: 'dev',
     force: true,
     catalogRoot,
   })
   assert.ok(seedResult.seeded > 0, `expected some seeded entries, got ${seedResult.seeded}`)
 
-  // 2. Record 5 evidence events for dev:backend-dev (4 success, 1 failure)
-  const expertId = 'dev:backend-dev'
+  const seededEntries = await loadExpertiseCatalog(catalogRoot)
+  assert.ok(seededEntries.length > 0, 'expected at least one seeded expertise entry')
+  const expertId = seededEntries[0].id
+
+  // 2. Record 5 evidence events for seeded expert (4 success, 1 failure)
   const evidenceEvents = [
     { outcome: 'success', task_type: 'api-implementation', duration_ms: 1200, review_pass: true },
     { outcome: 'success', task_type: 'api-design', duration_ms: 900, review_pass: true },
@@ -78,10 +102,10 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
   }
 
   // 3. Sync — verify confidence updated, capabilities present
-  const syncResult = await syncExpertise({ crew: 'dev', dryRun: false, catalogRoot, evidenceRoot })
+  const syncResult = await syncExpertise({ crew: 'dev', dryRun: false, catalogRoot, evidenceRoot, configPath: testConfigPath })
   assert.ok(syncResult.results.length > 0, 'sync should produce results')
 
-  const backendEntry = await loadExpertiseById(expertId, { catalogRoot })
+  const backendEntry = await loadExpertiseById(expertId, catalogRoot)
   assert.ok(backendEntry, 'backend-dev entry should exist in catalog')
   assert.ok(Array.isArray(backendEntry.capabilities) && backendEntry.capabilities.length > 0, 'capabilities should be populated')
 
@@ -90,7 +114,7 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
   // After evidence sync, confidence should reflect real invocations
   assert.ok(confidence.evidence_count >= 4, `expected evidence_count >= 4, got ${confidence.evidence_count}`)
 
-  // 4. Generate proposal from evidence for dev:backend-dev
+  // 4. Generate proposal from evidence for seeded expert
   const proposalResult = await generateProposalFromEvidenceById({
     targetId: expertId,
     crew: 'dev',
@@ -105,17 +129,20 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
   assert.ok(proposal.proposed_changes, 'proposal should have proposed_changes')
 
   // 5. Apply proposal — verify catalog updated
-  const proposalPath = join(tmpDir, 'proposal-apply-test.json')
-  const { writeFileSync } = await import('node:fs')
-  writeFileSync(proposalPath, JSON.stringify(proposal), 'utf-8')
+  const proposalDir = join(tmpDir, '.mah', 'expertise', 'proposals')
+  mkdirSync(proposalDir, { recursive: true })
+  const proposalPath = join(proposalDir, 'proposal-apply-test.yaml')
+  writeFileSync(proposalPath, stringifyYaml(proposal), 'utf-8')
 
   const applyResult = await applyProposalFromFile(proposalPath, {
     actor: 'orchestrator',
+    force: true,
+    workspaceRoot: tmpDir,
     catalogRoot,
   })
   assert.ok(applyResult.ok, `applyProposal failed: ${applyResult.error}`)
 
-  const afterApply = await loadExpertiseById(expertId, { catalogRoot })
+  const afterApply = await loadExpertiseById(expertId, catalogRoot)
   assert.ok(afterApply, 'catalog should be updated after apply')
 
   // 6. Export with evidence — verify evidence_summary present with metrics
@@ -136,15 +163,18 @@ test('Full pipeline: seed → evidence → sync → apply-proposal → export --
 // ---------------------------------------------------------------------------
 test('Lifecycle pipeline: seed → evidence → sync → transition lifecycle', async () => {
   // 1. Seed catalog for dev crew into temp dir
-  const seedResult = await seedExpertiseCatalog(null, {
+  const seedResult = await seedExpertiseCatalog(testConfigPath, {
     crew: 'dev',
     force: true,
     catalogRoot,
   })
   assert.ok(seedResult.seeded > 0, `expected some seeded entries`)
 
-  // 2. Record 5+ evidence events for dev:frontend-dev (all success)
-  const expertId = 'dev:frontend-dev'
+  const seededEntries = await loadExpertiseCatalog(catalogRoot)
+  assert.ok(seededEntries.length > 0, 'expected at least one seeded expertise entry')
+  const expertId = seededEntries[Math.min(1, seededEntries.length - 1)].id
+
+  // 2. Record 5+ evidence events for selected seeded expert (all success)
   const evidenceEvents = [
     { outcome: 'success', task_type: 'ui-implementation', duration_ms: 1100, review_pass: true },
     { outcome: 'success', task_type: 'css-styling', duration_ms: 800, review_pass: true },
@@ -164,11 +194,11 @@ test('Lifecycle pipeline: seed → evidence → sync → transition lifecycle', 
   }
 
   // 3. Sync
-  const syncResult = await syncExpertise({ crew: 'dev', dryRun: false, catalogRoot, evidenceRoot })
+  const syncResult = await syncExpertise({ crew: 'dev', dryRun: false, catalogRoot, evidenceRoot, configPath: testConfigPath })
   assert.ok(syncResult.results.length > 0, 'sync should produce results')
 
-  const frontendEntry = await loadExpertiseById(expertId, { catalogRoot })
-  assert.ok(frontendEntry, 'frontend-dev entry should exist in catalog')
+  const frontendEntry = await loadExpertiseById(expertId, catalogRoot)
+  assert.ok(frontendEntry, 'selected entry should exist in catalog')
   assert.equal(frontendEntry.lifecycle, 'active', 'lifecycle should be active initially')
 
   // 4. Transition lifecycle active → experimental
@@ -181,7 +211,7 @@ test('Lifecycle pipeline: seed → evidence → sync → transition lifecycle', 
   assert.ok(lifecycleResult.ok, `transitionLifecycle failed: ${lifecycleResult.error}`)
 
   // 5. Verify lifecycle changed in catalog
-  const afterTransition = await loadExpertiseById(expertId, { catalogRoot })
+  const afterTransition = await loadExpertiseById(expertId, catalogRoot)
   assert.ok(afterTransition, 'catalog entry should still exist after transition')
   assert.equal(afterTransition.lifecycle, 'experimental', `lifecycle should be 'experimental', got '${afterTransition.lifecycle}'`)
   assert.ok(afterTransition.metadata?.last_lifecycle_change, 'last_lifecycle_change should be recorded')

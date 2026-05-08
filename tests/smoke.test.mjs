@@ -190,6 +190,21 @@ test("multi-team extension registers the thinking slash command", () => {
   assert.match(source, /handleThinkingCommand\(commandText\)/)
 })
 
+test("multi-team extension registers domain approval commands", () => {
+  const source = readFileSync(path.join(repoRoot, "extensions", "multi-team.ts"), "utf-8")
+  assert.match(source, /pi\.registerCommand\("domain-approvals"/)
+  assert.match(source, /pi\.registerCommand\("approve-domain"/)
+  assert.match(source, /pi\.registerCommand\("deny-domain"/)
+})
+
+test("multi-team domain rules support explicit approval metadata", () => {
+  const source = readFileSync(path.join(repoRoot, "extensions", "multi-team.ts"), "utf-8")
+  assert.match(source, /approval_required\?: boolean/)
+  assert.match(source, /approval_mode\?: "explicit_tui"/)
+  assert.match(source, /grant_scope\?: "single_path" \| "subtree" \| "single_op"/)
+  assert.match(source, /PI_MULTI_HEADLESS !== "1"/)
+})
+
 test("forced runtime works when flag appears before command", () => {
   const result = run(["--runtime", "opencode", "detect"])
   assert.equal(result.status, 0, result.stderr)
@@ -267,7 +282,7 @@ test("claude dry-run works with wrapped instruction blocks in crew config", () =
 test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-"))
   try {
-    const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+    const bootstrapPath = path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs")
     const result = spawnSync(process.execPath, [bootstrapPath, "--non-interactive"], {
       cwd: tempDir,
       env: process.env,
@@ -280,6 +295,29 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
     assert.equal(parsed.version, 1)
     assert.ok(Array.isArray(parsed.crews) && parsed.crews.length >= 1)
     assert.equal(parsed.runtime_detection, undefined)
+    assert.ok(parsed.domain_profiles, "bootstrap should emit top-level domain_profiles")
+    assert.equal(parsed.catalog?.domain_profiles, undefined, "domain_profiles should not be nested under catalog")
+    assert.ok(parsed.runtimes?.openclaude, "bootstrap should emit modern runtime entries")
+    assert.ok(parsed.runtimes?.codex, "bootstrap should emit codex runtime entry")
+    assert.equal(parsed.runtimes?.pi?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.pi?.config_root, undefined)
+    assert.equal(parsed.runtimes?.pi?.default_extensions, undefined)
+    assert.equal(parsed.runtimes?.claude?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.claude?.ccr?.route_map, undefined)
+    assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.opencode?.task_policy, undefined)
+    assert.ok(Array.isArray(parsed.domain_profiles?.read_only_cwd), "read_only_cwd profile should be materialized")
+    assert.ok(Array.isArray(parsed.domain_profiles?.write_cwd), "write_cwd profile should be materialized")
+    assert.ok(Array.isArray(parsed.domain_profiles?.write_user_home_with_approval), "write_user_home_with_approval profile should be materialized")
+    for (const optionalProfile of ["bootstrap_generation", "runtime_assets_sync", "docs_authoring"]) {
+      const profileValue = parsed.domain_profiles?.[optionalProfile]
+      if (profileValue !== undefined) {
+        assert.ok(Array.isArray(profileValue), `${optionalProfile} profile should be an array when present`)
+      }
+    }
+    assert.equal(parsed.crews?.[0]?.source_configs, undefined)
+    assert.equal(parsed.crews?.[0]?.session, undefined)
+    assert.ok(parsed.crews[0].topology?.leads?.engineering, "bootstrap should emit full default crew topology")
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }
@@ -288,7 +326,7 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
 test("bootstrap script respects --crew flag in non-interactive mode", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-crew-"))
   try {
-    const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+    const bootstrapPath = path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs")
     const result = spawnSync(process.execPath, [bootstrapPath, "--non-interactive", "--crew", "custom-crew"], {
       cwd: tempDir,
       env: process.env,
@@ -306,7 +344,7 @@ test("bootstrap script respects --crew flag in non-interactive mode", () => {
 test("bootstrap script skips when file exists without --force", () => {
   const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-bootstrap-force-"))
   try {
-    const bootstrapPath = path.join(repoRoot, "scripts", "bootstrap-meta-agents.mjs")
+    const bootstrapPath = path.join(repoRoot, "scripts", "../scripts/bootstrap/bootstrap-meta-agents.mjs")
     writeFileSync(path.join(tempDir, "meta-agents.yaml"), "version: 1\n")
     const result = spawnSync(process.execPath, [bootstrapPath, "--non-interactive"], {
       cwd: tempDir,
@@ -333,6 +371,26 @@ test("mah init invokes bootstrap and creates meta-agents.yaml", () => {
     assert.match(result.stdout, /mah init completed/)
     const configPath = path.join(tempDir, "meta-agents.yaml")
     assert.equal(existsSync(configPath), true)
+    const parsed = YAML.parse(readFileSync(configPath, "utf-8"))
+    assert.equal(parsed.runtimes?.pi?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.claude?.wrapper, undefined)
+    assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
+    assert.equal(parsed.crews?.[0]?.source_configs, undefined)
+    assert.equal(parsed.crews?.[0]?.session, undefined)
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+})
+
+test("mah validate:config resolves meta-agents.yaml from the caller workspace", () => {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-validate-workspace-"))
+  try {
+    const initResult = runAt(tempDir, ["init", "--yes"])
+    assert.equal(initResult.status, 0, initResult.stderr)
+
+    const validateResult = runAt(tempDir, ["validate:config"])
+    assert.equal(validateResult.status, 0, validateResult.stderr)
+    assert.match(validateResult.stdout, /validate:config passed/)
   } finally {
     rmSync(tempDir, { recursive: true, force: true })
   }

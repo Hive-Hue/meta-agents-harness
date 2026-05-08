@@ -1,0 +1,12 @@
+interface:
+  display_name: "Stitch React Handoff"
+  short_description: "Refine Stitch UI and hand off to React."
+  brand_color: "#00BCD4"
+  default_prompt: "Use $stitch-react-handoff to refine Stitch screens and produce React-ready implementation guidance."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "stitch"
+      description: "Google Stitch MCP tools for projects, screens, design systems, and variants."
+policy:
+  allow_implicit_invocation: true

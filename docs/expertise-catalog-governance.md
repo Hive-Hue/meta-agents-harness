@@ -62,6 +62,15 @@ mah expertise propose <id> --from-evidence --evidence-limit 5
 
 This drafts conservative changes from recent evidence; approval flow stays manual.
 
+Optional AI rewrite mode:
+
+```bash
+mah expertise propose <id> --from-evidence --ai --provider openrouter --model nvidia/nemotron-3-super-120b-a12b:free
+```
+
+- `--ai` rewrites `summary`, `rationale`, and `proposed_changes` for reviewer clarity.
+- Falls back to deterministic proposal text when AI is not configured or fails.
+
 ## Update Rules
 
 - Do not write raw session logs into catalog.
@@ -87,3 +96,17 @@ When repo is reset, regenerate catalog seed from `meta-agents.yaml` declarations
 MAH does not load expertise from global `~/.mah` overlay.
 Global install keeps shared runtime assets such as skills, extensions, plugins, and themes.
 Expertise is workspace concern and is materialized into `.mah/expertise/catalog` by `mah sync` / `mah generate`.
+
+## WebUI Workspace Scope
+
+- WebUI expertise screens (`/expertise`) execute CLI-backed operations against the active `Workspace Path`.
+- If the selected workspace changes, expertise list/detail/evidence/proposals resolve from that workspace's `.mah/expertise/*`.
+- `Workspace Detection` in Bootstrap also scans the active workspace path and validates expertise using both:
+  - catalog entries under `.mah/expertise/catalog/**`
+  - `.mah/expertise/registry.json`
+
+## Automation Skill
+
+The [`skills/expertise-governance/SKILL.md`](../../skills/expertise-governance/SKILL.md) skill provides an automated orchestrator workflow for running the full governance cycle (steps 1–8) across all agents. It includes eligibility rules, evidence-limit guidance, human review criteria, lifecycle transition table, and quality gates.
+
+Use the skill when running governance on a schedule or before release cuts — it automates preparation steps while keeping human review as a required checkpoint before `apply-proposal`.

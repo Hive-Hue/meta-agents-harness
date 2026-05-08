@@ -15,9 +15,9 @@ import { execSync } from 'node:child_process'
 // Imports from expertise modules
 // ---------------------------------------------------------------------------
 
-const { recordEvidence, loadEvidenceFor, computeMetrics, getMetricsFor } = await import('../scripts/expertise-evidence-store.mjs')
-const { computeConfidence, scoreToBand, mergeConfidence, applyEvidenceFloor } = await import('../scripts/expertise-confidence.mjs')
-const { canTransition, transitionExpertise, describeLifecycle, getSuggestedNextStates, LIFECYCLE_STATES } = await import('../scripts/expertise-lifecycle.mjs')
+const { recordEvidence, loadEvidenceFor, computeMetrics, getMetricsFor } = await import('../scripts/expertise/evidence/expertise-evidence-store.mjs')
+const { computeConfidence, scoreToBand, mergeConfidence, applyEvidenceFloor } = await import('../scripts/expertise/expertise-confidence.mjs')
+const { canTransition, transitionExpertise, describeLifecycle, getSuggestedNextStates, LIFECYCLE_STATES } = await import('../scripts/expertise/expertise-lifecycle.mjs')
 
 // ---------------------------------------------------------------------------
 // Test constants

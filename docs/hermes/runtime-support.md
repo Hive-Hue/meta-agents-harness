@@ -24,7 +24,7 @@ Hermes support follows the principle of **selective absorption**:
 
 ## Adapter model
 
-Hermes is integrated through the standard adapter pattern in `scripts/runtime-adapters.mjs`.
+Hermes is integrated through the standard adapter pattern in `scripts/runtime/runtime-adapters.mjs`.
 
 ### Adapter configuration
 

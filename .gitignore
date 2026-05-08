@@ -1,4 +1,6 @@
 node_modules/
+dist/
+*.tsbuildinfo
 __pycache__/
 *.pyc
 .DS_Store
@@ -26,12 +28,14 @@ __pycache__/
 .kilo/agents/
 .codex/agents/
 .pi/crew/*/sessions/
+.claude/crew/*
 .claude/crew/*/sessions/
 .openclaude/crew/*/sessions/
 .opencode/crew/*/sessions/
 .opencode/crew/*
+.openclaude/crew/*
 .hermes/crew/*/sessions/
-.kilo/crew/*/sessions/
+.kilo/crew/*
 .codex/crew/*/sessions/
 .codex/skills/
 .claude/skills/
@@ -46,6 +50,8 @@ tmp/
 .env.stitch
 
 .openclaude-profile.json
+.openclaude/.mah-agent-routing.json
+.openclaude/settings.local.json
 .claude-profile.json
 .pi-profile.json
 .hermes-profile.json
@@ -57,8 +63,12 @@ meta-agents.yaml
 meta-agents.backup.yaml
 # Local MAH sync artifacts
 .claude/crew/dev/multi-team.yaml
-.openclaude/crew/dev/multi-team.yaml
-.openclaude/crew/dev/agents/engineering_lead.md
-.openclaude/crew/dev/agents/planning_lead.md
-.openclaude/crew/dev/agents/solution_architect.md
-.openclaude/crew/dev/agents/validation_lead.md
+
+# Playwright artifacts
+.playwright-mcp/
+
+# Local webui logs
+webui/vite-s.log
+
+# Plugin loader test temp fixtures
+.test-temp-plugin-loader/

@@ -32,19 +32,19 @@ Expertise Model is structured object used to decide:
 Current implementation is spread across:
 
 - [`types/expertise-types.mjs`](../types/expertise-types.mjs)
-- [`scripts/expertise-schema.mjs`](../scripts/expertise-schema.mjs)
-- [`scripts/expertise-loader.mjs`](../scripts/expertise-loader.mjs)
-- [`scripts/expertise-registry.mjs`](../scripts/expertise-registry.mjs)
-- [`scripts/expertise-routing.mjs`](../scripts/expertise-routing.mjs)
-- [`scripts/expertise-evidence-store.mjs`](../scripts/expertise-evidence-store.mjs)
-- [`scripts/expertise-confidence.mjs`](../scripts/expertise-confidence.mjs)
-- [`scripts/expertise-lifecycle.mjs`](../scripts/expertise-lifecycle.mjs)
-- [`scripts/expertise-export.mjs`](../scripts/expertise-export.mjs)
-- [`scripts/expertise-validate.mjs`](../scripts/expertise-validate.mjs)
-- [`scripts/expertise-seed.mjs`](../scripts/expertise-seed.mjs)
-- [`scripts/expertise-sync.mjs`](../scripts/expertise-sync.mjs)
-- [`scripts/expertise-apply-proposal.mjs`](../scripts/expertise-apply-proposal.mjs)
-- [`scripts/expertise-lifecycle-cli.mjs`](../scripts/expertise-lifecycle-cli.mjs)
+- [`scripts/expertise/expertise-schema.mjs`](../scripts/expertise/expertise-schema.mjs)
+- [`scripts/expertise/expertise-loader.mjs`](../scripts/expertise/expertise-loader.mjs)
+- [`scripts/expertise/expertise-registry.mjs`](../scripts/expertise/expertise-registry.mjs)
+- [`scripts/expertise/expertise-routing.mjs`](../scripts/expertise/expertise-routing.mjs)
+- [`scripts/expertise/evidence/expertise-evidence-store.mjs`](../scripts/expertise/evidence/expertise-evidence-store.mjs)
+- [`scripts/expertise/expertise-confidence.mjs`](../scripts/expertise/expertise-confidence.mjs)
+- [`scripts/expertise/expertise-lifecycle.mjs`](../scripts/expertise/expertise-lifecycle.mjs)
+- [`scripts/expertise/expertise-export.mjs`](../scripts/expertise/expertise-export.mjs)
+- [`scripts/expertise/expertise-validate.mjs`](../scripts/expertise/expertise-validate.mjs)
+- [`scripts/expertise/expertise-seed.mjs`](../scripts/expertise/expertise-seed.mjs)
+- [`scripts/expertise/expertise-sync.mjs`](../scripts/expertise/expertise-sync.mjs)
+- [`scripts/expertise/expertise-apply-proposal.mjs`](../scripts/expertise/expertise-apply-proposal.mjs)
+- [`scripts/expertise/expertise-lifecycle-cli.mjs`](../scripts/expertise/expertise-lifecycle-cli.mjs)
 
 CLI entry points live under `mah expertise` and are wired through [`scripts/meta-agents-harness.mjs`](../scripts/meta-agents-harness.mjs).
 
@@ -136,8 +136,7 @@ In practice:
 - `export` redacts sensitive fields such as `owner_id` and evidence details.
 - `validate:expertise` understands current owner object model.
 - Lifecycle promotion from `experimental` to `active` requires review evidence.
-- Evidence is runtime-only and may be redirected with `MAH_EXPERTISE_EVIDENCE_ROOT`; tests should use temp root.
-- Workspace-local `.mah/expertise/evidence` stays empty except `.gitkeep`; real evidence comes from actual tasks.
+- Evidence is workspace-local and recorded under `.mah/expertise/evidence/`; redirect with `MAH_EXPERTISE_EVIDENCE_ROOT` only when needed (e.g., shared evidence across multiple workspaces). Tests should use a temp root.
 
 ## Evidence Writing Policy
 
@@ -147,6 +146,21 @@ Expertise engine expects high-signal notes and compact observations:
 - reserve `observations` for narrow, time-bound facts
 - compress or prune weak notes before they become session logs
 - avoid raw transcripts, copied output, or narrative summaries in expertise files
+
+## The Compounding Loop
+
+The expertise and context systems form a virtuous cycle across sessions:
+
+- **Session outcomes** produce evidence, expertise notes, and session artifacts.
+- **`mah expertise sync`** bridges those outcomes into the catalog — discovering capabilities, adjusting confidence bands, and strengthening routing data. This is operational strengthening, not maintenance.
+- **`mah context propose --from-session`** extracts reusable knowledge from sessions as governed proposals. Draft → human review → promote to operational. This is governed learning, not a raw memory dump.
+- **Stronger routing confidence** selects better agents for the next task.
+- **Better context** loads the right operational memory for the selected agent.
+- **Better outcomes** close the loop.
+
+In short: **route the right agent → load the right context → show the work → compound over time.**
+
+Each sync and each curated proposal makes the next session marginally better. The system improves through use, not through configuration.
 
 ## Historical Note
 

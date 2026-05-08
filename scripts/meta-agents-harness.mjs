@@ -5,13 +5,19 @@ import { spawnSync } from "node:child_process"
 import os from "node:os"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
-import { RUNTIME_ORDER } from "./runtime-adapters.mjs"
-import { validateRuntimeAdapterContract } from "./runtime-adapter-contract.mjs"
-import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./m3-ops.mjs"
-import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./plugin-loader.mjs"
-import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime-core-ops.mjs"
-import { resolveMahHome } from "./mah-home.mjs"
-import { resolveWorkspaceRoot } from "./workspace-root.mjs"
+import { RUNTIME_ORDER } from "./runtime/runtime-adapters.mjs"
+import { validateRuntimeAdapterContract } from "./runtime/runtime-adapter-contract.mjs"
+import { appendProvenance, buildCrewGraph, buildRunGraphFromProvenance, collectSessions, parseSessionId, readMetaConfig, readProvenance, recordLifecycleEvent, exportSession as exportSessionFn, deleteSession as deleteSessionFn, resumeSession as resumeSessionFn, startSession as startSessionFn } from "./session/m3-ops.mjs"
+import { validatePlugin as validatePluginFn, unloadPlugin as unloadPluginFn, getAllRuntimes, listLoadedPlugins, loadPlugins, MAH_VERSION } from "./runtime/plugin-loader.mjs"
+import { clearActiveCrew, extractCrewArg, listRuntimeCrews, readActiveCrew, resolveCrewConfigPath, writeActiveCrew } from "./runtime/runtime-core-ops.mjs"
+import { resolveMahHome } from "./core/mah-home.mjs"
+import { resolveWorkspaceRoot } from "./core/workspace-root.mjs"
+import { buildContextMemoryExplainPayload } from "./context/context-memory-integration.mjs"
+import { buildAssistantStatePayload } from "./runtime/assistant-state.mjs"
+import { resolveWorkspaceCandidates } from "./routing/workspace-candidate-resolver.mjs"
+import { rankCooperativeCandidates } from "./routing/cooperative-ranking.mjs"
+import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
+import { recordDelegationEvidence } from "./expertise/evidence/evidence-pipeline.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -189,9 +195,16 @@ function printHelp() {
   console.log("Commands:")
   console.log("  detect")
   console.log("  doctor")
-  console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate] [args]")
-  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>]")
+  console.log("  expertise [list|show|seed|sync|recommend|explain|evidence|export|propose|apply-proposal|lifecycle|import]  Expertise catalog management")
+  console.log("  skills [list|inspect|explain|add|remove]  Skills catalog and assignment management")
+  console.log("  context [find|explain|list|show|validate|index|propose|proposals]  Context Manager — operational context retrieval")
+  console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
+  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>] [--provider <id>] [--model <id>] [--api-key <key>] [--base-url <url>] [--require-sprint-mode]  Generate config (add --ai for expertise-aware topology)")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
+  console.log("  task [list|show|create|update|run] [args]")
+  console.log("  mission [list|show|create|update|commit-scope|replan] [args]")
+  console.log("  mcp [list|add|remove|sync] [args]  MCP registry and runtime sync")
+  console.log("  webui [dev|build|preview] [args]  run WebUI (use --prod for build+preview)")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -208,7 +221,7 @@ function printHelp() {
   console.log("  use <crew>")
   console.log("  clear")
   console.log("  delegate --target <agent> --task '<task>' [--runtime <target>] [--crew <id>] [--execute|-x]")
-  console.log("  run [runtime-args]")
+  console.log("  run [runtime-args] [--full-crews]")
   console.log("  plan")
   console.log("  diff")
   console.log("  sync")
@@ -222,6 +235,7 @@ function printHelp() {
   console.log("  --session-id <id>")
   console.log("  --session-root <path>")
   console.log("  --session-mirror / --no-session-mirror")
+  console.log("  --full-crews")
   console.log("  --trace")
   console.log("  --json")
   console.log("  --mermaid")
@@ -232,6 +246,8 @@ function printHelp() {
   console.log("  --agent <name>")
   console.log("  --strict-markers")
   console.log("  --headless                 run in non-interactive mode")
+  console.log("  --verbose                  show full execution plan and child output")
+  console.log("  --quiet                    suppress delegate execution noise (default for --execute)")
   console.log("  --output <json|text>")
   console.log("  -o <json|text>")
 }
@@ -268,6 +284,20 @@ function stripHeadlessArgs(argv) {
   return argv.filter((item) => item !== "--headless" && item !== "--" && !item.startsWith("--output=") && !item.startsWith("-o="))
 }
 
+function extractCodexQuietOutput(raw = "") {
+  const text = `${raw || ""}`.replace(/\r\n/g, "\n")
+  if (!text.trim()) return ""
+  const marker = "\ncodex\n"
+  const lastMarker = text.lastIndexOf(marker)
+  if (lastMarker >= 0) {
+    const start = lastMarker + marker.length
+    const nextTokens = text.indexOf("\ntokens used", start)
+    const segment = (nextTokens >= 0 ? text.slice(start, nextTokens) : text.slice(start)).trim()
+    if (segment) return `${segment}\n`
+  }
+  return ""
+}
+
 function sanitizeEnvOverrides(envOverrides = {}) {
   const sensitiveKeyPattern = /(api[_-]?key|token|secret|password|pass|private|credential|oauth|bearer|pat)/i
   const redacted = {}
@@ -281,12 +311,123 @@ function parseFilterArgs(argv) {
   return {
     runtime: parseValueArg(argv, "--runtime", "-r"),
     crew: parseValueArg(argv, "--crew"),
+    agent: parseValueArg(argv, "--agent"),
+    task: parseValueArg(argv, "--task"),
     run: parseValueArg(argv, "--run"),
     json: hasFlag(argv, "--json"),
     mermaid: hasFlag(argv, "--mermaid"),
     mermaidLevel: parseValueArg(argv, "--mermaid-level"),
     mermaidCapabilities: hasFlag(argv, "--mermaid-capabilities"),
     dryRun: hasFlag(argv, "--dry-run")
+  }
+}
+
+function readCooperativeRoutingConfig() {
+  try {
+    const meta = readMetaConfig(repoRoot)
+    const cfg = meta?.cooperative_routing || {}
+    return {
+      enabled: cfg.enabled !== false,
+      defaultScope: cfg.default_scope === "full_crews" ? "full_crews" : "active_crew",
+      allowedCrews: Array.isArray(cfg.allowed_crews) ? cfg.allowed_crews.filter(Boolean) : [],
+      preferActiveCrewTiebreaker: cfg.prefer_active_crew_tiebreaker !== false
+    }
+  } catch {
+    return {
+      enabled: true,
+      defaultScope: "active_crew",
+      allowedCrews: [],
+      preferActiveCrewTiebreaker: true
+    }
+  }
+}
+
+function resolveRoutingScopeFromArgs(argv = [], routingConfig = readCooperativeRoutingConfig()) {
+  if (hasFlag(argv, "--full-crews")) return "full_crews"
+  return routingConfig.defaultScope || "active_crew"
+}
+
+function stripFullCrewsFlag(argv = []) {
+  return argv.filter((item) => item !== "--full-crews")
+}
+
+function upsertFlagValue(argv = [], flag, value) {
+  const out = []
+  let consumed = false
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i]
+    if (token === flag) {
+      consumed = true
+      i += 1
+      continue
+    }
+    if (token.startsWith(`${flag}=`)) {
+      consumed = true
+      continue
+    }
+    out.push(token)
+  }
+  if (!consumed || value) out.push(flag, value)
+  return out
+}
+
+async function buildCooperativeRoutingDecision({
+  runtime,
+  passthrough,
+  routingScope
+}) {
+  const sourceCrew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+  const routingConfig = readCooperativeRoutingConfig()
+
+  if (routingScope === "full_crews" && !routingConfig.enabled) {
+    return { ok: false, error: "cooperative routing is disabled by config (cooperative_routing.enabled=false)" }
+  }
+
+  const resolver = resolveWorkspaceCandidates({
+    repoRoot,
+    runtime,
+    sourceCrew,
+    routingScope,
+    runtimeProfile: runtimeProfiles[runtime]
+  })
+
+  if (routingConfig.allowedCrews.length > 0) {
+    resolver.candidates = resolver.candidates.filter((candidate) => routingConfig.allowedCrews.includes(candidate.crew))
+    resolver.candidateCrews = [...new Set(resolver.candidates.map((candidate) => candidate.crew))]
+  }
+
+  const { getRegistry } = await import("./expertise/expertise-registry.mjs")
+  const registry = await getRegistry()
+  const expertiseById = Object.fromEntries((registry?.entries || []).map((entry) => [entry.id, entry]))
+
+  const ranking = rankCooperativeCandidates({
+    task: stripFullCrewsFlag(passthrough).join(" "),
+    candidates: resolver.candidates,
+    sourceCrew: resolver.sourceCrew,
+    expertiseById,
+    weights: {
+      activeCrewPreference: routingConfig.preferActiveCrewTiebreaker ? 0.1 : 0
+    }
+  })
+
+  if (!ranking.selected) {
+    return {
+      ok: false,
+      error: `no valid cooperative candidate found (scope=${routingScope}, source_crew=${sourceCrew})`,
+      resolver,
+      ranking
+    }
+  }
+
+  return {
+    ok: true,
+    routingScope,
+    sourceCrew: resolver.sourceCrew,
+    selectedCrew: ranking.selected.crew,
+    selectedAgent: ranking.selected.agent,
+    candidateCrews: resolver.candidateCrews,
+    candidatesCount: resolver.candidates.length,
+    ranking
   }
 }
 
@@ -362,6 +503,93 @@ function runLocalScriptCapture(scriptPath, scriptArgs = []) {
     stdout: child.stdout || "",
     stderr: child.stderr || ""
   }
+}
+
+function runWebUi(argv = []) {
+  const webuiDir = path.join(packageRoot, "webui")
+  if (!existsSync(webuiDir)) {
+    console.error(`ERROR: webui directory not found at ${webuiDir}`)
+    return 1
+  }
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log("Usage: mah webui [dev|build|preview] [vite args]")
+    console.log("")
+    console.log("Examples:")
+    console.log("  mah webui")
+    console.log("  mah webui --host 0.0.0.0 --port 5173")
+    console.log("  mah webui --prod")
+    console.log("  mah webui build")
+    console.log("  mah webui preview --host 0.0.0.0 --port 4173")
+    console.log("")
+    console.log("Flags:")
+    console.log("  --prod         run production flow (build then API-enabled server)")
+    console.log("  dev            start Vite dev server (default)")
+    console.log("  build          build optimized production bundle")
+    console.log("  preview        vite preview (static preview; no MAH API middleware)")
+    return 0
+  }
+  const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
+  const parseDotEnv = (raw = "") => {
+    const out = {}
+    for (const line of `${raw}`.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith("#")) continue
+      const idx = trimmed.indexOf("=")
+      if (idx <= 0) continue
+      const key = trimmed.slice(0, idx).trim()
+      if (!key) continue
+      let value = trimmed.slice(idx + 1).trim()
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1)
+      }
+      out[key] = value
+    }
+    return out
+  }
+  const loadWorkspaceDotEnv = () => {
+    const envPath = path.join(repoRoot, ".env")
+    if (!existsSync(envPath)) return {}
+    try {
+      return parseDotEnv(readFileSync(envPath, "utf-8"))
+    } catch {
+      return {}
+    }
+  }
+  const webUiEnv = { ...process.env, ...loadWorkspaceDotEnv() }
+  const passthrough = [...argv]
+  const prodMode = passthrough.includes("--prod")
+  const cleaned = passthrough.filter((arg) => arg !== "--prod")
+  const first = cleaned[0]
+  const explicitCommand = first === "dev" || first === "build" || first === "preview" ? first : "dev"
+  const viteArgs = explicitCommand === "dev" || explicitCommand === "preview"
+    ? (first === explicitCommand ? cleaned.slice(1) : cleaned)
+    : (first === explicitCommand ? cleaned.slice(1) : cleaned)
+
+  const runNpm = (script, args = []) => spawnSync(npmCmd, ["run", script, "--prefix", webuiDir, ...(args.length ? ["--", ...args] : [])], {
+    cwd: repoRoot,
+    env: webUiEnv,
+    stdio: "inherit",
+  })
+
+  if (prodMode) {
+    const buildResult = runNpm("build")
+    if (typeof buildResult.status !== "number" || buildResult.status !== 0) {
+      if (buildResult.error) console.error(`ERROR: failed to build WebUI: ${buildResult.error.message}`)
+      return typeof buildResult.status === "number" ? buildResult.status : 1
+    }
+    const prodServerArgs = ["--mode", "production", ...viteArgs]
+    const previewResult = runNpm("dev", prodServerArgs)
+    if (typeof previewResult.status === "number") return previewResult.status
+    if (previewResult.error) console.error(`ERROR: failed to start production WebUI server: ${previewResult.error.message}`)
+    return 1
+  }
+
+  const child = runNpm(explicitCommand, viteArgs)
+  if (typeof child.status === "number") return child.status
+  if (child.error) {
+    console.error(`ERROR: failed to run WebUI (${explicitCommand}): ${child.error.message}`)
+  }
+  return 1
 }
 
 function readConfiguredMcpServers() {
@@ -908,21 +1136,72 @@ function printExplain(traceMode, payload) {
   }
   if (payload.active_crew) console.log(`active_crew=${payload.active_crew}`)
   if (payload.target_crew) console.log(`target_crew=${payload.target_crew}`)
+  if (payload.routing_scope) console.log(`routing_scope=${payload.routing_scope}`)
+  if (payload.source_crew) console.log(`routing_source_crew=${payload.source_crew}`)
+  if (typeof payload.candidate_crews_count === "number") {
+    console.log(`routing_candidate_crews=${payload.candidate_crews_count}`)
+  }
+  if (typeof payload.candidate_agents_count === "number") {
+    console.log(`routing_candidate_agents=${payload.candidate_agents_count}`)
+  }
+  if (payload.cooperative_ranking?.selected?.agent) {
+    console.log(`routing_selected_agent=${payload.cooperative_ranking.selected.agent}`)
+    console.log(`routing_selected_crew=${payload.cooperative_ranking.selected.crew}`)
+    console.log(`routing_selected_score=${payload.cooperative_ranking.selected.score}`)
+  }
+  if (payload.command === "run") {
+    console.log("lifecycle_sequence=queued → routed → running → completed|failed")
+  }
 }
 
 function runInit(argv) {
+  if (argv.includes("--help") || argv.includes("-h") || argv.includes("help")) {
+    const runtimes = orderedRuntimeNames(runtimeProfiles).join(", ")
+    console.log("")
+    console.log("mah init — Bootstrap MAH configuration")
+    console.log("")
+    console.log("Usage:")
+    console.log("  mah init [options]")
+    console.log("")
+    console.log("Options:")
+    console.log("  --yes, --non-interactive     Run without interactive prompts")
+    console.log("  --force                      Overwrite existing generated files when needed")
+    console.log("  --crew <name>                Crew id to seed in generated config (default: dev)")
+    console.log(`  --runtime <name>             Runtime marker to create (${runtimes})`)
+    console.log("  --name <name>                Project name")
+    console.log("  --description <text>         Project description")
+    console.log("  --brief <text>               Mission/domain brief used for topology generation")
+    console.log("  --ai, --ai-assisted          Enable AI-assisted topology generation")
+    console.log("  --provider <id>              AI provider (zai|openrouter|codex-oauth|minimax)")
+    console.log("  --model <id>                 AI model identifier")
+    console.log("  --api-key <key>              API key for AI provider")
+    console.log("  --base-url <url>             Custom AI base URL")
+    console.log("  --require-sprint-mode        Force sprint_mode generation in AI bootstrap")
+    console.log("  -h, --help                   Show this help")
+    console.log("")
+    console.log("Examples:")
+    console.log('  mah init --name "bootstrap-team" --crew dev --runtime pi')
+    console.log('  mah init --ai --provider zai --model glm-5 --name "bootstrap-team" --brief "Mobile app development"')
+    return 0
+  }
+
   const runtime = parseValueArg(argv, "--runtime")
   const crew = parseValueArg(argv, "--crew")
   const aiFlag = argv.includes("--ai") || argv.includes("--ai-assisted")
   const projectName = parseValueArg(argv, "--name")
   const projectDescription = parseValueArg(argv, "--description")
   const projectBrief = parseValueArg(argv, "--brief")
+  const aiProvider = parseValueArg(argv, "--provider") || parseValueArg(argv, "--ai-provider")
+  const aiModel = parseValueArg(argv, "--model") || parseValueArg(argv, "--ai-model")
+  const aiApiKey = parseValueArg(argv, "--api-key") || parseValueArg(argv, "--ai-api-key")
+  const aiBaseUrl = parseValueArg(argv, "--base-url") || parseValueArg(argv, "--ai-base-url")
+  const requireSprintMode = argv.includes("--require-sprint-mode")
   const yesFlag = argv.includes("--yes")
   const forceFlag = argv.includes("--force")
   const created = []
   const skipped = []
 
-  const bootstrapArgs = [path.join(packageRoot, "scripts", "bootstrap-meta-agents.mjs")]
+  const bootstrapArgs = [path.join(packageRoot, "scripts", "./bootstrap/bootstrap-meta-agents.mjs")]
   if (!process.stdin.isTTY || yesFlag) {
     bootstrapArgs.push("--non-interactive")
   }
@@ -943,6 +1222,21 @@ function runInit(argv) {
   }
   if (projectBrief) {
     bootstrapArgs.push("--brief", projectBrief)
+  }
+  if (aiProvider) {
+    bootstrapArgs.push("--provider", aiProvider)
+  }
+  if (aiModel) {
+    bootstrapArgs.push("--model", aiModel)
+  }
+  if (aiApiKey) {
+    bootstrapArgs.push("--api-key", aiApiKey)
+  }
+  if (aiBaseUrl) {
+    bootstrapArgs.push("--base-url", aiBaseUrl)
+  }
+  if (requireSprintMode) {
+    bootstrapArgs.push("--require-sprint-mode")
   }
 
   const bootstrapResult = spawnSync("node", bootstrapArgs, {
@@ -1007,6 +1301,7 @@ function printSessionsHelp() {
   console.log("  mah sessions new --runtime <name>    # Start a new session (runtime-dependent)")
   console.log("  mah sessions new --runtime <name> --dry-run  # Preview without spawning")
   console.log("  mah sessions export <id>             # Export session to $MAH_SESSIONS_DIR/<runtime>/<id>.tar.gz")
+  console.log("  mah sessions status <session-id>     # Show lifecycle state and timeline")
   console.log("  mah sessions delete <id> --yes       # Delete session (requires --yes confirmation)")
   console.log("  mah sessions --help                  # Show this help")
   console.log("")
@@ -1023,6 +1318,60 @@ function printSessionsHelp() {
   console.log("")
 }
 
+async function runSessionsStatus(sessionId, jsonMode = false) {
+  const { getLifecycleEvents, collectSessions } = await import('./session/m3-ops.mjs')
+  const { getCurrentState } = await import('../types/lifecycle-event-types.mjs')
+
+  if (!sessionId) {
+    console.error("ERROR: session-id required")
+    console.error("Usage: mah sessions status <session-id> [--json]")
+    return 1
+  }
+
+  const sessions = collectSessions(repoRoot, {})
+  const found = sessions.find(s => s.id === sessionId)
+  const events = getLifecycleEvents(repoRoot, sessionId)
+  const currentState = getCurrentState(events)
+
+  if (jsonMode) {
+    console.log(JSON.stringify({
+      session_id: sessionId,
+      current_state: currentState,
+      runtime: found?.runtime || sessionId.split(':')[0] || 'unknown',
+      crew: found?.crew || sessionId.split(':')[1] || 'unknown',
+      session_id_short: found?.session_id || sessionId.split(':')[2] || sessionId,
+      events,
+      event_count: events.length,
+      timeline: events.map(e => ({ event: e.event, timestamp: e.timestamp }))
+    }, null, 2))
+    return 0
+  }
+
+  console.log(`Session: ${sessionId}`)
+  console.log(`State:   ${currentState}`)
+
+  if (events.length > 0) {
+    console.log(`Timeline (${events.length} events):`)
+    for (const ev of events) {
+      const ts = ev.timestamp ? new Date(ev.timestamp).toISOString().replace('T', ' ').substring(0, 19) : '—'
+      let line = `  ${ts}  ${ev.event.padEnd(16)}`
+      if (ev.event === 'routed' && ev.agent) line += ` → ${ev.agent} (conf: ${typeof ev.routing_confidence === 'number' ? (ev.routing_confidence * 100).toFixed(0) + '%' : '?'})`
+      if (ev.event === 'routed' && ev.routing_reason) line += ` — ${ev.routing_reason}`
+      if (ev.routing_scope) line += ` [scope=${ev.routing_scope}]`
+      if (ev.source_crew) line += ` [source=${ev.source_crew}]`
+      if (ev.selected_crew) line += ` [selected_crew=${ev.selected_crew}]`
+      if (ev.event === 'completed') line += ` (exit: ${ev.result_code})`
+      if (ev.event === 'failed') line += ` — ${ev.result_reason || 'failed'}`
+      if (ev.event === 'context_loaded') line += ` (${ev.context_count || 0} docs)`
+      console.log(line)
+    }
+  } else {
+    console.log("No lifecycle events recorded yet.")
+  }
+
+  return 0
+}
+
 async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const subcommand = argv[0] || "list"
   const filters = parseFilterArgs(argv)
@@ -1034,6 +1383,154 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
   const allRuntimes = await getAllRuntimes()
 
   // Handle subcommands
+  if (subcommand === 'status') {
+    const sessionId = argv[1]
+    return runSessionsStatus(sessionId, jsonMode)
+  }
+
+  if (subcommand === "counts") {
+    const sessionId = argv[1]
+    if (!sessionId) {
+      console.error("ERROR: 'mah sessions counts <id>' requires a session ID")
+      return 1
+    }
+    const { collectSessions } = await import('./session/m3-ops.mjs')
+    const allRt = await getAllRuntimes()
+    const allSes = collectSessions(repoRoot, {}, allRt)
+    const found = allSes.find(s => s.id === sessionId || s.id.endsWith(sessionId) || s.id.includes(sessionId))
+    if (!found) {
+      console.error(`ERROR: session not found: ${sessionId}`)
+      return 1
+    }
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const sessionRoot = found.source_path
+    let conversation = 0, tool_calls = 0, artifacts = 0, delegations = 0
+    try {
+      const convPath = path.join(sessionRoot, "conversation.jsonl")
+      if (fs.existsSync(convPath)) {
+        const content = fs.readFileSync(convPath, "utf-8")
+        conversation = content.trim().split("\n").filter(l => l.trim()).length
+      }
+      const tcPath = path.join(sessionRoot, "tool_calls.jsonl")
+      if (fs.existsSync(tcPath)) {
+        const content = fs.readFileSync(tcPath, "utf-8")
+        tool_calls = content.trim().split("\n").filter(l => l.trim()).length
+      }
+      const artPath = path.join(sessionRoot, "artifacts")
+      if (fs.existsSync(artPath)) {
+        artifacts = fs.readdirSync(artPath).filter(f => !f.startsWith(".")).length
+      }
+      const idxPath = path.join(sessionRoot, "session_index.json")
+      if (fs.existsSync(idxPath)) {
+        try {
+          const idx = JSON.parse(fs.readFileSync(idxPath, "utf-8"))
+          const procs = idx.processes || []
+          delegations = procs.filter((p) => p.parentAgent !== null).length
+        } catch { /* ignore */ }
+      }
+
+      // Claude mirrors persist transcript pointers rather than MAH-native jsonl/index files.
+      // Fallback to transcript-based heuristics when canonical counters are missing.
+      if (conversation === 0 && tool_calls === 0 && artifacts === 0 && delegations === 0) {
+        let transcriptPath = path.join(sessionRoot, "session.transcript.jsonl.link")
+        if (!fs.existsSync(transcriptPath)) {
+          const aliasPath = path.join(sessionRoot, "session.alias.json")
+          if (fs.existsSync(aliasPath)) {
+            try {
+              const alias = JSON.parse(fs.readFileSync(aliasPath, "utf-8"))
+              const fromAlias = `${alias?.transcript_path || ""}`.trim()
+              if (fromAlias) transcriptPath = fromAlias
+            } catch { /* ignore malformed alias */ }
+          }
+        }
+
+        if (transcriptPath && fs.existsSync(transcriptPath)) {
+          try {
+            const lines = fs.readFileSync(transcriptPath, "utf-8")
+              .split("\n")
+              .map((line) => line.trim())
+              .filter(Boolean)
+            for (const line of lines) {
+              let item = null
+              try {
+                item = JSON.parse(line)
+              } catch {
+                continue
+              }
+              if (!item || typeof item !== "object") continue
+
+              const type = `${item.type || ""}`.toLowerCase()
+              if (type === "user" || type === "assistant") conversation += 1
+
+              const content = Array.isArray(item?.message?.content) ? item.message.content : []
+              for (const block of content) {
+                const blockType = `${block?.type || ""}`.toLowerCase()
+                if (blockType === "tool_use" || blockType === "tool") {
+                  tool_calls += 1
+                  const toolName = `${block?.name || block?.tool || block?.tool_name || ""}`.toLowerCase()
+                  if (toolName.includes("task") || toolName.includes("delegate")) delegations += 1
+                }
+                if (blockType === "file" || blockType === "diff" || blockType === "patch" || blockType === "artifact") {
+                  artifacts += 1
+                }
+              }
+
+              const serverToolUse = item?.message?.usage?.server_tool_use
+              if (serverToolUse && typeof serverToolUse === "object") {
+                for (const value of Object.values(serverToolUse)) {
+                  const n = Number.parseInt(`${value ?? 0}`, 10)
+                  if (Number.isFinite(n) && n > 0) tool_calls += n
+                }
+              }
+
+              const attachmentType = `${item?.attachment?.type || ""}`.toLowerCase()
+              if (attachmentType === "artifact" || attachmentType === "file" || attachmentType === "diff" || attachmentType === "patch") {
+                artifacts += 1
+              }
+            }
+          } catch { /* ignore transcript parse failures */ }
+        }
+      }
+
+      // OpenCode mirrors store exported payload in session.export.json.
+      // Use it as a fallback source for counts when jsonl/index files are absent.
+      const opencodeExportPath = path.join(sessionRoot, "session.export.json")
+      if (fs.existsSync(opencodeExportPath)) {
+        try {
+          const payload = JSON.parse(fs.readFileSync(opencodeExportPath, "utf-8"))
+          const messages = Array.isArray(payload?.messages) ? payload.messages : []
+          if (conversation === 0) conversation = messages.length
+
+          if (tool_calls === 0 || delegations === 0 || artifacts === 0) {
+            let toolCount = 0
+            let delegationCount = 0
+            let artifactPartCount = 0
+            for (const message of messages) {
+              const parts = Array.isArray(message?.parts) ? message.parts : []
+              for (const part of parts) {
+                const type = `${part?.type || ""}`.toLowerCase()
+                if (type === "tool") {
+                  toolCount += 1
+                  const toolName = `${part?.tool || part?.name || part?.tool_name || ""}`.toLowerCase()
+                  if (toolName.includes("task") || toolName.includes("delegate")) delegationCount += 1
+                }
+                if (type === "file" || type === "diff" || type === "patch" || type === "artifact") artifactPartCount += 1
+              }
+            }
+            if (tool_calls === 0) tool_calls = toolCount
+            if (delegations === 0) delegations = delegationCount
+
+            const summaryFiles = Number.parseInt(`${payload?.info?.summary?.files ?? 0}`, 10) || 0
+            if (artifacts === 0) artifacts = Math.max(summaryFiles, artifactPartCount)
+          }
+        } catch { /* ignore malformed export */ }
+      }
+    } catch { /* counts may not exist */ }
+    console.log(JSON.stringify({ session_id: sessionId, counts: { conversation, tool_calls, artifacts, delegations } }, null, 2))
+    return 0
+  }
+
   if (subcommand === "list") {
     const rows = collectSessions(repoRoot, { runtime: effectiveRuntime, crew: filters.crew }, allRuntimes)
     if (filters.json) {
@@ -1062,20 +1559,27 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error(`ERROR: invalid session ID format: ${sessionId} (expected runtime:crew:sessionId)`)
       return 1
     }
-    const targetRuntime = effectiveRuntime || parsedSessionId.runtime
-    const sessions = collectSessions(repoRoot, { runtime: targetRuntime }, allRuntimes)
-    const session = sessions.find((s) => s.id === sessionId)
-    if (!session) {
-      console.error(`ERROR: session not found: ${sessionId}`)
-      return 1
-    }
+    const targetRuntime = filters.runtime || parsedSessionId.runtime
     const resumeResult = resumeSessionFn(repoRoot, sessionId, targetRuntime, argv.slice(2), allRuntimes)
     if (!resumeResult.ok) {
       console.error(`ERROR: ${resumeResult.error}`)
       return 1
     }
+    const opencodeDirectResume = targetRuntime === "opencode"
+    const opencodeResumeArgs = opencodeDirectResume
+      ? ["--session", parsedSessionId.sessionId]
+      : []
+    const opencodeResumeExec = opencodeDirectResume
+      ? (allRuntimes?.[targetRuntime]?.directCli || "opencode")
+      : ""
     // Dry-run: print the command plan without dispatching
     if (filters.dryRun) {
+      if (opencodeDirectResume) {
+        console.log(`[dry-run] Would resume session '${sessionId}' with runtime '${targetRuntime}'`)
+        console.log(`[dry-run] exec=${opencodeResumeExec}`)
+        console.log(`[dry-run] args=${opencodeResumeArgs.join(" ")}`)
+        return 0
+      }
       const plan = resolveDispatchPlan(targetRuntime, "run", resumeResult.args)
       if (plan.error) {
         console.error(`ERROR: ${plan.error}`)
@@ -1085,6 +1589,9 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.log(`[dry-run] exec=${plan.exec}`)
       console.log(`[dry-run] args=${[...plan.args, ...plan.passthrough].join(" ")}`)
       return 0
+    }
+    if (opencodeDirectResume) {
+      return runCommand(opencodeResumeExec, opencodeResumeArgs, [], {}, { headless: false })
     }
     // Dispatch the run command with session context
     return dispatch(targetRuntime, "run", resumeResult.args)
@@ -1143,7 +1650,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
       console.error(`ERROR: unknown format '${format}'. Use: mah-json, summary-md, runtime-raw`)
       return 1
     }
-    const { exportSession } = await import("./session-export.mjs")
+    const { exportSession } = await import("./session/session-export.mjs")
     const exportResult = await exportSession(repoRoot, sessionId, format, allRuntimes)
     if (!exportResult.ok) {
       console.error(`ERROR: ${exportResult.error}`)
@@ -1176,9 +1683,9 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
 
     // Import and use session-injection
-    const { injectSessionContext } = await import("./session-injection.mjs")
-    const { parseSessionId } = await import("./m3-ops.mjs")
-    const { collectSessions } = await import("./m3-ops.mjs")
+    const { injectSessionContext } = await import("./session/session-injection.mjs")
+    const { parseSessionId } = await import("./session/m3-ops.mjs")
+    const { collectSessions } = await import("./session/m3-ops.mjs")
 
     const parsed = parseSessionId(sessionId)
     if (!parsed) {
@@ -1194,7 +1701,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     }
 
     // Build envelope from session ref
-    const { buildMahSessionEnvelope } = await import("./session-export.mjs")
+    const { buildMahSessionEnvelope } = await import("./session/session-export.mjs")
     const envelope = buildMahSessionEnvelope(sessionRef)
 
     const result = await injectSessionContext(repoRoot, envelope, targetRuntime, fidelityLevel, {
@@ -1232,7 +1739,7 @@ async function runSessions(argv, jsonMode = false, detectedRuntime = "") {
     const fidelityIdx = argv.indexOf("--fidelity")
     const fidelityLevel = fidelityIdx !== -1 ? argv[fidelityIdx + 1] : "contextual"
 
-    const { bridgeSession } = await import("./session-bridge.mjs")
+    const { bridgeSession } = await import("./session/session-bridge.mjs")
     const result = await bridgeSession(repoRoot, sessionId, targetRuntime, {
       fidelityLevel,
       runtimeRegistry: allRuntimes
@@ -1692,10 +2199,10 @@ async function runPlugins(argv, jsonMode = false) {
           if (validation.adapter?.runtimePackage === false) {
             console.log(`runtime provisioning skipped=${directCli}`)
           } else {
-          // Derive npm package name: directCli or runtimePackage override
+            // Derive npm package name: directCli or runtimePackage override
             let npmPackage = validation.adapter?.runtimePackage
             if (!npmPackage) {
-            // Convention: kilo -> @kilocode/cli, opencode -> @opencodeai/cli
+              // Convention: kilo -> @kilocode/cli, opencode -> @opencodeai/cli
               if (directCli === "kilo") {
                 npmPackage = "@kilocode/cli"
               } else if (directCli === "opencode") {
@@ -2014,28 +2521,30 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     }
   }
 
-  // Check if adapter supports headless execution
   const supportsHeadless = typeof adapter.prepareHeadlessRunContext === "function"
   if (!supportsHeadless) {
-    // Fall back to dispatchCapture for non-headless-aware adapters
     const captured = dispatchCapture(runtime, command, passthrough)
     return captured
   }
 
-  // Normalize args - strip headless/output flags for passthrough
   const normalizedPassthrough = stripHeadlessArgs(passthrough)
   const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
   const envOverrides = { ...normalized.envOverrides }
-
-  // Get headless execution plan from adapter
+  const crew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+  const headlessSessionId = `${runtime}:mah:headless-${Date.now()}`
   const headlessPlan = adapter.prepareHeadlessRunContext({
+    task: normalized.args.join(" "),
     repoRoot,
     runtime,
     adapter,
-    crew: normalizedPassthrough,
-    task: normalized.args.join(" "),
+    crew,
     argv: normalized.args,
     envOverrides
+  })
+
+  recordLifecycleEvent(repoRoot, headlessSessionId, {
+    event: "running",
+    details: { task: (normalized?.args?.join(" ") || "").substring(0, 100), runtime }
   })
 
   if (!headlessPlan || headlessPlan.error) {
@@ -2043,7 +2552,8 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
       status: 1,
       stdout: "",
       stderr: headlessPlan?.error || "failed to prepare headless run context",
-      error: headlessPlan?.error || "failed to prepare headless run context"
+      error: headlessPlan?.error || "failed to prepare headless run context",
+      sessionId: headlessSessionId
     }
   }
 
@@ -2055,6 +2565,22 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
     { headless: true }
   )
+  recordLifecycleEvent(repoRoot, headlessSessionId, {
+    event: result.status === 0 ? "completed" : "failed",
+    result_code: result.status,
+    result_reason: result.status === 0 ? "headless-execution-success" : (result.error || "headless-execution-failed")
+  })
+
+  const executionResult = normalizeExecutionResult({
+    runtime,
+    crew: headlessPlan.crew || 'unknown',
+    agent: 'unknown',
+    task: headlessPlan.task || normalized.args.join(' '),
+    output: result.stdout || '',
+    exitCode: result.status,
+    elapsedMs: headlessPlan.execution_time_ms || 0,
+    sessionId: headlessPlan.session_id || headlessSessionId
+  })
 
   // Format output based on output mode
   if (outputMode === "json") {
@@ -2066,7 +2592,9 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
       stderr: result.stderr || "",
       crew: headlessPlan.crew || "",
       session_id: headlessPlan.session_id || "",
-      execution_time_ms: headlessPlan.execution_time_ms || 0
+      execution_time_ms: headlessPlan.execution_time_ms || 0,
+      sessionId: headlessSessionId,
+      execution_result: executionResult
     }
     return envelope
   }
@@ -2081,7 +2609,7 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     result.stderr = stripHermesSplash(result.stderr)
   }
   process.stdout.write(result.stdout || "")
-  return result
+  return { ...result, sessionId: headlessSessionId, execution_result: executionResult }
 }
 
 function isSyncLikeCommand(command) {
@@ -2100,10 +2628,13 @@ function isSyncLikeCommand(command) {
  */
 async function runDelegate(passthrough, options = {}) {
   const startTimeMs = Date.now()
+  const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
   const execute = passthrough.includes("--execute") || passthrough.includes("-x")
   const headless = options.headless === true
+  const verbose = passthrough.includes("--verbose")
+  const quiet = !verbose && !passthrough.includes("--quiet=false")
   const autoMode = passthrough.includes("--auto")
-  const runArgs = passthrough.filter(a => a !== "--execute" && a !== "-x" && a !== "--auto" && a !== "--headless")
+  const runArgs = passthrough.filter(a => !["--execute", "-x", "--auto", "--headless", "--verbose", "--quiet"].includes(a))
   const target = parseValueArg(runArgs, "--target")
   const task = parseValueArg(runArgs, "--task")
   const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
@@ -2124,9 +2655,9 @@ async function runDelegate(passthrough, options = {}) {
   }
 
   // Dynamic imports — keeps the delegate surface lazy-loaded
-  const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./child-agent-spawn.mjs")
-  const { codexSidecarAdapter } = await import("./child-agent-codex-sidecar.mjs")
-  const { nativeRuntimeAdapter } = await import("./child-agent-native-runtime.mjs")
+  const { prepareChildSpawn, registerChildAgentAdapter, clearAdapters } = await import("./runtime/child-agent-spawn.mjs")
+  const { codexSidecarAdapter } = await import("./runtime/child-agent-codex-sidecar.mjs")
+  const { nativeRuntimeAdapter } = await import("./runtime/child-agent-native-runtime.mjs")
 
   // Register adapters (fresh each invocation)
   clearAdapters()
@@ -2137,6 +2668,11 @@ async function runDelegate(passthrough, options = {}) {
   const runtimeFromGlobalFlag = parseRuntimeBeforeCommand(process.argv.slice(2), "delegate")
   const sourceRuntime = process.env.MAH_RUNTIME || runtimeFromGlobalFlag || "pi"
   const effectiveTargetRuntime = targetRuntime || sourceRuntime
+  const delegateSessionId = `${sourceRuntime}:${crew || "default"}:delegate-${Date.now()}`
+  recordLifecycleEvent(repoRoot, delegateSessionId, {
+    event: "queued",
+    details: { task: (task || "").substring(0, 100), autoMode, sourceAgent: sourceAgent || "" }
+  })
 
   // Initialize expertise-related variables
   let expertiseSelected = null
@@ -2149,9 +2685,9 @@ async function runDelegate(passthrough, options = {}) {
   if (autoMode) {
     // Mode A: Auto-selection using expertise scoring
     try {
-      const { listDelegationTargets } = await import("./delegation-resolution.mjs")
-      const { scoreCandidates } = await import("./expertise-routing.mjs")
-      const { getRegistry } = await import("./expertise-registry.mjs")
+      const { listDelegationTargets } = await import("./runtime/delegation-resolution.mjs")
+      const { scoreCandidates } = await import("./expertise/expertise-routing.mjs")
+      const { getRegistry } = await import("./expertise/expertise-registry.mjs")
 
       // Get policy-allowed candidates
       const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
@@ -2206,7 +2742,7 @@ async function runDelegate(passthrough, options = {}) {
       console.error(`WARNING: expertise scoring failed: ${err.message}`)
       // Fall back to first allowed target if we have one
       try {
-        const { listDelegationTargets } = await import("./delegation-resolution.mjs")
+        const { listDelegationTargets } = await import("./runtime/delegation-resolution.mjs")
         const listResult = listDelegationTargets({ crew, sourceAgent, repoRoot })
         if (listResult.ok && listResult.targets.length > 0) {
           effectiveTarget = listResult.targets[0]
@@ -2222,9 +2758,9 @@ async function runDelegate(passthrough, options = {}) {
     // Mode B: Explicit target with expertise review
     // First, verify the explicit target is policy-allowed via delegation-resolution
     try {
-      const { resolveDelegationTarget, listDelegationTargets } = await import("./delegation-resolution.mjs")
-      const { scoreCandidates } = await import("./expertise-routing.mjs")
-      const { getRegistry } = await import("./expertise-registry.mjs")
+      const { resolveDelegationTarget, listDelegationTargets } = await import("./runtime/delegation-resolution.mjs")
+      const { scoreCandidates } = await import("./expertise/expertise-routing.mjs")
+      const { getRegistry } = await import("./expertise/expertise-registry.mjs")
 
       // Resolve explicit target against policy
       const resolveResult = resolveDelegationTarget({
@@ -2295,7 +2831,9 @@ async function runDelegate(passthrough, options = {}) {
   })
 
   if (
+    execute &&
     (sourceRuntime === "opencode" && effectiveTargetRuntime === "opencode" && effectiveTarget !== "orchestrator") ||
+    execute &&
     (sourceRuntime === "kilo" && effectiveTargetRuntime === "kilo" && effectiveTarget !== "orchestrator")
   ) {
     console.error(`ERROR: ${sourceRuntime} runtime cannot launch subagents as primary agents in same-runtime delegation.`)
@@ -2321,7 +2859,18 @@ async function runDelegate(passthrough, options = {}) {
     return 1
   }
 
+  recordLifecycleEvent(repoRoot, delegateSessionId, {
+    event: "routed",
+    agent: effectiveTarget,
+    agent_name: effectiveTarget,
+    routing_reason: expertiseWarning || "expertise-scored",
+    routing_confidence: expertiseScore,
+    details: { targetRuntime: result?.context?.targetRuntime || "", sourceRuntime }
+  })
+
   if (headless) {
+    let headlessPlan
+
     // For native delegation, reuse MAH's proven headless run pipeline instead of
     // reconstructing runtime-specific headless plans inline.
     if (result.context.mode === "native-same-runtime") {
@@ -2349,6 +2898,11 @@ async function runDelegate(passthrough, options = {}) {
           "headless execution delegated to MAH run pipeline"
         ]
       }
+    } else if (result.context.mode === "cross-runtime-sidecar") {
+      // Sidecar adapter already prepared the complete headless plan — use it directly
+      // No need to call prepareHeadlessRunContext on target runtime adapter
+      headlessPlan = result.plan
+      result.plan = headlessPlan
     } else {
       const adapter = runtimeProfiles[result.context.targetRuntime]
       if (!adapter) {
@@ -2359,7 +2913,7 @@ async function runDelegate(passthrough, options = {}) {
         console.error(`ERROR: runtime '${result.context.targetRuntime}' does not support headless execution`)
         return 1
       }
-      const headlessPlan = adapter.prepareHeadlessRunContext({
+      headlessPlan = await adapter.prepareHeadlessRunContext({
         repoRoot,
         runtime: result.context.targetRuntime,
         adapter,
@@ -2399,44 +2953,46 @@ async function runDelegate(passthrough, options = {}) {
     }
   }
 
-  // Structured output (key=value, consistent with other mah commands)
-  console.log("ok=true")
-  console.log(`logical_target=${effectiveTarget}`)
-  console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
-  console.log(`mode=${result.context.mode}`)
-  console.log(`source_runtime=${result.context.sourceRuntime}`)
-  console.log(`target_runtime=${result.context.targetRuntime}`)
-  console.log(`exec=${result.plan.exec}`)
-  console.log(`args=${result.plan.args.join(" ")}`)
-  if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
-    const safeEnvOverrides = sanitizeEnvOverrides(result.plan.envOverrides)
-    console.log(`env_overrides=${Object.entries(safeEnvOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
-  }
-  if (result.warnings && result.warnings.length > 0) {
-    for (const w of result.warnings) {
-      console.log(`warning=${w}`)
+  if (headless || verbose || !execute || !quiet) {
+    // Structured output (key=value, consistent with other mah commands)
+    console.log("ok=true")
+    console.log(`logical_target=${effectiveTarget}`)
+    console.log(`effective_target=${result.context.effectiveLogicalTarget}`)
+    console.log(`mode=${headless ? "headless" : result.context.mode}`)
+    console.log(`source_runtime=${result.context.sourceRuntime}`)
+    console.log(`target_runtime=${result.context.targetRuntime}`)
+    console.log(`exec=${result.plan.exec}`)
+    console.log(`args=${result.plan.args.join(" ")}`)
+    if (result.plan.envOverrides && Object.keys(result.plan.envOverrides).length > 0) {
+      const safeEnvOverrides = sanitizeEnvOverrides(result.plan.envOverrides)
+      console.log(`env_overrides=${Object.entries(safeEnvOverrides).map(([k, v]) => `${k}=${v}`).join(",")}`)
+    }
+    if (result.warnings && result.warnings.length > 0) {
+      for (const w of result.warnings) {
+        console.log(`warning=${w}`)
+      }
+    }
+
+    // Expertise scoring output fields
+    if (expertiseSelected) {
+      console.log(`expertise_selected=${expertiseSelected}`)
+    }
+    if (expertiseScore !== null) {
+      console.log(`expertise_score=${expertiseScore.toFixed(3)}`)
+    }
+    if (expertiseWarning) {
+      console.log(`expertise_warning=${expertiseWarning}`)
+    }
+    if (canonicalTargetModel) {
+      console.log(`model_canonical=${canonicalTargetModel}`)
+    }
+    if (modelIdentityTask) {
+      console.log(`model_identity_task=true`)
     }
   }
 
-  // Expertise scoring output fields
-  if (expertiseSelected) {
-    console.log(`expertise_selected=${expertiseSelected}`)
-  }
-  if (expertiseScore !== null) {
-    console.log(`expertise_score=${expertiseScore.toFixed(3)}`)
-  }
-  if (expertiseWarning) {
-    console.log(`expertise_warning=${expertiseWarning}`)
-  }
-  if (canonicalTargetModel) {
-    console.log(`model_canonical=${canonicalTargetModel}`)
-  }
-  if (modelIdentityTask) {
-    console.log(`model_identity_task=true`)
-  }
-
   if (execute) {
-    console.log("--- executing ---")
+    if (headless || verbose || !quiet) console.log("--- executing ---")
     const { spawnSync } = await import("node:child_process")
     const forceCanonicalModelOutput = modelIdentityTask && Boolean(canonicalTargetModel)
     const child = spawnSync(result.plan.exec, [...(result.plan.args || []), ...(result.plan.passthrough || [])], {
@@ -2446,9 +3002,23 @@ async function runDelegate(passthrough, options = {}) {
     })
     const stdout = child.stdout ? child.stdout.toString() : ""
     const stderr = child.stderr ? child.stderr.toString() : ""
-    if (headless && stdout) process.stdout.write(stdout)
-    if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
-    if (headless && !stdout.trim() && !stderr.trim()) {
+    if (headless && verbose) {
+      if (stdout) process.stdout.write(stdout)
+      if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
+    } else if (headless && quiet) {
+      if (result.context.targetRuntime === "codex" && result.context.mode === "cross-runtime-sidecar") {
+        const reduced = extractCodexQuietOutput(stdout)
+        if (reduced) process.stdout.write(reduced)
+      } else if (stdout.trim()) {
+        process.stdout.write(`${stdout.trim()}\n`)
+      }
+      const exitCode = typeof child.status === "number" ? child.status : 1
+      if (exitCode !== 0 && stderr.trim()) process.stderr.write(`${stderr.trim()}\n`)
+    } else {
+      if (headless && stdout) process.stdout.write(stdout)
+      if ((headless || forceCanonicalModelOutput) && stderr) process.stderr.write(stderr)
+    }
+    if ((verbose || !quiet) && headless && !stdout.trim() && !stderr.trim()) {
       console.log("child_stdout=<empty>")
       console.log("child_stderr=<empty>")
     }
@@ -2464,7 +3034,27 @@ async function runDelegate(passthrough, options = {}) {
       }
     }
     const exitCode = typeof child.status === "number" ? child.status : 1
-    console.log(`exit_code=${exitCode}`)
+    recordLifecycleEvent(repoRoot, delegateSessionId, {
+      event: exitCode === 0 ? "completed" : "failed",
+      result_code: exitCode,
+      result_reason: exitCode === 0 ? "success" : "non-zero exit",
+      error_detail: exitCode !== 0 ? { exitCode } : null
+    })
+    if (verbose && delegateSessionId) {
+      const { getLifecycleEvents } = await import("./session/m3-ops.mjs")
+      const delegateEvents = getLifecycleEvents(repoRoot, delegateSessionId)
+      if (delegateEvents.length > 0) {
+        console.log("\nLifecycle timeline:")
+        for (const ev of delegateEvents) {
+          const ts = ev.timestamp ? new Date(ev.timestamp).toISOString().substring(11, 19) : "—"
+          let line = `  [${ts}] ${ev.event}`
+          if (ev.agent) line += ` → ${ev.agent} (conf: ${typeof ev.routing_confidence === "number" ? (ev.routing_confidence * 100).toFixed(0) + "%" : "?"})`
+          if (ev.result_code !== undefined) line += ` (exit: ${ev.result_code})`
+          console.log(line)
+        }
+      }
+    }
+    if (verbose || !quiet || exitCode !== 0) console.log(`exit_code=${exitCode}`)
     if (child.error) console.log(`error=${child.error.message}`)
     // Record evidence for executed delegation
     await recordDelegationEvidence({
@@ -2474,6 +3064,7 @@ async function runDelegate(passthrough, options = {}) {
       outcome: exitCode === 0 ? "success" : "failure",
       durationMs: Date.now() - startTimeMs,
       sourceAgent,
+      sessionId: delegateSessionId || process.env.MAH_SESSION_ID || null,
       isExecuted: true
     })
     return exitCode
@@ -2487,58 +3078,11 @@ async function runDelegate(passthrough, options = {}) {
     outcome: "success",
     durationMs: 0,
     sourceAgent,
+    sessionId: delegateSessionId || process.env.MAH_SESSION_ID || null,
     isExecuted: false
   })
 
   return 0
-}
-
-/**
- * Record delegation evidence to the evidence store.
- * @param {Object} params
- */
-async function recordDelegationEvidence({ crew, expertiseId, taskDescription, outcome, durationMs, sourceAgent, isExecuted }) {
-  try {
-    const { recordEvidence } = await import("./expertise-evidence-store.mjs")
-    const { randomUUID } = await import("node:crypto")
-
-    // Map task description to task type via simple keyword detection
-    const taskLower = (taskDescription || "").toLowerCase()
-    /** @type {string} */
-    let taskType = "general"
-    if (taskLower.includes("implement") || taskLower.includes("build") || taskLower.includes("write") || taskLower.includes("code")) {
-      taskType = "code-generation"
-    } else if (taskLower.includes("test") || taskLower.includes("verify")) {
-      taskType = "testing"
-    } else if (taskLower.includes("review") || taskLower.includes("audit")) {
-      taskType = "review"
-    } else if (taskLower.includes("plan") || taskLower.includes("design") || taskLower.includes("architecture")) {
-      taskType = "planning"
-    } else if (taskLower.includes("deploy") || taskLower.includes("release")) {
-      taskType = "deployment"
-    }
-
-    const evidence = {
-      id: `ev-${Date.now()}-${randomUUID().slice(0, 8)}`,
-      expertise_id: `${crew}:${expertiseId}`,
-      outcome,
-      task_type: taskType,
-      task_description: taskDescription,
-      duration_ms: durationMs,
-      quality_signals: {
-        review_pass: outcome === "success" && isExecuted ? true : undefined,
-        rejection_count: outcome === "failure" ? 1 : 0
-      },
-      source_agent: sourceAgent,
-      source_session: process.env.MAH_SESSION_ID || "cli",
-      recorded_at: new Date().toISOString()
-    }
-
-    await recordEvidence(evidence)
-  } catch (err) {
-    // Evidence recording is best-effort — never block delegation output
-    console.error(`[expertise-evidence] failed to record evidence: ${err.message}`)
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2546,16 +3090,17 @@ async function recordDelegationEvidence({ crew, expertiseId, taskDescription, ou
 // ---------------------------------------------------------------------------
 
 /**
- * Parse --crew, --json, and other common flags from argv.
+ * Parse --crew, --json, --verbose, and other common flags from argv.
  * @param {string[]} argv
- * @returns {{ crew: string, json: boolean, extras: string[] }}
+ * @returns {{ crew: string, json: boolean, verbose: boolean, extras: string[] }}
  */
 function parseExpertiseFlags(argv) {
   const crew = parseValueArg(argv, '--crew') || process.env.MAH_ACTIVE_CREW || 'dev'
   const json = argv.includes('--json')
+  const verbose = argv.includes('--verbose')
   // Strip flags from extras
-  const extras = argv.filter(a => !a.startsWith('--') || a === '--json' || a.startsWith('--crew') || a.startsWith('--limit'))
-  return { crew, json, extras }
+  const extras = argv.filter(a => !a.startsWith('--') || a === '--json' || a === '--verbose' || a.startsWith('--crew') || a.startsWith('--limit'))
+  return { crew, json, verbose, extras }
 }
 
 /**
@@ -2588,6 +3133,37 @@ function formatValidation(status) {
   return map[status] || status
 }
 
+function joinOrNone(arr) {
+  return Array.isArray(arr) && arr.length > 0 ? arr.join(', ') : 'none'
+}
+
+function summarizeCapabilityFit(task, candidate) {
+  const expertise = candidate?.expertise || {}
+  const taskText = String(task || '').toLowerCase()
+  const capMatches = (expertise.capabilities || [])
+    .map(c => c?.name || c)
+    .filter(Boolean)
+    .filter(c => taskText.includes(String(c).toLowerCase()))
+    .slice(0, 2)
+  const domainMatches = (expertise.domains || [])
+    .filter(Boolean)
+    .filter(d => taskText.includes(String(d).toLowerCase()))
+    .slice(0, 2)
+
+  if (capMatches.length > 0) return `capability match: ${capMatches.join(', ')}`
+  if (domainMatches.length > 0) return `domain match: ${domainMatches.join(', ')}`
+  return 'general expertise fit'
+}
+
+function topEvidenceHint(scoreData, scoringResult) {
+  const penalties = scoreData?.penalties_applied || []
+  const blocked = scoreData?.blocked_filters || []
+  if (blocked.length > 0) return `blocked by ${blocked[0]}`
+  if (penalties.length > 0) return `penalty: ${penalties[0]}`
+  if (scoringResult?.explain?.selected_reason) return scoringResult.explain.selected_reason
+  return 'ranked by match + confidence'
+}
+
 /**
  * Run expertise subcommand.
  * @param {string[]} argv
@@ -2602,23 +3178,34 @@ async function runContext(argv, jsonMode = false) {
   if (!sub || sub === "--help" || sub === "-h") {
     console.log(`Usage: mah context <subcommand> [options]
 
-Context Memory — operational context retrieval for MAH agents
+Context Manager — operational context retrieval for MAH agents
 
 Subcommands:
-  validate [--strict] [--path <dir>]   Validate context memory documents
+  validate [--strict] [--path <dir>]   Validate context manager documents
   index [--rebuild]                    Build or update the context index
-  list [--agent <name>] [--capability] List context memory documents
+  list [--agent <name>] [--capability] List context manager documents
   show <id>                            Show a specific context document
   find --agent <name> --task "<desc>"  Find relevant context for a task
-  explain --agent <name> --task "<desc>" Explain retrieval reasoning
-  propose --from-session <ref>         Create memory proposal from session
+  explain --agent <name> --task "<desc>" [--verbose] Explain retrieval reasoning
+  propose --from-session <ref>         Create governed memory proposal from session (requires review before promotion)
+    Optional AI rewrite flags:
+      --ai
+      --provider <zai|openrouter|codex-oauth|minimax>
+      --model <id>
+      --api-key <key>
+      --base-url <url>
+      --endpoint </chat/completions|/responses>
+  proposals list [--json]             List proposals with statuses
+  proposals show <id> [--json]        Show proposal with overlap detection
+  proposals promote <id> [--stability <level>] [--force] [--json]  Promote to operational
+  proposals reject <id> --reason "..." [--json]  Reject proposal
 
 Options:
   --json        JSON output mode
   --strict      Strict validation (unknown fields = errors)
   --help, -h    Show this help message
 
-Context Memory is separate from Expertise routing. It provides operational
+Context Manager is separate from Expertise routing. It provides operational
 detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     return 0
   }
@@ -2631,8 +3218,8 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
       ? path.resolve(repoRoot, subArgv[pathIdx + 1])
       : path.join(contextRoot, "operational")
 
-    const { parseContextFile } = await import("./context-memory-schema.mjs")
-    const { validateContextMemoryDocument } = await import("./context-memory-validate.mjs")
+    const { parseContextFile } = await import("./context/context-memory-schema.mjs")
+    const { validateContextMemoryDocument } = await import("./context/context-memory-validate.mjs")
     const { readdirSync } = await import("node:fs")
 
     const files = []
@@ -2643,7 +3230,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           if (entry.isDirectory()) { walk(full); continue }
           if (entry.name.endsWith(".md") || entry.name.endsWith(".qmd")) files.push(full)
         }
-      } catch {}
+      } catch { }
     }
     walk(targetPath)
 
@@ -2687,7 +3274,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const capIdx = subArgv.indexOf("--capability")
     const capFilter = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
-    const { parseContextFile } = await import("./context-memory-schema.mjs")
+    const { parseContextFile } = await import("./context/context-memory-schema.mjs")
     const { readdirSync } = await import("node:fs")
 
     const searchDirs = [path.join(contextRoot, "operational")]
@@ -2702,7 +3289,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           }
         }
         walk(dir)
-      } catch {}
+      } catch { }
     }
 
     const docs = []
@@ -2718,8 +3305,8 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     if (jsonMode) {
       console.log(JSON.stringify({ documents: docs }, null, 2))
     } else {
-      if (docs.length === 0) { console.log("No context memory documents found."); return 0 }
-      console.log("=== Context Memory Documents ===\n")
+      if (docs.length === 0) { console.log("No context manager documents found."); return 0 }
+      console.log("=== Context Manager Documents ===\n")
       console.log("ID".padEnd(60) + " Kind".padEnd(22) + " Stability".padEnd(12) + " Priority".padEnd(10))
       console.log("─".repeat(60) + " " + "─".repeat(22) + " " + "─".repeat(12) + " " + "─".repeat(10))
       for (const d of docs) console.log(d.id.padEnd(60) + " " + d.kind.padEnd(22) + " " + d.stability.padEnd(12) + " " + d.priority.padEnd(10))
@@ -2733,7 +3320,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const docId = subArgv.find(a => !a.startsWith("--"))
     if (!docId) { console.error("ERROR: usage: mah context show <id>"); return 1 }
 
-    const { parseContextFile, deriveDocId } = await import("./context-memory-schema.mjs")
+    const { parseContextFile, deriveDocId } = await import("./context/context-memory-schema.mjs")
     const { readdirSync } = await import("node:fs")
 
     const searchDirs = [path.join(contextRoot, "operational")]
@@ -2748,7 +3335,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           }
         }
         walk(dir)
-      } catch {}
+      } catch { }
     }
 
     for (const file of files) {
@@ -2781,7 +3368,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
   if (sub === "index") {
     const rebuild = subArgv.includes("--rebuild")
 
-    const { buildOperationalIndex, loadIndex } = await import("./context-memory-schema.mjs")
+    const { buildOperationalIndex, loadIndex } = await import("./context/context-memory-schema.mjs")
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
 
     const result = buildOperationalIndex(contextRoot, { rebuild })
@@ -2795,7 +3382,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
         errors: result.errors,
       }, null, 2))
     } else {
-      console.log("=== Context Memory Index ===")
+      console.log("=== Context Manager Index ===")
       console.log("Total documents: " + result.total_documents)
       console.log("New: " + result.new)
       console.log("Updated: " + result.updated)
@@ -2811,6 +3398,27 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
 
   // --- mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
   if (sub === "find") {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json]
+
+Find operational context documents relevant to a task for a specific agent.
+
+Arguments:
+  --agent <name>     Agent name (e.g. backend-dev)
+  --task "<desc>"    Task description to match against context
+  --capability <cap> Optional capability hint to narrow retrieval
+  --json             JSON output mode
+
+Output:
+  Matched documents with relevance score, capability tags, and excerpt.
+  Returns top matches with the most specific capability signal.
+
+Examples:
+  mah context find --agent backend-dev --task "implement clickup integration"
+  mah context find --agent planning-lead --task "sprint planning" --capability backlog-planning
+`)
+      return 0
+    }
     const agentIdx = subArgv.indexOf("--agent")
     const taskIdx = subArgv.indexOf("--task")
     const capIdx = subArgv.indexOf("--capability")
@@ -2821,11 +3429,11 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
     if (!agent || !task) {
-      console.error("ERROR: usage: mah context find --agent <name> --task "<desc>" [--capability <cap>]")
+      console.error('ERROR: usage: mah context find --agent <name> --task "<desc>" [--capability <cap>]')
       return 1
     }
 
-    const { loadIndex, buildOperationalIndex, retrieveDocuments } = await import("./context-memory-schema.mjs")
+    const { loadIndex, buildOperationalIndex, retrieveDocuments } = await import("./context/context-memory-schema.mjs")
 
     // Try to load existing index first, build if needed
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
@@ -2858,7 +3466,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
         console.log("No matching documents found.")
         return 0
       }
-      console.log("=== Context Memory Retrieval ===")
+      console.log("=== Context Manager Retrieval ===")
       console.log("Task: " + task)
       console.log("Agent: " + agent)
       if (capability_hint) console.log("Capability hint: " + capability_hint)
@@ -2879,28 +3487,50 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     return 0
   }
 
-  // --- mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
+  // --- mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose] [--json] ---
   if (sub === "explain") {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose] [--json]
+
+Explain retrieval reasoning for a context find operation — why each document matched or didn't match.
+
+Arguments:
+  --agent <name>     Agent name (e.g. backend-dev)
+  --task "<desc>"    Task description used in retrieval
+  --capability <cap> Optional capability hint used in retrieval
+  --verbose          Show full per-document scoring breakdown
+  --json             JSON output mode (includes scoring rationale per document)
+
+Output (default text mode):
+  - Brief explanation of top match relevance
+  - Capability fit summary
+  Concise by default (4-5 lines). Use --verbose for full per-document breakdown.
+
+Examples:
+  mah context explain --agent backend-dev --task "implement clickup integration"
+  mah context explain --agent backend-dev --task "implement clickup integration" --verbose
+  mah context explain --agent backend-dev --task "implement clickup integration" --json
+`)
+      return 0
+    }
     const agentIdx = subArgv.indexOf("--agent")
     const taskIdx = subArgv.indexOf("--task")
     const capIdx = subArgv.indexOf("--capability")
+    const verbose = subArgv.includes("--verbose")
 
     const agent = agentIdx >= 0 ? subArgv[agentIdx + 1] : null
     const task = taskIdx >= 0 ? subArgv[taskIdx + 1] : null
     const capability_hint = capIdx >= 0 ? subArgv[capIdx + 1] : null
 
     if (!agent || !task) {
-      console.error("ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>]")
+      console.error('ERROR: usage: mah context explain --agent <name> --task "<desc>" [--capability <cap>] [--verbose]')
       return 1
     }
 
-    const { loadIndex, buildOperationalIndex, retrieveDocuments, scoreDocument } = await import("./context-memory-schema.mjs")
+    const { loadIndex, buildOperationalIndex, retrieveDocuments, scoreDocument } = await import("./context/context-memory-schema.mjs")
 
-    // Try to load existing index first, build if needed
     const indexPath = path.join(contextRoot, "index", "operational-context.index.json")
     let index = loadIndex(indexPath)
-
-    // If index is empty or doesn't exist, build from operational corpus only
     if (!index || !index.entries || index.entries.length === 0) {
       buildOperationalIndex(contextRoot, { rebuild: false })
       index = loadIndex(indexPath)
@@ -2911,7 +3541,6 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
 
     const request = { agent, task, capability_hint, available_tools: null, available_mcp: null }
 
-    // Score all docs for explanation
     const allScored = []
     for (const entry of index.entries || []) {
       const r = scoreDocument(entry, request)
@@ -2941,8 +3570,8 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
           top_scores: allScored.slice(0, 5).map(s => ({ id: s.id, score: s.score, reasons: s.reasons })),
         },
       }, null, 2))
-    } else {
-      console.log("=== Context Memory Retrieval Explanation ===")
+    } else if (verbose) {
+      console.log("=== Context Manager Retrieval Explanation ===")
       console.log("Task: " + task)
       console.log("Agent: " + agent)
       if (capability_hint) console.log("Capability hint: " + capability_hint)
@@ -2971,6 +3600,15 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
         const scoreStr = (s.score * 100).toFixed(0) + "%"
         console.log((s.id || "").padEnd(55) + scoreStr.padStart(8) + " " + stability.padEnd(11) + " " + s.reasons.join("; "))
       }
+    } else {
+      const top = result.matched_docs.slice(0, 3)
+      console.log(`Context retrieval for ${agent} — "${task}"`)
+      console.log("")
+      console.log(`Matched: ${result.matched_docs.length} docs (confidence: ${result.confidence})`)
+      for (const m of top) {
+        console.log(`  ${m.id} (${(m.score * 100).toFixed(0)}%) — ${(m.reasons || []).join('; ')}`)
+      }
+      console.log("Use --verbose for full breakdown.")
     }
     return 0
   }
@@ -2979,6 +3617,12 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
   if (sub === "propose") {
     const sessionIdx = subArgv.indexOf("--from-session")
     const sessionRef = sessionIdx >= 0 ? subArgv[sessionIdx + 1] : null
+    const aiEnabled = subArgv.includes("--ai")
+    const aiProvider = parseValueArg(subArgv, "--provider")
+    const aiModel = parseValueArg(subArgv, "--model")
+    const aiApiKey = parseValueArg(subArgv, "--api-key")
+    const aiBaseUrl = parseValueArg(subArgv, "--base-url")
+    const aiEndpoint = parseValueArg(subArgv, "--endpoint")
 
     if (!sessionRef) {
       console.error("ERROR: usage: mah context propose --from-session <session-ref>")
@@ -2987,7 +3631,7 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
       return 1
     }
 
-    const { proposeFromSession, writeProposal } = await import("./context-memory-proposal.mjs")
+    const { proposeFromSession, writeProposal, refineProposalWithAi } = await import("./context/context-memory-proposal.mjs")
     const result = proposeFromSession(repoRoot, sessionRef)
 
     if (!result.ok) {
@@ -2995,18 +3639,47 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
       return 1
     }
 
-    const writeResult = writeProposal(repoRoot, result.proposal)
+    let proposal = result.proposal
+    let aiMeta = null
+    if (aiEnabled) {
+      const aiResult = await refineProposalWithAi(
+        repoRoot,
+        proposal,
+        {
+          provider: aiProvider,
+          model: aiModel,
+          apiKey: aiApiKey,
+          baseUrl: aiBaseUrl,
+          endpoint: aiEndpoint,
+        },
+        process.env
+      )
+      if (aiResult.ok) {
+        proposal = aiResult.proposal
+        aiMeta = { provider: aiResult.provider, model: aiResult.model }
+      } else {
+        const aiError = aiResult?.error ? `: ${aiResult.error}` : ""
+        const aiDetails = aiResult?.details ? ` | ${String(aiResult.details).slice(0, 220)}` : ""
+        console.log(`context propose: AI rewrite skipped (${aiResult.reason}${aiError}${aiDetails})`)
+      }
+    }
+
+    const writeResult = writeProposal(repoRoot, proposal)
     if (!writeResult.ok) {
       console.error("ERROR: " + writeResult.error)
       return 1
     }
 
-    const prop = result.proposal
-    console.log("=== Context Memory Proposal Created ===")
+    const prop = proposal
+    console.log("=== Context Manager Proposal Created ===")
     console.log("File:    " + writeResult.file_path)
     console.log("Status:  draft (requires review)")
     console.log("Source:  " + prop.source_type + " — " + prop.source_ref)
     console.log("Proposed ID: " + prop.proposed_document_id)
+    if (aiMeta) {
+      console.log("AI rewrite: enabled")
+      console.log("AI model:  " + aiMeta.provider + "/" + aiMeta.model)
+    }
     console.log("")
     console.log("Summary:")
     console.log("  " + prop.summary)
@@ -3017,10 +3690,109 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
     }
     console.log("")
     console.log("Next steps:")
-    console.log("  1. Review the proposal at: " + writeResult.file_path)
-    console.log("  2. If approved, move to .mah/context/operational/")
-    console.log("  3. Set stability: draft → curated → stable")
+    console.log("  1. Review proposal for quality and relevance (no auto-promotion): " + writeResult.file_path)
+    console.log("  2. If approved, promote via: mah context proposals promote <id>")
+    console.log("  3. Rebuild index: mah context index --rebuild")
     return 0
+  }
+
+  // --- mah context proposals list|show|promote|reject ---
+  if (sub === "proposals") {
+    const govAction = subArgv[0]
+    const govArgv = subArgv.slice(1)
+    const govJson = govArgv.includes("--json") || jsonMode
+
+    const { listProposalSummaries, showProposal, promoteProposal, rejectProposal } = await import("./context/context-memory-proposal.mjs")
+
+    if (!govAction || govAction === "list") {
+      const summaries = listProposalSummaries(repoRoot)
+      if (govJson) {
+        console.log(JSON.stringify({ proposals: summaries }, null, 2))
+      } else {
+        if (summaries.length === 0) { console.log("No proposals found."); return 0 }
+        console.log("=== Context Manager Proposals ===\n")
+        console.log("ID".padEnd(38) + " Status".padEnd(12) + " Proposed Doc ID".padEnd(50) + " Source")
+        console.log("\u2500".repeat(38) + " " + "\u2500".repeat(12) + " " + "\u2500".repeat(50) + " " + "\u2500".repeat(30))
+        for (const s of summaries) {
+          console.log((s.id || "").slice(0, 36).padEnd(38) + (s.status || "").padEnd(12) + (s.proposed_document_id || "").slice(0, 48).padEnd(50) + (s.source_ref || "").slice(0, 30))
+        }
+        console.log("\n" + summaries.length + " proposal(s).")
+      }
+      return 0
+    }
+
+    if (govAction === "show") {
+      const proposalId = govArgv.find(a => !a.startsWith("-"))
+      if (!proposalId) { console.error("ERROR: usage: mah context proposals show <proposal-id>"); return 1 }
+      const result = showProposal(repoRoot, proposalId)
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (govJson) {
+        console.log(JSON.stringify(result, null, 2))
+      } else {
+        const p = result.proposal
+        console.log("=== Proposal: " + p.id + " ===\n")
+        console.log("Status:     " + p.status)
+        console.log("Source:     " + p.source_type + " \u2014 " + p.source_ref)
+        console.log("Proposed:   " + p.proposed_document_id)
+        console.log("Summary:    " + (p.summary || "(none)"))
+        console.log("File:       " + result.file_path)
+        if (result.overlaps && result.overlaps.length > 0) {
+          console.log("\nOverlaps detected:")
+          for (const o of result.overlaps) console.log("  [" + o.type + "] " + o.message)
+        }
+        console.log("\n--- Body ---\n" + (result.body || "(empty)"))
+      }
+      return 0
+    }
+
+    if (govAction === "promote") {
+      const proposalId = govArgv.find(a => !a.startsWith("-"))
+      if (!proposalId) { console.error("ERROR: usage: mah context proposals promote <proposal-id> [--stability <level>] [--force]"); return 1 }
+      const stabIdx = govArgv.indexOf("--stability")
+      const stability = stabIdx >= 0 ? govArgv[stabIdx + 1] : "curated"
+      const force = govArgv.includes("--force")
+      const result = await promoteProposal(repoRoot, proposalId, stability, { force })
+      if (!result.ok) {
+        if (result.overlaps && result.overlaps.length > 0) {
+          console.error("ERROR: " + result.error)
+          for (const o of result.overlaps) console.error("  [" + o.type + "] " + o.message)
+          return 1
+        }
+        console.error("ERROR: " + result.error); return 1
+      }
+      if (govJson) {
+        console.log(JSON.stringify({ ok: true, target_path: result.target_path, overlaps: result.overlaps }, null, 2))
+      } else {
+        console.log("=== Proposal Promoted ===")
+        console.log("Target: " + result.target_path)
+        if (result.overlaps && result.overlaps.length > 0) {
+          console.log("Warnings:")
+          for (const o of result.overlaps) console.log("  [" + o.type + "] " + o.message)
+        }
+      }
+      return 0
+    }
+
+    if (govAction === "reject") {
+      const proposalId = govArgv.find(a => !a.startsWith("-"))
+      const reasonIdx = govArgv.indexOf("--reason")
+      const reason = reasonIdx >= 0 ? govArgv[reasonIdx + 1] : ""
+      if (!proposalId) { console.error("ERROR: usage: mah context proposals reject <proposal-id> --reason \"...\""); return 1 }
+      if (!reason) { console.error("ERROR: --reason is required for rejection"); return 1 }
+      const result = rejectProposal(repoRoot, proposalId, reason)
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (govJson) {
+        console.log(JSON.stringify({ ok: true, file_path: result.file_path }, null, 2))
+      } else {
+        console.log("=== Proposal Rejected ===")
+        console.log("File:   " + result.file_path)
+        console.log("Reason: " + reason)
+      }
+      return 0
+    }
+
+    console.error("ERROR: unknown proposals subcommand '" + govAction + "'. Use: list, show, promote, reject")
+    return 1
   }
 
   console.error("ERROR: unknown context subcommand \x27" + sub + "\x27. Run \x27mah context --help\x27 for usage.")
@@ -3033,12 +3805,12 @@ async function runExpertise(argv, jsonMode = false) {
   const defaultCrew = process.env.MAH_ACTIVE_CREW || 'dev'
 
   // Load expertise modules lazily
-  const { getRegistry, buildRegistry } = await import('./expertise-registry.mjs')
-  const { seedExpertiseCatalog } = await import('./expertise-seed.mjs')
-  const { loadExpertiseById } = await import('./expertise-loader.mjs')
-  const { loadEvidenceFor, computeMetrics } = await import('./expertise-evidence-store.mjs')
-  const { computeConfidence, mergeConfidence } = await import('./expertise-confidence.mjs')
-  const { generateProposalById, generateProposalFromEvidenceById, writeProposalToFile, canGenerateProposal } = await import('./expertise-proposal.mjs')
+  const { getRegistry, buildRegistry } = await import('./expertise/expertise-registry.mjs')
+  const { seedExpertiseCatalog } = await import('./expertise/expertise-seed.mjs')
+  const { loadExpertiseById } = await import('./expertise/expertise-loader.mjs')
+  const { loadEvidenceFor, computeMetrics } = await import('./expertise/evidence/expertise-evidence-store.mjs')
+  const { computeConfidence, mergeConfidence } = await import('./expertise/expertise-confidence.mjs')
+  const { generateProposalById, generateProposalFromEvidenceById, writeProposalToFile, canGenerateProposal, refineExpertiseProposalWithAi } = await import('./expertise/expertise-proposal.mjs')
 
   const resolveExpertiseId = (targetId, crew = defaultCrew) => (
     targetId?.includes(':') ? targetId : `${crew}:${targetId}`
@@ -3055,6 +3827,23 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise seed [--crew <crew>] [--force] [--json]
   // ------------------------------------------------------------------
   if (sub === 'seed') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise seed [--crew <crew>] [--force] [--json]
+
+Seed expertise catalog entries from meta-agents.yaml agent declarations.
+
+Arguments:
+  --crew <crew>    Crew to seed (default: active crew from MAH_ACTIVE_CREW or 'dev')
+  --force          Overwrite existing entries with fresh data from meta-agents.yaml
+  --json           JSON output mode
+
+Examples:
+  mah expertise seed                       Seed default crew
+  mah expertise seed --force             Overwrite existing entries
+  mah expertise seed --crew dev           Seed specific crew
+`)
+      return 0
+    }
     const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
     const force = subArgv.includes('--force')
     const crew = targetCrew || defaultCrew
@@ -3088,18 +3877,40 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise sync [--crew <crew>] [--dry-run] [--json]
   // ------------------------------------------------------------------
   if (sub === 'sync') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise sync [--crew <crew>] [--dry-run] [--json]
+
+Sync confidence scores and discover capabilities from evidence + System A learnings.
+Strengthens routing over time — each sync compounds session outcomes into better agent selection.
+
+Arguments:
+  --crew <crew>    Crew to sync (default: active crew from MAH_ACTIVE_CREW or 'dev')
+  --dry-run        Show what would change without writing to catalog
+  --json           JSON output mode
+
+What gets updated:
+  - confidence.score and confidence.band from evidence invocation counts
+  - capabilities[] list from keyword detection in runtime expertise files
+
+Examples:
+  mah expertise sync --dry-run           Preview changes
+  mah expertise sync                    Execute sync
+  mah expertise sync --crew dev         Sync specific crew
+`)
+      return 0
+    }
     const { crew: targetCrew, json } = parseExpertiseFlags(subArgv)
     const dryRun = subArgv.includes('--dry-run')
     const crew = targetCrew || defaultCrew
 
     if (json || jsonMode) {
-      const { syncExpertise } = await import('./expertise-sync.mjs')
+      const { syncExpertise } = await import('./expertise/expertise-sync.mjs')
       const result = await syncExpertise({ crew, dryRun })
       console.log(JSON.stringify({ ok: true, ...result }))
       return 0
     }
 
-    const { syncExpertise } = await import('./expertise-sync.mjs')
+    const { syncExpertise } = await import('./expertise/expertise-sync.mjs')
     const result = await syncExpertise({ crew, dryRun })
 
     if (result.errors.length > 0) {
@@ -3136,6 +3947,25 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise list [--crew <crew>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'list') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise list [--crew <crew>] [--json]
+
+List all expertise entries in the catalog.
+
+Arguments:
+  --crew <crew>    Filter by crew (default: all crews)
+  --json           JSON output mode
+
+Output shows: ID, Lifecycle, Band (confidence band), Validation status, Owner
+Example output row: dev:backend-dev   active   high   validated   backend-dev
+
+Examples:
+  mah expertise list                     List all entries
+  mah expertise list --crew dev          List specific crew
+  mah expertise list --json             JSON output
+`)
+      return 0
+    }
     const { crew, json } = parseExpertiseFlags(subArgv)
     const registry = await getRegistry()
     const entries = registry.entries.filter(e => !crew || e.id.startsWith(`${crew}:`) || e.id === crew)
@@ -3173,6 +4003,26 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise show <id> [--json]
   // ------------------------------------------------------------------
   if (sub === 'show') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise show <id> [--json]
+
+Show detailed expertise entry for a specific agent.
+
+Arguments:
+  <id>             Expertise ID (e.g. dev:backend-dev)
+  --json            JSON output mode (includes live metrics: invocations, success rate, avg duration)
+
+What it shows:
+  - Full YAML frontmatter: capabilities, domains, lifecycle, validation_status, trust_tier
+  - Confidence: score, band, evidence_count
+  - Evidence metrics (live): total_invocations, successful_invocations, avg_duration_ms
+
+Examples:
+  mah expertise show dev:backend-dev
+  mah expertise show dev:backend-dev --json
+`)
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     if (!targetId) {
       console.error("ERROR: usage: mah expertise show <id>")
@@ -3198,8 +4048,15 @@ async function runExpertise(argv, jsonMode = false) {
 
     if (!confidence) confidence = entry.confidence || null
 
+    const entryWithDefaults = {
+      ...entry,
+      allowed_environments: Array.isArray(entry?.allowed_environments) && entry.allowed_environments.length > 0
+        ? entry.allowed_environments
+        : ["development"],
+    }
+
     if (jsonMode) {
-      console.log(JSON.stringify({ expertise: entry, metrics, confidence }, null, 2))
+      console.log(JSON.stringify({ expertise: entryWithDefaults, metrics, confidence }, null, 2))
       return 0
     }
 
@@ -3213,7 +4070,7 @@ async function runExpertise(argv, jsonMode = false) {
       console.log(`Confidence:  no evidence yet`)
     }
     console.log(`Owner:        ${entry.owner?.agent || entry.owner?.team || '—'}`)
-    console.log(`Environments: ${(entry.allowed_environments || []).join(', ') || 'all'}`)
+    console.log(`Environments: ${(entryWithDefaults.allowed_environments || []).join(', ') || 'all'}`)
     console.log(`Trust tier:   ${entry.trust_tier || 'internal'}`)
     if (entry.domains?.length) console.log(`Domains:      ${entry.domains.join(', ')}`)
     if (entry.capabilities?.length) console.log(`Capabilities: ${entry.capabilities.map(c => c.name || c).join(', ')}`)
@@ -3234,8 +4091,33 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise recommend --task "<task>" [--crew <crew>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'recommend') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise recommend --task '<task description>' [--crew <crew>] [--json] [--verbose]
+
+Recommend the best candidate agent for a task based on expertise routing scores.
+
+Arguments:
+  --task '<desc>'  Task description (required)
+  --crew <crew>    Crew to score against (default: active crew)
+  --json           JSON output mode (machine-readable, stable contract)
+  --verbose        Full scoring trace text (filters, penalties, per-candidate breakdown)
+
+Output (default text mode):
+  - Top recommended agent
+  - Confidence score and band
+  - Short capability-fit explanation
+  - Evidence summary and applicable constraints/penalties
+  Concise by default (≤5 lines). Use --verbose for full decision trace.
+
+Examples:
+  mah expertise recommend --task "implement user authentication API"
+  mah expertise recommend --task "implement user authentication API" --verbose
+  mah expertise recommend --task "implement user authentication API" --json
+`)
+      return 0
+    }
     const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
-    const { crew, json } = parseExpertiseFlags(subArgv)
+    const { crew, json, verbose } = parseExpertiseFlags(subArgv)
     const effectiveCrew = crew || defaultCrew
 
     if (!task) {
@@ -3244,8 +4126,8 @@ async function runExpertise(argv, jsonMode = false) {
     }
 
     const sourceAgent = process.env.MAH_AGENT || 'orchestrator'
-    const { listDelegationTargets } = await import('./delegation-resolution.mjs')
-    const { scoreCandidates } = await import('./expertise-routing.mjs')
+    const { listDelegationTargets } = await import('./runtime/delegation-resolution.mjs')
+    const { scoreCandidates } = await import('./expertise/expertise-routing.mjs')
 
     const listResult = listDelegationTargets({ crew: effectiveCrew, sourceAgent, repoRoot })
     if (!listResult.ok || listResult.targets.length === 0) {
@@ -3284,30 +4166,49 @@ async function runExpertise(argv, jsonMode = false) {
       return 0
     }
 
-    console.log(`=== Expertise Recommendation ===\n`)
-    console.log(`Task: "${task}"`)
-    console.log(`Crew: ${effectiveCrew}\n`)
-
     const sortedScores = Object.entries(scoringResult.scores || {})
       .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
 
-    console.log(`Candidates (${candidates.length}):\n`)
-    for (const [id, scoreData] of sortedScores) {
-      const bar = scoreData?.final_score > 0
-        ? `█`.repeat(Math.round(scoreData.final_score * 10)).padEnd(10, '░')
-        : '░'.repeat(10)
-      const marker = id === scoringResult.selected ? '→ ' : '  '
-      console.log(`${marker}${bar} ${(scoreData?.final_score || 0).toFixed(3)}  ${id}`)
+    const verboseTrace = verbose || (!json && !jsonMode)
+    if (verboseTrace) {
+      console.log(`=== Expertise Recommendation ===\n`)
+      console.log(`Task: "${task}"`)
+      console.log(`Crew: ${effectiveCrew}\n`)
+      console.log(`Candidates (${candidates.length}):\n`)
+      for (const [id, scoreData] of sortedScores) {
+        const bar = scoreData?.final_score > 0
+          ? `█`.repeat(Math.round(scoreData.final_score * 10)).padEnd(10, '░')
+          : '░'.repeat(10)
+        const marker = id === scoringResult.selected ? '→ ' : '  '
+        console.log(`${marker}${bar} ${(scoreData?.final_score || 0).toFixed(3)}  ${id}`)
+      }
+      console.log('')
+      if (scoringResult.selected) {
+        console.log(`Recommended: ${scoringResult.selected} (score: ${(scoringResult.scores[scoringResult.selected]?.final_score || 0).toFixed(3)})`)
+      }
+      if (scoringResult.escalation) {
+        console.log(`⚠ Escalation: ${scoringResult.fallback_reason || 'score below threshold'}`)
+      }
+      console.log("\nUse 'mah expertise explain --task \"<task>\" --verbose' for full decision trace.")
+      return 0
     }
 
-    console.log('')
-    if (scoringResult.selected) {
-      console.log(`Recommended: ${scoringResult.selected} (score: ${(scoringResult.scores[scoringResult.selected]?.final_score || 0).toFixed(3)})`)
-    }
-    if (scoringResult.escalation) {
-      console.log(`⚠ Escalation: ${scoringResult.fallback_reason || 'score below threshold'}`)
-    }
-    console.log("\nUse 'mah expertise explain --task \"<task>\"' for full decision trace.")
+    const selectedId = scoringResult.selected
+    const selectedScore = selectedId ? scoringResult.scores?.[selectedId] : null
+    const selectedCandidate = candidates.find(c => c.id === selectedId)
+    const fitReason = summarizeCapabilityFit(task, selectedCandidate)
+    const penalties = joinOrNone(selectedScore?.penalties_applied)
+    const evidenceHint = topEvidenceHint(selectedScore, scoringResult)
+    const escalationText = scoringResult.escalation
+      ? `yes — ${scoringResult.fallback_reason || 'score below threshold'}`
+      : 'no'
+
+    console.log(`Recommended: ${selectedId || 'none'} (${(selectedScore?.final_score || 0).toFixed(3)}) — ${fitReason}`)
+    console.log(`Confidence: ${selectedScore?.confidence_band || 'unknown'} | Penalties: ${penalties}`)
+    console.log(`Evidence: ${evidenceHint}`)
+    if (scoringResult.explain?.selected_reason) console.log(`Reason: ${scoringResult.explain.selected_reason}`)
+    console.log(`Escalation: ${escalationText}`)
+    console.log('Use --verbose for full trace.')
     return 0
   }
 
@@ -3315,6 +4216,27 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise evidence <id> [--limit N] [--json]
   // ------------------------------------------------------------------
   if (sub === 'evidence') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise evidence <id> [--limit <N>] [--json]
+
+Show evidence events recorded for an expertise entry. Evidence is recorded automatically
+by the pi runtime after each delegate_agent/delegate_agents_parallel call.
+
+Arguments:
+  <id>             Expertise ID (e.g. dev:backend-dev)
+  --limit <N>      Limit to N most recent events (default: 50, max: 500)
+  --json           JSON output mode
+
+Output includes: event timestamp, outcome (success/failure), task type, duration
+Aggregated metrics: total_invocations, successful_invocations, success_rate, avg_duration_ms
+
+Examples:
+  mah expertise evidence dev:backend-dev
+  mah expertise evidence dev:backend-dev --limit 10
+  mah expertise evidence dev:backend-dev --json
+`)
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     const limitArg = parseValueArg(subArgv, '--limit') || subArgv.find(a => !a.startsWith('--') && a !== targetId)
     const limit = limitArg ? parseInt(limitArg, 10) : 50
@@ -3357,18 +4279,50 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise explain --task "<task>" [--crew <crew>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'explain') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise explain --task '<task>' [--crew <crew>] [--agent <name>] [--json] [--verbose]
+
+Explain routing decision rationale for a task, or inspect a specific agent's suitability.
+
+Arguments:
+  --task '<desc>'  Task description (required)
+  --crew <crew>    Crew to score against (default: active crew)
+  --agent <name>   Inspect suitability of a specific agent (no task-level comparison)
+  --json           JSON output mode (includes explain object with filters_run, blocking, scoring_summary)
+  --verbose        Full routing decision trace text (all filters and per-candidate scores)
+
+Output (default text mode):
+  - Recommended agent (or inspected agent if --agent used)
+  - Confidence score and band
+  - Short capability-fit explanation
+  - Short evidence summary
+  - Relevant constraints/penalties
+  Concise by default. Use --verbose for full decision trace.
+
+Without --agent: scores all candidates, ranks by final_score, returns top match.
+With --agent: returns suitability for the specified agent without ranking all candidates.
+
+Examples:
+  mah expertise explain --task "implement user authentication API"
+  mah expertise explain --task "implement user authentication API" --verbose
+  mah expertise explain --task "implement user authentication API" --agent backend-dev
+  mah expertise explain --task "implement user authentication API" --json
+`)
+      return 0
+    }
     const task = parseValueArg(subArgv, '--task') || subArgv.find(a => !a.startsWith('--'))
-    const { crew, json } = parseExpertiseFlags(subArgv)
+    const agentFlag = parseValueArg(subArgv, '--agent')
+    const { crew, json, verbose } = parseExpertiseFlags(subArgv)
     const effectiveCrew = crew || defaultCrew
 
     if (!task) {
-      console.error("ERROR: usage: mah expertise explain --task '<task>' [--crew <crew>]")
+      console.error("ERROR: usage: mah expertise explain --task '<task>' [--crew <crew>] [--agent <name>]")
       return 1
     }
 
     const sourceAgent = process.env.MAH_AGENT || 'orchestrator'
-    const { listDelegationTargets } = await import('./delegation-resolution.mjs')
-    const { scoreCandidates } = await import('./expertise-routing.mjs')
+    const { listDelegationTargets } = await import('./runtime/delegation-resolution.mjs')
+    const { scoreCandidates } = await import('./expertise/expertise-routing.mjs')
 
     const listResult = listDelegationTargets({ crew: effectiveCrew, sourceAgent, repoRoot })
     if (!listResult.ok) {
@@ -3403,47 +4357,86 @@ async function runExpertise(argv, jsonMode = false) {
       return 0
     }
 
-    console.log(`=== Expertise Routing Trace ===\n`)
-    console.log(`Task: "${task}"`)
-    console.log(`Source: ${sourceAgent}  |  Crew: ${effectiveCrew}\n`)
-
-    console.log('── Decision Filters ──')
-    console.log('  [1] policy/topology allowed set')
-    console.log('  [2] environment compatibility')
-    console.log('  [3] trust tier requirement')
-    console.log('  [4] lifecycle blocking (restricted/revoked)')
-    console.log('  [5] expertise match score')
-    console.log('  [6] confidence + evidence freshness\n')
-
     const sorted = Object.entries(scoringResult.scores || {})
       .sort((a, b) => (b[1]?.final_score || 0) - (a[1]?.final_score || 0))
 
-    console.log('── Scoring Breakdown ──')
-    for (const [id, scoreData] of sorted) {
-      if (!scoreData) continue
-      console.log(`\n  ${id}:`)
-      console.log(`    expertise_match: ${scoreData.match_score?.toFixed(3) || '—'}`)
-      console.log(`    confidence_adj:  ${scoreData.confidence_adjustment?.toFixed(3) || '—'}`)
-      console.log(`    penalty:         ${scoreData.penalty?.toFixed(3) || '—'}`)
-      console.log(`    ─ final:         ${scoreData.final_score?.toFixed(3) || '—'}`)
-      if (scoreData.penalties_applied?.length) {
-        console.log(`    penalties:       ${scoreData.penalties_applied.join(', ')}`)
+    const verboseTrace = verbose || (!json && !jsonMode)
+    if (verboseTrace) {
+      console.log(`=== Expertise Routing Trace ===\n`)
+      console.log(`Task: "${task}"`)
+      console.log(`Source: ${sourceAgent}  |  Crew: ${effectiveCrew}\n`)
+
+      console.log('── Decision Filters ──')
+      console.log('  [1] policy/topology allowed set')
+      console.log('  [2] environment compatibility')
+      console.log('  [3] trust tier requirement')
+      console.log('  [4] lifecycle blocking (restricted/revoked)')
+      console.log('  [5] expertise match score')
+      console.log('  [6] confidence + evidence freshness\n')
+
+      console.log('── Scoring Breakdown ──')
+      for (const [id, scoreData] of sorted) {
+        if (!scoreData) continue
+        console.log(`\n  ${id}:`)
+        console.log(`    expertise_match: ${scoreData.match_score?.toFixed(3) || '—'}`)
+        console.log(`    confidence_adj:  ${scoreData.confidence_adjustment?.toFixed(3) || '—'}`)
+        console.log(`    penalty:         ${scoreData.penalty?.toFixed(3) || '—'}`)
+        console.log(`    ─ final:         ${scoreData.final_score?.toFixed(3) || '—'}`)
+        if (scoreData.penalties_applied?.length) {
+          console.log(`    penalties:       ${scoreData.penalties_applied.join(', ')}`)
+        }
+        if (scoreData.blocked_filters?.length) {
+          console.log(`    BLOCKED: ${scoreData.blocked_filters.join('; ')}`)
+        }
       }
-      if (scoreData.blocked_filters?.length) {
-        console.log(`    BLOCKED: ${scoreData.blocked_filters.join('; ')}`)
+
+      console.log('\n── Decision ──')
+      if (scoringResult.selected) {
+        const topScore = scoringResult.scores[scoringResult.selected]
+        console.log(`  Selected: ${scoringResult.selected}`)
+        console.log(`  Score: ${(topScore?.final_score || 0).toFixed(3)}`)
+        if (topScore?.confidence_band) console.log(`  Confidence band: ${topScore.confidence_band}`)
       }
+      if (scoringResult.escalation) {
+        console.log(`  ⚠ ESCALATION RECOMMENDED: ${scoringResult.fallback_reason}`)
+      }
+      return 0
     }
 
-    console.log('\n── Decision ──')
-    if (scoringResult.selected) {
-      const topScore = scoringResult.scores[scoringResult.selected]
-      console.log(`  Selected: ${scoringResult.selected}`)
-      console.log(`  Score: ${(topScore?.final_score || 0).toFixed(3)}`)
-      if (topScore?.confidence_band) console.log(`  Confidence band: ${topScore.confidence_band}`)
+    if (agentFlag) {
+      const scoreData = scoringResult.scores?.[agentFlag]
+      if (!scoreData) {
+        console.error(`ERROR: agent '${agentFlag}' not found in crew '${effectiveCrew}'`)
+        return 1
+      }
+      const verdict = agentFlag === scoringResult.selected
+        ? 'selected'
+        : (scoreData.final_score > 0 ? 'qualified-but-not-top' : 'below-threshold')
+      const evidence = topEvidenceHint(scoreData, scoringResult)
+      console.log(`Agent ${agentFlag} for "${task}" (crew: ${effectiveCrew}):\n`)
+      console.log(`Score: ${(scoreData.final_score || 0).toFixed(3)} | Match: ${(scoreData.match_score || 0).toFixed(3)} | Confidence: ${scoreData.confidence_band || 'unknown'}`)
+      console.log(`Penalties: ${joinOrNone(scoreData.penalties_applied)} | Blocked: ${joinOrNone(scoreData.blocked_filters)}`)
+      console.log(`Evidence: ${evidence}\n`)
+      if (verdict === 'qualified-but-not-top') {
+        console.log('Verdict: qualified-but-not-top')
+      } else if (verdict === 'below-threshold') {
+        console.log('Verdict: below-threshold')
+      } else {
+        console.log('Verdict: selected')
+      }
+      return 0
     }
-    if (scoringResult.escalation) {
-      console.log(`  ⚠ ESCALATION RECOMMENDED: ${scoringResult.fallback_reason}`)
+
+    console.log(`Routing for "${task}" (crew: ${effectiveCrew}):\n`)
+    const top3 = sorted.slice(0, 3)
+    for (let i = 0; i < top3.length; i++) {
+      const [id, scoreData] = top3[i]
+      const candidate = candidates.find(c => c.id === id)
+      console.log(`${i + 1}. ${id} (${(scoreData?.final_score || 0).toFixed(3)}) — ${summarizeCapabilityFit(task, candidate)}`)
+      console.log(`   Penalties: ${joinOrNone(scoreData?.penalties_applied)} | Blocked: ${joinOrNone(scoreData?.blocked_filters)}`)
     }
+    if (scoringResult.explain?.selected_reason) console.log(`\nReason: ${scoringResult.explain.selected_reason}`)
+    console.log(`Selected: ${scoringResult.selected || 'none'} | Use --verbose for full trace.`)
     return 0
   }
 
@@ -3452,7 +4445,28 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'export') {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
-      console.log("usage: mah expertise export <id> [--output <path>] [--domain <domain>] [--with-evidence] [--json]")
+      console.log(`Usage: mah expertise export <id> [--output <path>] [--domain <domain>] [--with-evidence] [--json]
+
+Export an expertise entry to JSON. Can optionally include evidence metrics.
+
+Arguments:
+  <id>             Expertise ID (e.g. dev:backend-dev)
+  --output <path>  Write export to file instead of stdout
+  --domain <name>  Check domain policy for a specific domain
+  --with-evidence  Include evidence metrics summary in export
+  --json           JSON output mode
+
+Notes:
+  - Export may be blocked by federated_allowed=false policy
+  - Sensitive fields (owner_id, evidence details) are redacted in export
+  - Use --domain to validate domain policy before exporting
+
+Examples:
+  mah expertise export dev:backend-dev
+  mah expertise export dev:backend-dev --output .mah/expertise/exported/backend-dev.json
+  mah expertise export dev:backend-dev --with-evidence
+  mah expertise export dev:backend-dev --domain software-engineering
+`)
       return 0
     }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
@@ -3466,7 +4480,7 @@ async function runExpertise(argv, jsonMode = false) {
       return 1
     }
 
-    const { exportExpertiseToFile } = await import('./expertise-export.mjs')
+    const { exportExpertiseToFile } = await import('./expertise/expertise-export.mjs')
 
     if (outputPath) {
       // SECURITY: v0.7.0-patch
@@ -3497,7 +4511,7 @@ async function runExpertise(argv, jsonMode = false) {
       return 1
     }
 
-    const { exportExpertise } = await import('./expertise-export.mjs')
+    const { exportExpertise } = await import('./expertise/expertise-export.mjs')
     const result = await exportExpertise(entry, { domain, skipPolicy: false, includeEvidence: withEvidence })
     if (!result.ok) {
       console.error(`ERROR: export blocked by policy: ${result.error}`)
@@ -3518,6 +4532,47 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise propose <id> [--output <path>] [--summary <text>] [--json]
   // ------------------------------------------------------------------
   if (sub === 'propose') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise propose <id> [options]
+
+Create a governed proposal artifact for catalog changes. Proposals require human review
+before apply-proposal. Generation is restricted to orchestrator and *-lead actors.
+
+Arguments:
+  <id>                   Expertise ID (e.g. dev:backend-dev)
+  --from-evidence        Draft changes from evidence store (default limit: 5 events)
+  --evidence-limit <N>   Number of recent evidence events to inspect (default: 5)
+  --summary <text>       Proposal summary
+  --rationale <text>     Rationale for the change
+  --changes '<json>'    Manual change specification (JSON object)
+  --evidence-refs <ids>  Comma-separated evidence IDs to include
+  --reviewers <roles>    Comma-separated reviewer roles (default: validation-lead,security-reviewer)
+  --output <path>        Write proposal YAML to file (required for apply-proposal)
+  --ai                   Rewrite summary/rationale/changes with AI before output
+  --provider <id>        AI provider (zai|openrouter|codex-oauth|minimax)
+  --model <id>           AI model ID (or MAH_AI_MODEL)
+  --api-key <key>        AI API key (or provider/env defaults)
+  --base-url <url>       Override provider base URL
+  --endpoint <path>      /chat/completions or /responses
+  --json                 JSON output mode
+
+Workflow:
+  1. Generate proposal with: mah expertise propose <id> --from-evidence --output <file>
+  2. Human reviews the proposal YAML at <file>
+  3. Apply with: mah expertise apply-proposal <file>
+
+Note: Without --output, proposal is written to stdout only (not usable by apply-proposal).
+
+Examples:
+  mah expertise propose dev:backend-dev --from-evidence --evidence-limit 5 \\
+    --summary "Evidence-backed confidence update" \\
+    --output .mah/expertise/proposals/proposal-dev-backend-dev.yaml
+  mah expertise propose dev:backend-dev --from-evidence --evidence-limit 10 --json
+  mah expertise propose dev:backend-dev --summary "Promote to validated" \\
+    --changes '{"validation_status":"validated"}' --output proposal.yaml
+`)
+      return 0
+    }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
     const outputPath = parseValueArg(subArgv, '--output') || ''
     const summary = parseValueArg(subArgv, '--summary') || ''
@@ -3526,11 +4581,17 @@ async function runExpertise(argv, jsonMode = false) {
     const evidenceRaw = parseValueArg(subArgv, '--evidence-refs') || ''
     const reviewersRaw = parseValueArg(subArgv, '--reviewers') || ''
     const fromEvidence = subArgv.includes('--from-evidence')
+    const aiEnabled = subArgv.includes('--ai')
+    const aiProvider = parseValueArg(subArgv, '--provider')
+    const aiModel = parseValueArg(subArgv, '--model')
+    const aiApiKey = parseValueArg(subArgv, '--api-key')
+    const aiBaseUrl = parseValueArg(subArgv, '--base-url')
+    const aiEndpoint = parseValueArg(subArgv, '--endpoint')
     const evidenceLimitRaw = parseValueArg(subArgv, '--evidence-limit') || '5'
     const evidenceLimit = Number.parseInt(evidenceLimitRaw, 10)
 
     if (!targetId) {
-      console.error("ERROR: usage: mah expertise propose <id> [--from-evidence] [--summary <text>] [--rationale <text>] [--changes '<json>'] [--output <path>]")
+      console.error("ERROR: usage: mah expertise propose <id> [--from-evidence] [--summary <text>] [--rationale <text>] [--changes '<json>'] [--ai] [--output <path>]")
       return 1
     }
 
@@ -3566,23 +4627,44 @@ async function runExpertise(argv, jsonMode = false) {
 
     const result = fromEvidence
       ? await generateProposalFromEvidenceById({
-          ...proposalArgs,
-          limit: Number.isFinite(evidenceLimit) && evidenceLimit > 0 ? evidenceLimit : 5,
-        })
+        ...proposalArgs,
+        limit: Number.isFinite(evidenceLimit) && evidenceLimit > 0 ? evidenceLimit : 5,
+      })
       : await generateProposalById({
-          ...proposalArgs,
-          summary: summary || `Propose catalog update for ${targetId}`,
-          rationale,
-          proposedChanges,
-          evidenceRefs,
-        })
+        ...proposalArgs,
+        summary: summary || `Propose catalog update for ${targetId}`,
+        rationale,
+        proposedChanges,
+        evidenceRefs,
+      })
 
     if (!result.ok) {
       console.error(`ERROR: proposal generation failed: ${result.error}`)
       return 1
     }
 
-    const proposal = result.proposal
+    let proposal = result.proposal
+    let aiMeta = null
+    if (aiEnabled) {
+      const aiResult = await refineExpertiseProposalWithAi(
+        repoRoot,
+        proposal,
+        {
+          provider: aiProvider,
+          model: aiModel,
+          apiKey: aiApiKey,
+          baseUrl: aiBaseUrl,
+          endpoint: aiEndpoint,
+        },
+        process.env
+      )
+      if (aiResult.ok) {
+        proposal = aiResult.proposal
+        aiMeta = { provider: aiResult.provider, model: aiResult.model }
+      } else {
+        console.log(`expertise propose: AI rewrite skipped (${aiResult.reason})`)
+      }
+    }
 
     if (outputPath) {
       const outputValidation = validateCliPath(outputPath, 'write')
@@ -3596,11 +4678,12 @@ async function runExpertise(argv, jsonMode = false) {
         return 1
       }
       if (jsonMode) {
-        console.log(JSON.stringify({ ok: true, output: writeResult.path, proposal }, null, 2))
+        console.log(JSON.stringify({ ok: true, output: writeResult.path, proposal, ...(aiMeta ? { ai: aiMeta } : {}) }, null, 2))
       } else {
         console.log(`✓ Proposal written to '${writeResult.path}'`)
         console.log(`  target: ${proposal.target_expertise_id}`)
         console.log(`  generated by: ${proposal.generated_by.actor} (${proposal.generated_by.role})`)
+        if (aiMeta) console.log(`  ai rewrite: ${aiMeta.provider}/${aiMeta.model}`)
       }
       return 0
     }
@@ -3612,6 +4695,7 @@ async function runExpertise(argv, jsonMode = false) {
       console.log(`Generated by: ${proposal.generated_by.actor} (${proposal.generated_by.role})`)
       console.log(`Summary: ${proposal.summary}`)
       if (proposal.rationale) console.log(`Rationale: ${proposal.rationale}`)
+      if (aiMeta) console.log(`AI rewrite: ${aiMeta.provider}/${aiMeta.model}`)
       console.log(`Target status: ${proposal.target_snapshot.validation_status} / ${proposal.target_snapshot.lifecycle}`)
       console.log(`Proposed changes: ${Object.keys(proposal.proposed_changes || {}).length ? JSON.stringify(proposal.proposed_changes) : 'none'}`)
       console.log(`Reviewers: ${(proposal.reviewers || []).join(', ') || 'validation-lead, security-reviewer'}`)
@@ -3624,7 +4708,33 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'apply-proposal') {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
-      console.log("usage: mah expertise apply-proposal <file> [--force] [--json]")
+      console.log(`Usage: mah expertise apply-proposal <file> [--force] [--json]
+
+Apply an approved proposal to the expertise catalog. This is the write step after
+human review — do NOT apply without reviewing the proposal first.
+
+Arguments:
+  <file>          Path to proposal YAML (generated by 'mah expertise propose')
+  --force         Apply even if catalog changed since proposal was generated
+  --json          JSON output mode
+
+What gets updated:
+  - validation_status, confidence.score/band, capabilities[], domains[]
+  - lifecycle state (if proposed)
+  - metadata.lessons[] (if evidence was used)
+
+After apply:
+  - Registry is rebuilt automatically (.mah/expertise/registry.json)
+  - Run 'mah expertise show <id>' to confirm changes persisted
+
+CAUTION: apply-proposal modifies catalog YAML files. Use --force only when
+the proposal is recent and the catalog has not drifted.
+
+Examples:
+  mah expertise apply-proposal .mah/expertise/proposals/proposal-dev-backend-dev.yaml
+  mah expertise apply-proposal .mah/expertise/proposals/proposal-dev-backend-dev.yaml --force
+  mah expertise apply-proposal .mah/expertise/proposals/proposal-dev-backend-dev.yaml --json
+`)
       return 0
     }
     const proposalPath = parseValueArg(subArgv, '') || subArgv[0]
@@ -3636,7 +4746,7 @@ async function runExpertise(argv, jsonMode = false) {
     }
 
     const actor = process.env.MAH_AGENT || 'orchestrator'
-    const { applyProposalFromFile } = await import('./expertise-apply-proposal.mjs')
+    const { applyProposalFromFile } = await import('./expertise/expertise-apply-proposal.mjs')
 
     const pathValidation = validateCliPath(proposalPath, 'read')
     if (!pathValidation.ok) {
@@ -3674,7 +4784,38 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === 'lifecycle') {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
-      console.log("usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]")
+      console.log(`Usage: mah expertise lifecycle <id> --to <state> [--actor <role>] [--reason <text>] [--json]
+
+Transition an expertise entry's lifecycle state with authorization and evidence requirements.
+
+Arguments:
+  <id>              Expertise ID (e.g. dev:backend-dev)
+  --to <state>      Target lifecycle state (required)
+  --actor <role>    Authorizing role (default: MAH_AGENT env var or 'orchestrator')
+  --reason <text>   Reason for the transition (required for transitions out of 'active')
+  --json            JSON output mode
+
+Valid lifecycle states and transitions:
+  experimental → active     Requires: evidence_count ≥ 5, confidence ≥ 0.6
+  active → restricted       Requires: trust_tier drop OR repeated failures
+  restricted → revoked     Requires: governance policy violation (needs security-reviewer + orchestrator)
+  restricted → active       Requires: remediation accepted
+  active → experimental     Requires: explicit reversion reason
+
+Lifecycle policy:
+  - Transitions out of 'active' always require --reason
+  - Transitions into 'active' require evidence_count ≥ 5
+  - 'restricted' and 'revoked' require security-reviewer authorization
+
+After transition:
+  - Registry is rebuilt automatically
+  - Run 'mah expertise show <id>' to confirm new lifecycle state
+
+Examples:
+  mah expertise lifecycle dev:backend-dev --to validated --actor validation-lead
+  mah expertise lifecycle dev:backend-dev --to restricted \\
+    --actor security-reviewer --reason "Repeated delegation failures"
+`)
       return 0
     }
     const targetId = parseValueArg(subArgv, '') || subArgv[0]
@@ -3687,7 +4828,7 @@ async function runExpertise(argv, jsonMode = false) {
       return 1
     }
 
-    const { transitionLifecycle } = await import('./expertise-lifecycle-cli.mjs')
+    const { transitionLifecycle } = await import('./expertise/expertise-lifecycle-cli.mjs')
     const result = await transitionLifecycle(targetId, targetState, { actor, reason })
 
     if (jsonMode) {
@@ -3715,6 +4856,34 @@ async function runExpertise(argv, jsonMode = false) {
   // expertise import <file> [--dry-run] [--json]
   // ------------------------------------------------------------------
   if (sub === 'import') {
+    if (subArgv.includes('--help') || subArgv.includes('-h')) {
+      console.log(`Usage: mah expertise import <file> [--dry-run] [--lenient] [--json]
+
+Import an expertise entry from a JSON export file. Validates against the v1 schema before writing.
+
+Arguments:
+  <file>          Path to expertise JSON file (from 'mah expertise export')
+  --dry-run       Validate without writing to catalog
+  --lenient       Allow unknown fields (forward-compatibility mode)
+  --json          JSON output mode
+
+Validation:
+  - Strict by default: unknown fields cause validation failure
+  - Use --lenient to allow forward-compat with future schema extensions
+  - Always run with --dry-run first to catch schema mismatches
+
+What it does:
+  - Validates schema version, owner, capabilities, domains, policy
+  - Writes to .mah/expertise/catalog/<crew>/<agent>.yaml
+  - Registry is NOT rebuilt automatically (run 'mah expertise sync' after import)
+
+Examples:
+  mah expertise import .mah/expertise/exported/backend-dev.json --dry-run
+  mah expertise import .mah/expertise/exported/backend-dev.json --lenient
+  mah expertise import .mah/expertise/exported/backend-dev.json --json
+`)
+      return 0
+    }
     const filePath = parseValueArg(subArgv, '') || subArgv[0]
     const dryRun = subArgv.includes('--dry-run')
     const lenient = subArgv.includes('--lenient')
@@ -3724,7 +4893,7 @@ async function runExpertise(argv, jsonMode = false) {
       return 1
     }
 
-    const { loadImportFile, importExpertise } = await import('./expertise-export.mjs')
+    const { loadImportFile, importExpertise } = await import('./expertise/expertise-export.mjs')
 
     // SECURITY: v0.7.0-patch
     const fileValidation = validateCliPath(filePath, 'read')
@@ -3777,7 +4946,7 @@ async function runExpertise(argv, jsonMode = false) {
   // ------------------------------------------------------------------
   if (sub === '--help' || sub === '-h' || sub === 'help' || !sub) {
     console.log(`
-mah expertise — Expertise Catalog CLI (v0.7.0)
+mah expertise — Expertise Catalog CLI (v0.9.0)
 
 Usage:
   mah expertise list                        List all expertise entries
@@ -3792,13 +4961,15 @@ Usage:
   mah expertise show <id> --json            JSON output
 
   mah expertise recommend --task '<desc>'   Recommend best candidate for task
+  mah expertise recommend --task '<desc>' --verbose   Full scoring trace text
   mah expertise recommend --task '<desc>' --json   JSON output
 
   mah expertise evidence <id>               Show evidence events for expertise
   mah expertise evidence <id> --limit 20   Limit to 20 events
   mah expertise evidence <id> --json        JSON output
 
-  mah expertise explain --task '<desc>'     Full routing decision trace
+  mah expertise explain --task '<desc>' [--agent <name>]   Explain routing decision (concise by default, --verbose for full trace)
+  mah expertise explain --task '<desc>' --verbose   Full routing decision trace
   mah expertise explain --task '<desc>' --json   JSON output
 
   mah expertise export <id>                 Export expertise to JSON
@@ -3820,6 +4991,7 @@ Usage:
   mah expertise propose <id> --evidence-limit <n>  Number of recent evidence events to inspect
   mah expertise propose <id> --evidence-refs <id1,id2>  Optional evidence refs
   mah expertise propose <id> --output <path> Write proposal to file
+  mah expertise propose <id> --ai --provider <id> --model <id>  AI rewrite proposal text
 
   mah expertise import <file>               Import expertise from JSON file (strict by default)
   mah expertise import <file> --dry-run     Validate without writing
@@ -3831,10 +5003,14 @@ Examples:
   mah expertise seed --crew dev              Seed specific crew
   mah expertise show dev:backend-dev
   mah expertise recommend --task "implement user authentication API"
+  mah expertise recommend --task "implement user authentication API" --verbose
+  mah expertise explain --task "implement user authentication API" --agent backend-dev
+  mah expertise explain --task "implement user authentication API" --verbose
   mah expertise evidence dev:backend-dev --limit 10
   mah expertise export dev:backend-dev --output .mah/expertise/exported/backend-dev.json
   mah expertise propose dev:backend-dev --summary "Promote backend-dev after v0.7.0 evidence accumulation" --changes '{"validation_status":"validated"}'
   mah expertise propose dev:backend-dev --from-evidence --evidence-limit 10
+  mah expertise propose dev:backend-dev --from-evidence --ai --provider openrouter --model nvidia/nemotron-3-super-120b-a12b:free
   mah expertise import .mah/expertise/exported/backend-dev.json --dry-run
 `)
     return 0
@@ -3845,7 +5021,7 @@ Examples:
   return 1
 }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2)
   const traceMode = hasFlag(argv, "--trace")
   const jsonMode = hasFlag(argv, "--json")
@@ -3913,7 +5089,7 @@ function main() {
   }
 
   if (first === "sessions") {
-    ;(async () => {
+    ; (async () => {
       // Use original argv (not normalizedArgv) because sessions subcommands use --runtime
       // as a first-class flag (filter/target runtime) and stripping it breaks parsing.
       const sessionsCommandIndex = argv.findIndex((arg) => arg === "sessions")
@@ -3924,8 +5100,28 @@ function main() {
     return
   }
 
+  if (first === "task") {
+    process.exitCode = runLocalScript(path.join("scripts", "./tasks/tasks-cli.mjs"), argv.slice(1))
+    return
+  }
+
+  if (first === "mission") {
+    process.exitCode = runLocalScript(path.join("scripts", "./tasks/missions-cli.mjs"), argv.slice(1))
+    return
+  }
+
+  if (first === "mcp") {
+    process.exitCode = runLocalScript(path.join("scripts", "./mcp/mcp-cli.mjs"), argv.slice(1))
+    return
+  }
+
+  if (first === "webui") {
+    process.exitCode = runWebUi(argv.slice(1))
+    return
+  }
+
   if (first === "plugins") {
-    ;(async () => {
+    ; (async () => {
       process.exitCode = await runPlugins(normalizedArgv.slice(1), jsonMode)
     })()
     return
@@ -3937,26 +5133,31 @@ function main() {
   }
 
   if (first === "delegate") {
-    ;(async () => {
+    ; (async () => {
       // Use original argv (not normalizedArgv) because delegate needs --runtime for target runtime,
       // not for MAH's own runtime detection. normalizedArgv strips --runtime.
       // argv = process.argv.slice(2), so argv[0] = 'delegate'. Skip it.
       const delegateHeadless = argv.includes("--headless")
-      const delegateArgv = normalizedArgv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
+      const delegateArgv = argv.slice(1).filter(a => !['--trace', '--json', '--mermaid', '--headless', '--strict-markers'].includes(a))
       process.exitCode = await runDelegate(delegateArgv, { headless: delegateHeadless })
     })()
     return
   }
 
   if (first === "context") {
-    ;(async () => {
+    ; (async () => {
       process.exitCode = await runContext(argv.slice(1), jsonMode)
     })()
     return
   }
 
+  if (first === "skills") {
+    process.exitCode = runLocalScript(path.join("scripts", "./skills/skills-cli.mjs"), argv.slice(1))
+    return
+  }
+
   if (first === "expertise") {
-    ;(async () => {
+    ; (async () => {
       process.exitCode = await runExpertise(argv.slice(1), jsonMode)
     })()
     return
@@ -3980,7 +5181,7 @@ function main() {
       : [first === "plan" ? "--plan" : "--diff"]
     const allArgs = [...modeFlag, ...extraArgs]
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), [...allArgs, "--json"])
+      const captured = runLocalScriptCapture(path.join("scripts", "./sync/sync-meta-agents.mjs"), [...allArgs, "--json"])
       let report = {}
       try {
         report = JSON.parse(captured.stdout || "{}")
@@ -3995,13 +5196,13 @@ function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), allArgs)
+    process.exitCode = runLocalScript(path.join("scripts", "./sync/sync-meta-agents.mjs"), allArgs)
     return
   }
 
   if (first === "validate:config") {
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      const captured = runLocalScriptCapture(path.join("scripts", "./validation/validate-meta-config.mjs"))
       printDiagnosticPayload(createDiagnosticPayload("validate:config", {
         status: captured.status,
         data: { stdout: captured.stdout.trim(), stderr: captured.stderr.trim() },
@@ -4010,14 +5211,15 @@ function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    process.exitCode = runLocalScript(path.join("scripts", "./validation/validate-meta-config.mjs"))
     return
   }
 
   if (first === "validate:expertise") {
     const expertiseArgs = argv.slice(1).filter((arg) => arg !== "--json")
+    const validateScript = path.join("scripts", "expertise", "expertise-validate.mjs")
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "expertise-validate.mjs"), [...expertiseArgs, "--json"])
+      const captured = runLocalScriptCapture(validateScript, [...expertiseArgs, "--json"])
       let jsonPayload = null
       try { jsonPayload = JSON.parse(captured.stdout || "{}") } catch { jsonPayload = null }
       printDiagnosticPayload(createDiagnosticPayload("validate:expertise", {
@@ -4028,13 +5230,13 @@ function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "expertise-validate.mjs"), expertiseArgs)
+    process.exitCode = runLocalScript(validateScript, expertiseArgs)
     return
   }
 
   if (first === "validate:sync") {
     if (jsonMode) {
-      const captured = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
+      const captured = runLocalScriptCapture(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check", "--json"])
       let report = {}
       try {
         report = JSON.parse(captured.stdout || "{}")
@@ -4049,7 +5251,7 @@ function main() {
       process.exitCode = captured.status
       return
     }
-    process.exitCode = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    process.exitCode = runLocalScript(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check"])
     return
   }
 
@@ -4090,8 +5292,8 @@ function main() {
 
   if (first === "validate:all") {
     if (jsonMode) {
-      const config = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
-      const sync = runLocalScriptCapture(path.join("scripts", "sync-meta-agents.mjs"), ["--check", "--json"])
+      const config = runLocalScriptCapture(path.join("scripts", "./validation/validate-meta-config.mjs"))
+      const sync = runLocalScriptCapture(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check", "--json"])
       const runtime = runtimeResult.runtime
         ? dispatchCapture(runtimeResult.runtime, "check:runtime", [])
         : { status: 0, stdout: "", stderr: "skipped: no runtime detected" }
@@ -4118,12 +5320,12 @@ function main() {
       process.exitCode = status
       return
     }
-    const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+    const configStatus = runLocalScript(path.join("scripts", "./validation/validate-meta-config.mjs"))
     if (configStatus !== 0) {
       process.exitCode = configStatus
       return
     }
-    const syncStatus = runLocalScript(path.join("scripts", "sync-meta-agents.mjs"), ["--check"])
+    const syncStatus = runLocalScript(path.join("scripts", "./sync/sync-meta-agents.mjs"), ["--check"])
     if (syncStatus !== 0) {
       process.exitCode = syncStatus
       return
@@ -4142,6 +5344,7 @@ function main() {
     const explainFilters = parseFilterArgs(normalizedArgv.slice(2))
     const isHeadless = hasHeadlessFlag(argv)
     const crewContext = resolveCrewExecutionContext(explainFilters.crew)
+    const routingScope = resolveRoutingScopeFromArgs(normalizedArgv.slice(2), readCooperativeRoutingConfig())
     if (explainCommand === "detect") {
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
@@ -4157,6 +5360,39 @@ function main() {
       process.exitCode = runtimeResult.runtime ? 0 : 1
       return
     }
+
+    if (explainCommand === "state") {
+      const statePayload = buildAssistantStatePayload({
+        repoRoot,
+        crew: explainFilters.crew || "",
+        agent: explainFilters.agent || "",
+        task: explainFilters.task || "",
+        runtime: runtimeResult.runtime || ""
+      })
+      if (jsonMode) {
+        printDiagnosticPayload(createDiagnosticPayload("explain", {
+          status: 0,
+          runtime: runtimeResult.runtime,
+          reason: runtimeResult.reason,
+          data: { target: "state", payload: statePayload }
+        }))
+      } else {
+        console.log("Assistant State")
+        console.log(`  Crew:     ${statePayload.crew}`)
+        console.log(`  Agent:    ${statePayload.agent}`)
+        console.log(`  Runtime:  ${statePayload.runtime}`)
+        console.log(`  Expertise: ${statePayload.expertise.selected || "none"} (confidence: ${typeof statePayload.expertise.confidence === "number" ? statePayload.expertise.confidence.toFixed(2) : "n/a"})`)
+        console.log(`  Context:  ${statePayload.context_memory.status} (${(statePayload.context_memory.matched_docs || []).length} docs)`)
+        console.log(`  Session:  ${statePayload.session.mode}${statePayload.session.session_id ? ` ${statePayload.session.session_id}` : ""}`)
+        console.log(`  Provenance: ${statePayload.provenance.status}`)
+        console.log(`  Readiness: ${statePayload.readiness.status}`)
+        for (const note of statePayload.readiness.notes || []) {
+          console.log(`    - ${note}`)
+        }
+      }
+      return
+    }
+
     if (!runtimeResult.runtime) {
       console.error(`ERROR: could not detect runtime. Use --runtime <${orderedRuntimeNames(runtimeProfiles).join("|")}>`)
       process.exitCode = 1
@@ -4168,7 +5404,7 @@ function main() {
         reason: runtimeResult.reason,
         command: explainCommand,
         resolved_exec: process.execPath,
-        resolved_args: [path.join("scripts", "sync-meta-agents.mjs"), "--check"],
+        resolved_args: [path.join("scripts", "./sync/sync-meta-agents.mjs"), "--check"],
         crewContext
       }
       if (jsonMode) {
@@ -4200,9 +5436,9 @@ function main() {
       }
     }
 
-// --- explain delegate ---
+    // --- explain delegate ---
     if (explainCommand === "delegate") {
-      ;(async () => {
+      ; (async () => {
         const target = parseValueArg(normalizedArgv.slice(2), "--target")
         const task = parseValueArg(normalizedArgv.slice(2), "--task")
         const crew = parseValueArg(normalizedArgv.slice(2), "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
@@ -4227,7 +5463,7 @@ function main() {
         // Load delegation-resolution helpers (only listDelegationTargets and resolveDelegationTarget are exported)
         let listDelegationTargets
         try {
-          const dr = await import("./delegation-resolution.mjs")
+          const dr = await import("./runtime/delegation-resolution.mjs")
           listDelegationTargets = dr.listDelegationTargets
         } catch (err) {
           if (jsonMode) {
@@ -4308,7 +5544,7 @@ function main() {
         // Load expertise-routing for scoreCandidates
         let scoreCandidates
         try {
-          const er = await import("./expertise-routing.mjs")
+          const er = await import("./expertise/expertise-routing.mjs")
           scoreCandidates = er.scoreCandidates
         } catch (err) {
           if (jsonMode) {
@@ -4319,7 +5555,7 @@ function main() {
             }))
           } else {
             console.error("ERROR: expertise-routing.mjs not available — " + err.message)
-            console.error("       Run: node scripts/expertise-routing.mjs to verify the module exists.")
+            console.error("       Run: node scripts/expertise/expertise-routing.mjs to verify the module exists.")
           }
           process.exitCode = 1
           return
@@ -4402,6 +5638,43 @@ function main() {
 
     if (["use", "run", "clear", "list:crews", "check:runtime", "validate", "validate:runtime", "doctor"].includes(explainCommand)) {
       const passthrough = normalizedArgv.slice(2)
+      const explainRoutingResolver = explainCommand === "run"
+        ? resolveWorkspaceCandidates({
+          repoRoot,
+          runtime: runtimeResult.runtime,
+          sourceCrew: explainFilters.crew || process.env.MAH_ACTIVE_CREW || "dev",
+          routingScope,
+          runtimeProfile: runtimeProfiles[runtimeResult.runtime]
+        })
+        : null
+      const explainRouting = explainRoutingResolver
+        ? {
+          routing_scope: explainRoutingResolver.routingScope,
+          source_crew: explainRoutingResolver.sourceCrew,
+          candidate_crews_count: explainRoutingResolver.candidateCrews.length,
+          candidate_agents_count: explainRoutingResolver.candidates.length,
+          candidate_crews: explainRoutingResolver.candidateCrews
+        }
+        : {}
+      let cooperativeRanking = null
+      if (explainCommand === "run" && explainRoutingResolver) {
+        try {
+          const routingDecision = await buildCooperativeRoutingDecision({
+            runtime: runtimeResult.runtime,
+            passthrough,
+            routingScope
+          })
+          cooperativeRanking = routingDecision.ranking || null
+        } catch (error) {
+          cooperativeRanking = {
+            selected: null,
+            ranking: [],
+            excluded: [],
+            warning: `cooperative ranking unavailable: ${error.message}`,
+            weights: null
+          }
+        }
+      }
 
       // Handle headless mode for run command
       if (explainCommand === "run" && isHeadless) {
@@ -4424,10 +5697,11 @@ function main() {
         const envOverrides = { ...normalized.envOverrides }
 
         // Get headless execution plan from adapter
-        const headlessPlan = adapter.prepareHeadlessRunContext({
+        const headlessPlan = await adapter.prepareHeadlessRunContext({
           repoRoot,
           runtime: runtimeResult.runtime,
           adapter,
+          crew,
           task: normalized.args.join(" "),
           argv: normalized.args,
           envOverrides
@@ -4450,7 +5724,12 @@ function main() {
           env: { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
           warnings: headlessPlan.warnings || [],
           crewContext,
+          ...explainRouting,
+          cooperative_ranking: cooperativeRanking,
           internal: headlessPlan.internal || {}
+        }
+        if (normalizedArgv.includes("--with-context-memory")) {
+          payload.context_memory = buildContextMemoryExplainPayload(passthrough)
         }
         if (jsonMode) {
           printDiagnosticPayload(createDiagnosticPayload("explain", {
@@ -4481,7 +5760,11 @@ function main() {
         env: plan.envOverrides || {},
         warnings: plan.warnings || [],
         candidates: plan.candidates || [],
-        crewContext
+        crewContext,
+        ...(explainCommand === "run" ? { ...explainRouting, cooperative_ranking: cooperativeRanking } : {})
+      }
+      if (normalizedArgv.includes("--with-context-memory")) {
+        payload.context_memory = buildContextMemoryExplainPayload(passthrough)
       }
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
@@ -4531,7 +5814,7 @@ function main() {
     const validateFilters = parseFilterArgs(normalizedArgv.slice(1))
     const crewContext = resolveCrewExecutionContext(validateFilters.crew)
     if (jsonMode) {
-      const configCaptured = runLocalScriptCapture(path.join("scripts", "validate-meta-config.mjs"))
+      const configCaptured = runLocalScriptCapture(path.join("scripts", "./validation/validate-meta-config.mjs"))
       if (configCaptured.status !== 0) {
         printDiagnosticPayload(createDiagnosticPayload("validate", {
           status: configCaptured.status,
@@ -4570,7 +5853,7 @@ function main() {
       process.exitCode = runtimeCaptured.status
       return
     } else {
-      const configStatus = runLocalScript(path.join("scripts", "validate-meta-config.mjs"))
+      const configStatus = runLocalScript(path.join("scripts", "./validation/validate-meta-config.mjs"))
       if (configStatus !== 0) {
         process.exitCode = configStatus
         return
@@ -4608,20 +5891,121 @@ function main() {
   }
 
   const command = first
-  const passthrough = normalizedArgv.slice(1)
+  let passthrough = normalizedArgv.slice(1)
+  let cooperativeDecision = null
+
+  if (command === "run") {
+    const routingScope = resolveRoutingScopeFromArgs(passthrough, readCooperativeRoutingConfig())
+    if (routingScope === "full_crews") {
+      cooperativeDecision = await buildCooperativeRoutingDecision({
+        runtime: runtimeResult.runtime,
+        passthrough,
+        routingScope
+      })
+      if (!cooperativeDecision?.ok) {
+        console.error(`ERROR: ${cooperativeDecision?.error || "failed cooperative routing"}`)
+        process.exitCode = 1
+        return
+      }
+      passthrough = stripFullCrewsFlag(passthrough)
+      passthrough = upsertFlagValue(passthrough, "--crew", cooperativeDecision.selectedCrew)
+      passthrough = upsertFlagValue(passthrough, "--agent", cooperativeDecision.selectedAgent)
+      process.env.MAH_ROUTING_SCOPE = "full_crews"
+      process.env.MAH_SOURCE_CREW = cooperativeDecision.sourceCrew
+      process.env.MAH_SELECTED_CREW = cooperativeDecision.selectedCrew
+    }
+  }
 
   // Check for headless mode on run command
   if (command === "run" && hasHeadlessFlag(argv)) {
+    // headless branch exits via process.exit(exitCode) after dispatchHeadless completes.
     const outputMode = parseOutputMode(argv)
+    const lifecycleSessionId = command === "run" && cooperativeDecision?.ok
+      ? `${runtimeResult.runtime}:${cooperativeDecision.sourceCrew}:coop-${Date.now()}`
+      : ""
+    if (lifecycleSessionId) {
+      const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
+      recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+        event: "queued",
+        routing_scope: cooperativeDecision.routingScope,
+        source_crew: cooperativeDecision.sourceCrew,
+        selected_crew: cooperativeDecision.selectedCrew,
+        selected_agent: cooperativeDecision.selectedAgent,
+        candidate_crews: cooperativeDecision.candidateCrews
+      })
+      recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+        event: "routed",
+        agent: cooperativeDecision.selectedAgent,
+        routing_reason: "cooperative-ranking",
+        routing_confidence: cooperativeDecision.ranking?.selected?.score ?? null,
+        routing_scope: cooperativeDecision.routingScope,
+        source_crew: cooperativeDecision.sourceCrew,
+        selected_crew: cooperativeDecision.selectedCrew,
+        selected_agent: cooperativeDecision.selectedAgent,
+        candidate_crews: cooperativeDecision.candidateCrews
+      })
+    }
     const result = dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
     if (outputMode === "json") {
-      console.log(JSON.stringify(result, null, 2))
+      console.log(JSON.stringify({
+        ...result,
+        routing: cooperativeDecision?.ok
+          ? {
+            routing_scope: cooperativeDecision.routingScope,
+            source_crew: cooperativeDecision.sourceCrew,
+            selected_crew: cooperativeDecision.selectedCrew,
+            selected_agent: cooperativeDecision.selectedAgent,
+            candidate_crews: cooperativeDecision.candidateCrews
+          }
+          : undefined
+      }, null, 2))
+    }
+    if (outputMode !== "json" && result.sessionId) {
+      const { getLifecycleEvents } = await import("./session/m3-ops.mjs")
+      const events = getLifecycleEvents(repoRoot, result.sessionId)
+      if (events.length > 0) {
+        const timeline = events.map(e => e.event).join(" → ")
+        console.log(`Lifecycle: ${timeline}`)
+      }
     }
     const exitCode = typeof result.status === "number" ? result.status : 1
     process.exit(exitCode)
   }
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)
+  if (command === "run" && cooperativeDecision?.ok) {
+    const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
+    const lifecycleSessionId = `${runtimeResult.runtime}:${cooperativeDecision.sourceCrew}:coop-${Date.now()}`
+    recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+      event: "queued",
+      routing_scope: cooperativeDecision.routingScope,
+      source_crew: cooperativeDecision.sourceCrew,
+      selected_crew: cooperativeDecision.selectedCrew,
+      selected_agent: cooperativeDecision.selectedAgent,
+      candidate_crews: cooperativeDecision.candidateCrews
+    })
+    recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+      event: "routed",
+      agent: cooperativeDecision.selectedAgent,
+      routing_reason: "cooperative-ranking",
+      routing_confidence: cooperativeDecision.ranking?.selected?.score ?? null,
+      routing_scope: cooperativeDecision.routingScope,
+      source_crew: cooperativeDecision.sourceCrew,
+      selected_crew: cooperativeDecision.selectedCrew,
+      selected_agent: cooperativeDecision.selectedAgent,
+      candidate_crews: cooperativeDecision.candidateCrews
+    })
+    recordLifecycleEvent(repoRoot, lifecycleSessionId, {
+      event: status === 0 ? "completed" : "failed",
+      result_code: status,
+      result_reason: status === 0 ? "cooperative-run-success" : "cooperative-run-failed",
+      routing_scope: cooperativeDecision.routingScope,
+      source_crew: cooperativeDecision.sourceCrew,
+      selected_crew: cooperativeDecision.selectedCrew,
+      selected_agent: cooperativeDecision.selectedAgent,
+      candidate_crews: cooperativeDecision.candidateCrews
+    })
+  }
   process.exitCode = status
 }
 

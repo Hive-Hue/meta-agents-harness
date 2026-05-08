@@ -1,20 +1,30 @@
-import test from "node:test"
+import test, { after } from "node:test"
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
-import { mkdtempSync, readFileSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import os from "node:os"
-import { appendProvenance } from "../scripts/m3-ops.mjs"
+import { appendProvenance } from "../scripts/session/m3-ops.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..")
 const cliPath = path.join(repoRoot, "scripts", "meta-agents-harness.mjs")
+const workspaceRoot = mkdtempSync(path.join(os.tmpdir(), "mah-platform-workspace-"))
+
+copyFileSync(path.join(repoRoot, "meta-agents.example.yaml"), path.join(workspaceRoot, "meta-agents.yaml"))
+for (const marker of [".pi", ".claude", ".opencode", ".openclaude", ".hermes", ".kilo", ".codex"]) {
+  mkdirSync(path.join(workspaceRoot, marker), { recursive: true })
+}
+
+after(() => {
+  rmSync(workspaceRoot, { recursive: true, force: true })
+})
 
 function runJson(args) {
   const result = spawnSync(process.execPath, [cliPath, ...args], {
-    cwd: repoRoot,
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
@@ -43,7 +53,7 @@ test("graph --json returns topology and run graph shape", () => {
 
 test("graph --mermaid returns flowchart syntax", () => {
   const result = spawnSync(process.execPath, [cliPath, "graph", "--mermaid"], {
-    cwd: repoRoot,
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
@@ -63,7 +73,7 @@ test("graph --mermaid returns flowchart syntax", () => {
 
 test("graph --mermaid supports basic and group detail levels", () => {
   const basic = spawnSync(process.execPath, [cliPath, "graph", "--crew", "dev", "--mermaid", "--mermaid-level", "basic"], {
-    cwd: repoRoot,
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
@@ -73,7 +83,7 @@ test("graph --mermaid supports basic and group detail levels", () => {
   assert.match(basic.stdout, /m_workers/)
 
   const group = spawnSync(process.execPath, [cliPath, "graph", "--crew", "dev", "--mermaid", "--mermaid-level", "group"], {
-    cwd: repoRoot,
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
@@ -89,7 +99,7 @@ test("graph --mermaid detailed can render capabilities with legend and colors", 
     process.execPath,
     [cliPath, "graph", "--crew", "dev", "--mermaid", "--mermaid-level", "detailed", "--mermaid-capabilities"],
     {
-      cwd: repoRoot,
+      cwd: workspaceRoot,
       env: process.env,
       encoding: "utf-8"
     }
@@ -99,7 +109,7 @@ test("graph --mermaid detailed can render capabilities with legend and colors", 
   assert.match(result.stdout, /subgraph lead_mcp\[MCPs\]/)
   assert.match(result.stdout, /subgraph worker_skill\[Skills\]/)
   assert.match(result.stdout, /subgraph workers_mcp\[MCPs\]/)
-  assert.match(result.stdout, /expertise-model/)
+  assert.match(result.stdout, /expertise[-_]model/)
   assert.match(result.stdout, /classDef orchestrator/)
   assert.match(result.stdout, /classDef skillNode/)
   assert.match(result.stdout, /subgraph legend\[Legend\]/)
@@ -108,24 +118,24 @@ test("graph --mermaid detailed can render capabilities with legend and colors", 
 })
 
 test("sync projects crew mission and sprint metadata into runtime artifacts", () => {
-  const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "sync-meta-agents.mjs")], {
-    cwd: repoRoot,
+  const sync = spawnSync(process.execPath, [path.join(repoRoot, "scripts", "../scripts/sync/sync-meta-agents.mjs")], {
+    cwd: workspaceRoot,
     env: process.env,
     encoding: "utf-8"
   })
   assert.equal(sync.status, 0, sync.stderr)
 
-  const claudeCrew = readFileSync(path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml"), "utf-8")
-  const opencodeCrew = readFileSync(path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml"), "utf-8")
-  const hermesCrew = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "multi-team.yaml"), "utf-8")
-  const hermesConfig = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "config.yaml"), "utf-8")
-  const hermesPrompt = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
-  const piPrompt = readFileSync(path.join(repoRoot, ".pi", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
-  const codexPrompt = readFileSync(path.join(repoRoot, ".codex", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
-  const kiloPrompt = readFileSync(path.join(repoRoot, ".kilo", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
-  const hermesLeadPrompt = readFileSync(path.join(repoRoot, ".hermes", "crew", "dev", "agents", "planning_lead.md"), "utf-8")
-  const codexLeadPrompt = readFileSync(path.join(repoRoot, ".codex", "crew", "dev", "agents", "planning_lead.md"), "utf-8")
-  const kiloLeadPrompt = readFileSync(path.join(repoRoot, ".kilo", "crew", "dev", "agents", "planning_lead.md"), "utf-8")
+  const claudeCrew = readFileSync(path.join(workspaceRoot, ".claude", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const opencodeCrew = readFileSync(path.join(workspaceRoot, ".opencode", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const hermesCrew = readFileSync(path.join(workspaceRoot, ".hermes", "crew", "dev", "multi-team.yaml"), "utf-8")
+  const hermesConfig = readFileSync(path.join(workspaceRoot, ".hermes", "crew", "dev", "config.yaml"), "utf-8")
+  const hermesPrompt = readFileSync(path.join(workspaceRoot, ".hermes", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
+  const piPrompt = readFileSync(path.join(workspaceRoot, ".pi", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
+  const codexPrompt = readFileSync(path.join(workspaceRoot, ".codex", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
+  const kiloPrompt = readFileSync(path.join(workspaceRoot, ".kilo", "crew", "dev", "agents", "orchestrator.md"), "utf-8")
+  const hermesLeadPrompt = readFileSync(path.join(workspaceRoot, ".hermes", "crew", "dev", "agents", "planning_lead.md"), "utf-8")
+  const codexLeadPrompt = readFileSync(path.join(workspaceRoot, ".codex", "crew", "dev", "agents", "planning_lead.md"), "utf-8")
+  const kiloLeadPrompt = readFileSync(path.join(workspaceRoot, ".kilo", "crew", "dev", "agents", "planning_lead.md"), "utf-8")
 
   assert.match(claudeCrew, /mission: Deliver bounded v0\.8\.0 Context Memory evolution/)
   assert.match(claudeCrew, /sprint_mode:/)

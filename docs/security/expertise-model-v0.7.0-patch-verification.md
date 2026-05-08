@@ -4,16 +4,16 @@
 
 | Original Finding | Status | Evidence |
 |---|---:|---|
-| Arbitrary file write via `recordEvidence()` expertise_id path join | FIXED | `scripts/expertise-evidence-store.mjs:16-18, 52-58, 136-160, 206-231, 273-301`; self-test rejects traversal IDs and accepts `dev:orchestrator`. |
-| Path traversal in expertise lookup by ID | FIXED | `scripts/expertise-loader.mjs:22-24, 38-56, 67-85, 239-263`; self-test rejects traversal attempts and accepts normal IDs. |
-| Arbitrary file write via `exportExpertiseToFile()` output path | FIXED | `scripts/expertise-export.mjs:29-43, 544-557`; self-test confirms safe path accepted and traversal blocked. |
+| Arbitrary file write via `recordEvidence()` expertise_id path join | FIXED | `scripts/expertise/evidence/expertise-evidence-store.mjs:16-18, 52-58, 136-160, 206-231, 273-301`; self-test rejects traversal IDs and accepts `dev:orchestrator`. |
+| Path traversal in expertise lookup by ID | FIXED | `scripts/expertise/expertise-loader.mjs:22-24, 38-56, 67-85, 239-263`; self-test rejects traversal attempts and accepts normal IDs. |
+| Arbitrary file write via `exportExpertiseToFile()` output path | FIXED | `scripts/expertise/expertise-export.mjs:29-43, 544-557`; self-test confirms safe path accepted and traversal blocked. |
 | CLI `--output` and `--file` surfaces lack path safety controls | FIXED | `scripts/meta-agents-harness.mjs:211-237, 2669-2735, 2879-2881`; CLI self-test confirms safe path accepted and unsafe paths rejected. |
-| Unbounded evidence loading can cause memory/CPU denial of service | FIXED | `scripts/expertise-evidence-store.mjs:16-18, 206-266`; file-count and file-size bounds implemented. |
-| Registry/catalog build is recursively unbounded and trusts directory contents | FIXED | `scripts/expertise-loader.mjs:22-24, 67-85`; recursion depth, symlink skipping, and file-count limit implemented. |
-| Trust tier is not enforced in routing, despite spec expectations | FIXED | `scripts/expertise-routing.mjs:74-76, 241-260, 335-371`; trust tier filter and mismatch penalty are active. |
-| Lifecycle state transitions are not authorization-aware | FIXED | `scripts/expertise-lifecycle.mjs:139-192, 235-238, 319-357`; hard authorization enforcement now blocks unauthorized sensitive transitions, audit trail persists, and self-tests cover blocked attempts. |
-| Confidence scoring is easily influenced by fabricated evidence records | FIXED | `scripts/expertise-confidence.mjs:48-145, 183-260`; provenance assessment adds trust caps, suspicious metrics detection, and self-tests verify manipulation scenarios. |
-| Import validation accepts unknown fields with warnings only | FIXED | `scripts/expertise-export.mjs:277-280, 405-427, 567-620`; strict mode is now default, unknown fields are rejected by default, and `--lenient`/`strict:false` are explicit opt-outs. |
+| Unbounded evidence loading can cause memory/CPU denial of service | FIXED | `scripts/expertise/evidence/expertise-evidence-store.mjs:16-18, 206-266`; file-count and file-size bounds implemented. |
+| Registry/catalog build is recursively unbounded and trusts directory contents | FIXED | `scripts/expertise/expertise-loader.mjs:22-24, 67-85`; recursion depth, symlink skipping, and file-count limit implemented. |
+| Trust tier is not enforced in routing, despite spec expectations | FIXED | `scripts/expertise/expertise-routing.mjs:74-76, 241-260, 335-371`; trust tier filter and mismatch penalty are active. |
+| Lifecycle state transitions are not authorization-aware | FIXED | `scripts/expertise/expertise-lifecycle.mjs:139-192, 235-238, 319-357`; hard authorization enforcement now blocks unauthorized sensitive transitions, audit trail persists, and self-tests cover blocked attempts. |
+| Confidence scoring is easily influenced by fabricated evidence records | FIXED | `scripts/expertise/expertise-confidence.mjs:48-145, 183-260`; provenance assessment adds trust caps, suspicious metrics detection, and self-tests verify manipulation scenarios. |
+| Import validation accepts unknown fields with warnings only | FIXED | `scripts/expertise/expertise-export.mjs:277-280, 405-427, 567-620`; strict mode is now default, unknown fields are rejected by default, and `--lenient`/`strict:false` are explicit opt-outs. |
 
 ## Verdict
 
@@ -23,7 +23,7 @@ All 10 original findings are now verified as FIXED.
 
 ## Verification Details
 
-### 1) `scripts/expertise-evidence-store.mjs`
+### 1) `scripts/expertise/evidence/expertise-evidence-store.mjs`
 
 - **Checked**: `sanitizeExpertiseId()` exists and enforces `^[a-z0-9._-]+:[a-z0-9._-]+$` with explicit rejection of `/`, `\`, and `..`.
 - **Checked**: `recordEvidence()` calls `sanitizeExpertiseId()` before path creation, then verifies the resolved evidence directory stays under the configured evidence root. The default remains `.mah/expertise/evidence`, but tests can redirect via `MAH_EXPERTISE_EVIDENCE_ROOT`.
@@ -32,7 +32,7 @@ All 10 original findings are now verified as FIXED.
 - **Checked**: self-tests reject traversal IDs and accept `dev:orchestrator`.
 - **Result**: fixed.
 
-### 2) `scripts/expertise-loader.mjs`
+### 2) `scripts/expertise/expertise-loader.mjs`
 
 - **Checked**: ID segments are validated with `ID_SEGMENT_REGEX = /^[a-z0-9._-]+$/`.
 - **Checked**: `sanitizeIdSegment()` rejects path separators and `..`.
@@ -41,7 +41,7 @@ All 10 original findings are now verified as FIXED.
 - **Checked**: self-test rejects traversal attempts such as `dev:../../etc` and `../:name`.
 - **Result**: fixed.
 
-### 3) `scripts/expertise-export.mjs`
+### 3) `scripts/expertise/expertise-export.mjs`
 
 - **Checked**: `validateExportPath()` resolves the user path against the repo root and rejects escapes.
 - **Checked**: `exportExpertiseToFile()` validates the output path before writing.
@@ -57,7 +57,7 @@ All 10 original findings are now verified as FIXED.
 - **Checked**: help/command flow now exposes `--lenient` for import while keeping strict behavior by default.
 - **Result**: fixed.
 
-### 5) `scripts/expertise-routing.mjs`
+### 5) `scripts/expertise/expertise-routing.mjs`
 
 - **Checked**: `checkTrustTierFilter()` exists and is wired into scoring before match scoring.
 - **Checked**: `TRUST_TIER_MISMATCH_PENALTY` is applied when the candidate is below the best trust tier in the candidate set.
@@ -65,7 +65,7 @@ All 10 original findings are now verified as FIXED.
 - **Checked**: routing self-test includes a trust-tier scenario and passes.
 - **Result**: fixed.
 
-### 6) `scripts/expertise-lifecycle.mjs`
+### 6) `scripts/expertise/expertise-lifecycle.mjs`
 
 - **Checked**: `isAuthorizedTransition()` exists and hard-blocks sensitive transitions without an authorized actor.
 - **Checked**: sensitive transitions include `restricted→active` and `active→restricted`; the implementation also treats these as authorization-sensitive boundaries.
@@ -74,7 +74,7 @@ All 10 original findings are now verified as FIXED.
 - **Checked**: self-tests now cover unauthorized attempts that must fail, plus successful governance-authorized transition.
 - **Result**: fixed.
 
-### 7) `scripts/expertise-confidence.mjs`
+### 7) `scripts/expertise/expertise-confidence.mjs`
 
 - **Checked**: `assessProvenance()` exists and classifies metrics as `verified`, `unverified`, or `fabricated_risk`.
 - **Checked**: `computeConfidence()` applies a 0.7 multiplier for unverified provenance and caps fabricated-risk confidence at 0.2.
@@ -83,7 +83,7 @@ All 10 original findings are now verified as FIXED.
 - **Checked**: legitimate metrics without provenance metadata still compute normally; they are only down-weighted when suspicious signals are present.
 - **Result**: fixed.
 
-### 8) `scripts/expertise-export.mjs` strict import default
+### 8) `scripts/expertise/expertise-export.mjs` strict import default
 
 - **Checked**: `validateImportPayload()` now defaults to strict mode via `options.strict !== false`.
 - **Checked**: unknown fields are rejected by default, and the error message includes the field name.
@@ -105,24 +105,24 @@ All 10 original findings are now verified as FIXED.
 ### 1) [MEDIUM] Lifecycle Authorization — Hard Enforcement
 - **Previous Status**: PARTIAL
 - **New Status**: FIXED
-- **Verification**: `scripts/expertise-lifecycle.mjs:139-192` adds `isAuthorizedTransition(actor, fromState, toState)` and `transitionExpertise()` now pushes an error immediately for unauthorized sensitive transitions. The sensitive transition set includes `restricted:active` and `active:restricted`. The implementation then returns `ok: false` when errors are present. Audit metadata is added at `scripts/expertise-lifecycle.mjs:235-238`.
-- **Self-Test Results**: PASS — `node scripts/expertise-lifecycle.mjs` reports `28 passed, 0 failed`; unauthorized sensitive transitions are blocked, non-admin actors are blocked, and governance actors succeed.
+- **Verification**: `scripts/expertise/expertise-lifecycle.mjs:139-192` adds `isAuthorizedTransition(actor, fromState, toState)` and `transitionExpertise()` now pushes an error immediately for unauthorized sensitive transitions. The sensitive transition set includes `restricted:active` and `active:restricted`. The implementation then returns `ok: false` when errors are present. Audit metadata is added at `scripts/expertise/expertise-lifecycle.mjs:235-238`.
+- **Self-Test Results**: PASS — `node scripts/expertise/expertise-lifecycle.mjs` reports `28 passed, 0 failed`; unauthorized sensitive transitions are blocked, non-admin actors are blocked, and governance actors succeed.
 - **Bypass**: No bypass found in this re-verification. The only accepted actor values are role-based; fake actors without `admin`/`governance` role are rejected for sensitive transitions.
 - **New Issues**: None.
 
 ### 2) [LOW] Confidence Provenance — Evidence Trust Mechanism
 - **Previous Status**: NOT FIXED
 - **New Status**: FIXED
-- **Verification**: `scripts/expertise-confidence.mjs:48-97` adds `assessProvenance()`, and `computeConfidence()` at `scripts/expertise-confidence.mjs:137-145` applies trust caps based on provenance. The code detects suspicious metrics patterns and lowers scores accordingly.
-- **Self-Test Results**: PASS — `node scripts/expertise-confidence.mjs` reports `=== All Self-Tests Passed ===`; verified, fabricated-risk, unverified, and capped-confidence scenarios all behave as expected.
+- **Verification**: `scripts/expertise/expertise-confidence.mjs:48-97` adds `assessProvenance()`, and `computeConfidence()` at `scripts/expertise/expertise-confidence.mjs:137-145` applies trust caps based on provenance. The code detects suspicious metrics patterns and lowers scores accordingly.
+- **Self-Test Results**: PASS — `node scripts/expertise/expertise-confidence.mjs` reports `=== All Self-Tests Passed ===`; verified, fabricated-risk, unverified, and capped-confidence scenarios all behave as expected.
 - **Bypass**: No bypass found in the implementation reviewed. Legitimate metrics without provenance metadata still compute, but suspicious metrics are down-weighted.
 - **New Issues**: None.
 
 ### 3) [LOW] Import Strict Mode — Default to Strict
 - **Previous Status**: NOT FIXED
 - **New Status**: FIXED
-- **Verification**: `scripts/expertise-export.mjs:277-280` sets strict mode default-on with `const strict = options.strict !== false`. Unknown fields are promoted to errors in the strict branch at `scripts/expertise-export.mjs:405-427`. `loadImportFile()` preserves strict default at `scripts/expertise-export.mjs:567-620`. `scripts/meta-agents-harness.mjs:2667-2735` adds `--lenient` to import, and strict mode is used when the flag is absent.
-- **Self-Test Results**: PASS — `node scripts/expertise-export.mjs` reports strict rejection by default, `--lenient`/`{ strict: false }` acceptance, and safe path validation passing.
+- **Verification**: `scripts/expertise/expertise-export.mjs:277-280` sets strict mode default-on with `const strict = options.strict !== false`. Unknown fields are promoted to errors in the strict branch at `scripts/expertise/expertise-export.mjs:405-427`. `loadImportFile()` preserves strict default at `scripts/expertise/expertise-export.mjs:567-620`. `scripts/meta-agents-harness.mjs:2667-2735` adds `--lenient` to import, and strict mode is used when the flag is absent.
+- **Self-Test Results**: PASS — `node scripts/expertise/expertise-export.mjs` reports strict rejection by default, `--lenient`/`{ strict: false }` acceptance, and safe path validation passing.
 - **Bypass**: No bypass found in normal CLI flow; permissive mode now requires explicit `--lenient` or `strict:false`.
 - **New Issues**: None.
 

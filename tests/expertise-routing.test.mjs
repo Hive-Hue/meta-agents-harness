@@ -73,7 +73,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 1. No candidates → selected=null, escalation=true, fallback_reason="all-candidates-blocked"
   test('returns escalation when no candidates provided', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const result = scoreCandidates({
       task: 'Implement user authentication',
       sourceAgent: 'orchestrator',
@@ -87,7 +87,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 2. One candidate → that candidate is selected
   test('returns the single candidate when only one is available', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [{
       id: 'backend-dev',
       expertise: {
@@ -110,7 +110,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 3. Restricted candidate → blocked, escalation=true
   test('blocks candidates with validation_status=restricted', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [
       {
         id: 'security-reviewer',
@@ -146,7 +146,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 4. Mixed quality → top-scoring candidate is selected
   test('ranks candidates by final_score and selects the best match', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [
       {
         id: 'frontend-dev',
@@ -195,7 +195,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 5. All below threshold → escalation=true
   test('triggers escalation when all scores fall below threshold', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [
       {
         id: 'frontend-dev',
@@ -230,7 +230,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 6. Experimental lifecycle applies penalty
   test('applies experimental lifecycle penalty', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [
       {
         id: 'experimental-agent',
@@ -266,7 +266,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
 // 7. match_score based on capability/domain overlap
   test('computes match_score based on capability and domain keyword overlap', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [
       {
         id: 'backend-dev',
@@ -315,7 +315,7 @@ test.describe('scoreCandidates — routing algorithm', () => {
 
   // 8. confidence_adjustment by band
   test('applies confidence band adjustments correctly', async () => {
-    const { scoreCandidates } = await import('../scripts/expertise-routing.mjs')
+    const { scoreCandidates } = await import('../scripts/expertise/expertise-routing.mjs')
     const candidates = [
       {
         id: 'critical-agent',
@@ -582,8 +582,8 @@ test.describe('non-regression — existing commands still work', () => {
   })
 
   // 23. expertise-validate.mjs script runs and validates all entries
-  test('scripts/expertise-validate.mjs validates expertise entries correctly', () => {
-    const stdout = execSync('node scripts/expertise-validate.mjs', {
+  test('scripts/expertise/expertise-validate.mjs validates expertise entries correctly', () => {
+    const stdout = execSync('node scripts/expertise/expertise-validate.mjs', {
       encoding: 'utf-8',
       cwd: repoRoot,
       timeout: 30000,

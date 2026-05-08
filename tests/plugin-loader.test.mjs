@@ -5,13 +5,12 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const FIXTURE_PLUGINS_DIR = path.resolve(__dirname, "../plugins")
-const FIXTURE_PLUGIN = path.resolve(__dirname, "../plugins/runtime-fake")
+const FIXTURE_PLUGINS_DIR = path.resolve(__dirname, "../.test-temp-plugin-loader/fixture-plugins")
 
 // Dynamically import plugin-loader to access internals
 // We use a helper to get a fresh module each time we need to reset state
 async function getPluginLoader() {
-  return import("../scripts/plugin-loader.mjs")
+  return import("../scripts/runtime/plugin-loader.mjs")
 }
 
 async function createTempPlugin(tempDir, name, pluginJson, indexContent) {
@@ -170,8 +169,26 @@ function cleanupTempDir() {
   }
 }
 
+function ensureFixturePlugins() {
+  setupTempDir()
+  const fakePluginPath = path.join(FIXTURE_PLUGINS_DIR, "runtime-fake")
+  mkdirSync(fakePluginPath, { recursive: true })
+  writeFileSync(path.join(fakePluginPath, "plugin.json"), JSON.stringify({
+    name: "fake",
+    version: "0.1.0",
+    mahVersion: "^0.8.0"
+  }))
+  writeFileSync(path.join(fakePluginPath, "index.mjs"), validRuntimePluginExport("fake", "0.1.0", "^0.8.0"))
+}
+
 describe("plugin-loader", async () => {
   setupTempDir()
+
+  it("reads MAH_VERSION from repository root package.json", async () => {
+    const loader = await getPluginLoader()
+    const rootPkg = JSON.parse(readFileSync(path.resolve(__dirname, "../package.json"), "utf-8"))
+    assert.equal(loader.MAH_VERSION, rootPkg.version)
+  })
 
   // Reset module state between tests by clearing the internal registry
   // The plugin-loader uses a module-level pluginRegistry Map
@@ -193,12 +210,12 @@ describe("plugin-loader", async () => {
   describe("loadPlugins", () => {
     it("discovers plugins from mah-plugins/ style directory", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
-      // Use the runtime-fake fixture - pass parent dir that contains plugin subdirs
+      // Pass parent dir that contains plugin subdirs
       const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
 
       assert.ok(loaded.some(p => p.name === "fake"), "should discover runtime-fake plugin")
-      assert.ok(loaded.some(p => p.name === "codex"), "should discover runtime-codex plugin")
     })
 
     it("discovers plugins from MAH_HOME/mah-plugins", async () => {
@@ -262,7 +279,7 @@ export const runtimePlugin = {
       const previousMahHome = process.env.MAH_HOME
       try {
         process.env.MAH_HOME = tempMahHome
-        const loader = await import(`../scripts/plugin-loader.mjs?home=${Date.now()}`)
+        const loader = await import(`../scripts/runtime/plugin-loader.mjs?home=${Date.now()}`)
         const runtimes = await loader.getAllRuntimes()
         assert.ok(runtimes.homefake, "should discover plugins installed in MAH_HOME/mah-plugins")
       } finally {
@@ -273,6 +290,7 @@ export const runtimePlugin = {
 
     it("skips plugins with version incompatibility", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
       // runtime-fake requires ^0.8.0, so version 0.4.0 should be incompatible
       const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.4.0")
@@ -282,6 +300,7 @@ export const runtimePlugin = {
 
     it("accepts plugins with compatible version", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
       // runtime-fake requires ^0.8.0, version 0.9.0 should be compatible
       const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.9.0")
@@ -387,6 +406,7 @@ export const runtimePlugin = {
 
     it("registers loaded plugins in the internal registry", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
       // Use FIXTURE_PLUGINS_DIR (the parent dir) not FIXTURE_PLUGIN (the plugin dir itself)
       const loaded = await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
@@ -413,6 +433,7 @@ export const runtimePlugin = {
 
     it("merges loaded plugins with bundled runtime plugins", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
       await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
       const runtimes = await loader.getAllRuntimes()
@@ -558,6 +579,7 @@ export const somethingElse = {}
   describe("unloadPlugin", () => {
     it("removes plugin from registry", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
       // Load a plugin first
       await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")
@@ -653,6 +675,7 @@ export { teardownCalled }
 
     it("after unload, can reload the same plugin", async () => {
       const loader = await getPluginLoader()
+      ensureFixturePlugins()
 
       // Load, unload, reload
       await loader.loadPlugins([FIXTURE_PLUGINS_DIR], "0.8.0")

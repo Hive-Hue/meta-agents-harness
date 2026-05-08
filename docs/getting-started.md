@@ -47,7 +47,38 @@ mah use dev
 
 # Run interactive session
 mah run
+
+# Inspect the planning workspace
+mah mission list --json
+mah task list --json
 ```
+
+### 4. WebUI Theme (v0.9.0 line)
+
+In the WebUI, open **Settings → Display → Theme** and select **Dark** or **Light**.
+The theme is applied immediately and persisted locally (`mah:theme`) for future reloads.
+
+### 5. WebUI Workspace Detection (v0.9.0 line)
+
+Bootstrap `Workspace Detection` scans the active **Workspace Path** (from Settings) and reports live state for config/runtime markers/git/expertise/context.
+
+### 6. MCP Registry and Sync (v0.9.0 line)
+
+MAH now uses a canonical MCP registry (`.mah/mcp/servers.json`) plus runtime-specific generated files.
+
+```bash
+# Inspect current MCP registry
+mah mcp list
+
+# Add or update servers
+mah mcp add playwright --type stdio --command npx --arg -y --arg @playwright/mcp@latest
+mah mcp update github --type stdio --command /usr/bin/github-mcp-server --arg stdio
+
+# Sync canonical registry to runtime-specific config files
+mah mcp sync
+```
+
+In WebUI, MCP management is available in **Settings → MCP Servers** (dedicated submenu).
 
 ---
 
@@ -106,7 +137,7 @@ mah init --yes \
 npm run bootstrap:meta
 
 # With flags
-node scripts/bootstrap-meta-agents.mjs --yes --crew dev
+node scripts/bootstrap/bootstrap-meta-agents.mjs --yes --crew dev
 ```
 
 ---
@@ -147,16 +178,32 @@ MAH_INIT_CREW="custom-crew" \
 mah init --yes
 ```
 
+WebUI login credentials:
+
+```bash
+MAH_WEBUI_USER=admin
+MAH_WEBUI_PASSWORD=mah
+```
+
+AI provider keys commonly used by bootstrap and runtime flows:
+
+```bash
+MINIMAX_API_KEY=...
+ZAI_API_KEY=...
+OPENAI_API_KEY=...
+OPENROUTER_API_KEY=...
+GEMINI_API_KEY=...
+```
+
 ---
 
 ## AI-Assisted Bootstrap
 
-AI-assisted mode generates enhanced configurations based on your project context.
+AI-assisted mode is an **optional acceleration** that uses direct provider HTTP calls to generate a tailored configuration. Logical mode produces a fully valid config without any runtime or API key.
 
 ### Requirements
 
-- **Runtime CLI**: `pi` or `opencode` installed and available in PATH
-- **API Key**: Configured in the runtime CLI (not passed to MAH directly)
+- **API Key/Token** for your selected provider
 - **Skill File**: `bootstrap` skill available
 
 ### Usage
@@ -165,23 +212,34 @@ AI-assisted mode generates enhanced configurations based on your project context
 # Interactive AI-assisted mode
 mah init
 # Select option 2 when prompted
+# Use arrows + Enter to choose provider
 
 # Non-interactive AI-assisted mode
-mah init --yes --ai --brief "E-commerce platform with microservices"
+mah init --yes --ai \
+  --provider openrouter \
+  --api-key "$OPENROUTER_API_KEY" \
+  --brief "E-commerce platform with microservices"
 
 # With project details
 mah init --yes --ai \
   --name "my-project" \
   --description "AI-powered code review tool" \
+  --provider minimax \
+  --api-key "$MINIMAX_API_KEY" \
   --brief "Automated code review with multi-agent analysis"
 ```
 
 ### What AI-Assisted Mode Does
 
-1. **Analyzes repository context** - Reads README, detects runtime markers
-2. **Generates tailored configuration** - Creates topology matching project needs
-3. **Infers sensible defaults** - Chooses appropriate crews, agents, and profiles
-4. **Falls back gracefully** - If AI fails, uses logical mode automatically
+1. **Collects repository context** — reads README and runtime markers
+2. **Generates tailored configuration** — creates topology matching project needs
+3. **Infers sensible defaults** — chooses appropriate crews, agents, and profiles
+4. **Falls back gracefully** — if HTTP AI fails, uses logical mode automatically
+
+In the `v0.9.0` development line, AI-assisted bootstrap can also:
+5. **Configure expertise-aware routing** — agents matched by skill, not just order
+6. **Set up Context Manager** — operational memory fetched per task at runtime
+7. **Enable visible execution** — lifecycle events, session status, and trace on demand
 
 ### Fallback Behavior
 
@@ -190,6 +248,25 @@ If AI-assisted mode fails (no runtime, missing skill, API error), MAH automatica
 ```
 bootstrap: bootstrap skill not found, falling back to logical mode
 bootstrap: created meta-agents.yaml
+```
+
+> **Note:** AI-assisted bootstrap first tries direct provider HTTP. If key/token or model is missing,
+> MAH can still fall back to installed runtime CLIs in headless/non-interactive mode.
+
+---
+
+## WebUI CLI
+
+```bash
+# Dev mode
+mah webui
+
+# Production mode (optimized): build + preview
+mah webui --prod
+
+# Explicit steps
+mah webui build
+mah webui preview --host 0.0.0.0 --port 4173
 ```
 
 ---
@@ -211,7 +288,9 @@ runtimes:                           # Runtime configurations (runtime detection 
   hermes: { ... }
 catalog:                            # Shared resources
   models: { ... }
-  domain_profiles: { ... }
+domain_profiles:                    # Domain access profiles
+  read_only_cwd: [ ... ]
+  write_cwd: [ ... ]
 crews:                              # Team definitions
   - id: "dev"
     topology: { ... }
@@ -243,7 +322,8 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
-        domain_profile: read_only_repo
+          - backlog_operator
+        domain_profile: read_only_cwd
       - id: planning-lead
         role: lead
         team: planning
@@ -252,17 +332,18 @@ crews:
           - delegate_bounded
           - zero_micromanagement
           - expertise_model
+          - backlog_operator
         # Stack multiple profiles to merge domain rules
         domain_profile:
-          - read_only_repo
-          - planning_delivery
+          - read_only_cwd
+          - write_user_home_with_approval
       - id: repo-analyst
         role: worker
         team: planning
         model_ref: worker_default
         skills:
           - expertise_model
-        domain_profile: read_only_repo
+        domain_profile: read_only_cwd
 ```
 
 ---
@@ -506,7 +587,7 @@ mah init --yes \
 ### AI-Enhanced Bootstrap
 
 ```bash
-# Let AI design the topology
+# AI-assisted (optional — generates expertise-aware topology)
 mah init --yes --ai \
   --brief "Microservices e-commerce platform with event-driven architecture"
 ```

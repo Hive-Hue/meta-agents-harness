@@ -22,13 +22,15 @@ Multi-agent teams often end up fragmented across runtime-specific repos and oper
 
 Meta Agents Harness solves that by providing:
 
-- **one CLI surface** for multiple runtimes
-- **runtime-aware dispatch** with deterministic detection
-- **shared multi-team topology** (`orchestrator -> leads -> workers`)
-- **canonical config generation** for runtime-specific artifacts
-- **incremental migration path** from runtime-specific harnesses to a unified entrypoint
+- **expertise-aware routing** — agents matched by skill and capability, not just name
+- **operational context memory** — the right docs fetched per task, per agent
+- **session and lifecycle visibility** — see execution as it happens, resume or inspect any session
+- **compounding loop** — successful runs improve future routing through governed expertise sync
+- **one CLI surface** for multiple runtimes with runtime-aware dispatch
+- **shared multi-team topology** (`orchestrator → leads → workers`)
+- **AI-assisted bootstrap** as optional acceleration, not a requirement
 
-This makes it easier to standardize operations without forcing teams to abandon the runtime they already use.
+Route the right agent, load the right context, show the work, compound over time.
 
 ---
 
@@ -52,6 +54,8 @@ mah init --yes --crew my-team --name "My Project" --description "Project descrip
 mah init --yes --force
 ```
 
+> `mah init` produces an expertise-aware topology — not just a config file. Each agent gets a capability profile that drives routing.
+
 ### Verify Your Setup
 
 ```bash
@@ -61,6 +65,27 @@ mah doctor          # Run diagnostics
 ```
 
 📖 **For detailed bootstrap documentation, see [`docs/getting-started.md`](./docs/getting-started.md)**
+
+### WebUI (Dev and Prod)
+
+```bash
+# Dev server
+mah webui
+
+# Production mode (build + preview)
+mah webui --prod
+
+# Equivalent explicit commands
+mah webui build
+mah webui preview --host 0.0.0.0 --port 4173
+```
+
+WebUI credentials are read from environment variables:
+
+```bash
+MAH_WEBUI_USER=admin
+MAH_WEBUI_PASSWORD=mah
+```
 
 ---
 
@@ -76,6 +101,7 @@ Current focus areas include:
 - preparing an adapter model for future runtime extensibility
 - improving operator UX with explainability and safer sync flows
 - unified session operations across all runtimes (list, resume, new, export, delete)
+- first-class planning workspace with `mah task`, `mah mission`, and WebUI `Tasks`
 
 This branch is the right place to evaluate the **direction**, **architecture**, and **product positioning** of the project.
 
@@ -184,6 +210,18 @@ mah list:crews
 mah use dev
 mah clear
 mah run
+mah expertise recommend --task "fix auth middleware"  # route by capability
+mah expertise sync                                    # strengthen routing from session outcomes
+mah skills list                                       # list skills and assignments
+mah skills inspect stitch-react-handoff               # inspect skill metadata
+mah skills add stitch-react-handoff --agent frontend-dev
+mah context find --agent worker-1 --task "fix auth"   # fetch operational memory
+mah context propose --from-session pi:dev:abc123      # governed learning
+mah sessions status                                   # see what's running
+mah mission list --json                               # inspect planning containers
+mah mission replan --id q4-audit --json              # apply mission replan
+mah task list --mission q4-audit --json              # inspect executable work
+mah task run --id TASK-142 --json                    # run a tracked task
 ```
 
 ### 2. Canonical configuration
@@ -261,6 +299,17 @@ In `v0.7.0`, the expertise model is treated as an operational foundation concept
 The workspace-local `.mah/expertise/evidence` directory is intentionally empty except for `.gitkeep`; real evidence should come from live tasks and test runs should use a temp root.
 
 See: `docs/expertise-model-foundation.md`
+
+### 7. Context Manager
+
+The Context Manager provides bounded operational memory fetched per task:
+
+- **per-agent, per-task retrieval** — `mah context find --agent <agent> --task "<task>"`
+- **governed proposals** — `mah context propose --from-session <ref>` creates a draft for human review
+- **no auto-promotion** — every context entry is curated before it enters the operational corpus
+- **runtime-agnostic** — `.md` and `.qmd` sources, no vector DB dependency
+
+See: `docs/context-manager.md`
 
 ---
 
@@ -349,18 +398,26 @@ For detailed onboarding documentation, see [`docs/onboarding.md`](./docs/onboard
 
 ## MCP configuration
 
-The repository uses two MCP-related files:
+MAH now supports a canonical MCP registry plus runtime-specific generated files:
 
+- `.mah/mcp/servers.json` — canonical MCP server registry (tracked)
 - `.mcp.example.json` — tracked repository template
-- `.mcp.json` — local active configuration (gitignored)
+- `.mcp.json` — local/generated active configuration (gitignored)
 
 Recommended flow:
 
 ```bash
-cp .mcp.example.json .mcp.json
+mah mcp list
+mah mcp add playwright --type stdio --command npx --arg -y --arg @playwright/mcp@latest
+mah mcp sync
 ```
 
-Then adjust local values and secrets as needed.
+This syncs runtime-specific targets currently used by MAH:
+
+- `.mcp.json`
+- `.pi/mcp-servers.json`
+- `.claude/settings.local.json` (`enabledMcpjsonServers`)
+- `.opencode/opencode.json` (`mcp` block)
 
 ---
 
@@ -686,6 +743,13 @@ Optional manual installation is still available if you want the same server outs
 
 ```bash
 codex mcp add mah -- /home/alysson/.nvm/versions/node/v22.19.0/bin/node /home/alysson/Github/meta-agents-harness/plugins/mah/mcp/server.mjs
+```
+
+If you want Codex to load a shared `.env` before it starts, use the repo wrapper:
+
+```bash
+MAH_CODEX_ENV_FILE=/home/alysson/Github/meta-agents-harness/.env \
+  /home/alysson/Github/meta-agents-harness/scripts/codex-with-env.sh
 ```
 
 ### `mah` command not available

@@ -11,7 +11,7 @@ Plugins can integrate in two ways:
 ## Overview
 
 Before v0.6.0, adding a new runtime required editing two core files:
-- `scripts/runtime-adapters.mjs` — add `createAdapter({...})`
+- `scripts/runtime/runtime-adapters.mjs` — add `createAdapter({...})`
 - `scripts/meta-agents-harness.mjs` — add the runtime to `RUNTIME_ORDER`
 
 This meant custom runtimes required permanent forks and merge conflicts on every MAH update.
@@ -352,7 +352,7 @@ A plugin runtime is selected by `mah detect` if its marker directory is present 
 
 ## Module API
 
-### `scripts/plugin-loader.mjs`
+### `scripts/runtime/plugin-loader.mjs`
 
 ```js
 import {
@@ -429,9 +429,9 @@ mah plugins validate ./path/to/plugin
 
 | File | Role |
 |---|---|
-| `scripts/plugin-loader.mjs` | Core plugin system — discovery, validation, registry |
-| `scripts/runtime-adapter-contract.mjs` | Adapter shape validation (shared with bundled plugins) |
-| `scripts/runtime-adapters.mjs` | Bundled runtime plugin definitions |
+| `scripts/runtime/plugin-loader.mjs` | Core plugin system — discovery, validation, registry |
+| `scripts/runtime/runtime-adapter-contract.mjs` | Adapter shape validation (shared with bundled plugins) |
+| `scripts/runtime/runtime-adapters.mjs` | Bundled runtime plugin definitions |
 | `scripts/meta-agents-harness.mjs` | CLI entry — imports `getAllRuntimes()` at startup |
 | `mah-plugins/` | Operator plugin directory (repo-local or `~/.mah/mah-plugins/`, depending on where the plugin is installed) |
 | `tests/plugin-loader.test.mjs` | Unit tests for plugin-loader |

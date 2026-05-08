@@ -20,6 +20,7 @@ Primary failure examples:
 - missing orchestrator agent in crew topology
 - unsupported config version
 - unknown skill refs declared on an agent
+- invalid `cooperative_routing` settings (unknown allowed crew, disabled+full scope conflict)
 
 ### `validate:runtime`
 

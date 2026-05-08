@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os'
 const repoRoot = process.cwd()
 
 // Import the module directly (not via CLI subprocess for unit coverage)
-const exportModulePath = resolve(repoRoot, 'scripts/expertise-export.mjs')
+const exportModulePath = resolve(repoRoot, 'scripts/expertise/expertise-export.mjs')
 const { 
   exportExpertise,
   exportExpertiseBundle,

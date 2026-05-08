@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { determineAction } from "../scripts/sync-utils.mjs"
+import { determineAction } from "../scripts/sync/sync-utils.mjs"
 
 test("determineAction covers create, update, no_change and drift mapping", () => {
   assert.equal(determineAction("missing"), "create")

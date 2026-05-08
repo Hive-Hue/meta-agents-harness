@@ -9,7 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-const { recordEvidence } = await import('../scripts/expertise-evidence-store.mjs')
+const { recordEvidence } = await import('../scripts/expertise/evidence/expertise-evidence-store.mjs')
 
 const repoRoot = process.cwd()
 const mah = 'node bin/mah'
