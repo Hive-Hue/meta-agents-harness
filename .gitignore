@@ -72,3 +72,7 @@ webui/vite-s.log
 
 # Plugin loader test temp fixtures
 .test-temp-plugin-loader/
+
+# Planning/spec documents are local-only on main
+/plan/
+/specs/
