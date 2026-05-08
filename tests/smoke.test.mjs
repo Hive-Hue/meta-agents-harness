@@ -306,9 +306,15 @@ test("bootstrap script creates minimal meta-agents.yaml in non-interactive mode"
     assert.equal(parsed.runtimes?.claude?.ccr?.route_map, undefined)
     assert.equal(parsed.runtimes?.opencode?.wrapper, undefined)
     assert.equal(parsed.runtimes?.opencode?.task_policy, undefined)
-    assert.ok(Array.isArray(parsed.domain_profiles?.bootstrap_generation), "bootstrap_generation profile should be materialized")
-    assert.ok(Array.isArray(parsed.domain_profiles?.runtime_assets_sync), "runtime_assets_sync profile should be materialized")
-    assert.ok(Array.isArray(parsed.domain_profiles?.docs_authoring), "docs_authoring profile should be materialized")
+    assert.ok(Array.isArray(parsed.domain_profiles?.read_only_cwd), "read_only_cwd profile should be materialized")
+    assert.ok(Array.isArray(parsed.domain_profiles?.write_cwd), "write_cwd profile should be materialized")
+    assert.ok(Array.isArray(parsed.domain_profiles?.write_user_home_with_approval), "write_user_home_with_approval profile should be materialized")
+    for (const optionalProfile of ["bootstrap_generation", "runtime_assets_sync", "docs_authoring"]) {
+      const profileValue = parsed.domain_profiles?.[optionalProfile]
+      if (profileValue !== undefined) {
+        assert.ok(Array.isArray(profileValue), `${optionalProfile} profile should be an array when present`)
+      }
+    }
     assert.equal(parsed.crews?.[0]?.source_configs, undefined)
     assert.equal(parsed.crews?.[0]?.session, undefined)
     assert.ok(parsed.crews[0].topology?.leads?.engineering, "bootstrap should emit full default crew topology")
