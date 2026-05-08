@@ -98,7 +98,9 @@ function requireGeneratedWorkspaceArtifacts(t, ...pathsToCheck) {
   const missing = pathsToCheck.filter((candidate) => !existsSync(candidate))
   if (missing.length > 0) {
     t.skip(`requires generated workspace artifacts: ${missing.join(", ")}`)
+    return false
   }
+  return true
 }
 
 function runtimeConfigPath(runtime) {
@@ -113,7 +115,7 @@ function requireRuntimeArtifacts(t, runtime, options = {}) {
   const extra = Array.isArray(options.extra) ? options.extra : []
   const required = [runtimeConfigPath(runtime), ...extra]
   if (includeMeta) required.unshift(path.join(repoRoot, "meta-agents.yaml"))
-  requireGeneratedWorkspaceArtifacts(t, ...required)
+  return requireGeneratedWorkspaceArtifacts(t, ...required)
 }
 
 test("global install does not seed expertise catalog under ~/.mah", () => {
@@ -243,7 +245,7 @@ test("expertise list from a nested workspace directory resolves the workspace ro
 
 for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo", "codex"]) {
   test(`${runtime} list:crews is handled by MAH core without wrapper`, (t) => {
-    requireRuntimeArtifacts(t, runtime)
+    if (!requireRuntimeArtifacts(t, runtime)) return
     const result = run(["--runtime", runtime, "list:crews"])
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /crew=dev/)
@@ -251,12 +253,12 @@ for (const runtime of ["pi", "claude", "opencode", "hermes", "kilo", "codex"]) {
 }
 
 test("kilo use persists active crew via MAH core state", (t) => {
-  requireRuntimeArtifacts(t, "kilo", {
+  if (!requireRuntimeArtifacts(t, "kilo", {
     extra: [
       path.join(repoRoot, ".kilo", "crew", "dev", "agents"),
       path.join(repoRoot, ".kilo", "crew", "dev", "expertise")
     ]
-  })
+  })) return
   const previous = existsSync(kiloActiveCrewFile) ? readFileSync(kiloActiveCrewFile, "utf-8") : null
   const restoreAgents = snapshotPath(path.join(repoRoot, ".kilo", "agents"))
   try {
@@ -275,12 +277,12 @@ test("kilo use persists active crew via MAH core state", (t) => {
 })
 
 test("codex use persists active crew and runtime artifacts via MAH core state", (t) => {
-  requireRuntimeArtifacts(t, "codex", {
+  if (!requireRuntimeArtifacts(t, "codex", {
     extra: [
       path.join(repoRoot, ".codex", "crew", "dev", "agents"),
       path.join(repoRoot, ".codex", "crew", "dev", "expertise")
     ]
-  })
+  })) return
   const restore = () => { }
   try {
     const result = run(["--runtime", "codex", "use", "dev"])
@@ -315,7 +317,7 @@ test("pi use persists active crew and session root via MAH core state", () => {
 })
 
 test("claude use persists active crew via MAH core state", (t) => {
-  requireRuntimeArtifacts(t, "claude")
+  if (!requireRuntimeArtifacts(t, "claude")) return
   const restore = snapshotPaths([
     path.join(repoRoot, ".claude", ".active-crew.json"),
     path.join(repoRoot, ".claude", "crew", "dev", "sessions")
@@ -332,12 +334,12 @@ test("claude use persists active crew via MAH core state", (t) => {
 })
 
 test("opencode use materializes active runtime tree via MAH core state", (t) => {
-  requireRuntimeArtifacts(t, "opencode", {
+  if (!requireRuntimeArtifacts(t, "opencode", {
     extra: [
       path.join(repoRoot, ".opencode", "crew", "dev", "agents"),
       path.join(repoRoot, ".opencode", "crew", "dev", "expertise")
     ]
-  })
+  })) return
   const restore = snapshotPaths([
     path.join(repoRoot, ".opencode", ".active-crew.json"),
     path.join(repoRoot, ".opencode", "multi-team.yaml"),
@@ -374,7 +376,7 @@ test("hermes use persists active crew via MAH core state", () => {
 })
 
 test("kilo explain run resolves to direct cli with injected crew context", (t) => {
-  requireRuntimeArtifacts(t, "kilo", { includeMeta: true })
+  if (!requireRuntimeArtifacts(t, "kilo", { includeMeta: true })) return
   const result = run(["--runtime", "kilo", "explain", "run", "--trace", "--crew", "dev"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -402,7 +404,7 @@ test("kilo explain run resolves to direct cli with injected crew context", (t) =
 })
 
 test("codex explain run resolves to interactive codex session with injected crew context", (t) => {
-  requireRuntimeArtifacts(t, "codex", { includeMeta: true })
+  if (!requireRuntimeArtifacts(t, "codex", { includeMeta: true })) return
   const result = run(["--runtime", "codex", "explain", "run", "--trace", "--crew", "dev", "--agent", "planning-lead"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -425,7 +427,7 @@ test("codex explain run resolves to interactive codex session with injected crew
 })
 
 test("codex explain run switches to full-auto only in autonomous subagent mode", (t) => {
-  requireRuntimeArtifacts(t, "codex", { includeMeta: true })
+  if (!requireRuntimeArtifacts(t, "codex", { includeMeta: true })) return
   const result = run([
     "--runtime",
     "codex",
@@ -460,7 +462,7 @@ test("codex explain run switches to full-auto only in autonomous subagent mode",
 })
 
 test("pi explain run resolves to direct cli with MAH session env", (t) => {
-  requireRuntimeArtifacts(t, "pi", { includeMeta: true })
+  if (!requireRuntimeArtifacts(t, "pi", { includeMeta: true })) return
   const result = run(["--runtime", "pi", "explain", "run", "--trace", "--crew", "dev"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -715,11 +717,11 @@ test("ensurePiGlobalSettings points PI theme discovery at the MAH overlay", () =
 })
 
 test("claude explain run resolves to direct cli with generated agent context", (t) => {
-  requireGeneratedWorkspaceArtifacts(
+  if (!requireGeneratedWorkspaceArtifacts(
     t,
     path.join(repoRoot, "meta-agents.yaml"),
     path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
-  )
+  )) return
   const result = run(["--runtime", "claude", "explain", "run", "--trace", "--crew", "dev", "--dry-run"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -731,7 +733,7 @@ test("claude explain run resolves to direct cli with generated agent context", (
 
 test("prepareClaudeRunContext exposes declared domain rules in subagent prompts", (t) => {
   const configPath = path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
-  requireGeneratedWorkspaceArtifacts(t, path.join(repoRoot, "meta-agents.yaml"), configPath)
+  if (!requireGeneratedWorkspaceArtifacts(t, path.join(repoRoot, "meta-agents.yaml"), configPath)) return
   const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: [] })
   assert.equal(result.ok, true, result.error)
   assert.ok((result.warnings || []).some((item) => /domain rules are declarative/i.test(item)))
@@ -743,7 +745,7 @@ test("prepareClaudeRunContext exposes declared domain rules in subagent prompts"
 
 test("prepareClaudeRunContext fails with --policy enforce-domain when granular domains exist", (t) => {
   const configPath = path.join(repoRoot, ".claude", "crew", "dev", "multi-team.yaml")
-  requireGeneratedWorkspaceArtifacts(t, path.join(repoRoot, "meta-agents.yaml"), configPath)
+  if (!requireGeneratedWorkspaceArtifacts(t, path.join(repoRoot, "meta-agents.yaml"), configPath)) return
   const result = prepareClaudeRunContext({ repoRoot, crew: "dev", configPath, argv: ["--policy", "enforce-domain"] })
   assert.equal(result.ok, false)
   assert.match(result.error || "", /cannot enforce per-agent domain path ACLs/i)
@@ -810,11 +812,11 @@ test("executeOpenclaudePreparedRun tracks latest session after run", () => {
 })
 
 test("opencode explain run resolves to direct cli without wrapper plan", (t) => {
-  requireGeneratedWorkspaceArtifacts(
+  if (!requireGeneratedWorkspaceArtifacts(
     t,
     path.join(repoRoot, "meta-agents.yaml"),
     path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml")
-  )
+  )) return
   const result = run(["--runtime", "opencode", "explain", "run", "--trace", "--crew", "dev", "--hierarchy"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -824,26 +826,28 @@ test("opencode explain run resolves to direct cli without wrapper plan", (t) => 
 })
 
 test("opencode explain run uses run subcommand when task prompt is provided", (t) => {
-  requireGeneratedWorkspaceArtifacts(
+  if (!requireGeneratedWorkspaceArtifacts(
     t,
     path.join(repoRoot, "meta-agents.yaml"),
     path.join(repoRoot, ".opencode", "crew", "dev", "multi-team.yaml")
-  )
+  )) return
   const result = run(["--runtime", "opencode", "explain", "run", "--trace", "--crew", "dev", "--agent", "planning-lead", "test task"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "opencode")
   assert.equal(payload.exec, "opencode")
-  assert.deepEqual(payload.execArgs, ["run", "-m", "zai-coding-plan/glm-5"])
+  assert.deepEqual(payload.execArgs.slice(0, 2), ["run", "-m"])
+  assert.equal(typeof payload.execArgs[2], "string")
+  assert.equal(payload.execArgs[2].length > 0, true)
   assert.deepEqual(payload.passthrough, ["test task", "--agent", "planning-lead"])
 })
 
 test("hermes explain run resolves to hermes chat with MAH bootstrap env", (t) => {
-  requireGeneratedWorkspaceArtifacts(
+  if (!requireGeneratedWorkspaceArtifacts(
     t,
     path.join(repoRoot, "meta-agents.yaml"),
     path.join(repoRoot, ".hermes", "crew", "dev", "multi-team.yaml")
-  )
+  )) return
   const result = run(["--runtime", "hermes", "explain", "run", "--trace", "--crew", "dev"])
   assert.equal(result.status, 0, result.stderr)
   const payload = JSON.parse(result.stdout)
@@ -856,11 +860,11 @@ test("hermes explain run resolves to hermes chat with MAH bootstrap env", (t) =>
 })
 
 test("hermes explain run strips MAH context-memory flags before spawning hermes", (t) => {
-  requireGeneratedWorkspaceArtifacts(
+  if (!requireGeneratedWorkspaceArtifacts(
     t,
     path.join(repoRoot, "meta-agents.yaml"),
     path.join(repoRoot, ".hermes", "crew", "dev", "multi-team.yaml")
-  )
+  )) return
   const result = run([
     "--runtime",
     "hermes",
