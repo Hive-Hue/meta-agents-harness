@@ -107,6 +107,7 @@ async function spawnTerminal(command: string, args: string[], options: TerminalS
     cwd: options.cwd,
     env: options.env,
     stdio: "pipe",
+    detached: true,
   });
 
   return {
@@ -117,7 +118,28 @@ async function spawnTerminal(command: string, args: string[], options: TerminalS
       // No-op in process-stream fallback.
     },
     kill() {
-      child.kill();
+      const pid = child.pid;
+      if (!pid || pid <= 0) return;
+      try {
+        process.kill(-pid, "SIGTERM");
+      } catch {
+        try {
+          child.kill("SIGTERM");
+        } catch {
+          // ignore
+        }
+      }
+      setTimeout(() => {
+        try {
+          process.kill(-pid, "SIGKILL");
+        } catch {
+          try {
+            child.kill("SIGKILL");
+          } catch {
+            // ignore
+          }
+        }
+      }, 500);
     },
     onData(callback: (data: string) => void) {
       child.stdout?.on("data", (chunk: Buffer | string) => callback(String(chunk)));
@@ -1446,13 +1468,17 @@ async function handleTerminalOpenShell(req: import("http").IncomingMessage, res:
     const shellBin = `${process.env.SHELL || ""}`.trim() || "bash";
     const shellBase = path.basename(shellBin).toLowerCase();
     const shellArgs = shellBase === "fish" ? [] : ["-i"];
+    const shellEnv = { ...process.env, ...workspaceEnv } as Record<string, string>;
+    // WebUI shells should not inherit npm prefix from `npm --prefix webui` launches.
+    delete shellEnv.npm_config_prefix;
+    delete shellEnv.NPM_CONFIG_PREFIX;
 
     const terminal = await spawnTerminal(
       shellBin,
       shellArgs,
       {
         cwd: workspaceRoot,
-        env: { ...process.env, ...workspaceEnv } as Record<string, string>,
+        env: shellEnv,
         cols: 120,
         rows: 40,
         name: "xterm-256color",

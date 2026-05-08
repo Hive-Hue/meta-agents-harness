@@ -41,6 +41,7 @@ export function AppShell() {
   const [terminalClosed, setTerminalClosed] = useState(false);
   const [terminalExitCode, setTerminalExitCode] = useState<number | null>(null);
   const terminalIdRef = useRef("");
+  const terminalRuntimeRef = useRef("");
   const eventSourceRef = useRef<EventSource | null>(null);
   const resizeDebounceRef = useRef<number | null>(null);
   const terminalHostRef = useRef<HTMLDivElement | null>(null);
@@ -99,16 +100,38 @@ export function AppShell() {
   useEffect(() => {
     terminalIdRef.current = terminalId;
   }, [terminalId]);
+  useEffect(() => {
+    terminalRuntimeRef.current = terminalRuntime;
+  }, [terminalRuntime]);
 
   const closeTerminalModal = useCallback((nextTerminalId?: string) => {
     const targetTerminalId = nextTerminalId ?? terminalIdRef.current;
+    const targetRuntime = terminalRuntimeRef.current;
     closeTerminalStream();
     if (targetTerminalId) {
-      fetch(`/api/mah/terminal/close/${encodeURIComponent(targetTerminalId)}`, {
-        method: "POST",
-      }).catch(() => {
-        // ignore close failures
-      });
+      if (targetRuntime === "shell") {
+        fetch(`/api/mah/terminal/input/${encodeURIComponent(targetTerminalId)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ data: "exit\n" }),
+        }).catch(() => {
+          // ignore close preflight failures
+        });
+        // Let interactive shell terminate cleanly after `exit` before force-close.
+        window.setTimeout(() => {
+          fetch(`/api/mah/terminal/close/${encodeURIComponent(targetTerminalId)}`, {
+            method: "POST",
+          }).catch(() => {
+            // ignore close failures
+          });
+        }, 1200);
+      } else {
+        fetch(`/api/mah/terminal/close/${encodeURIComponent(targetTerminalId)}`, {
+          method: "POST",
+        }).catch(() => {
+          // ignore close failures
+        });
+      }
     }
     setTerminalOpen(false);
     setTerminalMinimized(false);
