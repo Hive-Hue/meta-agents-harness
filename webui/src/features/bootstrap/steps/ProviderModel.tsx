@@ -11,7 +11,7 @@ const providers = [
   { id: "zai", name: "Z.ai", description: "GLM series models", models: ["glm-5", "glm-4.7", "glm-4.1"] },
   { id: "openrouter", name: "OpenRouter", description: "Multi-provider gateway", models: ["claude-sonnet-4", "gpt-4o", "gemini-2.5-pro"] },
   { id: "codex", name: "Codex OAuth", description: "OpenAI native", models: ["codex-1", "o4-mini", "gpt-4.1"] },
-  { id: "minimax", name: "MiniMax", description: "Cost-optimized models", models: ["MiniMax-M1", "abab-7"] },
+  { id: "minimax", name: "MiniMax", description: "Cost-optimized models", models: ["MiniMax-M2.1", "MiniMax-M2.5", "MiniMax-M2.7"] },
 ];
 
 export function ProviderModel({ data, onChange }: ProviderModelProps) {

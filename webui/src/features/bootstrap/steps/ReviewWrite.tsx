@@ -18,6 +18,7 @@ function generateYaml(data: WizardData): string {
   const crewId = data.crewId || "dev";
   const mission = data.missionStatement || "TBD";
   const description = data.description || "";
+  const includeSprintMode = data.requireSprintMode ?? false;
   const projectName = data.projectName || "my-project";
   const model = data.model || "glm-4.7";
 
@@ -41,7 +42,17 @@ function generateYaml(data: WizardData): string {
     names.forEach((name) => workerLines.push(`          - ${name}`));
   });
 
-  const agentEntries = agents.map((agentId) => {
+  const agentEntries = [
+    [
+      "      - id: " + topology.orchestrator.name,
+      "        role: orchestrator",
+      "        team: orchestration",
+      "        model_ref: orchestrator_default",
+      "        expertise: " + `${topology.orchestrator.name}-expertise-model`,
+      "        skills: [delegate_bounded, zero_micromanagement, expertise_model]",
+      "        domain_profile: read_only_cwd",
+    ].join("\n"),
+    ...agents.map((agentId) => {
     const isLead = leads.some((line) => line.endsWith(`: ${agentId}`));
     const team = topology.teams.find((item) => item.agents.some((a) => a.name === agentId))?.id || "general";
     return [
@@ -53,7 +64,8 @@ function generateYaml(data: WizardData): string {
       "        skills: [expertise_model]",
       "        domain_profile: read_only_cwd",
     ].join("\n");
-  });
+  }),
+  ];
 
   return [
     "version: 1",
@@ -83,6 +95,28 @@ function generateYaml(data: WizardData): string {
     `  - id: ${crewId}`,
     `    display_name: ${crewId === "dev" ? "Development Crew" : `${crewId} Crew`}`,
     `    mission: "${mission}"`,
+    ...(includeSprintMode
+      ? [
+          "    sprint_mode:",
+          `      name: bootstrap-${crewId}`,
+          "      active: true",
+          `      objective: "${mission}"`,
+          "      execution_mode: spec-bound-slice-driven",
+          "      directives:",
+          "        - spec-bound execution",
+          "        - expertise remains source-of-truth for routing",
+          "        - PR-sized slices",
+          "        - mandatory validation at each slice",
+          "      must_deliver:",
+          "        - Canonical meta-agents.yaml compatible with mah validate:config",
+          "        - Crew topology and agents aligned with mission scope",
+          "        - Runtime-agnostic contracts preserved",
+          "      must_not_deliver:",
+          "        - scope outside current mission",
+          "        - runtime-locked behavior",
+          "        - unsafe permission expansion",
+        ]
+      : []),
     "    topology:",
     `      orchestrator: ${topology.orchestrator.name}`,
     "      leads:",

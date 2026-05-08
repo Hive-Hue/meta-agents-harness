@@ -178,6 +178,23 @@ MAH_INIT_CREW="custom-crew" \
 mah init --yes
 ```
 
+WebUI login credentials:
+
+```bash
+MAH_WEBUI_USER=admin
+MAH_WEBUI_PASSWORD=mah
+```
+
+AI provider keys commonly used by bootstrap and runtime flows:
+
+```bash
+MINIMAX_API_KEY=...
+ZAI_API_KEY=...
+OPENAI_API_KEY=...
+OPENROUTER_API_KEY=...
+GEMINI_API_KEY=...
+```
+
 ---
 
 ## AI-Assisted Bootstrap
@@ -235,6 +252,22 @@ bootstrap: created meta-agents.yaml
 
 > **Note:** AI-assisted bootstrap first tries direct provider HTTP. If key/token or model is missing,
 > MAH can still fall back to installed runtime CLIs in headless/non-interactive mode.
+
+---
+
+## WebUI CLI
+
+```bash
+# Dev mode
+mah webui
+
+# Production mode (optimized): build + preview
+mah webui --prod
+
+# Explicit steps
+mah webui build
+mah webui preview --host 0.0.0.0 --port 4173
+```
 
 ---
 

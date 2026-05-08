@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -68,7 +68,8 @@ function parseArgs(argv) {
     provider: getValue("--provider") || getValue("--ai-provider"),
     model: getValue("--model") || getValue("--ai-model"),
     apiKey: getValue("--api-key") || getValue("--ai-api-key"),
-    baseUrl: getValue("--base-url") || getValue("--ai-base-url")
+    baseUrl: getValue("--base-url") || getValue("--ai-base-url"),
+    requireSprintMode: flags.has("--require-sprint-mode")
   }
 }
 
@@ -92,6 +93,7 @@ OPTIONS:
   --model <id>            Model for direct HTTP AI bootstrap
   --api-key <key>         API key for direct HTTP AI bootstrap
   --base-url <url>        Override provider base URL
+  --require-sprint-mode   Force sprint_mode generation in AI/system prompt and output normalization
 
 MODES:
   1. Logical (default): Generates config using templates and defaults
@@ -178,7 +180,7 @@ function discoverInstalledPlugins() {
   return plugins
 }
 
-function ensureDefaults(doc) {
+function ensureDefaults(doc, options = {}) {
   const next = { ...(doc || {}) }
   delete next.runtime_detection
   delete next.catalog?.skills
@@ -227,13 +229,28 @@ function ensureDefaults(doc) {
   }
   next.runtimes = sanitizedRuntimes
 
+  const toStringModelRef = (value) => {
+    if (typeof value === "string") return value.trim()
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const fallback = `${value.default || value.model || value.primary || ""}`.trim()
+      return fallback
+    }
+    return ""
+  }
+
   next.catalog = next.catalog || {}
+  const inputModels = next.catalog.models && typeof next.catalog.models === "object" ? next.catalog.models : {}
+  const normalizedInputModels = {}
+  for (const [key, value] of Object.entries(inputModels)) {
+    const normalized = toStringModelRef(value)
+    if (normalized) normalizedInputModels[key] = normalized
+  }
   next.catalog.models = {
     orchestrator_default: "minimax-coding-plan/MiniMax-M2.7",
     lead_default: "minimax-coding-plan/MiniMax-M2.7",
     worker_default: "openai-codex/gpt-5.3-codex",
     qa_default: "openai-codex/gpt-5.4-mini",
-    ...(next.catalog.models || {})
+    ...normalizedInputModels
   }
   next.catalog.model_fallbacks = next.catalog.model_fallbacks || {
     orchestrator_default: [
@@ -252,6 +269,47 @@ function ensureDefaults(doc) {
       "nvidia/nemotron-3-super-120b-a12b:free"
     ]
   }
+  const boolFromUnknown = (value) => {
+    if (typeof value === "boolean") return value
+    if (Array.isArray(value)) return boolFromUnknown(value[0])
+    if (typeof value === "string") {
+      const normalized = value.trim().toLowerCase()
+      if (["true", "1", "yes"].includes(normalized)) return true
+      if (["false", "0", "no"].includes(normalized)) return false
+    }
+    return undefined
+  }
+  const normalizeDomainRule = (rule) => {
+    if (!rule || typeof rule !== "object" || Array.isArray(rule)) return null
+    const pathValue = Array.isArray(rule.path) ? rule.path[0] : rule.path
+    const pathText = `${pathValue || "."}`.trim() || "."
+    const normalizedRule = { path: pathText }
+    const read = boolFromUnknown(rule.read)
+    const edit = boolFromUnknown(rule.edit)
+    const bash = boolFromUnknown(rule.bash)
+    const recursive = boolFromUnknown(rule.recursive)
+    const upsert = boolFromUnknown(rule.upsert)
+    const del = boolFromUnknown(rule.delete)
+    if (typeof read === "boolean") normalizedRule.read = read
+    if (typeof edit === "boolean") normalizedRule.edit = edit
+    if (typeof bash === "boolean") normalizedRule.bash = bash
+    if (typeof recursive === "boolean") normalizedRule.recursive = recursive
+    if (typeof upsert === "boolean") normalizedRule.upsert = upsert
+    if (typeof del === "boolean") normalizedRule.delete = del
+    return normalizedRule
+  }
+  const normalizeDomainProfileValue = (value) => {
+    if (Array.isArray(value)) {
+      const rules = value.map((item) => normalizeDomainRule(item)).filter(Boolean)
+      return rules.length > 0 ? rules : [{ path: ".", read: true }]
+    }
+    if (value && typeof value === "object") {
+      const single = normalizeDomainRule(value)
+      return [single || { path: ".", read: true }]
+    }
+    return [{ path: ".", read: true }]
+  }
+
   const defaultDomainProfiles = {
     read_only_cwd: [{ path: ".", read: true }],
     write_cwd: [{ path: ".", read: true, edit: true, bash: true, recursive: true }],
@@ -272,9 +330,13 @@ function ensureDefaults(doc) {
     next.domain_profiles && typeof next.domain_profiles === "object" && !Array.isArray(next.domain_profiles)
       ? next.domain_profiles
       : {}
+  const normalizedExistingDomainProfiles = {}
+  for (const [profileName, profileValue] of Object.entries(existingDomainProfiles)) {
+    normalizedExistingDomainProfiles[profileName] = normalizeDomainProfileValue(profileValue)
+  }
   next.domain_profiles = {
     ...defaultDomainProfiles,
-    ...existingDomainProfiles
+    ...normalizedExistingDomainProfiles
   }
 
   // Ensure every referenced agent domain_profile exists in domain_profiles.
@@ -296,6 +358,90 @@ function ensureDefaults(doc) {
     next.domain_profiles[profile] = isWriter
       ? [{ path: ".", read: true, edit: true, bash: true, recursive: true }]
       : [{ path: ".", read: true }]
+  }
+
+  // Normalize agent ids and enforce non-null team values required by schema.
+  for (const crew of Array.isArray(next.crews) ? next.crews : []) {
+    if (options.requireSprintMode && (!crew.sprint_mode || typeof crew.sprint_mode !== "object")) {
+      const crewLabel = `${crew?.id || "crew"}`.trim()
+      const missionText = `${crew?.mission || ""}`.trim()
+      crew.sprint_mode = {
+        name: `bootstrap-${crewLabel}`,
+        active: true,
+        objective: missionText || `Deliver bounded outcomes for ${crewLabel}.`,
+        execution_mode: "spec-bound-slice-driven",
+        directives: [
+          "spec-bound execution",
+          "expertise remains source-of-truth for routing",
+          "PR-sized slices",
+          "mandatory validation at each slice"
+        ],
+        must_deliver: [
+          "Canonical meta-agents.yaml compatible with mah validate:config",
+          "Crew topology and agents aligned with mission scope",
+          "Runtime-agnostic contracts preserved"
+        ],
+        must_not_deliver: [
+          "scope outside current mission",
+          "runtime-locked behavior",
+          "unsafe permission expansion"
+        ]
+      }
+    }
+
+    const teamByAgentId = {}
+    const orchestratorId = `${crew?.topology?.orchestrator || "orchestrator"}`.trim()
+    if (orchestratorId) teamByAgentId[orchestratorId] = "orchestration"
+    const leads = crew?.topology?.leads && typeof crew.topology.leads === "object" ? crew.topology.leads : {}
+    const workers = crew?.topology?.workers && typeof crew.topology.workers === "object" ? crew.topology.workers : {}
+    for (const [teamName, leadId] of Object.entries(leads)) {
+      const normalizedId = `${leadId || ""}`.trim()
+      if (normalizedId) teamByAgentId[normalizedId] = `${teamName}`
+    }
+    for (const [teamName, workerIds] of Object.entries(workers)) {
+      for (const workerId of Array.isArray(workerIds) ? workerIds : []) {
+        const normalizedId = `${workerId || ""}`.trim()
+        if (normalizedId) teamByAgentId[normalizedId] = `${teamName}`
+      }
+    }
+    const normalizedAgents = []
+    let hasOrchestrator = false
+    for (const rawAgent of Array.isArray(crew?.agents) ? crew.agents : []) {
+      const agent = rawAgent && typeof rawAgent === "object" ? { ...rawAgent } : {}
+      const normalizedId = `${agent.id || agent.name || ""}`.trim()
+      if (!normalizedId) continue
+      agent.id = normalizedId
+      if (!agent.name) agent.name = normalizedId
+      if (`${agent.role || ""}`.trim() === "orchestrator") hasOrchestrator = true
+      const currentTeam = `${agent.team || ""}`.trim()
+      agent.team = currentTeam || teamByAgentId[normalizedId] || (agent.role === "orchestrator" ? "orchestration" : "general")
+      normalizedAgents.push(agent)
+    }
+    const topologyOrchestrator = `${crew?.topology?.orchestrator || ""}`.trim()
+    if (topologyOrchestrator) {
+      const topoAgent = normalizedAgents.find((agent) => agent.id === topologyOrchestrator)
+      if (topoAgent) {
+        topoAgent.role = "orchestrator"
+        topoAgent.team = `${topoAgent.team || "orchestration"}`.trim() || "orchestration"
+        hasOrchestrator = true
+      }
+    }
+    if (!hasOrchestrator) {
+      const fallbackOrchestratorId = topologyOrchestrator || "orchestrator"
+      normalizedAgents.unshift({
+        id: fallbackOrchestratorId,
+        name: fallbackOrchestratorId,
+        role: "orchestrator",
+        team: "orchestration",
+        model_ref: "orchestrator_default",
+        expertise: "orchestrator-expertise-model",
+        skills: ["delegate_bounded", "zero_micromanagement", "expertise_model"],
+        domain_profile: "read_only_cwd",
+      })
+      if (!crew.topology || typeof crew.topology !== "object") crew.topology = {}
+      crew.topology.orchestrator = fallbackOrchestratorId
+    }
+    crew.agents = normalizedAgents
   }
 
   return next
@@ -385,6 +531,7 @@ OPERATOR INPUTS:
 ${inputs.brief ? `- Project brief: ${inputs.brief}` : ""}
 ${inputs.projectType ? `- Project type: ${inputs.projectType}` : ""}
 ${inputs.topologyPreference ? `- Topology preference: ${inputs.topologyPreference}` : ""}
+${inputs.requireSprintMode ? "- Force sprint_mode: true" : "- Force sprint_mode: false"}
 
 REPOSITORY CONTEXT:
 - Working directory: ${repoContext.cwd}
@@ -405,7 +552,8 @@ CRITICAL OUTPUT REQUIREMENTS:
    - domain_profiles (at minimum: read_only_cwd)
    - crews (id, display_name, mission, topology, agents)
 6. Every agents[].domain_profile value MUST exist as a key in domain_profiles.
-7. Do NOT emit legacy runtime wiring fields such as:
+${inputs.requireSprintMode ? "7. Every crew MUST include sprint_mode with: name, active, objective, execution_mode, directives, must_deliver, must_not_deliver." : "7. sprint_mode is optional unless explicitly forced by operator."}
+8. Do NOT emit legacy runtime wiring fields such as:
    - wrapper
    - config_root
    - extension_root
@@ -413,12 +561,12 @@ CRITICAL OUTPUT REQUIREMENTS:
    - route_map
    - task_policy
    - default_extensions
-8. Do NOT include runtime_detection; MAH applies runtime detection defaults internally
-9. Do NOT include a per-runtime skills path matrix; skill paths are resolved internally by convention
-10. Do NOT include an adapters block; MAH applies adapter mappings internally
-11. Follow the skill guidelines for config quality
-12. Use appropriate topology based on project complexity
-13. Configure all runtimes (pi, claude, kilo, opencode, hermes) based on detected markers
+9. Do NOT include runtime_detection; MAH applies runtime detection defaults internally
+10. Do NOT include a per-runtime skills path matrix; skill paths are resolved internally by convention
+11. Do NOT include an adapters block; MAH applies adapter mappings internally
+12. Follow the skill guidelines for config quality
+13. Use appropriate topology based on project complexity
+14. Configure all runtimes (pi, claude, kilo, opencode, hermes) based on detected markers
 
 Generate the complete meta-agents.yaml now:`
   return prompt
@@ -463,12 +611,17 @@ function resolveDirectAiOptions(inputs, env) {
 
 function extractYamlFromAiOutput(output) {
   let yamlContent = `${output || ""}`.trim()
+  // Remove reasoning/thinking wrappers some providers emit (e.g. MiniMax).
+  yamlContent = yamlContent
+    .replace(/<think[\s\S]*?<\/think>/gi, "")
+    .replace(/<reasoning[\s\S]*?<\/reasoning>/gi, "")
+    .trim()
   if (yamlContent.includes("```yaml") || yamlContent.includes("```yml") || yamlContent.includes("```YAML")) {
     yamlContent = yamlContent.replace(/```ya?ml?\n?/gi, "").replace(/\n?```$/m, "").trim()
   } else if (yamlContent.includes("```")) {
     yamlContent = yamlContent.replace(/```\n?/g, "").trim()
   }
-  const yamlStartMatch = yamlContent.match(/^(version:\s*1\n[\s\S]*)/m)
+  const yamlStartMatch = yamlContent.match(/(?:^|\n)(version:\s*1[\s\S]*)/m)
   if (yamlStartMatch) {
     yamlContent = yamlStartMatch[1]
   }
@@ -478,9 +631,70 @@ function extractYamlFromAiOutput(output) {
   }).join("\n").trim()
 }
 
+function coerceLikelyYamlScalars(yamlText) {
+  const lines = `${yamlText || ""}`.split("\n")
+  return lines.map((line) => {
+    const match = line.match(/^(\s*[A-Za-z0-9_-]+:\s*)(.+)$/)
+    if (!match) return line
+    const [, prefix, rawValue] = match
+    const value = rawValue.trim()
+    if (!value) return line
+    if (value.startsWith('"') || value.startsWith("'")) return line
+    if (value.startsWith("{") || value.startsWith("[") || value === "{}" || value === "[]") return line
+    if (!value.includes(":")) return line
+    // Compact mapping hazard: "mission: Deliver ...: text"
+    return `${prefix}${JSON.stringify(value)}`
+  }).join("\n")
+}
+
+function coerceAliasLikeTokens(yamlText) {
+  return `${yamlText || ""}`
+    .split("\n")
+    .map((line) => {
+      let next = line.replace(/^(\s*[A-Za-z0-9_-]+:\s+)\*([^\s#]+)(\s*(#.*)?)$/, '$1"*$2"$3')
+      next = next.replace(/^(\s*-\s+)\*([^\s#]+)(\s*(#.*)?)$/, '$1"*$2"$3')
+      return next
+    })
+    .join("\n")
+}
+
+function validateGeneratedYaml(yamlText) {
+  const tempDir = mkdtempSync(path.join(os.tmpdir(), "mah-validate-config-"))
+  try {
+    const tempPath = path.join(tempDir, "meta-agents.yaml")
+    writeFileSync(tempPath, `${yamlText}\n`, "utf-8")
+    const validatorScript = path.join(repoRoot, "scripts", "validation", "validate-meta-config.mjs")
+    const run = spawnSync(process.execPath, [validatorScript], {
+      cwd: tempDir,
+      env: process.env,
+      encoding: "utf-8",
+    })
+    if (run.status === 0) return { ok: true, details: "" }
+    const details = `${run.stderr || run.stdout || ""}`.trim()
+    return { ok: false, details: details || "validate:config failed" }
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true })
+  }
+}
+
 function parseAndNormalizeAiYaml(output, fallbackMeta = {}) {
   const yamlContent = extractYamlFromAiOutput(output)
-  const parsed = YAML.parse(yamlContent)
+  let parsed
+  try {
+    parsed = YAML.parse(yamlContent)
+  } catch (firstError) {
+    try {
+      const repairedText = coerceLikelyYamlScalars(yamlContent)
+      parsed = YAML.parse(repairedText)
+    } catch {
+      const aliasSafe = coerceAliasLikeTokens(coerceLikelyYamlScalars(yamlContent))
+      try {
+        parsed = YAML.parse(aliasSafe)
+      } catch {
+        throw firstError
+      }
+    }
+  }
   if (!parsed || typeof parsed !== "object") {
     throw new Error("Parsed YAML is not a valid object")
   }
@@ -490,10 +704,22 @@ function parseAndNormalizeAiYaml(output, fallbackMeta = {}) {
   if (!parsed.version || !parsed.name) {
     throw new Error("YAML missing required fields (version, name)")
   }
-  return `${YAML.stringify(ensureDefaults(parsed), { indent: 2 })}`.replaceAll("use_when", "use-when").replaceAll("max_lines", "max-lines")
+  const normalized = `${YAML.stringify(ensureDefaults(parsed, { requireSprintMode: !!fallbackMeta.requireSprintMode }), { indent: 2 })}`.replaceAll("use_when", "use-when").replaceAll("max_lines", "max-lines")
+  const validation = validateGeneratedYaml(normalized)
+  if (!validation.ok) {
+    const error = new Error(`YAML failed schema validation: ${validation.details}`)
+    error.validationDetails = validation.details
+    throw error
+  }
+  return normalized
 }
 
 function buildDirectAiRequestBody(options, skillContent, prompt) {
+  const baseSystem = `${skillContent}
+
+You generate only valid meta-agents.yaml content.
+Never output chain-of-thought, analysis, or thinking tags (e.g. <think>...</think>).
+Return raw YAML only.`
   if (options.endpoint === "/responses") {
     return {
       model: options.model,
@@ -502,22 +728,28 @@ function buildDirectAiRequestBody(options, skillContent, prompt) {
       input: [
         {
           role: "system",
-          content: `${skillContent}\n\nYou generate only valid meta-agents.yaml content.`
+          content: baseSystem
         },
         { role: "user", content: prompt }
       ]
     }
   }
-  return {
+  const body = {
     model: options.model,
     messages: [
       {
         role: "system",
-        content: `${skillContent}\n\nYou generate only valid meta-agents.yaml content.`
+        content: baseSystem
       },
       { role: "user", content: prompt }
     ]
   }
+  // MiniMax-specific hint to avoid visible reasoning blocks in output.
+  if (options.provider?.id === "minimax") {
+    body.temperature = 0.1
+    body.top_p = 0.9
+  }
+  return body
 }
 
 function extractDirectAiText(payload) {
@@ -577,6 +809,32 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
 
   const skillContent = readFileSync(skillPath, "utf-8")
   const prompt = buildAiPrompt(inputs, repoContext)
+  const fallbackMeta = {
+    version: 1,
+    name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
+    description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
+    requireSprintMode: !!inputs.requireSprintMode,
+  }
+  const sendDirectRequest = async (userPrompt) => {
+    const response = await fetch(`${options.baseUrl}${options.endpoint}`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${options.apiKey}`
+      },
+      body: JSON.stringify(buildDirectAiRequestBody(options, skillContent, userPrompt))
+    })
+    const bodyText = await response.text()
+    if (!response.ok) return { ok: false, type: "http", response, bodyText }
+    let payload
+    try {
+      payload = JSON.parse(bodyText)
+    } catch (error) {
+      return { ok: false, type: "invalid_json", error, bodyText }
+    }
+    return { ok: true, payload, bodyText }
+  }
   console.log(`bootstrap: invoking ${options.provider.label} model ${options.model} via direct HTTP...`)
   if (env.MAH_TEST_AI_HTTP_STATUS) {
     const code = Number.parseInt(env.MAH_TEST_AI_HTTP_STATUS, 10) || 500
@@ -585,11 +843,7 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
   }
   if (env.MAH_TEST_AI_HTTP_RESPONSE) {
     try {
-      const yamlContent = parseAndNormalizeAiYaml(env.MAH_TEST_AI_HTTP_RESPONSE, {
-        version: 1,
-        name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
-        description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
-      })
+      const yamlContent = parseAndNormalizeAiYaml(env.MAH_TEST_AI_HTTP_RESPONSE, fallbackMeta)
       mkdirSync(path.dirname(targetPath), { recursive: true })
       writeFileSync(targetPath, yamlContent)
       return { success: true, runtime: "direct-http" }
@@ -601,27 +855,17 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 180000)
   try {
-    const response = await fetch(`${options.baseUrl}${options.endpoint}`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${options.apiKey}`
-      },
-      body: JSON.stringify(buildDirectAiRequestBody(options, skillContent, prompt))
-    })
-    const bodyText = await response.text()
-    if (!response.ok) {
-      console.log(`bootstrap: direct HTTP AI call failed with status ${response.status}`)
-      return { success: false, reason: "http_status", code: response.status, output: bodyText }
+    const first = await sendDirectRequest(prompt)
+    if (!first.ok) {
+      if (first.type === "http") {
+        console.log(`bootstrap: direct HTTP AI call failed with status ${first.response.status}`)
+        return { success: false, reason: "http_status", code: first.response.status, output: first.bodyText }
+      }
+      console.log(`bootstrap: direct HTTP AI response is not JSON: ${first.error.message}`)
+      return { success: false, reason: "invalid_json", error: first.error, output: first.bodyText }
     }
-    let payload
-    try {
-      payload = JSON.parse(bodyText)
-    } catch (error) {
-      console.log(`bootstrap: direct HTTP AI response is not JSON: ${error.message}`)
-      return { success: false, reason: "invalid_json", error, output: bodyText }
-    }
+    const payload = first.payload
+    const bodyText = first.bodyText
     const providerError = extractProviderErrorText(payload)
     if (providerError) {
       console.log(`bootstrap: provider returned error payload: ${providerError}`)
@@ -634,13 +878,31 @@ async function invokeDirectAiHttp(inputs, repoContext, skillPath, env) {
     }
     let yamlContent
     try {
-      yamlContent = parseAndNormalizeAiYaml(output, {
-        version: 1,
-        name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
-        description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
-      })
+      yamlContent = parseAndNormalizeAiYaml(output, fallbackMeta)
     } catch (parseError) {
       console.log(`bootstrap: direct HTTP AI output is not valid YAML: ${parseError.message}`)
+      const repairPrompt = `${prompt}
+
+REPAIR ROUND:
+Your previous output failed validation.
+Failure details:
+${parseError.message}
+
+Return ONLY corrected YAML that strictly passes schema and YAML parsing.`
+      const repair = await sendDirectRequest(repairPrompt)
+      if (repair.ok) {
+        const repairedOutput = extractDirectAiText(repair.payload)
+        if (repairedOutput) {
+          try {
+            const repairedYaml = parseAndNormalizeAiYaml(repairedOutput, fallbackMeta)
+            mkdirSync(path.dirname(targetPath), { recursive: true })
+            writeFileSync(targetPath, repairedYaml)
+            return { success: true, runtime: "direct-http-repair" }
+          } catch (repairError) {
+            return { success: false, reason: "invalid_yaml", error: repairError, output: repairedOutput, parseMessage: `${repairError.message || ""}`.trim() }
+          }
+        }
+      }
       return { success: false, reason: "invalid_yaml", error: parseError, output, parseMessage: `${parseError.message || ""}`.trim() }
     }
     mkdirSync(path.dirname(targetPath), { recursive: true })
@@ -699,6 +961,7 @@ ${prompt}`
       version: 1,
       name: `${inputs.projectName || path.basename(cwd) || "my-project"}`,
       description: `${inputs.description || "Unified configuration for MAH runtimes."}`,
+      requireSprintMode: !!inputs.requireSprintMode,
     })
   } catch (parseError) {
     console.log(`bootstrap: AI output is not valid YAML: ${parseError.message}`)
@@ -948,7 +1211,8 @@ async function main() {
     provider: normalizeTextOption(options.provider),
     modelPreference: normalizeTextOption(options.model),
     apiKey: normalizeTextOption(options.apiKey),
-    baseUrl: normalizeTextOption(options.baseUrl)
+    baseUrl: normalizeTextOption(options.baseUrl),
+    requireSprintMode: !!options.requireSprintMode
   }
   if (canPrompt && !options.ai) {
     console.log("bootstrap: creating meta-agents.yaml with interactive setup")

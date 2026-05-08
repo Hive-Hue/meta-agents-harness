@@ -76,6 +76,16 @@ export function ProjectDetails({ data, onChange }: ProjectDetailsProps) {
             ))}
           </div>
         </div>
+        <div className="form-field form-field--full">
+          <label className="wizard-confirm">
+            <input
+              type="checkbox"
+              checked={data.requireSprintMode ?? false}
+              onChange={(e) => onChange({ requireSprintMode: e.target.checked })}
+            />
+            <span>Force sprint mode generation (AI elaborates and includes <code>sprint_mode</code>)</span>
+          </label>
+        </div>
       </div>
     </div>
   );

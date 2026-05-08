@@ -199,12 +199,12 @@ function printHelp() {
   console.log("  skills [list|inspect|explain|add|remove]  Skills catalog and assignment management")
   console.log("  context [find|explain|list|show|validate|index|propose|proposals]  Context Manager — operational context retrieval")
   console.log("  explain [detect|use|run|plan|diff|sync|generate|generate:tree|validate|state] [args]")
-  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>] [--provider <id>] [--model <id>] [--api-key <key>] [--base-url <url>]  Generate config (add --ai for expertise-aware topology)")
+  console.log("  init [--yes] [--force] [--ai] [--crew <name>] [--runtime <name>] [--name <name>] [--description <desc>] [--brief <text>] [--provider <id>] [--model <id>] [--api-key <key>] [--base-url <url>] [--require-sprint-mode]  Generate config (add --ai for expertise-aware topology)")
   console.log("  sessions [--runtime <name>] [--crew <name>] [--json] [list|resume|new|export|delete] [args]")
   console.log("  task [list|show|create|update|run] [args]")
   console.log("  mission [list|show|create|update|commit-scope|replan] [args]")
   console.log("  mcp [list|add|remove|sync] [args]  MCP registry and runtime sync")
-  console.log("  webui [vite-args]  start WebUI dev server")
+  console.log("  webui [dev|build|preview] [args]  run WebUI (use --prod for build+preview)")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -511,15 +511,83 @@ function runWebUi(argv = []) {
     console.error(`ERROR: webui directory not found at ${webuiDir}`)
     return 1
   }
+  if (argv.includes("--help") || argv.includes("-h")) {
+    console.log("Usage: mah webui [dev|build|preview] [vite args]")
+    console.log("")
+    console.log("Examples:")
+    console.log("  mah webui")
+    console.log("  mah webui --host 0.0.0.0 --port 5173")
+    console.log("  mah webui --prod")
+    console.log("  mah webui build")
+    console.log("  mah webui preview --host 0.0.0.0 --port 4173")
+    console.log("")
+    console.log("Flags:")
+    console.log("  --prod         run production flow (build then API-enabled server)")
+    console.log("  dev            start Vite dev server (default)")
+    console.log("  build          build optimized production bundle")
+    console.log("  preview        vite preview (static preview; no MAH API middleware)")
+    return 0
+  }
   const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
-  const child = spawnSync(npmCmd, ["run", "dev", "--prefix", webuiDir, "--", ...argv], {
+  const parseDotEnv = (raw = "") => {
+    const out = {}
+    for (const line of `${raw}`.split(/\r?\n/)) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith("#")) continue
+      const idx = trimmed.indexOf("=")
+      if (idx <= 0) continue
+      const key = trimmed.slice(0, idx).trim()
+      if (!key) continue
+      let value = trimmed.slice(idx + 1).trim()
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1)
+      }
+      out[key] = value
+    }
+    return out
+  }
+  const loadWorkspaceDotEnv = () => {
+    const envPath = path.join(repoRoot, ".env")
+    if (!existsSync(envPath)) return {}
+    try {
+      return parseDotEnv(readFileSync(envPath, "utf-8"))
+    } catch {
+      return {}
+    }
+  }
+  const webUiEnv = { ...process.env, ...loadWorkspaceDotEnv() }
+  const passthrough = [...argv]
+  const prodMode = passthrough.includes("--prod")
+  const cleaned = passthrough.filter((arg) => arg !== "--prod")
+  const first = cleaned[0]
+  const explicitCommand = first === "dev" || first === "build" || first === "preview" ? first : "dev"
+  const viteArgs = explicitCommand === "dev" || explicitCommand === "preview"
+    ? (first === explicitCommand ? cleaned.slice(1) : cleaned)
+    : (first === explicitCommand ? cleaned.slice(1) : cleaned)
+
+  const runNpm = (script, args = []) => spawnSync(npmCmd, ["run", script, "--prefix", webuiDir, ...(args.length ? ["--", ...args] : [])], {
     cwd: repoRoot,
-    env: process.env,
+    env: webUiEnv,
     stdio: "inherit",
   })
+
+  if (prodMode) {
+    const buildResult = runNpm("build")
+    if (typeof buildResult.status !== "number" || buildResult.status !== 0) {
+      if (buildResult.error) console.error(`ERROR: failed to build WebUI: ${buildResult.error.message}`)
+      return typeof buildResult.status === "number" ? buildResult.status : 1
+    }
+    const prodServerArgs = ["--mode", "production", ...viteArgs]
+    const previewResult = runNpm("dev", prodServerArgs)
+    if (typeof previewResult.status === "number") return previewResult.status
+    if (previewResult.error) console.error(`ERROR: failed to start production WebUI server: ${previewResult.error.message}`)
+    return 1
+  }
+
+  const child = runNpm(explicitCommand, viteArgs)
   if (typeof child.status === "number") return child.status
   if (child.error) {
-    console.error(`ERROR: failed to start WebUI: ${child.error.message}`)
+    console.error(`ERROR: failed to run WebUI (${explicitCommand}): ${child.error.message}`)
   }
   return 1
 }
@@ -1108,6 +1176,7 @@ function runInit(argv) {
     console.log("  --model <id>                 AI model identifier")
     console.log("  --api-key <key>              API key for AI provider")
     console.log("  --base-url <url>             Custom AI base URL")
+    console.log("  --require-sprint-mode        Force sprint_mode generation in AI bootstrap")
     console.log("  -h, --help                   Show this help")
     console.log("")
     console.log("Examples:")
@@ -1126,6 +1195,7 @@ function runInit(argv) {
   const aiModel = parseValueArg(argv, "--model") || parseValueArg(argv, "--ai-model")
   const aiApiKey = parseValueArg(argv, "--api-key") || parseValueArg(argv, "--ai-api-key")
   const aiBaseUrl = parseValueArg(argv, "--base-url") || parseValueArg(argv, "--ai-base-url")
+  const requireSprintMode = argv.includes("--require-sprint-mode")
   const yesFlag = argv.includes("--yes")
   const forceFlag = argv.includes("--force")
   const created = []
@@ -1164,6 +1234,9 @@ function runInit(argv) {
   }
   if (aiBaseUrl) {
     bootstrapArgs.push("--base-url", aiBaseUrl)
+  }
+  if (requireSprintMode) {
+    bootstrapArgs.push("--require-sprint-mode")
   }
 
   const bootstrapResult = spawnSync("node", bootstrapArgs, {

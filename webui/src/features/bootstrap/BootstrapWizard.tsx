@@ -28,6 +28,7 @@ export type WizardData = {
   crewId?: string;
   missionStatement?: string;
   description?: string;
+  requireSprintMode?: boolean;
   runtime?: string;
   topologyTeams?: string[];
   topologyWorkersPerTeam?: number;
@@ -128,6 +129,7 @@ export function BootstrapWizard() {
             crewId: wizardData.crewId,
             missionStatement: wizardData.missionStatement,
             description: wizardData.description,
+            requireSprintMode: wizardData.requireSprintMode ? "1" : "0",
             reviewPrompt,
           }),
         });

@@ -50,6 +50,7 @@ function getCommand(step: number, data: WizardData): string {
 
   const parts = ["mah init"];
   if (data.setupMode === "ai-assisted") parts.push("--ai");
+  if (data.requireSprintMode) parts.push("--require-sprint-mode");
   if (data.provider) parts.push("--provider " + data.provider);
   const runtime = normalizeRuntime(data.runtime);
   if (runtime) parts.push("--runtime " + runtime);

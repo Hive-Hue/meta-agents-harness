@@ -61,9 +61,9 @@ constraints:
 
 If required pieces are missing, infer conservative defaults and state assumptions explicitly.
 
-### Optional: sprint_mode (PI, Hermes, OpenCode)
+### Optional: sprint_mode
 
-For PI-family runtimes, optionally include:
+For richer team scope definition, optionally include:
 
 ```yaml
 sprint_mode:
@@ -303,7 +303,7 @@ qa-reviewer:
 
 ## 6. Quality Gates
 
-For PI-family runtimes with sprint_mode, every slice must pass these four gates:
+When sprint_mode is present, every slice must pass these four gates:
 
 ### Gate 1: Spec Adherence Check
 
@@ -548,7 +548,7 @@ Output is **acceptable only if** all of the following are true:
 3. **No worker has edit/bash outside owned scope** — stream ownership enforced
 4. **Leads do not get direct edit/bash by default** — coordination, not execution
 5. **Prompts include runtime-specific frontmatter** — all required fields present
-6. **Quality gates defined and actionable** — each slice must pass all 4 gates (PI-family with sprint_mode)
+6. **Quality gates defined and actionable** — each slice must pass all 4 gates (when sprint_mode is present)
 7. **Deferred list is first-class** — anything not delivered goes there, not to the void
 8. **Profile matched correctly** — prompts reflect profile domain language
 

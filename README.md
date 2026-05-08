@@ -66,6 +66,27 @@ mah doctor          # Run diagnostics
 
 📖 **For detailed bootstrap documentation, see [`docs/getting-started.md`](./docs/getting-started.md)**
 
+### WebUI (Dev and Prod)
+
+```bash
+# Dev server
+mah webui
+
+# Production mode (build + preview)
+mah webui --prod
+
+# Equivalent explicit commands
+mah webui build
+mah webui preview --host 0.0.0.0 --port 4173
+```
+
+WebUI credentials are read from environment variables:
+
+```bash
+MAH_WEBUI_USER=admin
+MAH_WEBUI_PASSWORD=mah
+```
+
 ---
 
 ## Current status of the `development` branch
