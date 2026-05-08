@@ -15,7 +15,7 @@ Meta Agents Harness (MAH) is a runtime-agnostic orchestration layer for multi-ag
 - [Expertise Catalog Governance](./expertise-catalog-governance.md) — How the seed catalog is proposed, reviewed, and refreshed
 - [Skills CLI](./skills-cli.md) — Skill inspection and agent skill assignment management (`mah skills`)
 - [Tasks and Missions CLI](./tasks-and-missions-cli.md) — Planning and execution workspace commands (`mah task`, `mah mission`)
-- [Context Manager](./context-manager.md) — Operational context retrieval for agents after routing (v0.9.0 target line)
+- [Context Manager](./context-manager.md) — Operational context retrieval for agents after routing
 - [Platform Capabilities](./platform-capabilities.md) — Feature overview across runtimes
 - [Runtime Boundary](./runtime-boundary.md) — What MAH owns vs. what runtime handles
 - [Headless Runtime](./headless-runtime.md) — Non-interactive execution model and support matrix
@@ -58,4 +58,4 @@ docs/
 
 - [Repository](https://github.com/Hive-Hue/meta-agents-harness)
 - [CHANGELOG](../CHANGELOG.md) — Release history
-- [Specification](../specs/) — Formal specs and test plans
+- [Specifications (development branch)](https://github.com/Hive-Hue/meta-agents-harness/tree/development/specs) — Formal specs and test plans

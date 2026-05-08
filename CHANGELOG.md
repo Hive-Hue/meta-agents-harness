@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
 
-## [Unreleased] (target: v0.9.0)
+## [Unreleased]
+
+## [0.9.0] - 2026-05-08
 
 ### Added
 
@@ -120,7 +122,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Overview quick actions now deep-link into the real task workspace and command previews provide clipboard feedback/fallback behavior
 - `vite.config.js` and `vite.config.ts` now serve the same expanded MAH middleware surface for auth, terminal, tasks, missions, and shell/session orchestration
 - WebUI `Tasks` APIs now delegate task and mission state changes through `mah task` / `mah mission` instead of duplicating planning rules in Vite middleware
-- `development` package metadata now tracks the upcoming `v0.9.0` release line in both the root package and WebUI package
+- Package metadata now aligns with `v0.9.0` in both the root package and WebUI package
 - Bootstrap defaults now include `backlog_operator` for orchestrator and lead agents, and sync metadata now emits a specific `use_when` hint for this skill
 - Crew examples and onboarding/getting-started docs now document backlog execution through `mah task` / `mah mission`
 
@@ -159,9 +161,8 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - WebUI theme switcher now applies reliably to shared layout surfaces (including `header`, `sidebar`, `overview`, right inspector, and `/tasks` PERT-related views) when toggling light/dark mode
 - `tests/runtime-core-integration.test.mjs` now skips runtime-specific integration assertions when generated workspace artifacts are missing, avoiding false CI failures on clean checkouts
 
-### Note
+### Notes
 
-- All `v0.9.0` work remains unreleased.
 - S8 (Bounded Governance Add-ons) excluded from `v0.9.0`; deferred to `v0.9.x`
 
 ## [0.8.0] - 2026-04-21

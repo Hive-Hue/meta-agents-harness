@@ -1,10 +1,10 @@
-# Context Manager (planned for v0.9.0)
+# Context Manager
 
 ## Status
 
 Context Manager is an operational layer for retrieving relevant task context after expertise-based routing has selected an agent. It provides bounded, explainable, reusable operational memory without interfering with routing decisions.
 
-This document covers the planned `v0.9.0` implementation and current unreleased behavior.
+This document covers the `v0.9.0` implementation and current behavior.
 
 ## What It Is
 

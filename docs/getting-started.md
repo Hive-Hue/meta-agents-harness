@@ -53,16 +53,16 @@ mah mission list --json
 mah task list --json
 ```
 
-### 4. WebUI Theme (v0.9.0 line)
+### 4. WebUI Theme
 
 In the WebUI, open **Settings → Display → Theme** and select **Dark** or **Light**.
 The theme is applied immediately and persisted locally (`mah:theme`) for future reloads.
 
-### 5. WebUI Workspace Detection (v0.9.0 line)
+### 5. WebUI Workspace Detection
 
 Bootstrap `Workspace Detection` scans the active **Workspace Path** (from Settings) and reports live state for config/runtime markers/git/expertise/context.
 
-### 6. MCP Registry and Sync (v0.9.0 line)
+### 6. MCP Registry and Sync
 
 MAH now uses a canonical MCP registry (`.mah/mcp/servers.json`) plus runtime-specific generated files.
 
@@ -236,7 +236,7 @@ mah init --yes --ai \
 3. **Infers sensible defaults** — chooses appropriate crews, agents, and profiles
 4. **Falls back gracefully** — if HTTP AI fails, uses logical mode automatically
 
-In the `v0.9.0` development line, AI-assisted bootstrap can also:
+From `v0.9.0` onward, AI-assisted bootstrap can also:
 5. **Configure expertise-aware routing** — agents matched by skill, not just order
 6. **Set up Context Manager** — operational memory fetched per task at runtime
 7. **Enable visible execution** — lifecycle events, session status, and trace on demand

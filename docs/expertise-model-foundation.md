@@ -168,6 +168,6 @@ Original `v0.3.0` note captured rename and early stabilization. Current document
 
 ## Related Release Work
 
-- [`plan/done/expertise-integration-v0.8.0.md`](../plan/done/expertise-integration-v0.8.0.md)
-- [`specs/meta-agents-harness-expertise-model-spec.md`](../specs/meta-agents-harness-expertise-model-spec.md)
+- [`plan/done/expertise-integration-v0.8.0.md`](https://github.com/Hive-Hue/meta-agents-harness/blob/development/plan/done/expertise-integration-v0.8.0.md)
+- [`specs/meta-agents-harness-expertise-model-spec.md`](https://github.com/Hive-Hue/meta-agents-harness/blob/development/specs/meta-agents-harness-expertise-model-spec.md)
 - [`CHANGELOG.md`](../CHANGELOG.md)
