@@ -1341,6 +1341,8 @@ async function runSessionsStatus(sessionId, jsonMode = false) {
       crew: found?.crew || sessionId.split(':')[1] || 'unknown',
       session_id_short: found?.session_id || sessionId.split(':')[2] || sessionId,
       events,
+      goal: events.find(e => e.goal)?.goal || null,
+      cost_summary: events.find(e => e.cost_summary)?.cost_summary || null,
       event_count: events.length,
       timeline: events.map(e => ({ event: e.event, timestamp: e.timestamp }))
     }, null, 2))
@@ -1363,7 +1365,13 @@ async function runSessionsStatus(sessionId, jsonMode = false) {
       if (ev.event === 'completed') line += ` (exit: ${ev.result_code})`
       if (ev.event === 'failed') line += ` — ${ev.result_reason || 'failed'}`
       if (ev.event === 'context_loaded') line += ` (${ev.context_count || 0} docs)`
+      if (ev.cost_summary) line += ` [cost: ${ev.cost_summary.duration_ms}ms, ${ev.cost_summary.lifecycle_events || '?'} events]`
       console.log(line)
+    }
+    // Show goal if present in any event
+    const goalEvent = events.find(e => e.goal)
+    if (goalEvent?.goal) {
+      console.log(`Goal:   ${goalEvent.goal}`)
     }
   } else {
     console.log("No lifecycle events recorded yet.")
@@ -2635,6 +2643,7 @@ async function runDelegate(passthrough, options = {}) {
   const quiet = !verbose && !passthrough.includes("--quiet=false")
   const autoMode = passthrough.includes("--auto")
   const runArgs = passthrough.filter(a => !["--execute", "-x", "--auto", "--headless", "--verbose", "--quiet"].includes(a))
+  const goal = parseValueArg(passthrough, "--goal")
   const target = parseValueArg(runArgs, "--target")
   const task = parseValueArg(runArgs, "--task")
   const targetRuntime = parseValueArg(runArgs, "--runtime", "-r") || ""
@@ -2671,6 +2680,7 @@ async function runDelegate(passthrough, options = {}) {
   const delegateSessionId = `${sourceRuntime}:${crew || "default"}:delegate-${Date.now()}`
   recordLifecycleEvent(repoRoot, delegateSessionId, {
     event: "queued",
+    goal: goal || undefined,
     details: { task: (task || "").substring(0, 100), autoMode, sourceAgent: sourceAgent || "" }
   })
 
@@ -2859,12 +2869,31 @@ async function runDelegate(passthrough, options = {}) {
     return 1
   }
 
+  // Load governance signals for routed event (best-effort)
+  let routedGovernance = null
+  try {
+    const { getRegistry } = await import("./expertise/expertise-registry.mjs")
+    const registry = await getRegistry()
+    const selectedEntry = (registry?.entries || []).find(
+      (e) => (e.id.endsWith(`:${effectiveTarget}`) || e.id === effectiveTarget)
+    )
+    if (selectedEntry) {
+      routedGovernance = {
+        trust_tier: selectedEntry.trust_tier || undefined,
+        approval_required: selectedEntry.approval_required || undefined,
+        supervision_required: selectedEntry.supervision_required || undefined,
+        confidential_execution: selectedEntry.confidential_execution || undefined,
+      }
+    }
+  } catch { /* best-effort */ }
+
   recordLifecycleEvent(repoRoot, delegateSessionId, {
     event: "routed",
     agent: effectiveTarget,
     agent_name: effectiveTarget,
     routing_reason: expertiseWarning || "expertise-scored",
     routing_confidence: expertiseScore,
+    governance: routedGovernance,
     details: { targetRuntime: result?.context?.targetRuntime || "", sourceRuntime }
   })
 
@@ -3034,8 +3063,14 @@ async function runDelegate(passthrough, options = {}) {
       }
     }
     const exitCode = typeof child.status === "number" ? child.status : 1
+    const { getLifecycleEvents } = await import("./session/m3-ops.mjs")
     recordLifecycleEvent(repoRoot, delegateSessionId, {
       event: exitCode === 0 ? "completed" : "failed",
+      goal: goal || undefined,
+      cost_summary: {
+        duration_ms: Date.now() - startTimeMs,
+        lifecycle_events: getLifecycleEvents(repoRoot, delegateSessionId).length,
+      },
       result_code: exitCode,
       result_reason: exitCode === 0 ? "success" : "non-zero exit",
       error_detail: exitCode !== 0 ? { exitCode } : null
@@ -3456,8 +3491,26 @@ Examples:
       available_mcp: null,
     }
 
-
-    const result = retrieveDocuments(request, index)
+    let result
+    if (process.env.MAH_VECTOR_RETRIEVAL === "1") {
+      try {
+        const { retrieveWithVectorFallback } = await import("./context/vector-adapter.mjs")
+        const retrievalResult = await retrieveWithVectorFallback(request, index.entries || [], { vectorFirst: true, timeout_ms: 8000 })
+        result = {
+          matched_docs: retrievalResult.results || [],
+          summary_blocks: retrievalResult.summary_blocks || [],
+          tool_hints: retrievalResult.tool_hints || [],
+          skill_hints: retrievalResult.skill_hints || [],
+          confidence: retrievalResult.confidence || "low",
+          total_candidates: retrievalResult.total_candidates || 0,
+          retrieval_provider: retrievalResult.provider || "vector",
+        }
+      } catch (err) {
+        result = retrieveDocuments(request, index)
+      }
+    } else {
+      result = retrieveDocuments(request, index)
+    }
 
     if (jsonMode) {
       console.log(JSON.stringify(result, null, 2))
@@ -3472,13 +3525,16 @@ Examples:
       if (capability_hint) console.log("Capability hint: " + capability_hint)
       console.log("Total candidates: " + result.total_candidates)
       console.log("Confidence: " + result.confidence)
+      if (result.retrieval_provider) console.log("Retrieval provider: " + result.retrieval_provider)
       console.log("\nTop matches:")
       console.log("ID".padEnd(60) + " Score   Reasons")
       console.log("─".repeat(90))
       for (const m of result.matched_docs) {
         const scoreStr = (m.score * 100).toFixed(0) + "%"
         const reasonsStr = m.reasons.join("; ")
-        console.log(m.id.padEnd(60) + scoreStr.padStart(8) + " " + reasonsStr)
+        const displayId = m.metadata?.doc_id || m.metadata?.file || m.id
+        const fileHint = m.metadata?.file ? ` (${m.metadata.file})` : ""
+        console.log(displayId.padEnd(60) + scoreStr.padStart(8) + " " + reasonsStr + fileHint)
       }
       if (result.tool_hints.length > 0) {
         console.log("\nTool hints: " + result.tool_hints.join(", "))
@@ -4417,6 +4473,12 @@ Examples:
       console.log(`Score: ${(scoreData.final_score || 0).toFixed(3)} | Match: ${(scoreData.match_score || 0).toFixed(3)} | Confidence: ${scoreData.confidence_band || 'unknown'}`)
       console.log(`Penalties: ${joinOrNone(scoreData.penalties_applied)} | Blocked: ${joinOrNone(scoreData.blocked_filters)}`)
       console.log(`Evidence: ${evidence}\n`)
+      // Show governance signals if present
+      const agentCandidate = candidates.find(c => c.id === agentFlag)
+      const govSignals = agentCandidate?.expertise
+      if (govSignals && (govSignals.trust_tier !== undefined || govSignals.approval_required !== undefined || govSignals.supervision_required !== undefined || govSignals.confidential_execution !== undefined)) {
+        console.log(`Governance: trust_tier=${govSignals.trust_tier || 'unknown'}, approval_required=${govSignals.approval_required || false}, supervision_required=${govSignals.supervision_required || false}, confidential_execution=${govSignals.confidential_execution || false}`)
+      }
       if (verdict === 'qualified-but-not-top') {
         console.log('Verdict: qualified-but-not-top')
       } else if (verdict === 'below-threshold') {
@@ -5893,9 +5955,11 @@ async function main() {
   const command = first
   let passthrough = normalizedArgv.slice(1)
   let cooperativeDecision = null
+  let goal = null
 
   if (command === "run") {
     const routingScope = resolveRoutingScopeFromArgs(passthrough, readCooperativeRoutingConfig())
+    goal = parseValueArg(passthrough, "--goal")
     if (routingScope === "full_crews") {
       cooperativeDecision = await buildCooperativeRoutingDecision({
         runtime: runtimeResult.runtime,
@@ -5927,12 +5991,30 @@ async function main() {
       const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
       recordLifecycleEvent(repoRoot, lifecycleSessionId, {
         event: "queued",
+        goal: goal || undefined,
         routing_scope: cooperativeDecision.routingScope,
         source_crew: cooperativeDecision.sourceCrew,
         selected_crew: cooperativeDecision.selectedCrew,
         selected_agent: cooperativeDecision.selectedAgent,
         candidate_crews: cooperativeDecision.candidateCrews
       })
+      // Load selected agent expertise for governance signals
+      let governance = null
+      try {
+        const { getRegistry } = await import("./expertise/expertise-registry.mjs")
+        const registry = await getRegistry()
+        const selectedEntry = (registry?.entries || []).find(
+          (e) => (e.id.endsWith(`:${cooperativeDecision.selectedAgent}`) || e.id === cooperativeDecision.selectedAgent)
+        )
+        if (selectedEntry) {
+          governance = {
+            trust_tier: selectedEntry.trust_tier || undefined,
+            approval_required: selectedEntry.approval_required || undefined,
+            supervision_required: selectedEntry.supervision_required || undefined,
+            confidential_execution: selectedEntry.confidential_execution || undefined,
+          }
+        }
+      } catch { /* best-effort */ }
       recordLifecycleEvent(repoRoot, lifecycleSessionId, {
         event: "routed",
         agent: cooperativeDecision.selectedAgent,
@@ -5942,7 +6024,8 @@ async function main() {
         source_crew: cooperativeDecision.sourceCrew,
         selected_crew: cooperativeDecision.selectedCrew,
         selected_agent: cooperativeDecision.selectedAgent,
-        candidate_crews: cooperativeDecision.candidateCrews
+        candidate_crews: cooperativeDecision.candidateCrews,
+        governance
       })
     }
     const result = dispatchHeadless(runtimeResult.runtime, command, passthrough, outputMode)
@@ -5974,16 +6057,35 @@ async function main() {
 
   const status = dispatch(runtimeResult.runtime, command, passthrough)
   if (command === "run" && cooperativeDecision?.ok) {
-    const { recordLifecycleEvent } = await import("./session/m3-ops.mjs")
+    const { recordLifecycleEvent, getLifecycleEvents } = await import("./session/m3-ops.mjs")
     const lifecycleSessionId = `${runtimeResult.runtime}:${cooperativeDecision.sourceCrew}:coop-${Date.now()}`
+    const startTimeMs = Date.now()
     recordLifecycleEvent(repoRoot, lifecycleSessionId, {
       event: "queued",
+      goal: goal || undefined,
       routing_scope: cooperativeDecision.routingScope,
       source_crew: cooperativeDecision.sourceCrew,
       selected_crew: cooperativeDecision.selectedCrew,
       selected_agent: cooperativeDecision.selectedAgent,
       candidate_crews: cooperativeDecision.candidateCrews
     })
+    // Load selected agent expertise for governance signals
+    let governance = null
+    try {
+      const { getRegistry } = await import("./expertise/expertise-registry.mjs")
+      const registry = await getRegistry()
+      const selectedEntry = (registry?.entries || []).find(
+        (e) => (e.id.endsWith(`:${cooperativeDecision.selectedAgent}`) || e.id === cooperativeDecision.selectedAgent)
+      )
+      if (selectedEntry) {
+        governance = {
+          trust_tier: selectedEntry.trust_tier || undefined,
+          approval_required: selectedEntry.approval_required || undefined,
+          supervision_required: selectedEntry.supervision_required || undefined,
+          confidential_execution: selectedEntry.confidential_execution || undefined,
+        }
+      }
+    } catch { /* best-effort */ }
     recordLifecycleEvent(repoRoot, lifecycleSessionId, {
       event: "routed",
       agent: cooperativeDecision.selectedAgent,
@@ -5993,10 +6095,16 @@ async function main() {
       source_crew: cooperativeDecision.sourceCrew,
       selected_crew: cooperativeDecision.selectedCrew,
       selected_agent: cooperativeDecision.selectedAgent,
-      candidate_crews: cooperativeDecision.candidateCrews
+      candidate_crews: cooperativeDecision.candidateCrews,
+      governance
     })
     recordLifecycleEvent(repoRoot, lifecycleSessionId, {
       event: status === 0 ? "completed" : "failed",
+      goal: goal || undefined,
+      cost_summary: {
+        duration_ms: Date.now() - startTimeMs,
+        lifecycle_events: getLifecycleEvents(repoRoot, lifecycleSessionId).length,
+      },
       result_code: status,
       result_reason: status === 0 ? "cooperative-run-success" : "cooperative-run-failed",
       routing_scope: cooperativeDecision.routingScope,

@@ -3,12 +3,14 @@ type IconProps = {
   className?: string;
   size?: number;
   filled?: boolean;
+  style?: React.CSSProperties;
 };
 
-export function Icon({ name, className = "", size, filled = false }: IconProps) {
+export function Icon({ name, className = "", size, filled = false, style: extraStyle }: IconProps) {
   const style = {
     fontSize: size ? `${size}px` : undefined,
     fontVariationSettings: filled ? "'FILL' 1" : undefined,
+    ...extraStyle,
   };
 
   return (

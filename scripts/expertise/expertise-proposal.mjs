@@ -58,6 +58,7 @@ export function buildExpertiseProposal({
   proposedChanges = {},
   evidenceRefs = [],
   reviewers = [],
+  confidenceChange = null,
 }) {
   if (!targetExpertise?.id) {
     return { ok: false, error: 'targetExpertise is required' }
@@ -118,6 +119,15 @@ export function buildExpertiseProposal({
     source: {
       catalog_path: targetExpertise.__source_file ? targetExpertise.__source_file : null,
     },
+    ...(confidenceChange ? {
+      confidence_change: {
+        current_band: confidenceChange.current_band,
+        proposed_band: confidenceChange.proposed_band,
+        current_score: confidenceChange.current_score,
+        proposed_score: confidenceChange.proposed_score,
+        direction: confidenceChange.proposed_score > confidenceChange.current_score ? 'improvement' : 'degradation',
+      },
+    } : {}),
   }
 
   return { ok: true, proposal }
@@ -225,6 +235,91 @@ export function loadProposalFile(filePath) {
   } catch (err) {
     return { ok: false, error: `failed to read proposal file: ${err.message}` }
   }
+}
+
+export async function generateGovernedProposal({
+  targetExpertiseId,
+  actor,
+  summary,
+  rationale,
+  proposedChanges,
+  catalogPath,
+  confidenceChange = null,
+}) {
+  if (!canGenerateProposal(actor)) {
+    return { ok: false, error: `actor role '${inferActorRole(actor) || 'none'}' cannot generate proposals` }
+  }
+  if (typeof summary !== 'string' || !summary.trim()) {
+    return { ok: false, error: 'summary is required and must be a non-empty string' }
+  }
+  const targetId = targetExpertiseId?.includes(':') ? targetExpertiseId : `dev:${targetExpertiseId}`
+  const targetExpertise = await loadExpertiseById(targetId)
+  if (!targetExpertise) {
+    return { ok: false, error: `expertise '${targetId}' not found in catalog` }
+  }
+  const result = buildExpertiseProposal({
+    targetExpertise,
+    actor,
+    summary,
+    rationale: rationale || '',
+    proposedChanges: proposedChanges || {},
+    evidenceRefs: [],
+    reviewers: [],
+    confidenceChange,
+  })
+  if (!result.ok) return result
+  const validation = validateProposalPayload(result.proposal)
+  if (!validation.valid) {
+    return { ok: false, error: 'proposal validation failed', validationErrors: validation.errors }
+  }
+  return { ok: true, proposal: result.proposal, validationErrors: [] }
+}
+
+export function reviewProposal(proposal, reviewer, decision, comment = '') {
+  if (!proposal || typeof proposal !== 'object') {
+    return { ok: false, error: 'proposal is required' }
+  }
+  if (!['approved', 'rejected', 'needs_changes'].includes(decision)) {
+    return { ok: false, error: `decision must be 'approved', 'rejected', or 'needs_changes'; got '${decision}'` }
+  }
+  const updated = {
+    ...proposal,
+    status: decision === 'approved' ? 'approved' : (decision === 'rejected' ? 'rejected' : 'needs_changes'),
+    reviews: [...(proposal.reviews || []), {
+      reviewer: reviewer || 'unknown-reviewer',
+      decision,
+      comment: comment || '',
+      reviewed_at: nowStamp(),
+    }],
+  }
+  return { ok: true, proposal: updated }
+}
+
+export function promoteProposal(proposal, targetExpertise) {
+  if (!proposal || typeof proposal !== 'object') {
+    return { ok: false, error: 'proposal is required' }
+  }
+  if (proposal.status !== 'approved') {
+    return { ok: false, error: `proposal status is '${proposal.status}', must be 'approved' before promotion` }
+  }
+  const merged = {
+    ...targetExpertise,
+    ...(proposal.proposed_changes && typeof proposal.proposed_changes === 'object'
+      ? proposal.proposed_changes
+      : {}),
+    lifecycle: proposal.proposed_changes?.lifecycle || targetExpertise.lifecycle,
+    validation_status: proposal.proposed_changes?.validation_status || targetExpertise.validation_status,
+    confidence: proposal.proposed_changes?.confidence || targetExpertise.confidence,
+    capabilities: proposal.proposed_changes?.capabilities || targetExpertise.capabilities,
+    domains: proposal.proposed_changes?.domains || targetExpertise.domains,
+    metadata: {
+      ...(targetExpertise.metadata || {}),
+      ...(proposal.proposed_changes?.metadata || {}),
+    },
+    last_promoted: nowStamp(),
+    last_promoted_by: proposal.generated_by?.actor || 'unknown',
+  }
+  return { ok: true, expertise: merged }
 }
 
 export async function generateProposalById({

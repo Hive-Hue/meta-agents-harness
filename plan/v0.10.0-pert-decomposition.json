@@ -1,0 +1,148 @@
+{
+  "tasks": [
+    {
+      "id": "T1",
+      "description": "Design spec: vector-aware context memory retrieval contracts with qmd/pvector adapter interface, fallback strategy, and bounded retrieval budgets",
+      "predecessors": [],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 8
+    },
+    {
+      "id": "T2",
+      "description": "Design spec: enhanced expertise foundation — routing signals schema, confidence scoring model, governed learning loop lifecycle, explainability surface",
+      "predecessors": [],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 8
+    },
+    {
+      "id": "T3",
+      "description": "Design spec: WebUI console data models for run/session management and tasks/mission tracking, API surface definition",
+      "predecessors": [],
+      "optimistic": 3,
+      "most_likely": 5,
+      "pessimistic": 7
+    },
+    {
+      "id": "T4",
+      "description": "Implement qmd/pvector adapter module with pluggable vector store interface and query translation",
+      "predecessors": ["T1"],
+      "optimistic": 6,
+      "most_likely": 10,
+      "pessimistic": 14
+    },
+    {
+      "id": "T5",
+      "description": "Implement graceful fallback from vector search to canonical file-based context retrieval when no vector store available",
+      "predecessors": ["T1", "T4"],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 9
+    },
+    {
+      "id": "T6",
+      "description": "Implement context memory retrieval benchmarks comparing vector vs file-based paths",
+      "predecessors": ["T4", "T5"],
+      "optimistic": 3,
+      "most_likely": 5,
+      "pessimistic": 7
+    },
+    {
+      "id": "T7",
+      "description": "Implement expertise routing signals extraction and confidence scoring from expertise model YAML",
+      "predecessors": ["T2"],
+      "optimistic": 5,
+      "most_likely": 8,
+      "pessimistic": 12
+    },
+    {
+      "id": "T8",
+      "description": "Implement governed expertise learning loop — proposal/review/promote lifecycle with CLI and validation",
+      "predecessors": ["T2", "T7"],
+      "optimistic": 6,
+      "most_likely": 9,
+      "pessimistic": 13
+    },
+    {
+      "id": "T9",
+      "description": "Implement expertise routing explainability surface — why agent X chosen for task Y, with signal breakdown",
+      "predecessors": ["T2", "T7"],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 9
+    },
+    {
+      "id": "T10",
+      "description": "Implement WebUI backend hooks for run/session management — start, stop, inspect, resume endpoints",
+      "predecessors": ["T3"],
+      "optimistic": 6,
+      "most_likely": 10,
+      "pessimistic": 14
+    },
+    {
+      "id": "T11",
+      "description": "Implement WebUI backend hooks for tasks/mission tracking — list, status, filter, drill-down endpoints",
+      "predecessors": ["T3"],
+      "optimistic": 5,
+      "most_likely": 8,
+      "pessimistic": 12
+    },
+    {
+      "id": "T12",
+      "description": "Implement WebUI frontend console — run/session management UI (start, stop, inspect, resume)",
+      "predecessors": ["T3", "T10"],
+      "optimistic": 8,
+      "most_likely": 12,
+      "pessimistic": 18
+    },
+    {
+      "id": "T13",
+      "description": "Implement WebUI frontend console — tasks/mission tracking UI (list, status, filter, drill-down)",
+      "predecessors": ["T3", "T11"],
+      "optimistic": 7,
+      "most_likely": 11,
+      "pessimistic": 16
+    },
+    {
+      "id": "T14",
+      "description": "Integration tests: vector retrieval path with qmd/pvector adapter, fallback path, and boundary conditions",
+      "predecessors": ["T4", "T5"],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 9
+    },
+    {
+      "id": "T15",
+      "description": "Integration tests: expertise routing confidence scoring, governed learning loop state transitions, explainability output",
+      "predecessors": ["T7", "T8", "T9"],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 9
+    },
+    {
+      "id": "T16",
+      "description": "Integration tests: WebUI console workflows — run/session lifecycle, tasks/mission tracking, access control",
+      "predecessors": ["T10", "T11", "T12", "T13"],
+      "optimistic": 4,
+      "most_likely": 7,
+      "pessimistic": 10
+    },
+    {
+      "id": "T17",
+      "description": "Non-regression coverage: validate expertise-first routing preserved, bounded retrieval budgets enforced, runtime-agnostic contracts intact across all three pillars",
+      "predecessors": ["T14", "T15", "T16"],
+      "optimistic": 4,
+      "most_likely": 6,
+      "pessimistic": 9
+    },
+    {
+      "id": "T18",
+      "description": "Documentation: update operator docs, CLI help, and architecture diagrams for all three pillars",
+      "predecessors": ["T4", "T7", "T10", "T11"],
+      "optimistic": 3,
+      "most_likely": 5,
+      "pessimistic": 7
+    }
+  ]
+}

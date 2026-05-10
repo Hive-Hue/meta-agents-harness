@@ -3,6 +3,8 @@ import { CommandPreview } from "../../components/ui/CommandPreview";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { useSessionsData, type SessionInfo } from "./useSessionsData";
+import { SessionInspector } from "./SessionInspector";
+import { StartRunModal } from "./StartRunModal";
 import { requestGlobalConsoleOpen } from "../console/consoleBridge";
 import { getFeatureAiCliOptions } from "../settings/aiFeatureSettings";
 import "./sessions.css";
@@ -27,10 +29,39 @@ export function SessionsOverview() {
   const [runtime, setRuntime] = useState("pi");
   const { sessions, loading, error, reload } = useSessionsData(runtime);
   const [selected, setSelected] = useState<SessionInfo | null>(null);
+  const [showStartRun, setShowStartRun] = useState(false);
+  const [inspectSessionId, setInspectSessionId] = useState<string | null>(null);
 
   const toneMap: Record<string, "running" | "completed" | "failed"> = {
     running: "running", completed: "completed", failed: "failed",
     shutdown: "failed", available: "completed", done: "completed"
+  };
+
+  const handleStopSession = async (sessionId: string) => {
+    if (!confirm(`Stop session ${sessionId}? This will mark it as failed.`)) return;
+    try {
+      const resp = await fetch("/api/mah/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ args: ["sessions", "stop", sessionId] }),
+      });
+      const data = await resp.json();
+      if (!data.ok) alert(`Stop failed: ${data.stderr || data.error}`);
+      else void reload();
+    } catch (e) { alert(`Stop error: ${e instanceof Error ? e.message : String(e)}`); }
+  };
+
+  const handleResumeSession = async (sessionId: string) => {
+    try {
+      const resp = await fetch("/api/mah/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ args: ["sessions", "resume", sessionId] }),
+      });
+      const data = await resp.json();
+      if (!data.ok) alert(`Resume failed: ${data.stderr || data.error}`);
+      else void reload();
+    } catch (e) { alert(`Resume error: ${e instanceof Error ? e.message : String(e)}`); }
   };
 
   return (
@@ -68,6 +99,14 @@ export function SessionsOverview() {
             </div>
           </div>
           <CommandPreview context="sessions" command="mah sessions list --json" />
+          <button
+            type="button"
+            className="sessions-new-run-btn"
+            onClick={() => setShowStartRun(true)}
+            title="Start new run"
+          >
+            <Icon name="add" size={16} /> New Run
+          </button>
         </section>
 
         <section className="sessions-main__content">
@@ -84,6 +123,7 @@ export function SessionsOverview() {
                     <th>Runtime / Crew</th>
                     <th>Status</th>
                     <th>Time</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -115,6 +155,36 @@ export function SessionsOverview() {
                         <span>Start: {formatTime(session.createdAt)}</span>
                         <span>Update: {relativeTime(session.updatedAt)}</span>
                       </td>
+                      <td className="actions-cell">
+                        <button
+                          type="button"
+                          className="session-action-btn"
+                          title="Inspect session"
+                          onClick={(e) => { e.stopPropagation(); setInspectSessionId(session.id); }}
+                        >
+                          <Icon name="visibility" size={14} />
+                        </button>
+                        {session.status === "running" && (
+                          <button
+                            type="button"
+                            className="session-action-btn session-action-btn--danger"
+                            title="Stop session"
+                            onClick={(e) => { e.stopPropagation(); handleStopSession(session.id); }}
+                          >
+                            <Icon name="stop" size={14} />
+                          </button>
+                        )}
+                        {(session.status === "completed" || session.status === "failed" || session.status === "done") && (
+                          <button
+                            type="button"
+                            className="session-action-btn session-action-btn--resume"
+                            title="Resume session"
+                            onClick={(e) => { e.stopPropagation(); handleResumeSession(session.id); }}
+                          >
+                            <Icon name="play_arrow" size={14} />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -124,9 +194,26 @@ export function SessionsOverview() {
         </section>
       </main>
 
+      {showStartRun && <StartRunModal onClose={() => setShowStartRun(false)} />}
+
       <aside className="inspector sessions-inspector">
-        {selected ? (
-          <SessionInspector session={selected} onClose={() => setSelected(null)} />
+        {inspectSessionId ? (
+          (() => {
+            const session = sessions.find(s => s.id === inspectSessionId);
+            if (!session) return null;
+            return (
+              <SessionInspector
+                sessionId={session.id}
+                runtime={session.runtime}
+                crew={session.crew}
+                status={session.status}
+                createdAt={session.createdAt}
+                onClose={() => setInspectSessionId(null)}
+              />
+            );
+          })()
+        ) : selected ? (
+          <SessionInspectorLegacy session={selected} onClose={() => setSelected(null)} />
         ) : (
           <section className="inspector__body sessions-inspector__empty">
             <Icon name="info" size={32} />
@@ -138,7 +225,7 @@ export function SessionsOverview() {
   );
 }
 
-function SessionInspector({ session, onClose }: { session: SessionInfo; onClose: () => void }) {
+function SessionInspectorLegacy({ session, onClose }: { session: SessionInfo; onClose: () => void }) {
   const [terminating, setTerminating] = useState(false);
   const [showProposalModal, setShowProposalModal] = useState(false);
   const [proposalSummary, setProposalSummary] = useState("");

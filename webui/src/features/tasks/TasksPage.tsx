@@ -7,6 +7,12 @@ import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { requestGlobalConsoleOpen } from "../console/consoleBridge";
 import { getAgenticEstimationSettings, type AgenticEstimationSettings } from "./agenticEstimationSettings";
 import { useTasksData, type MissionRecord, type TaskRecord, type TaskState } from "./useTasksData";
+import { TaskBoard } from "./TaskBoard";
+import { TaskInspector as TaskInspectorPanel } from "./TaskInspector";
+import { MissionList } from "./MissionList";
+import { TaskFilters, type TaskFiltersValue } from "./TaskFilters";
+import { useTaskActions } from "./useTaskActions";
+import { useMissionData } from "./useMissionData";
 import "./tasks.css";
 
 type TasksView = "board" | "missions" | "pert" | "timeline" | "inbox" | "replan";
@@ -420,6 +426,13 @@ export function TasksPage() {
   const activeView = normalizeView(searchParams.get("view"));
   const selectedTaskId = searchParams.get("task") ?? "";
   const selectedMissionId = searchParams.get("mission") ?? "";
+
+  // T12: task board / inspector state
+  const [t12SelectedTask, setT12SelectedTask] = useState<TaskRecord | null>(null);
+  const [t12Filters, setT12Filters] = useState<TaskFiltersValue>({ states: [], mission: "", owner: "", search: "" });
+  const [tasks2, setTasks2] = useState<TaskRecord[]>([]);
+  const { transitionTask } = useTaskActions(tasks2, setTasks2);
+  const missionData = useMissionData(tasks2);
 
   const updateTasksParams = useCallback((
     updates: Partial<Record<"view" | "task" | "mission", string | null>>,
@@ -839,6 +852,25 @@ export function TasksPage() {
               onOpenPert={() => handleSelectView("pert")}
               onOpenModal={() => setIsBoardModalOpen(true)}
               tasks={tasks}
+            />
+          )}
+          {/* T12: Enhanced Board View with filters + inspector */}
+          {!loading && activeView === "board" && tasks.length > 0 && (
+            <T12BoardView
+              tasks={tasks}
+              filters={t12Filters}
+              onFiltersChange={setT12Filters}
+              selectedTask={t12SelectedTask}
+              onSelectTask={(task) => setT12SelectedTask(task)}
+              onCloseInspector={() => setT12SelectedTask(null)}
+              onTransition={async (taskId, newState) => {
+                // Sync with main tasks list
+                const updated = tasks.map(t => t.id === taskId ? { ...t, state: newState as TaskState } : t);
+                setTasks2(updated);
+                await transitionTask(taskId, newState);
+              }}
+              missions={missionData.map(m => m.id)}
+              owners={[...new Set(tasks.map(t => t.owner))]}
             />
           )}
           {activeView === "missions" && missions.length > 0 && (
@@ -1272,6 +1304,70 @@ export function TasksPage() {
 
 function SubpageEmpty({ message }: { message: string }) {
   return <div className="empty-state">{message}</div>;
+}
+
+// T12: Enhanced board view with filters and inspector
+function T12BoardView({
+  tasks,
+  filters,
+  onFiltersChange,
+  selectedTask,
+  onSelectTask,
+  onCloseInspector,
+  onTransition,
+  missions,
+  owners,
+}: {
+  tasks: TaskRecord[];
+  filters: TaskFiltersValue;
+  onFiltersChange: (f: TaskFiltersValue) => void;
+  selectedTask: TaskRecord | null;
+  onSelectTask: (t: TaskRecord) => void;
+  onCloseInspector: () => void;
+  onTransition: (taskId: string, newState: string) => void;
+  missions: string[];
+  owners: string[];
+}) {
+  // Apply filters
+  const filtered = tasks.filter(t => {
+    if (filters.states.length > 0 && !filters.states.includes(t.state)) return false;
+    if (filters.mission && t.missionId !== filters.mission) return false;
+    if (filters.owner && t.owner !== filters.owner) return false;
+    if (filters.search) {
+      const q = filters.search.toLowerCase();
+      if (!t.id.toLowerCase().includes(q) && !t.title.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  return (
+    <div className="tasks-stack" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <TaskFilters
+        filters={filters}
+        onChange={onFiltersChange}
+        missions={missions}
+        owners={owners}
+      />
+      <div style={{ display: "flex", flex: 1, minHeight: 0, gap: 0 }}>
+        <div style={{ flex: 1, overflow: "hidden" }}>
+          <TaskBoard
+            tasks={filtered}
+            onSelectTask={onSelectTask}
+            onTransitionTask={onTransition}
+          />
+        </div>
+        {selectedTask && (
+          <aside className="inspector" style={{ width: 360, borderLeft: "1px solid var(--color-border-subtle)", overflow: "hidden" }}>
+            <TaskInspectorPanel
+              task={selectedTask}
+              onClose={onCloseInspector}
+              onTransition={onTransition}
+            />
+          </aside>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function BoardView({

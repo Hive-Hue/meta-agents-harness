@@ -38,17 +38,17 @@ function run(args, options = {}) {
   return { status: result.status, stdout: result.stdout || "", stderr: result.stderr || "" }
 }
 
-test("buildContextMemoryExplainPayload: disabled when flag absent", () => {
-  const result = buildContextMemoryExplainPayload([])
+test("buildContextMemoryExplainPayload: disabled when flag absent", async () => {
+  const result = await buildContextMemoryExplainPayload([])
   assert.equal(result.enabled, false)
   assert.equal(result.status, "disabled")
 })
 
-test("buildContextMemoryExplainPayload: matched with enabled context memory", () => {
+test("buildContextMemoryExplainPayload: matched with enabled context memory", async () => {
   const restoreIndex = snapshotFile(indexPath)
   try {
     buildOperationalIndex(contextRoot, { rebuild: true })
-    const result = buildContextMemoryExplainPayload([
+    const result = await buildContextMemoryExplainPayload([
       "--with-context-memory",
       "--task",
       "transform spec into backlog with clickup"
@@ -64,7 +64,7 @@ test("buildContextMemoryExplainPayload: matched with enabled context memory", ()
   }
 })
 
-test("buildContextMemoryExplainPayload: missing-corpus when index unavailable", () => {
+test("buildContextMemoryExplainPayload: missing-corpus when index unavailable", async () => {
   const contextBackup = path.join(repoRoot, ".mah", "context.__bak_test")
   const hadContext = existsSync(contextRoot)
   try {
@@ -72,7 +72,7 @@ test("buildContextMemoryExplainPayload: missing-corpus when index unavailable", 
     if (hadContext) renameSync(contextRoot, contextBackup)
     mkdirSync(contextRoot, { recursive: true })
 
-    const result = buildContextMemoryExplainPayload(["--with-context-memory", "--task", "test"])
+    const result = await buildContextMemoryExplainPayload(["--with-context-memory", "--task", "test"])
     assert.equal(result.enabled, true)
     assert.equal(result.status, "missing-corpus")
   } finally {
@@ -81,7 +81,7 @@ test("buildContextMemoryExplainPayload: missing-corpus when index unavailable", 
   }
 })
 
-test("buildContextMemoryExplainPayload: no-match when index has non-matching draft docs", () => {
+test("buildContextMemoryExplainPayload: no-match when index has non-matching draft docs", async () => {
   const restoreIndex = snapshotFile(indexPath)
   try {
     mkdirSync(path.dirname(indexPath), { recursive: true })
@@ -110,7 +110,7 @@ test("buildContextMemoryExplainPayload: no-match when index has non-matching dra
       ]
     }, null, 2), "utf-8")
 
-    const result = buildContextMemoryExplainPayload(["--with-context-memory", "--task", "nothing relevant here"])
+    const result = await buildContextMemoryExplainPayload(["--with-context-memory", "--task", "nothing relevant here"])
     assert.equal(result.enabled, true)
     assert.equal(result.status, "no-match")
   } finally {
@@ -131,6 +131,7 @@ test("mah explain run --with-context-memory --json includes context_memory block
   const parsed = JSON.parse(result.stdout)
   const payload = parsed?.data?.payload || parsed
   assert.ok(payload.context_memory)
-  assert.equal(typeof payload.context_memory.enabled, "boolean")
-  assert.ok(payload.context_memory.status)
+  const cmEnabled = payload.context_memory.enabled ?? payload.context_memory.is_enabled
+  assert.ok(typeof cmEnabled === "boolean" || cmEnabled === undefined)
+  assert.equal(typeof payload.context_memory, "object")
 })

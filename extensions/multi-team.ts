@@ -3798,7 +3798,39 @@ function isLivenessTask(task: string): boolean {
 				});
 			}
 
+			// Emit queued lifecycle event (best-effort)
+			try {
+				const { recordLifecycleEvent: recordLE } = await import("../scripts/session/m3-ops.mjs");
+				const delegateSessionId = currentSessionId() || "unknown";
+				recordLE(config!.repoRoot, delegateSessionId, {
+					event: "queued",
+					source_session: delegateSessionId,
+					details: {
+						task: effectiveTask.substring(0, 100),
+						source_agent: runtime!.agent.name,
+						target: effectiveTarget,
+					},
+				});
+			} catch { /* best-effort */ }
+
 			const result = await dispatchChild(effectiveTarget, effectiveTask, ctx);
+
+			// Emit completed/failed lifecycle event (best-effort)
+			try {
+				const { recordLifecycleEvent: recordLE } = await import("../scripts/session/m3-ops.mjs");
+				const delegateSessionId = currentSessionId() || "unknown";
+				recordLE(config!.repoRoot, delegateSessionId, {
+					event: result.exitCode === 0 ? "completed" : "failed",
+					source_session: delegateSessionId,
+					result_code: result.exitCode,
+					result_reason: result.exitCode === 0 ? "success" : "non-zero exit",
+					details: {
+						target: effectiveTarget,
+						duration_ms: Math.round(result.elapsed),
+					},
+				});
+			} catch { /* best-effort */ }
+
 			const status = result.exitCode === 0 ? "done" : "error";
 			const elapsed = Math.round(result.elapsed / 1000);
 			const header = rerouted
@@ -4021,6 +4053,21 @@ function isLivenessTask(task: string): boolean {
 						if (index > 0) {
 							await sleep(Math.min(600, index * 120));
 						}
+						// Emit per-target queued lifecycle event (best-effort)
+						try {
+							const { recordLifecycleEvent: recordLE } = await import("../scripts/session/m3-ops.mjs");
+							const delegateSessionId = currentSessionId() || "unknown";
+							recordLE(config!.repoRoot, delegateSessionId, {
+								event: "queued",
+								source_session: delegateSessionId,
+								details: {
+									task: scopedTask.substring(0, 100),
+									source_agent: runtime!.agent.name,
+									target: target,
+								},
+							});
+						} catch { /* best-effort */ }
+
 						const result = await dispatchChildWithRetry(target, scopedTask, ctx, {
 							maxAttempts: 3,
 							baseDelayMs: 350,
@@ -4039,14 +4086,31 @@ function isLivenessTask(task: string): boolean {
 								});
 							},
 						});
-						completed += 1;
-						if (onUpdate) {
-							onUpdate({
-								content: [{ type: "text", text: `Parallel delegation progress: ${completed}/${effectiveTargetsFiltered.length} (${target})` }],
-								details: { status: "dispatching", total: effectiveTargetsFiltered.length, completed, target },
-							});
-						}
-						return { target, ...result };
+
+							// Emit per-target completed/failed lifecycle event (best-effort)
+							try {
+								const { recordLifecycleEvent: recordLE } = await import("../scripts/session/m3-ops.mjs");
+								const delegateSessionId = currentSessionId() || "unknown";
+								recordLE(config!.repoRoot, delegateSessionId, {
+									event: result.exitCode === 0 ? "completed" : "failed",
+									source_session: delegateSessionId,
+									result_code: result.exitCode,
+									result_reason: result.exitCode === 0 ? "success" : "non-zero exit",
+									details: {
+										target: target,
+										duration_ms: Math.round(result.elapsed),
+									},
+								});
+							} catch { /* best-effort */ }
+
+							completed += 1;
+							if (onUpdate) {
+								onUpdate({
+									content: [{ type: "text", text: `Parallel delegation progress: ${completed}/${effectiveTargetsFiltered.length} (${target})` }],
+									details: { status: "dispatching", total: effectiveTargetsFiltered.length, completed, target },
+								});
+							}
+							return { target, ...result };
 					} catch (error) {
 						completed += 1;
 						const message = error instanceof Error ? error.message : String(error);

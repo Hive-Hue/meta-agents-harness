@@ -1,0 +1,29 @@
+flowchart TD
+  T1["Design qmd/pvector adapter interface<br/>3.3h"]:::normal
+  T2["Implement qmd/pvector adapter<br/>10.0h"]:::normal
+  T3["Add retrieval benchmarks<br/>5.0h"]:::normal
+  T4["Integration tests vector adapter<br/>5.2h"]:::normal
+  T5["Design expertise explain surface<br/>3.2h"]:::critical
+  T6["Implement confidence scoring<br/>8.2h"]:::critical
+  T7["Implement expertise learning loops<br/>8.2h"]:::critical
+  T8["Integration tests expertise<br/>5.2h"]:::critical
+  T9["Design WebUI run/session UI<br/>3.2h"]:::normal
+  T10["Design WebUI tasks/mission UI<br/>3.2h"]:::normal
+  T11["Implement run/session UI<br/>12.3h"]:::normal
+  T12["Implement tasks/mission UI<br/>11.2h"]:::normal
+  T13["Integration tests WebUI<br/>6.2h"]:::normal
+  T14["Non-regression all pillars<br/>6.2h"]:::critical
+  T15["Final integration + release<br/>5.0h"]:::critical
+
+  T1 --> T2 --> T3 --> T4
+  T5 --> T6 --> T7 --> T8
+  T9 --> T11 --> T13
+  T10 --> T11
+  T10 --> T12 --> T13
+  T4 --> T14
+  T8 --> T14
+  T13 --> T14
+  T14 --> T15
+
+  classDef critical fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px,color:#fff
+  classDef normal fill:#74c0fc,stroke:#339af0,stroke-width:1px,color:#000

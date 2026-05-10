@@ -202,7 +202,7 @@ test("mah delegate --execute emits lifecycle events to disk", { timeout: 60_000 
     cwd: repoRoot,
     encoding: "utf-8",
     timeout: 50000,
-    env: { ...process.env }
+    env: { ...process.env, MAH_AGENT: "orchestrator", MAH_ACTIVE_CREW: "dev" }
   })
 
   const afterFiles = existsSync(eventsDir)

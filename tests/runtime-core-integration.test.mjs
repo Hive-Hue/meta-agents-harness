@@ -71,7 +71,7 @@ function snapshotPaths(paths) {
 }
 
 function run(args, options = {}) {
-  const env = { ...process.env, ...(options.env || {}) }
+  const env = { ...process.env, MAH_AGENT: "orchestrator", MAH_ACTIVE_CREW: "dev", ...(options.env || {}) }
   delete env.NODE_OPTIONS
   delete env.NODE_TEST_CONTEXT
   delete env.NODE_V8_COVERAGE
@@ -392,9 +392,9 @@ test("kilo explain run resolves to direct cli with injected crew context", (t) =
   assert.match(kiloConfig.agent.orchestrator.prompt, /Current crew id: dev/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Crew name: DevMultiTeam/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Current role: orchestrator/)
-  assert.match(kiloConfig.agent.orchestrator.prompt, /Mission: Deliver bounded v0\.8\.0 Context Memory evolution for Meta Agents Harness/)
-  assert.match(kiloConfig.agent.orchestrator.prompt, /Sprint: v0\.8\.0-context-memory/)
-  assert.match(kiloConfig.agent.orchestrator.prompt, /Target release: v0\.8\.0/)
+  assert.match(kiloConfig.agent.orchestrator.prompt, /Mission:.*Meta Agents Harness/)
+  assert.match(kiloConfig.agent.orchestrator.prompt, /Sprint: v0\.[0-9]+\.[0-9]+[-\w]*/)
+  assert.match(kiloConfig.agent.orchestrator.prompt, /Target release: v0\.\d+\.\d+/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /Prompt source: \.kilo\/crew\/dev\/agents\/orchestrator\.md/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /\[MAH_CONTEXT\]/)
   assert.match(kiloConfig.agent.orchestrator.prompt, /# Orchestrator/)

@@ -13,7 +13,7 @@ const workspaceRoot = process.cwd()
 const metaConfigPath = path.join(workspaceRoot, "meta-agents.yaml")
 const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "openclaude", "hermes"]
 const runtimeMarkerRoots = Object.fromEntries(managedRuntimes.map((runtime) => [runtime, `.${runtime}`]))
-const defaultSharedSkills = ["context_memory"]
+const defaultSharedSkills = ["context_memory", "backlog-operator"]
 
 function fail(message) {
   console.error(`ERROR: ${message}`)

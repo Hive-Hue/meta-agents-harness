@@ -57,7 +57,8 @@ const CONFIDENCE_ADJUSTMENTS = {
 }
 
 const SCORE_EXACT_CAPABILITY = 0.3
-const SCORE_DOMAIN_MATCH = 0.2
+const SCORE_DOMAIN_MATCH_FULL_TOKEN = 0.25
+const SCORE_DOMAIN_MATCH_PARTIAL = 0.2
 const SCORE_PARTIAL_CAPABILITY = 0.1
 const SCORE_MAX = 1.0
 
@@ -68,6 +69,32 @@ const PENALTY_MAX_FAILURES = 2 // max -0.4
 const FRESHNESS_PENALTY_THRESHOLD = 3
 const FRESHNESS_PENALTY = -0.1
 const DEFAULT_THRESHOLD = 0.3
+
+/**
+ * Freshness decay table: graduated penalty for sparse evidence.
+ * 0 evidence = -0.15, 1 = -0.10, 2 = -0.05, 3+ = 0.0
+ * @param {number} evidence_count
+ * @returns {number}
+ */
+function computeFreshnessPenalty(evidence_count) {
+  if (evidence_count === 0) return -0.15
+  if (evidence_count === 1) return -0.10
+  if (evidence_count === 2) return -0.05
+  return 0.0
+}
+
+/**
+ * Compute confidence adjustment based on band and evidence freshness decay.
+ * @param {Object} confidence
+ * @param {number} evidence_count
+ * @returns {{ adjustment: number, freshPenalty: number }}
+ */
+function computeConfidenceAdjustment(confidence, evidence_count) {
+  const band = confidence?.band || 'medium'
+  const adjustment = CONFIDENCE_ADJUSTMENTS[band] ?? 0.0
+  const freshPenalty = computeFreshnessPenalty(evidence_count)
+  return { adjustment, freshPenalty }
+}
 
 const BLOCKED_VALIDATION_STATUSES = ['restricted', 'revoked']
 
@@ -112,13 +139,20 @@ function calculateMatchScore(task, capabilities, domains, input_contract = {}) {
     }
   }
 
-  // Domain match: +0.2 per matched domain
+  // Domain match: +0.25 for full-token match, +0.2 for partial
   for (const domain of domains) {
     const domainLower = domain.toLowerCase()
-    const domainWords = domainLower.split(/\s+/)
-    const domainHit = domainWords.some(w => w.length > 2 && taskTokens.some(t => t.includes(w) || w.includes(t)))
-    if (domainHit) {
-      score += SCORE_DOMAIN_MATCH
+    // Full-token match: domain word appears as complete token in task
+    const fullTokenHit = taskTokens.some(t => t === domainLower || domainLower.split(/\s+/).some(dw => dw === t))
+    if (fullTokenHit) {
+      score += SCORE_DOMAIN_MATCH_FULL_TOKEN
+    } else {
+      // Partial match: domain word appears as substring in task token or vice versa
+      const domainWords = domainLower.split(/\s+/)
+      const partialHit = domainWords.some(w => w.length > 2 && taskTokens.some(t => t.includes(w) || w.includes(t)))
+      if (partialHit) {
+        score += SCORE_DOMAIN_MATCH_PARTIAL
+      }
     }
   }
 
@@ -134,22 +168,6 @@ function calculateMatchScore(task, capabilities, domains, input_contract = {}) {
   }
 
   return Math.min(score, SCORE_MAX)
-}
-
-/**
- * Compute confidence adjustment based on band and evidence count.
- * @param {Object} confidence
- * @param {number} evidence_count
- * @returns {number} adjustment in range [-0.4, +0.1]
- */
-function computeConfidenceAdjustment(confidence, evidence_count) {
-  const band = confidence?.band || 'medium'
-  const adjustment = CONFIDENCE_ADJUSTMENTS[band] ?? 0.0
-
-  // Freshness penalty: low evidence count
-  const freshPenalty = (evidence_count < FRESHNESS_PENALTY_THRESHOLD) ? FRESHNESS_PENALTY : 0.0
-
-  return adjustment + freshPenalty
 }
 
 /**
@@ -308,6 +326,12 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
         penalties_applied: [],
         passed_filters,
         blocked_filters,
+        confidence_details: {
+          evidence_count: expertise.confidence?.evidence_count ?? 0,
+          freshness_penalty: 0,
+          band_adjustment: 0,
+          decay_tier: 'none',
+        },
       }
       continue
     }
@@ -327,6 +351,12 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
         penalties_applied: [],
         passed_filters,
         blocked_filters,
+        confidence_details: {
+          evidence_count: expertise.confidence?.evidence_count ?? 0,
+          freshness_penalty: 0,
+          band_adjustment: 0,
+          decay_tier: 'none',
+        },
       }
       continue
     }
@@ -340,6 +370,12 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
         agent_id: id, match_score: 0, confidence_adjustment: 0, penalty: 0, final_score: 0,
         confidence_band: expertise.confidence?.band || 'medium', penalties_applied: [],
         passed_filters, blocked_filters,
+        confidence_details: {
+          evidence_count: expertise.confidence?.evidence_count ?? 0,
+          freshness_penalty: 0,
+          band_adjustment: 0,
+          decay_tier: 'none',
+        },
       }
       continue
     }
@@ -355,10 +391,11 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
 
     // Compute confidence adjustment
     const evidence_count = expertise.confidence?.evidence_count ?? 0
-    const confidence_adjustment = computeConfidenceAdjustment(
+    const { adjustment: band_adjustment, freshPenalty } = computeConfidenceAdjustment(
       expertise.confidence || {},
       evidence_count
     )
+    const confidence_adjustment = band_adjustment + freshPenalty
 
     // Compute penalties
     // In v0.7.0 evidence store is not integrated; use empty array
@@ -387,6 +424,12 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
       penalties_applied,
       passed_filters,
       blocked_filters,
+      confidence_details: {
+        evidence_count,
+        freshness_penalty: freshPenalty,
+        band_adjustment,
+        decay_tier: evidence_count === 0 ? 'none' : evidence_count < 3 ? 'sparse' : 'robust',
+      },
     }
 
     ranked.push({ id, score: scores[id] })
@@ -397,7 +440,17 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
 
   const filteredCount = candidates.length - ranked.length
 
-  // --- Phase 3: Build result ---
+  // --- Phase 3: Compute routing signals ---
+  const candidate_depth = ranked.length
+  const topScore = ranked[0]?.score?.final_score || 0
+  const secondScore = ranked[1]?.score?.final_score || 0
+  const bottomScore = ranked[ranked.length - 1]?.score?.final_score || 0
+  const diversity_score = ranked.length >= 2 ? Math.min(1, topScore - bottomScore) : 0
+  const margin = ranked.length >= 2 ? topScore - secondScore : topScore
+  const consensus = ranked.length >= 2 && margin < 0.1
+  const routing_signals = { diversity_score, margin, consensus, candidate_depth }
+
+  // --- Phase 4: Build result ---
   const top = ranked[0] || null
   const escalation = !top || top.score.final_score < threshold
 
@@ -446,6 +499,7 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
     selected_reason: selectedReason,
     fallback_triggered: escalation,
     fallback_reason: fallbackReason,
+    routing_signals,
     timestamp: new Date().toISOString(),
   }
 
@@ -455,6 +509,7 @@ export function scoreCandidates({ task, sourceAgent, candidates, options = {} })
     explain,
     escalation,
     fallback_reason: fallbackReason,
+    routing_signals,
   }
 }
 

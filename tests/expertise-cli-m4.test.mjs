@@ -46,7 +46,7 @@ function runExpertise(args) {
       encoding: 'utf-8',
       timeout: 15000,
       cwd: repoRoot,
-      env: { ...process.env, MAH_ACTIVE_CREW: 'dev', MAH_EXPERTISE_EVIDENCE_ROOT: evidenceRoot }
+      env: { ...process.env, MAH_ACTIVE_CREW: 'dev', MAH_AGENT: 'orchestrator', MAH_EXPERTISE_EVIDENCE_ROOT: evidenceRoot }
     })
     return { stdout, stderr: '', status: 0 }
   } catch (err) {

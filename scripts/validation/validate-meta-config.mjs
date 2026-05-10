@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, "..", "..")
 const workspaceRoot = resolveWorkspaceRoot(process.cwd())
 const configPath = path.join(workspaceRoot, "meta-agents.yaml")
-const defaultSharedSkills = ["context_memory"]
+const defaultSharedSkills = ["context_memory", "backlog-operator"]
 
 const runtimeDetectionSchema = z.object({
   order: z.array(z.enum(["forced", "marker", "cli"])).min(1),

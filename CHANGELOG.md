@@ -5,7 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
 
-## [Unreleased] (target: v0.9.0)
+## v0.10.0 — Post-v0.9.0 Evolution (2026-05-09)
+
+### Three Pillars
+
+**Vector-aware Context Memory**
+- `scripts/context/vector-adapter.mjs` — checks qmd/pvector availability, queries vector store or falls back to file-based retrieval; same `RetrievalResult` shape for both paths
+- `scripts/context/pvector-proxy.py` — FastAPI proxy bridging MAH's pvector REST contract to Qdrant vector search with auto-embedding via `sentence-transformers` (all-MiniLM-L6-v2, 384d)
+- `scripts/context/pvector-proxy/pyproject.toml` — Python project config with `fastapi`, `httpx`, `uvicorn`, optional `sentence-transformers` embed extra
+- `scripts/context/index-to-qdrant.py` — indexes `.mah/context/operational/` docs into Qdrant using all-MiniLM-L6-v2 embeddings (384d cosine)
+- `scripts/context/pvector-setup.sh` — one-shot setup: installs dependencies, creates Qdrant collection `mah-context` (384d cosine)
+- `scripts/context/retrieval-benchmark.mjs` — benchmarks vector vs file-based retrieval: provider, elapsed_ms, scores, Jaccard overlap, speedup ratio
+- CLI-gated by `MAH_VECTOR_RETRIEVAL=1` / `MAH_PVECTOR_URL` env vars; no mandatory vector store dependency
+- Qdrant 1.18+ support with `indexing_threshold_kb` optimizer config for small datasets
+- Integration tests for adapter fallback and retrieval correctness
+
+**Enhanced Expertise Foundation**
+- Confidence scoring + richer routing signals in expertise-routing.mjs
+- Expertise routing explainability surface (why agent X chosen for task Y)
+- Governed expertise learning loops (proposal/review/promote lifecycle)
+- Integration tests for routing explain + confidence + governance
+
+**WebUI Console**
+- Run/session management console (start/stop/inspect/resume)
+- Tasks/mission tracking console (list/status/filter/drill-down)
+- Integration tests for WebUI console workflows
+
+**Bounded Governance Add-ons (from v0.9 S8)**
+- `--goal` flag for run/session goal binding
+- `cost_summary` in completed lifecycle events
+- Governance signals (approval_required, supervision_required, confidential_execution) surfaced in expertise explain and routed events
+
+**PI Lifecycle Events (from v0.9 Phase 3 Slice 2)**
+- `delegate_agent` and `delegate_agents_parallel` emit queued/completed/failed lifecycle events
+- Session ID mapping via currentSessionId()
+
+**Bug Fixes**
+- Fixed ReferenceError: goal not defined in meta-agents-harness.mjs (non-cooperative run path)
+
+**Non-Regression**
+- Vector: 85/85 tests pass
+- Expertise: 283/283 tests pass
+- WebUI: 84/84 tests pass
+
+## [0.9.0] - 2026-05-08
 
 ### Added
 

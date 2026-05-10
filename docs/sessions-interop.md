@@ -142,3 +142,41 @@ For sessions created before v0.6.0:
 ### Session Bridge (`scripts/session/session-bridge.mjs`)
 
 - `bridgeSession(repoRoot, sourceSessionId, targetRuntime, options)` — high-level bridge
+
+## v0.10.0 — Goal Binding & Lifecycle Events
+
+### Goal Binding (`--goal` flag)
+
+Sessions can now be bound to a specific goal via `--goal`:
+
+```bash
+mah run --goal "Implement vector adapter" --agent solution-architect
+mah session resume <session-id> --goal "Continue vector adapter"
+```
+
+The goal is persisted in the session envelope and injected into subsequent turns. When a goal is set, the session context includes the goal in the system prompt to maintain task alignment.
+
+### Cost Summary in Lifecycle Events
+
+Completed lifecycle events now include a `cost_summary` field:
+
+```json
+{
+  "event": "completed",
+  "cost_summary": {
+    "total_tokens": 42500,
+    "prompt_tokens": 38000,
+    "completion_tokens": 4500,
+    "estimated_cost_usd": 0.12
+  }
+}
+```
+
+### PI Lifecycle Events
+
+`delegate_agent` and `delegate_agents_parallel` now emit structured lifecycle events:
+- `queued` — delegation enqueued, waiting for target agent
+- `completed` — target agent returned result successfully
+- `failed` — target agent errored or timed out
+
+Each event carries `currentSessionId()` for cross-referencing with the parent session.

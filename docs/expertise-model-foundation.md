@@ -171,3 +171,26 @@ Original `v0.3.0` note captured rename and early stabilization. Current document
 - [`plan/done/expertise-integration-v0.8.0.md`](../plan/done/expertise-integration-v0.8.0.md)
 - [`specs/meta-agents-harness-expertise-model-spec.md`](../specs/meta-agents-harness-expertise-model-spec.md)
 - [`CHANGELOG.md`](../CHANGELOG.md)
+
+## v0.10.0 — Confidence Scoring & Governance
+
+### Confidence Scoring
+
+Expertise routing now produces per-agent confidence scores based on skill match strength, domain overlap, and historical success rate. The `explain` surface surfaces these scores alongside the routing decision rationale.
+
+### Governance Signal Surfacing
+
+Three governance signals are now surfaced in expertise explain output and routed events:
+- `approval_required` — task requires human approval before execution
+- `supervision_required` — task should run under human supervision
+- `confidential_execution` — task contains sensitive data requiring restricted logging
+
+### Governed Learning Loop
+
+Expertise learning follows a governed proposal/review/promote lifecycle:
+
+1. **Proposal** — `mah context propose --from-session <session>` extracts candidate expertise entries
+2. **Review** — human reviews proposals in `.mah/context/proposed/`; entries include a `confidence_change` field showing projected routing impact
+3. **Promote** — approved entries move to `.mah/context/operational/` and are indexed for retrieval
+
+No expertise entry is promoted without explicit human approval. This prevents automatic expertise drift and ensures routing quality compounds through deliberate curation.

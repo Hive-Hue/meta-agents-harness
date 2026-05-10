@@ -9,6 +9,7 @@ const defaultPackageRoot = path.resolve(__dirname, "..")
 export const CANONICAL_MAH_SKILLS = [
   "active-listener",
   "bootstrap",
+  "backlog-operator",
   "caveman",
   "caveman-commit",
   "caveman-crew",

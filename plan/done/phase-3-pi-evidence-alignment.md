@@ -1,8 +1,10 @@
 # Phase 3 — PI Evidence Alignment Slice Plan
 
-**Status:** draft
+**Status:** Slice 1 delivered; Slice 2 deferred
 **Author:** solution-architect
 **Date:** 2026-04-24
+
+> **Post-release note (2026-05-09):** Slice 1 (shared-evidence-pipeline) was delivered — `scripts/expertise/evidence/evidence-pipeline.mjs` exists and is used by both PI (`extensions/multi-team.ts`) and CLI (`scripts/meta-agents-harness.mjs`). Slice 2 (pi-lifecycle-events) was not implemented in v0.9 and remains deferred.
 
 ## Background
 
@@ -95,17 +97,17 @@ Same pattern, inside the per-target loop.
 
 ### Acceptance Criteria
 
-- [ ] `scripts/expertise/evidence/evidence-pipeline.mjs` exists and exports `recordDelegationEvidence`
-- [ ] PI `delegate_agent` no longer calls `recordEvidence` directly — calls `recordDelegationEvidence`
-- [ ] PI `delegate_agents_parallel` no longer calls `recordEvidence` directly — calls `recordDelegationEvidence`
-- [ ] CLI `meta-agents-harness.mjs` imports `recordDelegationEvidence` from pipeline, local function removed
-- [ ] Evidence records from PI contain `execution_result` field with canonical `AgentExecutionResult` shape
-- [ ] Evidence records from PI contain `id`, `recorded_at`, `quality_signals`
-- [ ] Existing PI session tracking (events.jsonl, conversation.jsonl, etc.) untouched
-- [ ] Best-effort error handling preserved — try/catch around every evidence call
-- [ ] `deriveTaskType` no longer duplicated — single canonical in pipeline
-- [ ] Smoke test: `mah delegate` via CLI still records evidence correctly
-- [ ] Build passes (`tsc --noEmit` for multi-team.ts if applicable)
+- [x] `scripts/expertise/evidence/evidence-pipeline.mjs` exists and exports `recordDelegationEvidence`
+- [x] PI `delegate_agent` no longer calls `recordEvidence` directly — calls `recordDelegationEvidence`
+- [x] PI `delegate_agents_parallel` no longer calls `recordEvidence` directly — calls `recordDelegationEvidence`
+- [x] CLI `meta-agents-harness.mjs` imports `recordDelegationEvidence` from pipeline, local function removed
+- [x] Evidence records from PI contain `execution_result` field with canonical `AgentExecutionResult` shape
+- [x] Evidence records from PI contain `id`, `recorded_at`, `quality_signals`
+- [x] Existing PI session tracking (events.jsonl, conversation.jsonl, etc.) untouched
+- [x] Best-effort error handling preserved — try/catch around every evidence call
+- [x] `deriveTaskType` no longer duplicated — single canonical in pipeline
+- [x] Smoke test: `mah delegate` via CLI still records evidence correctly
+- [x] Build passes (`tsc --noEmit` for multi-team.ts if applicable)
 
 ### Risks
 
@@ -123,6 +125,8 @@ Same pattern, inside the per-target loop.
 ### Name
 
 `pi-lifecycle-events`
+
+> **Status:** Not delivered in v0.9. Deferred to future work.
 
 ### Scope
 

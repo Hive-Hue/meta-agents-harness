@@ -332,3 +332,253 @@
   font-size: 12px;
   font-family: var(--font-mono);
 }
+
+/* ============================================
+   T11: Session Console — new styles
+   ============================================ */
+
+/* New Run button */
+.sessions-new-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0a0a0a;
+  color: #fff;
+  border: 1px solid #0a0a0a;
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.sessions-new-run-btn:hover {
+  background: #333;
+}
+
+/* Actions column in table */
+.actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.session-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  padding: 5px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.session-action-btn:hover {
+  border-color: var(--color-text-dim);
+  color: var(--color-text);
+}
+
+.session-action-btn--danger:hover {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.session-action-btn--resume:hover {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+/* Session Inspector Panel */
+.session-inspector__session-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: #212121ff;
+  margin: 2px 0 0;
+}
+
+.session-inspector__goal {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #f0f7f8;
+  border: 1px solid #d0d7d9;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  color: var(--color-text);
+}
+
+.session-inspector__goal .icon {
+  color: var(--color-secondary-cyan);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.session-inspector__goal-text {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.session-inspector__cost {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-inspector__cost-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.session-inspector__cost-row span {
+  color: var(--color-text-muted);
+}
+
+.session-inspector__cost-row strong {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+}
+
+.session-inspector__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 12px 0 8px;
+}
+
+.session-inspector__timeline {
+  margin: 8px 0;
+}
+
+.session-inspector__timeline .timeline-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.timeline-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.timeline-item:last-child {
+  border-bottom: none;
+}
+
+.timeline-item__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-item__event {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.timeline-item__time {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.timeline-item__agent,
+.timeline-item__conf,
+.timeline-item__exit,
+.timeline-item__reason,
+.timeline-item__cost {
+  font-size: 11px;
+  color: var(--color-text-dim);
+}
+
+.session-inspector__loading {
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* Start Run Modal */
+.start-run-modal {
+  width: 520px;
+}
+
+.start-run-modal .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.start-run-modal .modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.start-run-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.start-run-modal__field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.start-run-modal__field input,
+.start-run-modal__field select,
+.start-run-modal__field textarea {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: var(--font-ui);
+  background: var(--color-surface);
+  color: var(--color-text);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.start-run-modal__field textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.start-run-modal__field input:focus,
+.start-run-modal__field select:focus,
+.start-run-modal__field textarea:focus {
+  outline: none;
+  border-color: var(--color-secondary-cyan);
+}

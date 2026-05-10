@@ -1,8 +1,10 @@
 # Context Memory Finalization Slices
 
 **Version:** 0.8.0-followup  
-**Status:** proposed  
+**Status:** completed (all slices delivered in v0.9)  
 **Purpose:** unify the remaining executable slices required to finish Context Memory
+
+> **Post-release note (2026-05-09):** All three slices (S1 Runtime Visibility, S2 Proposal Governance, S3 Assistant-State) were delivered in v0.9. Context Memory finalization is complete. This document is retained for historical reference.
 
 ## 1. Overview
 
@@ -97,11 +99,13 @@ Rationale:
 
 | Slice | Milestone | Status | Outcome |
 |---|---|---|---|
-| S1 | M3 remainder | proposed | Make retrieved Context Memory visible in explain surfaces before runtime execution |
-| S2 | M5 remainder | proposed | Turn proposal drafts into a governed review, reject, and promote workflow |
-| S3 | M6 | proposed | Expose a canonical runtime-agnostic assistant-state surface |
+| S1 | M3 remainder | delivered | Make retrieved Context Memory visible in explain surfaces before runtime execution |
+| S2 | M5 remainder | delivered | Turn proposal drafts into a governed review, reject, and promote workflow |
+| S3 | M6 | delivered | Expose a canonical runtime-agnostic assistant-state surface |
 
 ## 5. Slice S1 — Runtime Visibility
+
+**Current status:** delivered
 
 ### Goal
 
@@ -204,6 +208,8 @@ Out of scope:
 S1 is complete when the operator can inspect the exact bounded Context Memory retrieval result for a run without starting the runtime and without reading internal code.
 
 ## 6. Slice S2 — Proposal Governance
+
+**Current status:** delivered
 
 ### Goal
 
@@ -313,6 +319,8 @@ Out of scope:
 S2 is complete when proposal creation, review, rejection, and promotion form a complete governed operator workflow with traceable state transitions.
 
 ## 7. Slice S3 — Assistant-State Base
+
+**Current status:** delivered
 
 ### Goal
 

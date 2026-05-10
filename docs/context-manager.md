@@ -302,3 +302,15 @@ CLI entry via scripts/meta-agents-harness.mjs
 - Expertise Model Foundation ./expertise-model-foundation.md
 - Sessions Interop ./sessions-interop.md
 - Runtime Boundary ./runtime-boundary.md
+
+## v0.10.0 — Vector-aware Retrieval
+
+MAH supports optional qmd/pvector adapters for vector-aware context retrieval. When no vector store is available, retrieval gracefully falls back to canonical file-based search.
+
+### Enabling Vector Retrieval
+
+Set `qmd` or `pvector` adapter path in `meta-agents.yaml` domain profiles. When the adapter is present and a vector store is available, queries use vector similarity. When unavailable, MAH falls back to file-based retrieval automatically.
+
+### Benchmarks
+
+Run `mah context benchmark` to compare vector vs file-based retrieval paths for your corpus.
