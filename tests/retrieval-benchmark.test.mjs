@@ -3,7 +3,7 @@
  * Compares vector vs file-based retrieval paths for the same queries.
  * Run: node --test tests/retrieval-benchmark.test.mjs
  */
-import { describe, test, beforeEach } from "node:test"
+import { describe, test, beforeEach, afterEach } from "node:test"
 import assert from "node:assert/strict"
 import path from "path"
 import { fileURLToPath } from "node:url"
@@ -180,6 +180,20 @@ const BENCHMARK_QUERIES = [
 // ---------------------------------------------------------------------------
 
 describe("Retrieval Benchmark", () => {
+  const originalQmdPath = process.env.MAH_QMD_PATH
+  const originalPvectorUrl = process.env.MAH_PVECTOR_URL
+
+  beforeEach(() => {
+    process.env.MAH_QMD_PATH = "__qmd_missing_for_test__"
+    delete process.env.MAH_PVECTOR_URL
+  })
+
+  afterEach(() => {
+    if (originalQmdPath === undefined) delete process.env.MAH_QMD_PATH
+    else process.env.MAH_QMD_PATH = originalQmdPath
+    if (originalPvectorUrl === undefined) delete process.env.MAH_PVECTOR_URL
+    else process.env.MAH_PVECTOR_URL = originalPvectorUrl
+  })
 
   describe("T1: File-based retrieval completes for standard request", () => {
     for (const q of BENCHMARK_QUERIES.slice(0, 3)) {

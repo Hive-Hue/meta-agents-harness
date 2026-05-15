@@ -4,7 +4,7 @@
  * benchmark validation, and non-regression on existing context memory.
  * Run: node --test tests/vector-adapter-integration.test.mjs
  */
-import { describe, test, beforeEach } from "node:test"
+import { describe, test, beforeEach, afterEach } from "node:test"
 import assert from "node:assert/strict"
 import path from "path"
 import { fileURLToPath } from "node:url"
@@ -135,6 +135,20 @@ const MOCK_INDEX = { entries: MOCK_INDEX_ENTRIES }
 // ---------------------------------------------------------------------------
 
 describe("Vector Adapter Integration", () => {
+  const originalQmdPath = process.env.MAH_QMD_PATH
+  const originalPvectorUrl = process.env.MAH_PVECTOR_URL
+
+  beforeEach(() => {
+    process.env.MAH_QMD_PATH = "__qmd_missing_for_test__"
+    delete process.env.MAH_PVECTOR_URL
+  })
+
+  afterEach(() => {
+    if (originalQmdPath === undefined) delete process.env.MAH_QMD_PATH
+    else process.env.MAH_QMD_PATH = originalQmdPath
+    if (originalPvectorUrl === undefined) delete process.env.MAH_PVECTOR_URL
+    else process.env.MAH_PVECTOR_URL = originalPvectorUrl
+  })
 
   // ========================================================================
   // 1. Adapter Interface Contract

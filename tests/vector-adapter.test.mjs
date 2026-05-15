@@ -3,7 +3,7 @@
  * Verify vector retrieval adapter with graceful fallback
  * Run: node --test tests/vector-adapter.test.mjs
  */
-import { describe, it } from "node:test"
+import { describe, it, beforeEach, afterEach } from "node:test"
 import assert from "node:assert/strict"
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
@@ -25,6 +25,21 @@ const {
 } = await import("../scripts/context/context-memory-schema.mjs")
 
 describe("Vector Adapter", () => {
+  const originalQmdPath = process.env.MAH_QMD_PATH
+  const originalPvectorUrl = process.env.MAH_PVECTOR_URL
+
+  beforeEach(() => {
+    // Keep tests deterministic regardless of local qmd/pvector setup.
+    process.env.MAH_QMD_PATH = "__qmd_missing_for_test__"
+    delete process.env.MAH_PVECTOR_URL
+  })
+
+  afterEach(() => {
+    if (originalQmdPath === undefined) delete process.env.MAH_QMD_PATH
+    else process.env.MAH_QMD_PATH = originalQmdPath
+    if (originalPvectorUrl === undefined) delete process.env.MAH_PVECTOR_URL
+    else process.env.MAH_PVECTOR_URL = originalPvectorUrl
+  })
 
   describe("checkVectorAvailability", () => {
     it("returns available=false when no qmd/pvector installed", () => {

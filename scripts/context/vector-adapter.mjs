@@ -50,21 +50,11 @@ export function checkVectorAvailability(options = {}) {
     }
   }
 
-  // Check for pvector service URL
+  // If pvector URL is configured, treat adapter as available.
+  // Connectivity is verified during query execution (queryPvector),
+  // where failures naturally fall back to file-based retrieval.
   if (pvectorUrl) {
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 3000)
-      const response = fetch(pvectorUrl + "/health", {
-        signal: controller.signal,
-        method: "GET",
-      })
-      clearTimeout(timeout)
-      // If fetch succeeds, pvector is available
-      return { available: true, provider: "pvector", reason: "pvector service reachable" }
-    } catch {
-      // not available
-    }
+    return { available: true, provider: "pvector", reason: "pvector url configured" }
   }
 
   return { available: false, provider: null, reason: "no qmd binary or pvector service found" }
