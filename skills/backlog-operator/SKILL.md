@@ -31,7 +31,8 @@ Backlog operations must reflect real execution. Never mark a task as done withou
 3. Mark execution start:
    - `mah task update <id> --payload '{"state":"in_progress","lastUpdate":"<iso8601>"}' --json`
 4. Execute task:
-   - `mah task run --id <id> --json`
+   - CLI path: `mah task run --id <id> --json`
+   - UI path (`/run`): open prefilled run from selected task and execute from Run Console
 5. Reconcile final state:
    - success: `state=done`
    - blocked: `state=blocked` + `blockedReason`
@@ -54,4 +55,4 @@ Backlog operations must reflect real execution. Never mark a task as done withou
 - Do not execute tasks outside the requested mission/backlog scope
 - If runtime/tooling fails, persist the failure reason in task state
 - Avoid speculative updates; status must mirror command outcomes
-
+- Running a task must not create a new backlog task implicitly. If a new task appears, treat as regression and report it.

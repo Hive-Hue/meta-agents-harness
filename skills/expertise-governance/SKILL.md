@@ -24,7 +24,7 @@ Do NOT use this skill when:
 
 ## Core Principle
 
-**Automation is for preparation. Humans still approve.** The orchestrator prepares proposals, the governance workflow remains human-reviewed before applying. Auto-apply is disabled by design.
+**Automation is for preparation. Humans still approve.** The orchestrator prepares proposals, and every proposal is human-reviewed before apply. Auto-apply is disabled by design.
 
 ## Table of Contents
 
@@ -43,7 +43,7 @@ Do NOT use this skill when:
 
 ```
 Step 1  mah expertise seed [--force]
-Step 2  (automatic — pi runtime records evidence after each delegation)
+Step 2  (record evidence — automatic in pi, runtime-dependent elsewhere)
 Step 3  mah expertise sync --dry-run    ← orchestrator reviews preview
 Step 4  mah expertise sync             ← orchestrator executes
 Step 5  mah expertise propose --from-evidence [--evidence-limit N]  ← per agent
@@ -70,11 +70,13 @@ mah expertise seed [--force]
 
 Use `--force` to overwrite existing entries with fresh declarations from `meta-agents.yaml`.
 
-### Step 2 — Record (automatic)
+### Step 2 — Record (runtime-specific)
 
-Pi runtime records evidence after each `delegate_agent` / `delegate_agents_parallel` call. No operator action needed.
+- `pi`: records evidence automatically after each `delegate_agent` / `delegate_agents_parallel` call.
+- Other runtimes (`codex`, `openclaude`, `opencode`, `hermes`): evidence capture may depend on runtime adapters and session exporters.
+- If automatic evidence is missing, do not assume no work happened; verify session artifacts/logs first, then run sync/propose only with confirmed evidence.
 
-Evidence files land in `.mah/expertise/evidence/<crew>/<agent>/`.
+Evidence files (when recorded) land in `.mah/expertise/evidence/<crew>/<agent>/`.
 
 ### Step 3 — Preview Sync
 
@@ -200,11 +202,7 @@ A human must review proposals before apply when ANY of:
 - Confidence change > 0.2 in either direction
 - New capability keywords are unsubstantiated (keyword-only detection, no lesson backing)
 
-A proposal can be applied without human review only when:
-
-- Only `confidence` score is being updated (within ±0.15)
-- No `validation_status`, `trust_tier`, or `lifecycle` changes
-- No new capability keywords are being added
+A proposal must always be human-reviewed before apply.
 
 ---
 
