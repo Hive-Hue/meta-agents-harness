@@ -305,12 +305,262 @@ CLI entry via scripts/meta-agents-harness.mjs
 
 ## v0.10.0 — Vector-aware Retrieval
 
-MAH supports optional qmd/pvector adapters for vector-aware context retrieval. When no vector store is available, retrieval gracefully falls back to canonical file-based search.
+MAH supports optional qmd/pvector adapters for semantic retrieval. Vector retrieval is additive: when unavailable or unhealthy, MAH gracefully falls back to canonical file-based retrieval.
 
-### Enabling Vector Retrieval
+### Runtime Flags
 
-Set `qmd` or `pvector` adapter path in `meta-agents.yaml` domain profiles. When the adapter is present and a vector store is available, queries use vector similarity. When unavailable, MAH falls back to file-based retrieval automatically.
+- `MAH_VECTOR_RETRIEVAL=1` enables vector-first path for `mah context find`.
+- `MAH_PVECTOR_URL=http://localhost:8080` points MAH to a pvector-compatible HTTP service.
+- `MAH_PVECTOR_COLLECTION=mah-context` sets the collection/logical index.
+- `MAH_QMD_PATH=qmd` optionally points to a qmd binary adapter.
+- `MAH_PGVECTOR_DSN=postgresql://mah:mah@localhost:5432/mah_context` configures pgvector proxy DB access.
+- `MAH_PGVECTOR_TABLE=context_vectors` sets the pgvector table used by the native proxy.
+- `MAH_PGVECTOR_COLLECTION_MODE=none|column|payload` controls how collection filtering is applied in pgvector.
+
+When vector path is disabled or unavailable, output still succeeds with `retrieval_provider: "file-based"` and lexical matches.
+
+### Option A: Qdrant via Docker (Ready Path)
+
+This repository already includes scripts for Qdrant indexing plus a pvector-compatible proxy.
+
+1. Start Qdrant:
+
+```bash
+docker run -d \
+  --name mah-qdrant \
+  -p 6333:6333 \
+  -p 6334:6334 \
+  -v "$(pwd)/.mah/qdrant-storage:/qdrant/storage" \
+  qdrant/qdrant
+```
+
+2. Install proxy dependencies:
+
+```bash
+scripts/context/pvector-setup.sh
+```
+
+3. Start pvector proxy:
+
+```bash
+uv run --project scripts/context/pvector-proxy/pyproject.toml \
+  python scripts/context/pvector-proxy.py
+```
+
+4. Export runtime variables:
+
+```bash
+export MAH_VECTOR_RETRIEVAL=1
+export MAH_PVECTOR_URL=http://localhost:8080
+export MAH_PVECTOR_COLLECTION=mah-context
+export QDRANT_URL=http://localhost:6333
+```
+
+5. Index operational corpus into Qdrant:
+
+```bash
+python scripts/context/index-to-qdrant.py
+```
+
+Note: `index-to-qdrant.py` recreates the target collection before upsert.
+
+6. Validate retrieval:
+
+```bash
+mah context find --agent planning-lead --task "triage backlog" --json
+```
+
+### Option B: qmd CLI (Direct Adapter)
+
+MAH can call `qmd` directly when the binary is available. The adapter tries multiple command variants (`query/search`, with and without `--limit`) for compatibility across versions.
+
+#### Installation
+
+1. Install a supported runtime (Node.js >= 22 or Bun):
+
+```bash
+node --version
+# or
+bun --version
+```
+
+2. Install qmd globally:
+
+```bash
+npm install -g @tobilu/qmd
+# or
+bun install -g @tobilu/qmd
+```
+
+3. Verify install:
+
+```bash
+qmd --version
+```
+
+#### Setup + Run (Quick Path)
+
+1. Set runtime flags:
+
+```bash
+export MAH_VECTOR_RETRIEVAL=1
+export MAH_QMD_PATH=qmd
+```
+
+2. Optional health/smoke check:
+
+```bash
+qmd query --json "triage backlog"
+```
+
+3. Run MAH retrieval:
+
+```bash
+mah context find --agent planning-lead --task "triage backlog" --json
+```
+
+Note:
+- qmd corpus/index lifecycle is managed by qmd itself. Ensure qmd has indexed the target content before running MAH semantic retrieval.
+- When qmd returns semantic hits, MAH normalizes result IDs using source filename/path metadata (for example `qmd://.../file.md`) instead of opaque fallback IDs like `qmd-result-N`.
+- If qmd returns no semantic hits, MAH gracefully falls back to lexical `file-based` retrieval and still returns the canonical Context Manager response shape.
+
+### Option C: pgvector via Docker (Native Proxy)
+
+This repository now ships a first-party pgvector proxy with the same pvector contract expected by MAH:
+- `GET /health`
+- `POST /query` with `{ "query": "...", "vector": [..] | null, "top_n": 5, "collection": "..." }`
+
+#### Installation
+
+1. Install required tools and verify:
+
+```bash
+docker --version
+python3 --version
+uv --version
+```
+
+2. If `uv` is missing, install it:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+3. Ensure Docker daemon is running before setup/index/proxy commands.
+
+#### Setup + Run (Quick Path)
+
+1. Setup Postgres + schema + proxy dependencies:
+
+```bash
+scripts/context/pvector-pgvector-setup.sh
+```
+
+2. Set runtime flags:
+
+```bash
+export MAH_VECTOR_RETRIEVAL=1
+export MAH_PVECTOR_URL=http://localhost:8080
+export MAH_PVECTOR_COLLECTION=mah-context
+export MAH_PGVECTOR_DSN=postgresql://mah:mah@localhost:5432/mah_context
+export MAH_PGVECTOR_TABLE=context_vectors
+export MAH_PGVECTOR_COLLECTION_MODE=column
+```
+
+3. Start native pgvector proxy:
+
+```bash
+uv run --project scripts/context/pvector-pgvector-proxy/pyproject.toml \
+  python scripts/context/pvector-pgvector-proxy.py
+```
+
+4. Validate proxy health:
+
+```bash
+curl -s http://localhost:8080/health
+```
+
+5. Index operational corpus into pgvector:
+
+```bash
+python scripts/context/index-to-pgvector.py
+```
+
+6. Run MAH retrieval:
+
+```bash
+mah context find --agent planning-lead --task "triage backlog" --json
+```
+
+#### Manual Docker Path (Equivalent)
+
+If you prefer manual commands instead of the setup script:
+
+1. Start Postgres with pgvector:
+
+```bash
+docker run -d \
+  --name mah-pgvector \
+  -e POSTGRES_USER=mah \
+  -e POSTGRES_PASSWORD=mah \
+  -e POSTGRES_DB=mah_context \
+  -p 5432:5432 \
+  -v "$(pwd)/.mah/pgvector-data:/var/lib/postgresql/data" \
+  pgvector/pgvector:pg16
+```
+
+2. Initialize extension and table:
+
+```bash
+psql "postgresql://mah:mah@localhost:5432/mah_context" <<'SQL'
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS context_vectors (
+  id text PRIMARY KEY,
+  collection text NOT NULL DEFAULT 'mah-context',
+  embedding vector(384) NOT NULL,
+  payload jsonb NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX IF NOT EXISTS context_vectors_embedding_idx
+  ON context_vectors
+  USING ivfflat (embedding vector_cosine_ops)
+  WITH (lists = 100);
+SQL
+```
+
+3. Scoring query used by native proxy:
+
+```sql
+SELECT
+  id,
+  1 - (embedding <=> $1::vector) AS score,
+  payload AS metadata
+FROM context_vectors
+ORDER BY embedding <=> $1::vector
+LIMIT $2;
+```
+
+Important:
+- Use the same embedding model and dimension on indexing/query paths (repo defaults to `all-MiniLM-L6-v2`, 384d).
+- Point MAH to proxy URL using `MAH_PVECTOR_URL`, then enable `MAH_VECTOR_RETRIEVAL=1`.
 
 ### Benchmarks
 
-Run `mah context benchmark` to compare vector vs file-based retrieval paths for your corpus.
+Run benchmark script directly:
+
+```bash
+node scripts/context/retrieval-benchmark.mjs
+```
+
+### Troubleshooting
+
+- If vector service is down, MAH should still return results via lexical fallback.
+- Confirm health endpoint:
+  - `curl -s http://localhost:8080/health`
+- Confirm Qdrant reachable:
+  - `curl -s http://localhost:6333/collections`
+- If `mah context find` shows file-based provider while vector is expected, verify:
+  - `MAH_VECTOR_RETRIEVAL=1`
+  - `MAH_PVECTOR_URL` points to a healthy proxy/service
+  - collection/index contains vectors.

@@ -155,35 +155,70 @@ export function scoreDocumentsLexical(request, indexEntries) {
 async function queryQmd(request, options = {}) {
   const { timeout_ms = 8000, qmdPath = process.env.MAH_QMD_PATH || "qmd" } = options
   const queryText = buildQueryText(request)
+  const topN = Math.max(1, Number.parseInt(String(request.top_n || 5), 10) || 5)
+  const commandVariants = [
+    ["query", "--json", "--limit", String(topN), queryText],
+    ["query", "--json", queryText],
+    ["search", "--json", "--limit", String(topN), queryText],
+    ["search", "--json", queryText],
+  ]
 
-  const child = spawnSync(qmdPath, ["query", "--json", queryText], {
-    timeout: timeout_ms,
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-  })
-
-  if (child.status !== 0 || !child.stdout) {
-    throw new Error(`qmd query failed: exit ${child.status}`)
-  }
-
-  try {
-    const parsed = JSON.parse(child.stdout)
-    // Map qmd output format to RetrievalResult format
-    // qmd returns { results: [{ id, score, text }] }
-    if (!parsed.results || !Array.isArray(parsed.results)) {
-      return []
-    }
-    return parsed.results.map((r) => {
-      const sim = (r.score ?? r.similarity)?.toFixed(2) || "unknown"
-      return {
-        id: r.id || r.doc_id || `qmd-result-${Math.random()}`,
-        score: typeof r.score === "number" ? r.score : (r.similarity || 0),
-        reasons: r.reasons || [`similarity:${sim}`],
-      }
+  let lastErr = null
+  for (const args of commandVariants) {
+    const child = spawnSync(qmdPath, args, {
+      timeout: timeout_ms,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
     })
-  } catch {
-    throw new Error("qmd output parse failed")
+
+    if (child.status !== 0 || !child.stdout) {
+      lastErr = `args=${JSON.stringify(args)} exit=${child.status}`
+      continue
+    }
+
+    try {
+      const parsed = JSON.parse(child.stdout)
+      const items = extractQmdResults(parsed)
+      if (items.length === 0) return []
+      return items.map((r, idx) => {
+        const sourceFile = pickFirstString(
+          r?.file,
+          r?.path,
+          r?.filepath,
+          r?.filename,
+          r?.source,
+          r?.document,
+          r?.metadata?.file,
+          r?.metadata?.path,
+          r?.metadata?.filepath,
+          r?.metadata?.filename,
+        )
+        const resolvedId = pickFirstString(
+          r?.id,
+          r?.doc_id,
+          r?.document_id,
+          sourceFile,
+        ) || `qmd-result-${idx}`
+        const numericScore = typeof r.score === "number"
+          ? r.score
+          : (typeof r.similarity === "number" ? r.similarity : 0)
+        const sim = Number.isFinite(numericScore) ? numericScore.toFixed(2) : "unknown"
+        return {
+          id: resolvedId,
+          score: numericScore,
+          metadata: {
+            ...(r.metadata || {}),
+            ...(sourceFile ? { file: sourceFile } : {}),
+          },
+          reasons: r.reasons || [`similarity:${sim}`],
+        }
+      })
+    } catch {
+      lastErr = `args=${JSON.stringify(args)} parse_failed`
+    }
   }
+
+  throw new Error(`qmd query failed: ${lastErr || "no working command variant"}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -206,13 +241,16 @@ async function queryPvector(request, options = {}) {
   const timeout = setTimeout(() => controller.abort(), timeout_ms)
 
   try {
+    const topN = Math.max(1, Number.parseInt(String(request.top_n || 5), 10) || 5)
     const response = await fetch(pvectorUrl + "/query", {
       method: "POST",
       signal: controller.signal,
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         query: queryText,
-        top_k: request.top_n || 5,
+        // Keep both keys for compatibility with existing and newer bridges.
+        top_n: topN,
+        top_k: topN,
         filters: {
           agent: request.agent || undefined,
           crew: request.crew || undefined,
@@ -254,6 +292,23 @@ function buildQueryText(request) {
   if (request.task) parts.push(request.task)
   if (request.capability_hint) parts.push(request.capability_hint)
   return parts.join(" ")
+}
+
+function extractQmdResults(parsed) {
+  if (!parsed) return []
+  if (Array.isArray(parsed)) return parsed
+  if (Array.isArray(parsed.results)) return parsed.results
+  if (Array.isArray(parsed.matches)) return parsed.matches
+  if (parsed.data && Array.isArray(parsed.data.results)) return parsed.data.results
+  if (parsed.data && Array.isArray(parsed.data.matches)) return parsed.data.matches
+  return []
+}
+
+function pickFirstString(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return ""
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,13 @@
+[project]
+name = "pvector-pgvector-proxy"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi",
+  "psycopg[binary]",
+  "uvicorn[standard]",
+  "pydantic",
+]
+
+[project.optional-dependencies]
+embed = ["sentence-transformers"]

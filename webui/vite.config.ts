@@ -23,6 +23,16 @@ const PROVIDER_SECRET_SPECS = [
   { id: "gemini", label: "Google Gemini", envVar: "GEMINI_API_KEY" },
 ] as const;
 
+const CONTEXT_SETTING_SPECS = [
+  { key: "MAH_VECTOR_RETRIEVAL", defaultValue: "0" },
+  { key: "MAH_QMD_PATH", defaultValue: "qmd" },
+  { key: "MAH_PVECTOR_URL", defaultValue: "" },
+  { key: "MAH_PVECTOR_COLLECTION", defaultValue: "mah-context" },
+  { key: "MAH_PGVECTOR_DSN", defaultValue: "postgresql://mah:mah@localhost:5432/mah_context" },
+  { key: "MAH_PGVECTOR_TABLE", defaultValue: "context_vectors" },
+  { key: "MAH_PGVECTOR_COLLECTION_MODE", defaultValue: "none" },
+] as const;
+
 // In-memory store for run sessions
 const runSessions = new Map<string, {
   events: Array<{ event: string; at: string; details?: Record<string, unknown> }>;
@@ -543,6 +553,186 @@ function handleSecretsApi(req: import("http").IncomingMessage, res: import("http
 
   res.statusCode = 405;
   res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+}
+
+function handleContextSettingsApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+  if (!hasWorkspaceConfig(workspaceRoot)) {
+    res.statusCode = 409;
+    res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+    return;
+  }
+
+  const envPath = path.join(workspaceRoot, ENV_FILENAME);
+  const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const parsed = parseDotEnvContent(rawEnv);
+
+  if (req.method === "GET") {
+    const settings = Object.fromEntries(
+      CONTEXT_SETTING_SPECS.map((spec) => {
+        const value = `${parsed[spec.key] || process.env[spec.key] || spec.defaultValue}`.trim();
+        return [spec.key, value];
+      }),
+    );
+    res.statusCode = 200;
+    res.end(JSON.stringify({ ok: true, settings }));
+    return;
+  }
+
+  if (req.method === "PUT") {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    req.on("end", async () => {
+      try {
+        const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
+        const body = JSON.parse(bodyRaw) as { settings?: Record<string, unknown> };
+        const payload = body.settings && typeof body.settings === "object" ? body.settings : {};
+
+        let nextEnv = rawEnv;
+        const nextSettings: Record<string, string> = {};
+        for (const spec of CONTEXT_SETTING_SPECS) {
+          const rawValue = payload[spec.key];
+          const normalized = rawValue === null || rawValue === undefined ? "" : `${rawValue}`.trim();
+          const finalValue = normalized || spec.defaultValue;
+          const envValue = spec.key === "MAH_VECTOR_RETRIEVAL"
+            ? (finalValue === "1" ? "1" : "0")
+            : finalValue;
+          nextSettings[spec.key] = envValue;
+          nextEnv = upsertEnvVar(nextEnv, spec.key, envValue);
+        }
+
+        writeFileSync(envPath, nextEnv, "utf-8");
+        res.statusCode = 200;
+        res.end(JSON.stringify({ ok: true, settings: nextSettings }));
+      } catch (error) {
+        res.statusCode = 500;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      }
+    });
+    return;
+  }
+
+  res.statusCode = 405;
+  res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+}
+
+function handleContextVectorActionApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+  if (!hasWorkspaceConfig(workspaceRoot)) {
+    res.statusCode = 409;
+    res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+    return;
+  }
+  if (req.method !== "POST") {
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+
+  const chunks: Buffer[] = [];
+  req.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+  req.on("end", async () => {
+    try {
+      const bodyRaw = Buffer.concat(chunks).toString("utf-8") || "{}";
+      const body = JSON.parse(bodyRaw) as { action?: string };
+      const action = `${body.action || ""}`.trim();
+      const envPath = path.join(workspaceRoot, ENV_FILENAME);
+      const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+      const workspaceEnv = parseDotEnvContent(rawEnv);
+      const mergedEnv = { ...process.env, ...workspaceEnv } as Record<string, string>;
+
+      const runPython = (scriptName: string, timeout = 180000) => {
+        const scriptPath = path.join(repoRoot, "scripts", "context", scriptName);
+        if (!existsSync(scriptPath)) {
+          throw new Error(`script not found: ${scriptPath}`);
+        }
+        const child = spawnSync("python3", [scriptPath], {
+          cwd: repoRoot,
+          env: mergedEnv,
+          encoding: "utf-8",
+          timeout,
+        });
+        return {
+          status: typeof child.status === "number" ? child.status : 1,
+          stdout: `${child.stdout || ""}`,
+          stderr: `${child.stderr || ""}`,
+        };
+      };
+
+      if (action === "index_qdrant") {
+        const out = runPython("index-to-qdrant.py");
+        res.statusCode = out.status === 0 ? 200 : 500;
+        res.end(JSON.stringify({
+          ok: out.status === 0,
+          action,
+          status: out.status,
+          stdout: out.stdout,
+          stderr: out.stderr,
+        }));
+        return;
+      }
+
+      if (action === "index_pgvector") {
+        const out = runPython("index-to-pgvector.py");
+        res.statusCode = out.status === 0 ? 200 : 500;
+        res.end(JSON.stringify({
+          ok: out.status === 0,
+          action,
+          status: out.status,
+          stdout: out.stdout,
+          stderr: out.stderr,
+        }));
+        return;
+      }
+
+      if (action === "proxy_health") {
+        const pvectorUrl = `${workspaceEnv.MAH_PVECTOR_URL || process.env.MAH_PVECTOR_URL || ""}`.trim();
+        if (!pvectorUrl) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: "MAH_PVECTOR_URL is empty. Save vector config first." }));
+          return;
+        }
+        const url = `${pvectorUrl.replace(/\/+$/, "")}/health`;
+        const response = await fetch(url, { method: "GET" });
+        const text = await response.text();
+        let parsed: unknown = null;
+        try {
+          parsed = text ? JSON.parse(text) : null;
+        } catch {
+          parsed = text;
+        }
+        res.statusCode = response.ok ? 200 : 500;
+        res.end(JSON.stringify({
+          ok: response.ok,
+          action,
+          url,
+          status: response.status,
+          payload: parsed,
+        }));
+        return;
+      }
+
+      res.statusCode = 400;
+      res.end(JSON.stringify({ ok: false, error: "invalid action" }));
+    } catch (error) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    }
+  });
 }
 
 function handleExpertiseProposalsApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
@@ -1708,6 +1898,14 @@ function mahApiMiddleware() {
 
         if (url === "/api/mah/secrets") {
           handleSecretsApi(req, res);
+          return;
+        }
+        if (url === "/api/mah/context-settings") {
+          handleContextSettingsApi(req, res);
+          return;
+        }
+        if (url === "/api/mah/context-vector-action") {
+          handleContextVectorActionApi(req, res);
           return;
         }
         if (url === "/api/mah/expertise-proposals") {

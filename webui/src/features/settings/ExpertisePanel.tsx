@@ -138,6 +138,35 @@ export function ExpertisePanel() {
 
   return (
     <>
+      <div className="settings-expertise-sticky-stats" role="status" aria-live="polite">
+        <div className="settings-stats">
+          <div className="settings-stat">
+            <span className="settings-stat__label">Total Agents</span>
+            <span className="settings-stat__value">10</span>
+          </div>
+          <div className="settings-stat">
+            <span className="settings-stat__label">Validated</span>
+            <span className="settings-stat__value">10</span>
+          </div>
+          <div className="settings-stat">
+            <span className="settings-stat__label">Experimental</span>
+            <span className="settings-stat__value">0</span>
+          </div>
+          <div className="settings-stat">
+            <span className="settings-stat__label">Restricted</span>
+            <span className="settings-stat__value">0</span>
+          </div>
+          <div className="settings-stat">
+            <span className="settings-stat__label">Evidence Events</span>
+            <span className="settings-stat__value">47</span>
+          </div>
+          <div className="settings-stat">
+            <span className="settings-stat__label">Last Sync</span>
+            <span className="settings-stat__value" style={{ fontSize: 13 }}>2026-04-25</span>
+          </div>
+        </div>
+      </div>
+
       <SettingsSection title="Expertise Governance">
         <ToggleSwitch checked={autoSeed} onChange={setAutoSeed} label="Auto-seed on crew creation" />
         <FormField label="Evidence Retention Window" type="number" value={retention} onChange={setRetention} min={1} max={365} suffix="days" />
@@ -181,35 +210,6 @@ export function ExpertisePanel() {
           onChange={setAiEndpoint}
           placeholder="/chat/completions or /responses"
         />
-      </SettingsSection>
-
-      <SettingsSection title="Catalog Stats">
-        <div className="settings-stats">
-          <div className="settings-stat">
-            <span className="settings-stat__label">Total Agents</span>
-            <span className="settings-stat__value">10</span>
-          </div>
-          <div className="settings-stat">
-            <span className="settings-stat__label">Validated</span>
-            <span className="settings-stat__value">10</span>
-          </div>
-          <div className="settings-stat">
-            <span className="settings-stat__label">Experimental</span>
-            <span className="settings-stat__value">0</span>
-          </div>
-          <div className="settings-stat">
-            <span className="settings-stat__label">Restricted</span>
-            <span className="settings-stat__value">0</span>
-          </div>
-          <div className="settings-stat">
-            <span className="settings-stat__label">Evidence Events</span>
-            <span className="settings-stat__value">47</span>
-          </div>
-          <div className="settings-stat">
-            <span className="settings-stat__label">Last Sync</span>
-            <span className="settings-stat__value" style={{ fontSize: 13 }}>2026-04-25</span>
-          </div>
-        </div>
       </SettingsSection>
     </>
   );

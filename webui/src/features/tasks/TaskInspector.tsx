@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Icon } from "../../components/ui/Icon";
 import type { TaskRecord } from "./useTasksData";
 
@@ -5,6 +6,9 @@ interface TaskInspectorProps {
   task: TaskRecord | null;
   onClose: () => void;
   onTransition: (taskId: string, newState: string) => void;
+  onEditTask: (task: TaskRecord) => void;
+  onDeleteTask: (taskId: string) => void;
+  busyAction?: string;
 }
 
 const STATE_LABELS: Record<string, string> = {
@@ -53,7 +57,20 @@ function formatTimestamp(iso?: string): string {
   }
 }
 
-export function TaskInspector({ task, onClose, onTransition }: TaskInspectorProps) {
+export function TaskInspector({
+  task,
+  onClose,
+  onTransition,
+  onEditTask,
+  onDeleteTask,
+  busyAction = "",
+}: TaskInspectorProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+  }, [task?.id]);
+
   if (!task) {
     return (
       <div className="task-inspector task-inspector--empty">
@@ -65,6 +82,7 @@ export function TaskInspector({ task, onClose, onTransition }: TaskInspectorProp
 
   const validNext = VALID_TRANSITIONS[task.state] || [];
   const canTransition = validNext.length > 0;
+  const isDeleting = busyAction === `delete-task-${task.id}`;
 
   return (
     <div className="task-inspector">
@@ -103,6 +121,35 @@ export function TaskInspector({ task, onClose, onTransition }: TaskInspectorProp
         </div>
 
         {/* State Machine */}
+        <div className="task-inspector__section">
+          <h4 className="task-inspector__section-title">Task Actions</h4>
+          <div className="task-inspector__state-actions">
+            <button
+              type="button"
+              className="task-inspector__action-btn"
+              onClick={() => onEditTask(task)}
+            >
+              <Icon name="edit" size={14} />
+              Edit Task
+            </button>
+            <button
+              type="button"
+              className={`task-inspector__action-btn${confirmDelete ? " task-inspector__action-btn--danger" : ""}`}
+              onClick={() => {
+                if (!confirmDelete) {
+                  setConfirmDelete(true);
+                  return;
+                }
+                onDeleteTask(task.id);
+              }}
+              disabled={isDeleting}
+            >
+              <Icon name="delete" size={14} />
+              {isDeleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete Task"}
+            </button>
+          </div>
+        </div>
+
         <div className="task-inspector__section">
           <h4 className="task-inspector__section-title">State Machine</h4>
           <div className="task-inspector__state-actions">

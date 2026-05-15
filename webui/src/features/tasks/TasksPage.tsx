@@ -56,6 +56,12 @@ type TasksToast = {
   tone: "info" | "error";
 };
 
+type CrewTopologyOption = {
+  id: string;
+  label: string;
+  owners: string[];
+};
+
 const views: Array<{ id: TasksView; label: string }> = [
   { id: "board", label: "Board" },
   { id: "missions", label: "Missions" },
@@ -64,6 +70,67 @@ const views: Array<{ id: TasksView; label: string }> = [
   { id: "inbox", label: "Inbox" },
   { id: "replan", label: "Replan" },
 ];
+
+const PERT_LAYOUT_STORAGE_PREFIX = "mah.tasks.pert.layout.v1";
+
+type PertLayoutOverrides = Record<string, { x: number; y: number }>;
+
+function sanitizePertLayoutOverrides(value: unknown): PertLayoutOverrides {
+  if (!value || typeof value !== "object") return {};
+  const entries = Object.entries(value as Record<string, unknown>);
+  const sanitized: PertLayoutOverrides = {};
+  entries.forEach(([nodeId, position]) => {
+    if (!nodeId || typeof position !== "object" || !position) return;
+    const x = Number((position as { x?: unknown }).x);
+    const y = Number((position as { y?: unknown }).y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    sanitized[nodeId] = {
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
+    };
+  });
+  return sanitized;
+}
+
+function readPertLayoutOverrides(storageKey: string): PertLayoutOverrides {
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { nodePositionOverrides?: unknown } | null;
+    return sanitizePertLayoutOverrides(parsed?.nodePositionOverrides);
+  } catch {
+    return {};
+  }
+}
+
+function normalizeCrewTopology(config: unknown): CrewTopologyOption[] {
+  if (!config || typeof config !== "object") return [];
+  const crews = (config as { crews?: unknown }).crews;
+  if (!Array.isArray(crews)) return [];
+  return crews
+    .map((crew) => {
+      if (!crew || typeof crew !== "object") return null;
+      const id = typeof (crew as { id?: unknown }).id === "string" ? (crew as { id: string }).id.trim() : "";
+      if (!id) return null;
+      const displayName = typeof (crew as { display_name?: unknown }).display_name === "string"
+        ? ((crew as { display_name: string }).display_name || "").trim()
+        : "";
+      const agents = Array.isArray((crew as { agents?: unknown }).agents) ? (crew as { agents: unknown[] }).agents : [];
+      const owners = Array.from(new Set(
+        agents
+          .map((agent) => (agent && typeof agent === "object" && typeof (agent as { id?: unknown }).id === "string"
+            ? (agent as { id: string }).id.trim()
+            : ""))
+          .filter(Boolean),
+      ));
+      return {
+        id,
+        label: displayName || id,
+        owners,
+      };
+    })
+    .filter((item): item is CrewTopologyOption => Boolean(item));
+}
 
 function normalizeView(value: string | null): TasksView {
   return views.some((view) => view.id === value) ? (value as TasksView) : "board";
@@ -394,6 +461,8 @@ export function TasksPage() {
     updateTask,
     deleteTask,
     createMission,
+    updateMission,
+    deleteMission,
     commitMissionScope,
     applyMissionReplan,
     runTask,
@@ -405,6 +474,7 @@ export function TasksPage() {
   const [isTaskCreateOpen, setIsTaskCreateOpen] = useState(false);
   const [isTaskEditOpen, setIsTaskEditOpen] = useState(false);
   const [isMissionCreateOpen, setIsMissionCreateOpen] = useState(false);
+  const [isMissionEditOpen, setIsMissionEditOpen] = useState(false);
   const [taskDraft, setTaskDraft] = useState({
     title: "",
     missionId: "",
@@ -416,6 +486,7 @@ export function TasksPage() {
   });
   const [taskEditDraft, setTaskEditDraft] = useState<Partial<TaskRecord>>({});
   const [agenticSettings, setAgenticSettings] = useState<AgenticEstimationSettings>(() => getAgenticEstimationSettings());
+  const [topologyCrews, setTopologyCrews] = useState<CrewTopologyOption[]>([]);
   const [missionDraft, setMissionDraft] = useState({
     name: "",
     objective: "",
@@ -423,6 +494,7 @@ export function TasksPage() {
     risk: "Medium",
     capacity: "70%",
   });
+  const [missionEditDraft, setMissionEditDraft] = useState<Partial<MissionRecord>>({});
   const activeView = normalizeView(searchParams.get("view"));
   const selectedTaskId = searchParams.get("task") ?? "";
   const selectedMissionId = searchParams.get("mission") ?? "";
@@ -483,6 +555,64 @@ export function TasksPage() {
     () => missions.find((mission) => mission.id === selectedMissionId) ?? missions[0],
     [missions, selectedMissionId],
   );
+  const fallbackCrewIds = useMemo(() => {
+    const fromTasks = tasks
+      .map((task) => (task.crewId || "").trim())
+      .filter(Boolean);
+    return Array.from(new Set(["dev", ...fromTasks]));
+  }, [tasks]);
+  const fallbackOwners = useMemo(() => {
+    const fromTasks = tasks
+      .map((task) => (task.owner || "").trim())
+      .filter(Boolean);
+    return Array.from(new Set(["planning-lead", ...fromTasks]));
+  }, [tasks]);
+  const taskCreateCrewOptions = useMemo<CrewTopologyOption[]>(() => {
+    if (topologyCrews.length > 0) return topologyCrews;
+    return fallbackCrewIds.map((crewId) => ({
+      id: crewId,
+      label: crewId,
+      owners: Array.from(new Set(
+        tasks
+          .filter((task) => (task.crewId || "").trim() === crewId)
+          .map((task) => (task.owner || "").trim())
+          .filter(Boolean),
+      )),
+    }));
+  }, [fallbackCrewIds, tasks, topologyCrews]);
+  const crewOwnersMap = useMemo(
+    () => new Map(taskCreateCrewOptions.map((crew) => [crew.id, crew.owners] as const)),
+    [taskCreateCrewOptions],
+  );
+  const resolveOwnerOptions = useCallback((crewId: string): string[] => {
+    const fromCrew = crewOwnersMap.get((crewId || "").trim()) ?? [];
+    if (fromCrew.length > 0) return fromCrew;
+    const fromTasks = Array.from(new Set(
+      tasks
+        .filter((task) => (task.crewId || "").trim() === (crewId || "").trim())
+        .map((task) => (task.owner || "").trim())
+        .filter(Boolean),
+    ));
+    if (fromTasks.length > 0) return fromTasks;
+    return fallbackOwners;
+  }, [crewOwnersMap, fallbackOwners, tasks]);
+  const taskCreateOwnerOptions = useMemo(
+    () => resolveOwnerOptions(taskDraft.crewId),
+    [resolveOwnerOptions, taskDraft.crewId],
+  );
+  const taskEditCrewId = useMemo(
+    () => (taskEditDraft.crewId || selectedTask?.crewId || taskCreateCrewOptions[0]?.id || "dev").toString().trim(),
+    [selectedTask?.crewId, taskCreateCrewOptions, taskEditDraft.crewId],
+  );
+  const taskEditOwnerOptions = useMemo(
+    () => resolveOwnerOptions(taskEditCrewId),
+    [resolveOwnerOptions, taskEditCrewId],
+  );
+  const pertLayoutStorageKey = useMemo(() => {
+    const workspaceScope = encodeURIComponent(workspacePath || "default-workspace");
+    const missionScope = encodeURIComponent(selectedMissionId || "all-missions");
+    return `${PERT_LAYOUT_STORAGE_PREFIX}:${workspaceScope}:${missionScope}`;
+  }, [selectedMissionId, workspacePath]);
 
   const counts = useMemo(() => {
     const blocked = tasks.filter((task) => task.state === "blocked").length;
@@ -582,7 +712,7 @@ export function TasksPage() {
   ), [selectedMissionId, tasks]);
 
   useEffect(() => {
-    if (!isPertModalOpen && !isBoardModalOpen && !isFlowHelpOpen && !isTaskCreateOpen && !isTaskEditOpen && !isMissionCreateOpen) return;
+    if (!isPertModalOpen && !isBoardModalOpen && !isFlowHelpOpen && !isTaskCreateOpen && !isTaskEditOpen && !isMissionCreateOpen && !isMissionEditOpen && !t12SelectedTask) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsPertModalOpen(false);
       if (event.key === "Escape") setIsBoardModalOpen(false);
@@ -590,10 +720,12 @@ export function TasksPage() {
       if (event.key === "Escape") setIsTaskCreateOpen(false);
       if (event.key === "Escape") setIsTaskEditOpen(false);
       if (event.key === "Escape") setIsMissionCreateOpen(false);
+      if (event.key === "Escape") setIsMissionEditOpen(false);
+      if (event.key === "Escape") setT12SelectedTask(null);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isBoardModalOpen, isFlowHelpOpen, isMissionCreateOpen, isPertModalOpen, isTaskCreateOpen, isTaskEditOpen]);
+  }, [isBoardModalOpen, isFlowHelpOpen, isMissionCreateOpen, isMissionEditOpen, isPertModalOpen, isTaskCreateOpen, isTaskEditOpen, t12SelectedTask]);
 
   useEffect(() => {
     if (!toast) return;
@@ -611,12 +743,41 @@ export function TasksPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    const loadTopology = async () => {
+      try {
+        const response = await fetch("/api/mah/config", {
+          headers: {
+            "x-mah-workspace-path": workspacePath,
+          },
+        });
+        const data = await response.json() as { ok?: boolean; config?: unknown };
+        if (cancelled || !data?.ok) return;
+        setTopologyCrews(normalizeCrewTopology(data.config));
+      } catch {
+        if (!cancelled) setTopologyCrews([]);
+      }
+    };
+    void loadTopology();
+    return () => {
+      cancelled = true;
+    };
+  }, [workspacePath]);
+
   const openTaskCreateModal = () => {
+    const preferredCrewId = taskCreateCrewOptions.find((crew) => crew.id === "dev")?.id
+      || taskCreateCrewOptions[0]?.id
+      || "dev";
+    const ownerOptions = resolveOwnerOptions(preferredCrewId);
+    const preferredOwner = ownerOptions.find((owner) => owner === "planning-lead")
+      || ownerOptions[0]
+      || "planning-lead";
     setTaskDraft({
       title: "",
       missionId: selectedMissionId || missions[0]?.id || "",
-      crewId: "dev",
-      owner: "planning-lead",
+      crewId: preferredCrewId,
+      owner: preferredOwner,
       runtime: "openclaude",
       priority: "medium",
       summary: "",
@@ -624,12 +785,34 @@ export function TasksPage() {
     setIsTaskCreateOpen(true);
   };
 
+  const handleTaskCrewChange = useCallback((nextCrewId: string) => {
+    const ownerOptions = resolveOwnerOptions(nextCrewId);
+    setTaskDraft((current) => ({
+      ...current,
+      crewId: nextCrewId,
+      owner: ownerOptions.includes(current.owner) ? current.owner : (ownerOptions[0] || ""),
+    }));
+  }, [resolveOwnerOptions]);
+
+  const handleTaskEditCrewChange = useCallback((nextCrewId: string) => {
+    const ownerOptions = resolveOwnerOptions(nextCrewId);
+    setTaskEditDraft((current) => ({
+      ...current,
+      crewId: nextCrewId,
+      owner: ownerOptions.includes((current.owner || "").toString()) ? (current.owner || "").toString() : (ownerOptions[0] || ""),
+    }));
+  }, [resolveOwnerOptions]);
+
   const openTaskEditModal = (task?: TaskRecord) => {
     if (!task) return;
+    const crewId = (task.crewId || taskCreateCrewOptions[0]?.id || "dev").trim();
+    const ownerOptions = resolveOwnerOptions(crewId);
+    const owner = ownerOptions.includes(task.owner) ? task.owner : (ownerOptions[0] || task.owner || "planning-lead");
     setTaskEditDraft({
       title: task.title,
       summary: task.summary,
-      owner: task.owner,
+      crewId,
+      owner,
       runtime: task.runtime,
       priority: task.priority,
       state: task.state,
@@ -672,6 +855,20 @@ export function TasksPage() {
     setIsMissionCreateOpen(true);
   };
 
+  const openMissionEditModal = (mission?: MissionRecord) => {
+    if (!mission) return;
+    setMissionEditDraft({
+      name: mission.name,
+      objective: mission.objective,
+      dueWindow: mission.dueWindow,
+      risk: mission.risk,
+      capacity: mission.capacity,
+      status: mission.status,
+      health: mission.health,
+    });
+    setIsMissionEditOpen(true);
+  };
+
   const handleCreateMission = async () => {
     if (!missionDraft.name.trim()) return;
     try {
@@ -687,6 +884,47 @@ export function TasksPage() {
         updateTasksParams({ view: "missions", mission: created.id }, false);
         setToast({ message: `Mission ${created.name} criada em .mah/tasks.`, tone: "info" });
       }
+    } catch (nextError) {
+      setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
+    }
+  };
+
+  const handleUpdateMission = async (missionId: string, updates: Partial<MissionRecord>) => {
+    try {
+      const updated = await updateMission(missionId, updates);
+      if (updated) {
+        updateTasksParams({ mission: updated.id }, true);
+        setToast({ message: `Mission ${updated.name} updated.`, tone: "info" });
+        return true;
+      }
+      return false;
+    } catch (nextError) {
+      setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
+      return false;
+    }
+  };
+
+  const handleDeleteMission = async (mission?: MissionRecord) => {
+    if (!mission) return;
+    const missionTasks = tasks.filter((task) => task.missionId === mission.id);
+    const wantsDelete = window.confirm(`Delete mission "${mission.name}"?`);
+    if (!wantsDelete) return;
+    const cascade = missionTasks.length > 0
+      ? window.confirm(`This mission has ${missionTasks.length} task(s). Delete these tasks too?`)
+      : false;
+    try {
+      const result = await deleteMission(mission.id, cascade);
+      const nextMission = result.missions[0];
+      updateTasksParams({
+        mission: nextMission?.id || null,
+        task: nextMission ? (result.tasks.find((task) => task.missionId === nextMission.id)?.id || null) : null,
+      }, true);
+      setToast({
+        message: cascade
+          ? `Mission ${mission.name} deleted with ${result.removedTasks.length} task(s).`
+          : `Mission ${mission.name} deleted.`,
+        tone: "info",
+      });
     } catch (nextError) {
       setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
     }
@@ -851,6 +1089,10 @@ export function TasksPage() {
               onSelectTask={handleSelectTask}
               onOpenPert={() => handleSelectView("pert")}
               onOpenModal={() => setIsBoardModalOpen(true)}
+              onTransitionTask={(taskId, newState) => void handleUpdateTask(taskId, { state: newState })}
+              onEditTask={(task) => openTaskEditModal(task)}
+              onDeleteTask={(taskId) => void handleDeleteTask(taskId)}
+              busyAction={busyAction}
               tasks={tasks}
             />
           )}
@@ -869,6 +1111,9 @@ export function TasksPage() {
                 setTasks2(updated);
                 await transitionTask(taskId, newState);
               }}
+              onEditTask={(task) => openTaskEditModal(task)}
+              onDeleteTask={(taskId) => void handleDeleteTask(taskId)}
+              busyAction={busyAction}
               missions={missionData.map(m => m.id)}
               owners={[...new Set(tasks.map(t => t.owner))]}
             />
@@ -881,6 +1126,9 @@ export function TasksPage() {
               onSelectMission={handleSelectMission}
               onSelectTask={handleSelectTask}
               onCreateMission={openMissionCreateModal}
+              onEditMission={(mission) => openMissionEditModal(mission)}
+              onDeleteMission={(mission) => void handleDeleteMission(mission)}
+              busyAction={busyAction}
             />
           )}
           {activeView === "pert" && tasks.length > 0 && (
@@ -891,6 +1139,7 @@ export function TasksPage() {
               onCloseModal={undefined}
               agenticSettings={agenticSettings}
               tasks={tasks}
+              layoutStorageKey={pertLayoutStorageKey}
             />
           )}
           {activeView === "timeline" && tasks.length > 0 && (
@@ -1023,6 +1272,105 @@ export function TasksPage() {
         </div>
       ) : null}
 
+      {isMissionEditOpen && selectedMission ? (
+        <div className="tasks-modal-backdrop" onClick={() => setIsMissionEditOpen(false)}>
+          <section className="tasks-modal tasks-modal--compose" onClick={(event) => event.stopPropagation()}>
+            <div className="tasks-modal__header">
+              <div>
+                <p className="tasks-panel__label">Edit Mission</p>
+                <h3>{selectedMission.id}</h3>
+              </div>
+              <button type="button" className="tasks-toolbar__btn" onClick={() => setIsMissionEditOpen(false)}>
+                <Icon name="close" size={16} />
+                Close
+              </button>
+            </div>
+
+            <div className="tasks-form">
+              <div className="tasks-form__grid">
+                <label className="tasks-field tasks-field--full">
+                  <span>Name</span>
+                  <input
+                    type="text"
+                    value={missionEditDraft.name || ""}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, name: event.target.value }))}
+                  />
+                </label>
+                <label className="tasks-field tasks-field--full">
+                  <span>Objective</span>
+                  <textarea
+                    rows={4}
+                    value={missionEditDraft.objective || ""}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, objective: event.target.value }))}
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Due Window</span>
+                  <input
+                    type="text"
+                    value={missionEditDraft.dueWindow || ""}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, dueWindow: event.target.value }))}
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Risk</span>
+                  <input
+                    type="text"
+                    value={missionEditDraft.risk || ""}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, risk: event.target.value }))}
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Capacity</span>
+                  <input
+                    type="text"
+                    value={missionEditDraft.capacity || ""}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, capacity: event.target.value }))}
+                  />
+                </label>
+                <label className="tasks-field">
+                  <span>Status</span>
+                  <select
+                    value={missionEditDraft.status || selectedMission.status}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, status: event.target.value as MissionRecord["status"] }))}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="active">Active</option>
+                    <option value="at_risk">At Risk</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </label>
+                <label className="tasks-field tasks-field--full">
+                  <span>Health</span>
+                  <input
+                    type="text"
+                    value={missionEditDraft.health || ""}
+                    onChange={(event) => setMissionEditDraft((current) => ({ ...current, health: event.target.value }))}
+                  />
+                </label>
+              </div>
+              <div className="tasks-modal__actions">
+                <button type="button" className="tasks-toolbar__btn" onClick={() => setIsMissionEditOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tasks-toolbar__btn tasks-toolbar__btn--primary"
+                  onClick={async () => {
+                    const ok = await handleUpdateMission(selectedMission.id, missionEditDraft);
+                    if (ok) setIsMissionEditOpen(false);
+                  }}
+                  disabled={!missionEditDraft.name?.toString().trim() || busyAction === `update-mission-${selectedMission.id}`}
+                >
+                  <Icon name="save" size={16} />
+                  {busyAction === `update-mission-${selectedMission.id}` ? "Saving..." : "Save Mission"}
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {isTaskCreateOpen ? (
         <div className="tasks-modal-backdrop" onClick={() => setIsTaskCreateOpen(false)}>
           <section className="tasks-modal tasks-modal--compose" onClick={(event) => event.stopPropagation()}>
@@ -1071,21 +1419,29 @@ export function TasksPage() {
                 </label>
                 <label className="tasks-field">
                   <span>Crew</span>
-                  <input
-                    type="text"
+                  <select
                     value={taskDraft.crewId}
-                    onChange={(event) => setTaskDraft((current) => ({ ...current, crewId: event.target.value }))}
-                    placeholder="dev"
-                  />
+                    onChange={(event) => handleTaskCrewChange(event.target.value)}
+                  >
+                    {taskCreateCrewOptions.map((crew) => (
+                      <option key={crew.id} value={crew.id}>
+                        {crew.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="tasks-field">
                   <span>Owner</span>
-                  <input
-                    type="text"
+                  <select
                     value={taskDraft.owner}
                     onChange={(event) => setTaskDraft((current) => ({ ...current, owner: event.target.value }))}
-                    placeholder="planning-lead"
-                  />
+                  >
+                    {taskCreateOwnerOptions.map((owner) => (
+                      <option key={owner} value={owner}>
+                        {owner}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="tasks-field">
                   <span>Runtime</span>
@@ -1176,8 +1532,30 @@ export function TasksPage() {
                   </select>
                 </label>
                 <label className="tasks-field">
+                  <span>Crew</span>
+                  <select
+                    value={taskEditCrewId}
+                    onChange={(event) => handleTaskEditCrewChange(event.target.value)}
+                  >
+                    {taskCreateCrewOptions.map((crew) => (
+                      <option key={crew.id} value={crew.id}>
+                        {crew.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="tasks-field">
                   <span>Owner</span>
-                  <input type="text" value={taskEditDraft.owner || ""} onChange={(event) => setTaskEditDraft((current) => ({ ...current, owner: event.target.value }))} />
+                  <select
+                    value={(taskEditDraft.owner || selectedTask.owner || taskEditOwnerOptions[0] || "").toString()}
+                    onChange={(event) => setTaskEditDraft((current) => ({ ...current, owner: event.target.value }))}
+                  >
+                    {taskEditOwnerOptions.map((owner) => (
+                      <option key={owner} value={owner}>
+                        {owner}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="tasks-field">
                   <span>Runtime</span>
@@ -1211,7 +1589,7 @@ export function TasksPage() {
       ) : null}
 
       {isPertModalOpen && activeView === "pert" ? (
-        <div className="tasks-modal-backdrop" onClick={() => setIsPertModalOpen(false)}>
+        <div className="tasks-modal-backdrop tasks-modal-backdrop--pert" onClick={() => setIsPertModalOpen(false)}>
           <section className="tasks-modal tasks-modal--pert" onClick={(event) => event.stopPropagation()}>
             <PertView
               selectedTaskId={selectedTaskId}
@@ -1220,6 +1598,7 @@ export function TasksPage() {
               onCloseModal={() => setIsPertModalOpen(false)}
               agenticSettings={agenticSettings}
               tasks={tasks}
+              layoutStorageKey={pertLayoutStorageKey}
               expanded
             />
           </section>
@@ -1236,6 +1615,10 @@ export function TasksPage() {
               onOpenPert={() => handleSelectView("pert")}
               onOpenModal={() => undefined}
               onCloseModal={() => setIsBoardModalOpen(false)}
+              onTransitionTask={(taskId, newState) => void handleUpdateTask(taskId, { state: newState })}
+              onEditTask={(task) => openTaskEditModal(task)}
+              onDeleteTask={(taskId) => void handleDeleteTask(taskId)}
+              busyAction={busyAction}
               tasks={tasks}
               expanded
             />
@@ -1315,6 +1698,9 @@ function T12BoardView({
   onSelectTask,
   onCloseInspector,
   onTransition,
+  onEditTask,
+  onDeleteTask,
+  busyAction,
   missions,
   owners,
 }: {
@@ -1325,6 +1711,9 @@ function T12BoardView({
   onSelectTask: (t: TaskRecord) => void;
   onCloseInspector: () => void;
   onTransition: (taskId: string, newState: string) => void;
+  onEditTask: (task: TaskRecord) => void;
+  onDeleteTask: (taskId: string) => void;
+  busyAction: string;
   missions: string[];
   owners: string[];
 }) {
@@ -1356,16 +1745,27 @@ function T12BoardView({
             onTransitionTask={onTransition}
           />
         </div>
-        {selectedTask && (
-          <aside className="inspector" style={{ width: 360, borderLeft: "1px solid var(--color-border-subtle)", overflow: "hidden" }}>
+      </div>
+      {selectedTask ? (
+        <div className="tasks-modal-backdrop tasks-modal-backdrop--task-inspector" onClick={onCloseInspector}>
+          <section className="tasks-modal tasks-modal--task-inspector" onClick={(event) => event.stopPropagation()}>
             <TaskInspectorPanel
               task={selectedTask}
               onClose={onCloseInspector}
               onTransition={onTransition}
+              onEditTask={(task) => {
+                onEditTask(task);
+                onCloseInspector();
+              }}
+              onDeleteTask={(taskId) => {
+                onDeleteTask(taskId);
+                onCloseInspector();
+              }}
+              busyAction={busyAction}
             />
-          </aside>
-        )}
-      </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1377,6 +1777,10 @@ function BoardView({
   onOpenPert,
   onOpenModal,
   onCloseModal,
+  onTransitionTask,
+  onEditTask,
+  onDeleteTask,
+  busyAction,
   tasks,
   expanded = false,
 }: {
@@ -1386,16 +1790,64 @@ function BoardView({
   onOpenPert: () => void;
   onOpenModal: () => void;
   onCloseModal?: () => void;
+  onTransitionTask: (taskId: string, newState: TaskState) => void | Promise<void>;
+  onEditTask: (task: TaskRecord) => void;
+  onDeleteTask: (taskId: string) => void;
+  busyAction: string;
   tasks: TaskRecord[];
   expanded?: boolean;
 }) {
+  const [boardFilters, setBoardFilters] = useState<TaskFiltersValue>({ states: [], mission: "", owner: "", search: "" });
+  const [boardModalTaskId, setBoardModalTaskId] = useState<string | null>(null);
   const boardColumns: Array<{ id: TaskState; title: string }> = [
     { id: "backlog", title: "Backlog" },
     { id: "ready", title: "Ready" },
     { id: "in_progress", title: "In Progress" },
     { id: "blocked", title: "Blocked" },
     { id: "review", title: "Review" },
+    { id: "done", title: "Done" },
   ];
+  const boardMissions = useMemo(
+    () => [...new Set(tasks.map((task) => task.missionId).filter((missionId): missionId is string => Boolean(missionId)))],
+    [tasks],
+  );
+  const boardOwners = useMemo(
+    () => [...new Set(tasks.map((task) => task.owner).filter(Boolean))],
+    [tasks],
+  );
+  const filteredTasks = useMemo(
+    () => tasks.filter((task) => {
+      if (boardFilters.states.length > 0 && !boardFilters.states.includes(task.state)) return false;
+      if (boardFilters.mission && task.missionId !== boardFilters.mission) return false;
+      if (boardFilters.owner && task.owner !== boardFilters.owner) return false;
+      if (boardFilters.search) {
+        const query = boardFilters.search.toLowerCase();
+        if (!task.id.toLowerCase().includes(query) && !task.title.toLowerCase().includes(query)) return false;
+      }
+      return true;
+    }),
+    [boardFilters, tasks],
+  );
+  const boardModalTask = useMemo(
+    () => (boardModalTaskId ? tasks.find((task) => task.id === boardModalTaskId) ?? null : null),
+    [boardModalTaskId, tasks],
+  );
+  const openTaskModal = useCallback((taskId: string) => {
+    onSelectTask(taskId);
+    setBoardModalTaskId(taskId);
+  }, [onSelectTask]);
+  const closeTaskModal = useCallback(() => {
+    setBoardModalTaskId(null);
+  }, []);
+
+  useEffect(() => {
+    if (!boardModalTaskId) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeTaskModal();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [boardModalTaskId, closeTaskModal]);
 
   return (
     <div className="tasks-stack">
@@ -1425,23 +1877,24 @@ function BoardView({
             ) : null}
           </div>
         </div>
-        <div className="tasks-kpis">
-          <div><span>Due Window</span><strong>{selectedMission?.dueWindow || "TBD"}</strong></div>
-          <div><span>Risk Level</span><strong>{selectedMission?.risk || "Unknown"}</strong></div>
-          <div><span>Capacity</span><strong>{selectedMission?.capacity || "—"}</strong></div>
-          <div><span>Health</span><strong>{selectedMission?.health || "Awaiting selection"}</strong></div>
-        </div>
       </section>
+
+      <TaskFilters
+        filters={boardFilters}
+        onChange={setBoardFilters}
+        missions={boardMissions}
+        owners={boardOwners}
+      />
 
       <section className={`tasks-board${expanded ? " tasks-board--expanded" : ""}`}>
         {boardColumns.map((column) => (
           <div key={column.id} className={`tasks-board__column${expanded ? " tasks-board__column--expanded" : ""}`}>
             <div className="tasks-board__column-header">
               <h3>{column.title}</h3>
-              <span>{tasks.filter((task) => task.state === column.id).length}</span>
+              <span>{filteredTasks.filter((task) => task.state === column.id).length}</span>
             </div>
             <div className={`tasks-board__cards${expanded ? " tasks-board__cards--expanded" : ""}`}>
-              {tasks
+              {filteredTasks
                 .filter((task) => task.state === column.id)
                 .map((task) => (
                   <div
@@ -1449,11 +1902,11 @@ function BoardView({
                     role="button"
                     tabIndex={0}
                     className={`task-card${selectedTaskId === task.id ? " task-card--selected" : ""}${task.state === "blocked" ? " task-card--blocked" : ""}`}
-                    onClick={() => onSelectTask(task.id)}
+                    onClick={() => openTaskModal(task.id)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        onSelectTask(task.id);
+                        openTaskModal(task.id);
                       }
                     }}
                   >
@@ -1480,6 +1933,27 @@ function BoardView({
         ))}
       </section>
 
+      {boardModalTask ? (
+        <div className="tasks-modal-backdrop tasks-modal-backdrop--task-inspector" onClick={closeTaskModal}>
+          <section className="tasks-modal tasks-modal--task-inspector" onClick={(event) => event.stopPropagation()}>
+            <TaskInspectorPanel
+              task={boardModalTask}
+              onClose={closeTaskModal}
+              onTransition={(taskId, newState) => void onTransitionTask(taskId, newState as TaskState)}
+              onEditTask={(task) => {
+                onEditTask(task);
+                closeTaskModal();
+              }}
+              onDeleteTask={(taskId) => {
+                onDeleteTask(taskId);
+                closeTaskModal();
+              }}
+              busyAction={busyAction}
+            />
+          </section>
+        </div>
+      ) : null}
+
     </div>
   );
 }
@@ -1491,6 +1965,9 @@ function MissionsView({
   onSelectMission,
   onSelectTask,
   onCreateMission,
+  onEditMission,
+  onDeleteMission,
+  busyAction,
 }: {
   tasks: TaskRecord[];
   missions: MissionRecord[];
@@ -1498,6 +1975,9 @@ function MissionsView({
   onSelectMission: (id: string) => void;
   onSelectTask: (id: string) => void;
   onCreateMission: () => void;
+  onEditMission: (mission: MissionRecord) => void;
+  onDeleteMission: (mission: MissionRecord) => void;
+  busyAction: string;
 }) {
   const currentMission = missions.find((mission) => mission.id === selectedMissionId) ?? missions[0];
   const missionTasks = tasks.filter((task) => task.missionId === currentMission.id);
@@ -1549,6 +2029,19 @@ function MissionsView({
           </div>
           <div className="tasks-inline-actions">
             <div className="tasks-panel__health">{currentMission.health}</div>
+            <button type="button" className="tasks-toolbar__btn" onClick={() => onEditMission(currentMission)}>
+              <Icon name="edit" size={16} />
+              Edit Mission
+            </button>
+            <button
+              type="button"
+              className="tasks-toolbar__btn tasks-toolbar__btn--danger"
+              onClick={() => onDeleteMission(currentMission)}
+              disabled={busyAction === `delete-mission-${currentMission.id}`}
+            >
+              <Icon name="delete" size={16} />
+              {busyAction === `delete-mission-${currentMission.id}` ? "Deleting..." : "Delete Mission"}
+            </button>
             <button type="button" className="tasks-toolbar__btn" onClick={onCreateMission}>
               <Icon name="add" size={16} />
               Create Mission
@@ -1620,6 +2113,7 @@ function PertView({
   onCloseModal,
   agenticSettings,
   tasks,
+  layoutStorageKey,
   expanded = false,
 }: {
   selectedTaskId: string;
@@ -1628,11 +2122,12 @@ function PertView({
   onCloseModal?: () => void;
   agenticSettings: AgenticEstimationSettings;
   tasks: TaskRecord[];
+  layoutStorageKey: string;
   expanded?: boolean;
 }) {
   const diagram = useMemo(() => buildPertDiagram(tasks, agenticSettings), [agenticSettings, tasks]);
   const editorRef = useRef<HTMLDivElement | null>(null);
-  const INITIAL_ZOOM = 0.75;
+  const INITIAL_ZOOM = expanded ? 0.62 : 0.75;
   const dragStateRef = useRef({
     active: false,
     startX: 0,
@@ -1640,28 +2135,140 @@ function PertView({
     panX: 0,
     panY: 0,
   });
+  const nodeDragStateRef = useRef({
+    active: false,
+    pointerId: -1,
+    nodeId: "",
+    startX: 0,
+    startY: 0,
+    nodeX: 0,
+    nodeY: 0,
+    moved: false,
+  });
   const [zoom, setZoom] = useState(INITIAL_ZOOM);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDraggingViewport, setIsDraggingViewport] = useState(false);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
+  const hydratedLayoutKeyRef = useRef<string | null>(null);
+  const [nodePositionOverrides, setNodePositionOverrides] = useState<PertLayoutOverrides>(() => {
+    hydratedLayoutKeyRef.current = layoutStorageKey;
+    return readPertLayoutOverrides(layoutStorageKey);
+  });
+  const lastAutoFitSignatureRef = useRef("");
 
-  const clampZoom = useCallback((value: number) => Math.min(1.8, Math.max(0.65, Number(value.toFixed(2)))), []);
+  const clampZoom = useCallback((value: number) => Math.min(1.8, Math.max(0.25, Number(value.toFixed(2)))), []);
+
+  useEffect(() => {
+    if (hydratedLayoutKeyRef.current === layoutStorageKey) return;
+    hydratedLayoutKeyRef.current = layoutStorageKey;
+    setNodePositionOverrides(readPertLayoutOverrides(layoutStorageKey));
+  }, [layoutStorageKey]);
+
+  useEffect(() => {
+    const validNodeIds = new Set(diagram.nodes.map((node) => node.task.id));
+    setNodePositionOverrides((current) => {
+      let changed = false;
+      const next: Record<string, { x: number; y: number }> = {};
+      Object.entries(current).forEach(([nodeId, position]) => {
+        if (validNodeIds.has(nodeId)) next[nodeId] = position;
+        else changed = true;
+      });
+      return changed ? next : current;
+    });
+  }, [diagram.nodes]);
+
+  useEffect(() => {
+    if (hydratedLayoutKeyRef.current !== layoutStorageKey) return;
+    try {
+      if (Object.keys(nodePositionOverrides).length === 0) {
+        window.localStorage.removeItem(layoutStorageKey);
+        return;
+      }
+      window.localStorage.setItem(
+        layoutStorageKey,
+        JSON.stringify({
+          nodePositionOverrides,
+          updatedAt: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      // Storage can be unavailable in restricted environments. Keep runtime behavior intact.
+    }
+  }, [layoutStorageKey, nodePositionOverrides]);
+
+  const positionedNodes = useMemo(
+    () => diagram.nodes.map((node) => {
+      const override = nodePositionOverrides[node.task.id];
+      return override ? { ...node, x: override.x, y: override.y } : node;
+    }),
+    [diagram.nodes, nodePositionOverrides],
+  );
+
+  const positionedNodeLookup = useMemo(
+    () => new Map(positionedNodes.map((node) => [node.task.id, node] as const)),
+    [positionedNodes],
+  );
+
+  const canvasBounds = useMemo(() => {
+    const horizontalPadding = 80;
+    const verticalPadding = 80;
+    const minX = Math.min(0, ...positionedNodes.map((node) => node.x - horizontalPadding));
+    const minY = Math.min(0, ...positionedNodes.map((node) => node.y - verticalPadding));
+    const maxX = Math.max(
+      diagram.width,
+      ...positionedNodes.map((node) => node.x + node.width + horizontalPadding),
+    );
+    const maxY = Math.max(
+      diagram.height,
+      ...positionedNodes.map((node) => node.y + node.height + verticalPadding),
+    );
+    const offsetX = minX < 0 ? -minX : 0;
+    const offsetY = minY < 0 ? -minY : 0;
+    return {
+      offsetX,
+      offsetY,
+      width: Math.ceil(maxX + offsetX),
+      height: Math.ceil(maxY + offsetY),
+    };
+  }, [diagram.height, diagram.width, positionedNodes]);
+
+  const renderedNodes = useMemo(
+    () => positionedNodes.map((node) => ({
+      ...node,
+      x: node.x + canvasBounds.offsetX,
+      y: node.y + canvasBounds.offsetY,
+    })),
+    [canvasBounds.offsetX, canvasBounds.offsetY, positionedNodes],
+  );
+
+  const renderedNodeLookup = useMemo(
+    () => new Map(renderedNodes.map((node) => [node.task.id, node] as const)),
+    [renderedNodes],
+  );
 
   const centerDiagram = useCallback((nextZoom: number) => {
     const container = editorRef.current;
     if (!container) return;
-    const centeredPanX = (container.clientWidth - diagram.width * nextZoom) / 2;
-    const centeredPanY = (container.clientHeight - diagram.height * nextZoom) / 2 - 70;
+    const centeredPanX = (container.clientWidth - canvasBounds.width * nextZoom) / 2;
+    const centeredPanY = (container.clientHeight - canvasBounds.height * nextZoom) / 2 + 10;
     setPan({
       x: Number(centeredPanX.toFixed(2)),
       y: Number(centeredPanY.toFixed(2)),
     });
-  }, [diagram.height, diagram.width]);
+  }, [canvasBounds.height, canvasBounds.width]);
+
+  const layoutSignature = useMemo(
+    () => `${expanded}:${diagram.width}:${diagram.height}:${diagram.nodes.map((node) => node.task.id).join("|")}`,
+    [diagram.height, diagram.nodes, diagram.width, expanded],
+  );
 
   useEffect(() => {
+    if (lastAutoFitSignatureRef.current === layoutSignature) return;
+    lastAutoFitSignatureRef.current = layoutSignature;
     setZoom(INITIAL_ZOOM);
     const frameId = window.requestAnimationFrame(() => centerDiagram(INITIAL_ZOOM));
     return () => window.cancelAnimationFrame(frameId);
-  }, [INITIAL_ZOOM, centerDiagram, expanded]);
+  }, [INITIAL_ZOOM, centerDiagram, layoutSignature]);
 
   const handleEditorWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1687,6 +2294,7 @@ function PertView({
     if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     if (target?.closest(".tasks-pert__node")) return;
+    if (nodeDragStateRef.current.active) return;
     const container = editorRef.current;
     if (!container) return;
     dragStateRef.current = {
@@ -1720,13 +2328,69 @@ function PertView({
     }
   }, []);
 
+  const handleNodePointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>, nodeId: string) => {
+    if (event.button !== 0) return;
+    const node = positionedNodeLookup.get(nodeId);
+    if (!node) return;
+    event.preventDefault();
+    event.stopPropagation();
+    nodeDragStateRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      nodeId,
+      startX: event.clientX,
+      startY: event.clientY,
+      nodeX: node.x,
+      nodeY: node.y,
+      moved: false,
+    };
+    setDraggingNodeId(nodeId);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }, [positionedNodeLookup]);
+
+  const handleNodePointerMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const dragState = nodeDragStateRef.current;
+    if (!dragState.active || dragState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const deltaX = (event.clientX - dragState.startX) / zoom;
+    const deltaY = (event.clientY - dragState.startY) / zoom;
+    if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) dragState.moved = true;
+    setNodePositionOverrides((current) => ({
+      ...current,
+      [dragState.nodeId]: {
+        x: Number((dragState.nodeX + deltaX).toFixed(2)),
+        y: Number((dragState.nodeY + deltaY).toFixed(2)),
+      },
+    }));
+  }, [zoom]);
+
+  const handleNodePointerUp = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const dragState = nodeDragStateRef.current;
+    if (!dragState.active || dragState.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    nodeDragStateRef.current.active = false;
+    setDraggingNodeId(null);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (!dragState.moved) onSelectTask(dragState.nodeId);
+  }, [onSelectTask]);
+  const hasNodeOverrides = Object.keys(nodePositionOverrides).length > 0;
+
   return (
     <div className="tasks-stack">
-      <section className="tasks-panel">
+      <section className={`tasks-panel tasks-pert-panel${expanded ? " tasks-pert-panel--expanded" : ""}`}>
         <div className="tasks-panel__header">
-          <div>
+          <div className="tasks-pert__title-block">
             <p className="tasks-panel__label">PERT Network</p>
             <h3>Critical path flowchart</h3>
+            {!expanded ? (
+              <p className="tasks-pert__microhint">
+                Wheel to zoom · Drag canvas to pan · Drag node to reposition
+              </p>
+            ) : null}
           </div>
           <div className="tasks-pert__header-actions">
             <div className="tasks-kpis tasks-kpis--inline">
@@ -1738,33 +2402,61 @@ function PertView({
               <div><span>Tokens</span><strong>{diagram.totalTokenEstimate.toLocaleString()}</strong></div>
               <div><span>Est. Cost</span><strong>${diagram.totalCostEstimateUsd.toFixed(3)}</strong></div>
             </div>
-            {!expanded ? (
-              <button type="button" className="tasks-toolbar__btn" onClick={onOpenModal}>
-                <Icon name="open_in_full" size={16} />
-                Expand Diagram
-              </button>
-            ) : null}
-            {expanded && onCloseModal ? (
-              <button type="button" className="tasks-toolbar__btn" onClick={onCloseModal}>
-                <Icon name="close" size={16} />
-                Close
-              </button>
-            ) : null}
+            <div className="tasks-pert__action-buttons">
+              {!expanded ? <span className="tasks-pert__zoom-badge">Zoom {Math.round(zoom * 100)}%</span> : null}
+              {!expanded ? (
+                <button
+                  type="button"
+                  className="tasks-toolbar__btn"
+                  onClick={() => setNodePositionOverrides({})}
+                  disabled={!hasNodeOverrides}
+                >
+                  <Icon name="refresh" size={16} />
+                  Reset Layout
+                </button>
+              ) : null}
+              {!expanded ? (
+                <button type="button" className="tasks-toolbar__btn" onClick={onOpenModal}>
+                  <Icon name="open_in_full" size={16} />
+                  Expand Diagram
+                </button>
+              ) : null}
+              {expanded && onCloseModal ? (
+                <button type="button" className="tasks-toolbar__btn" onClick={onCloseModal}>
+                  <Icon name="close" size={16} />
+                  Close
+                </button>
+              ) : null}
+            </div>
           </div>
         </div>
         {/* <div className="tasks-callout">
           PERT/CPM flow based on dependency arrows, expected duration, earliest/latest times, and slack across the active mission.
         </div> */}
-        <div className="tasks-pert__toolbar">
-          <div className="tasks-pert-hint">
-            <span>Wheel to zoom</span>
-            <span>Click and drag canvas to pan</span>
-            <span>Zoom {Math.round(zoom * 100)}%</span>
+        {expanded ? (
+          <div className="tasks-pert__toolbar">
+            <div className="tasks-pert-hint">
+              <span>Wheel to zoom</span>
+              <span>Click and drag canvas to pan</span>
+              <span>Drag node to reposition</span>
+              <span>Zoom {Math.round(zoom * 100)}%</span>
+            </div>
+            <div className="tasks-toolbar tasks-toolbar--inline-end">
+              <button
+                type="button"
+                className="tasks-toolbar__btn"
+                onClick={() => setNodePositionOverrides({})}
+                disabled={!hasNodeOverrides}
+              >
+                <Icon name="refresh" size={16} />
+                Reset Layout
+              </button>
+            </div>
           </div>
-        </div>
+        ) : null}
         <div
           ref={editorRef}
-          className={`tasks-pert-editor${expanded ? " tasks-pert-editor--expanded" : ""}${isDraggingViewport ? " tasks-pert-editor--dragging" : ""}`}
+          className={`tasks-pert-editor${expanded ? " tasks-pert-editor--expanded" : ""}${isDraggingViewport ? " tasks-pert-editor--dragging" : ""}${draggingNodeId ? " tasks-pert-editor--node-dragging" : ""}`}
           onWheel={handleEditorWheel}
           onPointerDown={handleEditorPointerDown}
           onPointerMove={handleEditorPointerMove}
@@ -1775,14 +2467,14 @@ function PertView({
             <div
               className="tasks-pert-editor__canvas"
               style={{
-                width: diagram.width,
-                height: diagram.height,
+                width: canvasBounds.width,
+                height: canvasBounds.height,
                 left: pan.x,
                 top: pan.y,
                 transform: `scale(${zoom})`,
               }}
             >
-            <svg className="tasks-pert-editor__edges" viewBox={`0 0 ${diagram.width} ${diagram.height}`} preserveAspectRatio="none">
+            <svg className="tasks-pert-editor__edges" viewBox={`0 0 ${canvasBounds.width} ${canvasBounds.height}`} preserveAspectRatio="none">
               <defs>
                 <marker id="tasks-pert-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-text-dim)" />
@@ -1792,8 +2484,8 @@ function PertView({
                 </marker>
               </defs>
               {diagram.edges.map((edge) => {
-                const from = diagram.nodes.find((node) => node.task.id === edge.fromId);
-                const to = diagram.nodes.find((node) => node.task.id === edge.toId);
+                const from = renderedNodeLookup.get(edge.fromId);
+                const to = renderedNodeLookup.get(edge.toId);
                 if (!from || !to) return null;
                 const startX = from.x + from.width;
                 const startY = from.y + from.height / 2;
@@ -1811,13 +2503,22 @@ function PertView({
                 );
               })}
             </svg>
-            {diagram.nodes.map((node) => (
+            {renderedNodes.map((node) => (
               <button
                 key={node.task.id}
                 type="button"
-                className={`tasks-pert__node${selectedTaskId === node.task.id ? " tasks-pert__node--selected" : ""}${node.task.state === "blocked" ? " tasks-pert__node--blocked" : ""}${node.critical ? " tasks-pert__node--critical" : ""}${node.task.state === "in_progress" ? " tasks-pert__node--active" : ""}${node.task.state === "done" || node.task.state === "review" ? " tasks-pert__node--done" : ""}`}
+                className={`tasks-pert__node${selectedTaskId === node.task.id ? " tasks-pert__node--selected" : ""}${node.task.state === "blocked" ? " tasks-pert__node--blocked" : ""}${node.critical ? " tasks-pert__node--critical" : ""}${node.task.state === "in_progress" ? " tasks-pert__node--active" : ""}${node.task.state === "done" || node.task.state === "review" ? " tasks-pert__node--done" : ""}${draggingNodeId === node.task.id ? " tasks-pert__node--dragging" : ""}`}
                 style={{ left: node.x, top: node.y, width: node.width, minHeight: node.height }}
-                onClick={() => onSelectTask(node.task.id)}
+                onPointerDown={(event) => handleNodePointerDown(event, node.task.id)}
+                onPointerMove={handleNodePointerMove}
+                onPointerUp={handleNodePointerUp}
+                onPointerCancel={handleNodePointerUp}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectTask(node.task.id);
+                  }
+                }}
               >
                 <div className="tasks-pert__node-topline">
                   <span className="tasks-pert__node-id">{node.task.id}</span>

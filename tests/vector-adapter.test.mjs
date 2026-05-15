@@ -179,6 +179,57 @@ describe("Vector Adapter", () => {
         assert.strictEqual(typeof doc.score, "number")
       }
     })
+
+    it("sends top_n (and top_k compatibility) to pvector query endpoint", async () => {
+      const prevFetch = globalThis.fetch
+      const prevPvector = process.env.MAH_PVECTOR_URL
+      const prevQmdPath = process.env.MAH_QMD_PATH
+      let queryBody = null
+
+      globalThis.fetch = async (url, init = {}) => {
+        const asText = String(url)
+        if (asText.endsWith("/query")) {
+          queryBody = init.body ? JSON.parse(String(init.body)) : null
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [{ id: "vector/doc-1", score: 0.93, metadata: { source: "mock" } }],
+            }),
+          }
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ status: "ok" }),
+        }
+      }
+
+      process.env.MAH_PVECTOR_URL = "http://localhost:8080"
+      process.env.MAH_QMD_PATH = "__qmd_missing_for_test__"
+
+      try {
+        const result = await retrieveWithVectorFallback(
+          { task: "vector test task", top_n: 7, agent: "planning-lead", crew: "dev" },
+          [],
+          { vectorFirst: true, timeout_ms: 2000 }
+        )
+
+        assert.strictEqual(result.provider, "pvector")
+        assert.strictEqual(result.fallback, false)
+        assert.ok(queryBody, "query request body should be captured")
+        assert.strictEqual(queryBody.top_n, 7)
+        assert.strictEqual(queryBody.top_k, 7)
+        assert.strictEqual(queryBody.filters.agent, "planning-lead")
+        assert.strictEqual(queryBody.filters.crew, "dev")
+      } finally {
+        globalThis.fetch = prevFetch
+        if (prevPvector === undefined) delete process.env.MAH_PVECTOR_URL
+        else process.env.MAH_PVECTOR_URL = prevPvector
+        if (prevQmdPath === undefined) delete process.env.MAH_QMD_PATH
+        else process.env.MAH_QMD_PATH = prevQmdPath
+      }
+    })
   })
 
   describe("scoreDocumentsLexical", () => {

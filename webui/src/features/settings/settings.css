@@ -385,6 +385,129 @@
   gap: 8px;
 }
 
+.settings-context-tools {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.375rem;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  background: var(--color-surface-neutral);
+}
+
+.settings-context-config {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.375rem;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  background: var(--color-surface-neutral);
+}
+
+.settings-context-config code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.settings-context-config__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-context-presets {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-context-presets__label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.settings-context-tools__header {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.settings-context-tools__hint {
+  margin: 0;
+  color: var(--color-text-dim);
+  font-size: 12px;
+}
+
+.settings-context-tools__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-context-search {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.settings-context-search__run {
+  justify-content: center;
+  align-self: stretch;
+}
+
+.settings-context-tools__error,
+.settings-context-tools__success {
+  margin: 0;
+  font-size: 12px;
+}
+
+.settings-context-tools__error {
+  color: #ff7a7a;
+}
+
+.settings-context-tools__success {
+  color: #67d4a3;
+}
+
+.settings-context-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.settings-context-results {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 0.375rem;
+}
+
+.settings-context-sticky-stats {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--color-surface);
+  padding: 4px 0 10px 0;
+  margin-top: -4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.settings-expertise-sticky-stats {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  background: var(--color-surface);
+  padding: 4px 0 10px 0;
+  margin-top: -4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
 .settings-teams-list {
   list-style: none;
   margin: 0;
@@ -470,6 +593,14 @@
   .settings-sidebar__tab--active {
     border-bottom-color: var(--color-cyan);
     border-left-color: transparent;
+  }
+
+  .settings-context-search {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-context-config__grid {
+    grid-template-columns: 1fr;
   }
 }
 

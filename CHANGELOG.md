@@ -5,16 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on Keep a Changelog, and Semantic Versioning is applied conservatively in pre-1.0 mode (`0.x`).
 
 
+## [0.10.1] - Unreleased
+
+### Added
+
+- WebUI `Settings > Context Memory` now has a persisted **Vector Runtime Config** block wired to workspace `.env`:
+  - `MAH_VECTOR_RETRIEVAL`
+  - `MAH_QMD_PATH`
+  - `MAH_PVECTOR_URL`
+  - `MAH_PVECTOR_COLLECTION`
+  - `MAH_PGVECTOR_DSN`
+  - `MAH_PGVECTOR_TABLE`
+  - `MAH_PGVECTOR_COLLECTION_MODE`
+- New WebUI API endpoint `GET/PUT /api/mah/context-settings` in `webui/vite.config.ts` and `webui/vite.config.js` for context/vector runtime configuration management.
+- New WebUI API endpoint `POST /api/mah/context-vector-action` for operational vector actions:
+  - `index_qdrant` → runs `scripts/context/index-to-qdrant.py`
+  - `index_pgvector` → runs `scripts/context/index-to-pgvector.py`
+  - `proxy_health` → checks `<MAH_PVECTOR_URL>/health`
+- Context Memory presets in Settings:
+  - `Qdrant`
+  - `pgvector`
+  - `qmd`
+
+### Changed
+
+- Context Memory operator workflow in WebUI is now end-to-end from Settings:
+  - Save/reload vector runtime configuration
+  - Trigger vector indexing for Qdrant or pgvector
+  - Validate proxy health without leaving the UI
+- WebUI `Settings > Expertise` now mirrors `Context Memory` stats behavior: top stats are sticky and rendered without an extra section container to improve vertical space usage.
+- Context manager documentation expanded for vector backends and runtime setup/usage:
+  - Qdrant via Docker (ready path)
+  - qmd direct CLI adapter
+  - native pgvector proxy and indexer flow
+
+### Fixed
+
+- pvector adapter request payload now sends `top_n` (keeping `top_k` compatibility), aligning MAH adapter calls with proxy contract.
+- qmd adapter execution is more resilient across command variants (`query/search`, optional `--limit`) and output shapes.
+- qmd semantic results now preserve source filename/path in normalized MAH result IDs (instead of `qmd-result-*` fallbacks when metadata is available).
+- MAH home bootstrap copy flow is now resilient to local virtualenv/symlink tree edge-cases under `scripts/` (avoids non-directory overwrite failures while preparing `~/.mah` overlay).
+
+
 ## v0.10.0 — Post-v0.9.0 Evolution (2026-05-09)
 
 ### Three Pillars
 
 **Vector-aware Context Memory**
 - `scripts/context/vector-adapter.mjs` — checks qmd/pvector availability, queries vector store or falls back to file-based retrieval; same `RetrievalResult` shape for both paths
+- `scripts/context/vector-adapter.mjs` — qmd command compatibility improved (`query/search`, optional `--limit`) and pvector payload now sends `top_n` (with `top_k` compatibility)
 - `scripts/context/pvector-proxy.py` — FastAPI proxy bridging MAH's pvector REST contract to Qdrant vector search with auto-embedding via `sentence-transformers` (all-MiniLM-L6-v2, 384d)
 - `scripts/context/pvector-proxy/pyproject.toml` — Python project config with `fastapi`, `httpx`, `uvicorn`, optional `sentence-transformers` embed extra
 - `scripts/context/index-to-qdrant.py` — indexes `.mah/context/operational/` docs into Qdrant using all-MiniLM-L6-v2 embeddings (384d cosine)
 - `scripts/context/pvector-setup.sh` — one-shot setup: installs dependencies, creates Qdrant collection `mah-context` (384d cosine)
+- `scripts/context/pvector-pgvector-proxy.py` — native FastAPI proxy for PostgreSQL + pgvector implementing MAH pvector contract (`/health`, `/query`)
+- `scripts/context/pvector-pgvector-proxy/pyproject.toml` — project config for native pgvector proxy dependencies (`psycopg[binary]`, `fastapi`, `uvicorn`)
+- `scripts/context/index-to-pgvector.py` — native pgvector indexer for `.mah/context/operational/` docs (384d embeddings + upsert)
+- `scripts/context/pvector-pgvector-setup.sh` — one-shot setup for pgvector Docker container, schema bootstrap, and runtime env guidance
 - `scripts/context/retrieval-benchmark.mjs` — benchmarks vector vs file-based retrieval: provider, elapsed_ms, scores, Jaccard overlap, speedup ratio
 - CLI-gated by `MAH_VECTOR_RETRIEVAL=1` / `MAH_PVECTOR_URL` env vars; no mandatory vector store dependency
 - Qdrant 1.18+ support with `indexing_threshold_kb` optimizer config for small datasets

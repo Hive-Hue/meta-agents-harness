@@ -367,7 +367,7 @@
 
 .tasks-board {
   display: grid;
-  grid-template-columns: repeat(5, minmax(180px, 1fr));
+  grid-template-columns: repeat(6, minmax(180px, 1fr));
   gap: 16px;
   overflow-x: auto;
 }
@@ -405,7 +405,9 @@
 
 .tasks-board--expanded {
   align-items: stretch;
-  overflow: hidden;
+  overflow-x: auto;
+  grid-template-columns: repeat(6, minmax(220px, 1fr));
+  gap: 14px;
 }
 
 .tasks-board__column--expanded {
@@ -624,7 +626,7 @@
 
 .tasks-pert-editor {
   position: relative;
-  height: calc(100vh - 446px);
+  height: clamp(420px, calc(100vh - 350px), 72vh);
   overflow: hidden;
   border: 1px solid var(--color-border-subtle);
   border-radius: calc(var(--radius) + 4px);
@@ -650,7 +652,7 @@
 .tasks-pert__toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -695,6 +697,10 @@
   pointer-events: none;
 }
 
+.tasks-pert-editor--node-dragging {
+  cursor: default;
+}
+
 .tasks-pert-editor__edges {
   position: absolute;
   inset: 0;
@@ -736,6 +742,8 @@
 
 .tasks-pert__node {
   position: absolute;
+  cursor: grab;
+  user-select: none;
 }
 
 .tasks-replan__node {
@@ -857,6 +865,13 @@
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16), 0 16px 32px rgba(15, 23, 42, 0.12);
 }
 
+.tasks-pert__node--dragging {
+  cursor: grabbing;
+  z-index: 8;
+  transform: none;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.24), 0 18px 36px rgba(8, 47, 73, 0.28);
+}
+
 .tasks-replan__node--highlight {
   border-color: var(--color-secondary-cyan);
   background: var(--color-cyan-surface);
@@ -879,18 +894,111 @@
   font-size: 12px;
 }
 
+.tasks-pert__title-block {
+  min-width: 260px;
+}
+
+.tasks-pert__microhint {
+  margin: 6px 0 0;
+  color: var(--color-text-dim);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .tasks-pert__header-actions {
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-left: auto;
-  max-width: 760px;
+  flex: 1;
+  min-width: 0;
 }
 
 .tasks-pert__header-actions .tasks-kpis--inline {
-  margin-right: 32px;
+  margin-right: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.tasks-pert__action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.tasks-pert__zoom-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.tasks-pert-panel:not(.tasks-pert-panel--expanded) .tasks-panel__header {
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tasks-pert-panel:not(.tasks-pert-panel--expanded) .tasks-pert__header-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.tasks-pert-panel:not(.tasks-pert-panel--expanded) .tasks-pert__header-actions .tasks-kpis--inline {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tasks-pert-panel:not(.tasks-pert-panel--expanded) .tasks-pert__header-actions .tasks-kpis--inline div {
+  min-width: 90px;
+  flex: 0 0 auto;
+}
+
+.tasks-pert-panel:not(.tasks-pert-panel--expanded) .tasks-pert__action-buttons {
+  flex-wrap: nowrap;
+}
+
+.tasks-pert-panel {
+  gap: 10px;
+}
+
+.tasks-pert-panel--expanded {
+  padding: 12px;
+  gap: 8px;
+}
+
+.tasks-pert-panel--expanded .tasks-panel__header {
+  align-items: center;
+  gap: 10px;
+}
+
+.tasks-pert-panel--expanded .tasks-panel__label {
+  margin-bottom: 2px;
+}
+
+.tasks-pert-panel--expanded .tasks-pert__header-actions {
+  gap: 10px;
+  max-width: none;
+}
+
+.tasks-pert-panel--expanded .tasks-pert__header-actions .tasks-kpis--inline {
+  margin-right: 12px;
 }
 
 .tasks-legend {
@@ -1306,11 +1414,44 @@
 }
 
 .tasks-modal--pert .tasks-stack {
-  padding: 18px;
+  padding: 10px;
+}
+
+.tasks-modal-backdrop--pert {
+  inset: 72px 0 0;
+  margin-top: 0;
+  align-items: flex-start;
+  padding: 10px;
+}
+
+.tasks-modal--pert {
+  width: min(1980px, calc(100vw - 12px));
+  max-height: calc(100vh - 84px);
+  max-height: calc(100dvh - 84px);
+  overflow: hidden;
 }
 
 .tasks-modal--board .tasks-stack {
   padding: 18px;
+}
+
+.tasks-modal--board {
+  width: min(1880px, calc(100vw - 24px));
+  max-height: calc(100vh - 36px);
+}
+
+.tasks-modal-backdrop--task-inspector {
+  z-index: 45;
+}
+
+.tasks-modal--task-inspector {
+  width: min(1120px, calc(100vw - 40px));
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
+.tasks-modal--task-inspector .task-inspector {
+  height: min(760px, calc(100vh - 132px));
 }
 
 .tasks-modal--compose {
@@ -1387,7 +1528,9 @@
 }
 
 .tasks-pert-editor--expanded {
-  height: min(400px, calc(100vh - 260px));
+  height: calc(100vh - 220px);
+  min-height: 520px;
+  max-height: 84vh;
 }
 
 .tasks-flow-guide__notes {
@@ -1547,6 +1690,10 @@
   .tasks-replan {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
   }
+
+  .tasks-board--expanded {
+    grid-template-columns: repeat(6, minmax(190px, 1fr));
+  }
 }
 
 @media (max-width: 960px) {
@@ -1596,6 +1743,10 @@
     grid-template-columns: 1fr;
   }
 
+  .tasks-board--expanded {
+    grid-template-columns: repeat(6, minmax(170px, 1fr));
+  }
+
   .tasks-pert-controls {
     align-items: flex-start;
   }
@@ -1628,6 +1779,31 @@
 
   .tasks-modal-backdrop {
     padding: 12px;
+  }
+
+  .tasks-modal--board {
+    width: calc(100vw - 12px);
+  }
+
+  .tasks-modal--pert {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 80px);
+    max-height: calc(100dvh - 80px);
+  }
+
+  .tasks-modal-backdrop--pert {
+    inset: 68px 0 0;
+    padding: 6px;
+  }
+
+  .tasks-modal--task-inspector {
+    width: calc(100vw - 12px);
+  }
+
+  .tasks-pert-editor--expanded {
+    height: calc(100vh - 250px);
+    min-height: 420px;
+    max-height: 76vh;
   }
 
   .tasks-toast {
@@ -2078,6 +2254,20 @@
 
 .task-inspector__action-btn:hover {
   border-color: var(--color-secondary-cyan);
+}
+
+.task-inspector__action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.task-inspector__action-btn--danger {
+  border-color: rgba(239, 68, 68, 0.45);
+  color: var(--color-error);
+}
+
+.task-inspector__action-btn--danger:hover {
+  border-color: rgba(239, 68, 68, 0.65);
 }
 
 .task-inspector__no-actions {

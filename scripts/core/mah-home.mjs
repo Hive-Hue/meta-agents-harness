@@ -1,4 +1,4 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const defaultPackageRoot = path.resolve(__dirname, "..")
+const COPY_SKIP_ENTRIES = new Set([".git", ".venv", "node_modules", "__pycache__"])
 export const CANONICAL_MAH_SKILLS = [
   "active-listener",
   "bootstrap",
@@ -42,22 +43,41 @@ function copyDirectoryTree(sourcePath, targetPath) {
   }
   mkdirSync(targetPath, { recursive: true })
   for (const entry of readdirSync(sourcePath, { withFileTypes: true })) {
+    if (COPY_SKIP_ENTRIES.has(entry.name)) continue
     const sourceEntry = path.join(sourcePath, entry.name)
     const targetEntry = path.join(targetPath, entry.name)
-    if (existsSync(targetEntry)) {
+    let sourceIsDirectory = entry.isDirectory()
+    if (!sourceIsDirectory) {
       try {
-        if (lstatSync(targetEntry).isSymbolicLink()) {
-          rmSync(targetEntry, { recursive: true, force: true })
-        }
+        sourceIsDirectory = statSync(sourceEntry).isDirectory()
       } catch {
-        // ignore stat errors and let cpSync decide
+        sourceIsDirectory = false
       }
     }
-    if (entry.isDirectory()) {
+
+    if (existsSync(targetEntry)) {
+      try {
+        const targetStats = lstatSync(targetEntry)
+        if (targetStats.isSymbolicLink()) {
+          rmSync(targetEntry, { recursive: true, force: true })
+        } else if (sourceIsDirectory && !targetStats.isDirectory()) {
+          rmSync(targetEntry, { recursive: true, force: true })
+        } else if (!sourceIsDirectory) {
+          // For file-like entries (including symlinks to files), replace target
+          // unconditionally to avoid file/dir type mismatches across environments.
+          rmSync(targetEntry, { recursive: true, force: true })
+        }
+      } catch (error) {
+        throw new Error(`Failed to prepare target entry ${targetEntry}: ${error?.message || error}`)
+      }
+    }
+    if (sourceIsDirectory) {
       copyDirectoryTree(sourceEntry, targetEntry)
       continue
     }
-    cpSync(sourceEntry, targetEntry, { force: true, dereference: true })
+    // Some virtualenv/toolchain symlinks can resolve to directories when
+    // dereferenced, so keep recursive enabled for this copy path.
+    cpSync(sourceEntry, targetEntry, { force: true, dereference: true, recursive: true })
   }
   return true
 }
