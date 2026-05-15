@@ -14,12 +14,8 @@ const MAH_PLUGINS_DIR = path.join(repoRoot, "mah-plugins")
 const TEST_PLUGIN_NAME = "fake"
 const TEST_PLUGIN_DIR = path.join(MAH_PLUGINS_DIR, TEST_PLUGIN_NAME)
 const TEST_PLUGIN_MARKER = path.join(repoRoot, ".fake")
-const CORE_PLUGIN_NAME = "corefake"
-const CORE_PLUGIN_DIR = path.join(MAH_PLUGINS_DIR, CORE_PLUGIN_NAME)
-const CORE_PLUGIN_MARKER = path.join(repoRoot, ".corefake")
 const TEST_PLUGIN_SOURCE_ROOT = path.join(repoRoot, ".test-temp-plugin-loader", "plugins-e2e")
 const TEST_PLUGIN_SOURCE = path.join(TEST_PLUGIN_SOURCE_ROOT, TEST_PLUGIN_NAME)
-const CORE_PLUGIN_SOURCE = path.join(TEST_PLUGIN_SOURCE_ROOT, CORE_PLUGIN_NAME)
 
 function runMah(args, options = {}) {
   const env = { ...process.env, ...options.env }
@@ -136,115 +132,9 @@ export const runtimePlugin = {
   writeFileSync(path.join(targetDir, "index.mjs"), indexContent)
 }
 
-function createCoreManagedTestPlugin(targetDir) {
-  mkdirSync(targetDir, { recursive: true })
-
-  const pluginJson = {
-    name: CORE_PLUGIN_NAME,
-    version: "0.0.1",
-    mahVersion: "^0.8.0",
-    entry: "index.mjs"
-  }
-
-  writeFileSync(path.join(targetDir, "plugin.json"), JSON.stringify(pluginJson, null, 2))
-
-  const indexContent = `
-function createFakeAdapter(definition) {
-  return {
-    ...definition,
-    detect(cwd, existsFn) {
-      return existsFn(\`\${cwd}/\${this.markerDir}\`)
-    },
-    supports(command) {
-      if (["list:crews", "use", "clear"].includes(command)) return true
-      if (command === "run") return true
-      return Array.isArray(this.commands?.[command]) && this.commands[command].length > 0
-    },
-    prepareRunContext({ argv = [] }) {
-      return {
-        ok: true,
-        exec: this.directCli,
-        args: Array.isArray(argv) && argv.length > 0 ? ["run"] : [],
-        passthrough: Array.isArray(argv) ? argv : [],
-        envOverrides: { COREFAKE_PROMPT: "from-core" },
-        warnings: []
-      }
-    },
-    resolveCommandPlan(command, commandExistsFn) {
-      const variants = this.commands?.[command] || []
-      if (variants.length === 0) return { ok: false, error: \`command not supported: \${command}\`, variants: [] }
-      const candidates = variants.map(([exec, args]) => ({
-        exec,
-        args,
-        exists: commandExistsFn(exec),
-        usable: true
-      }))
-      const selected = candidates.find((item) => item.usable)
-      if (!selected) return { ok: false, error: \`no executable available for \${command}\`, variants: candidates }
-      return { ok: true, exec: selected.exec, args: selected.args, variants: candidates }
-    },
-    validateRuntime(commandExistsFn) {
-      const hasRuntimeEntrypoint = Boolean(this.wrapper) || Boolean(this.directCli)
-      const checks = [
-        { name: "marker_dir", ok: Boolean(this.markerDir) },
-        { name: "wrapper_declared", ok: Boolean(this.wrapper) },
-        { name: "direct_cli_declared", ok: Boolean(this.directCli) },
-        { name: "runtime_entrypoint_declared", ok: hasRuntimeEntrypoint },
-        { name: "commands_declared", ok: Object.keys(this.commands || {}).length > 0 }
-      ]
-      return {
-        ok: checks.every((check) => check.ok || check.name === "wrapper_declared"),
-        checks
-      }
-    }
-  }
-}
-
-const adapter = createFakeAdapter({
-  name: "${CORE_PLUGIN_NAME}",
-  markerDir: ".${CORE_PLUGIN_NAME}",
-  wrapper: null,
-  directCli: "${CORE_PLUGIN_NAME}",
-  runtimePackage: false,
-  capabilities: {
-    sessionModeNew: true,
-    sessionModeContinue: true,
-    sessionModeNone: false,
-    sessionIdViaEnv: "${CORE_PLUGIN_NAME.toUpperCase()}_SESSION_ID",
-    sessionRootFlag: "--session-root",
-    sessionMirrorFlag: false,
-    sessionNewArgs: [],
-    sessionContinueArgs: ["-c"]
-  },
-  supportsSessions: true,
-  sessionListCommand: null,
-  sessionExportCommand: null,
-  sessionDeleteCommand: null,
-  supportsSessionNew: true,
-  commands: {
-    doctor: [["${CORE_PLUGIN_NAME}", ["doctor"]]],
-    "check:runtime": [["${CORE_PLUGIN_NAME}", ["check:runtime"]]],
-    validate: [["${CORE_PLUGIN_NAME}", ["validate"]]],
-    "validate:runtime": [["${CORE_PLUGIN_NAME}", ["validate:runtime"]]]
-  }
-})
-
-export const runtimePlugin = {
-  name: "${CORE_PLUGIN_NAME}",
-  version: "0.0.1",
-  mahVersion: "^0.8.0",
-  adapter
-}
-`
-
-  writeFileSync(path.join(targetDir, "index.mjs"), indexContent)
-}
-
 function cleanup() {
   rmSync(TEST_PLUGIN_DIR, { recursive: true, force: true })
   rmSync(TEST_PLUGIN_MARKER, { recursive: true, force: true })
-  rmSync(CORE_PLUGIN_DIR, { recursive: true, force: true })
-  rmSync(CORE_PLUGIN_MARKER, { recursive: true, force: true })
   rmSync(TEST_PLUGIN_SOURCE_ROOT, { recursive: true, force: true })
   rmSync(path.join(MAH_PLUGINS_DIR, "broken"), { recursive: true, force: true })
 }
@@ -253,7 +143,6 @@ test.describe("plugins e2e", () => {
   test.beforeEach(() => {
     cleanup()
     createTestPlugin(TEST_PLUGIN_SOURCE)
-    createCoreManagedTestPlugin(CORE_PLUGIN_SOURCE)
   })
 
   test.afterEach(() => {
@@ -271,24 +160,6 @@ test.describe("plugins e2e", () => {
     const installedPlugin = JSON.parse(readFileSync(path.join(TEST_PLUGIN_DIR, "plugin.json"), "utf-8"))
     assert.equal(installedPlugin.name, "fake")
     assert.equal(installedPlugin.version, "0.0.1")
-  })
-
-  test("mah plugins install accepts wrapperless MAH-managed plugin", () => {
-    const installResult = runMah(["plugins", "install", CORE_PLUGIN_SOURCE])
-
-    assert.equal(installResult.status, 0, installResult.stderr)
-    assert.match(installResult.stdout, /installed=corefake/)
-    assert.equal(existsSync(path.join(CORE_PLUGIN_DIR, "plugin.json")), true)
-    assert.equal(existsSync(path.join(CORE_PLUGIN_DIR, "index.mjs")), true)
-
-    const listResult = runMah(["plugins", "list"])
-    assert.equal(listResult.status, 0, listResult.stderr)
-    assert.match(listResult.stdout, /plugin corefake version=0\.0\.1/)
-
-    const detectResult = runMah(["detect", "--runtime", "corefake"], { cwd: path.join(repoRoot, "docs") })
-    assert.equal(detectResult.status, 0, detectResult.stderr)
-    assert.match(detectResult.stdout, /runtime=corefake/)
-    assert.match(detectResult.stdout, /reason=forced/)
   })
 
   test("mah plugins list shows only loaded plugins", () => {

@@ -6,6 +6,14 @@ const TASKS_STORAGE_DIR = path.join(".mah", "tasks")
 const TASKS_FILE = "tasks.yaml"
 const MISSIONS_FILE = "missions.yaml"
 
+function assertTaskMutationsEnabled() {
+  const raw = `${process.env.MAH_DISABLE_TASK_MUTATIONS || ""}`.trim().toLowerCase()
+  const disabled = raw === "1" || raw === "true" || raw === "yes"
+  if (disabled) {
+    throw new Error("task mutations are disabled for this run context")
+  }
+}
+
 function toTaskRuntime(runtime = "") {
   return `${runtime || "openclaude"}`.trim() || "openclaude"
 }
@@ -172,6 +180,7 @@ export function listTasks(repoRoot, filters = {}) {
 }
 
 export function createTask(repoRoot, payload = {}) {
+  assertTaskMutationsEnabled()
   const { tasks } = readTaskStore(repoRoot)
   const task = normalizeTaskRecord(payload, tasks)
   const nextTasks = [task, ...tasks]
@@ -180,6 +189,7 @@ export function createTask(repoRoot, payload = {}) {
 }
 
 export function updateTask(repoRoot, taskId, updates = {}) {
+  assertTaskMutationsEnabled()
   const { tasks } = readTaskStore(repoRoot)
   let updatedTask = null
   const nextTasks = tasks.map((task) => {
@@ -200,6 +210,7 @@ export function updateTask(repoRoot, taskId, updates = {}) {
 }
 
 export function deleteTask(repoRoot, taskId) {
+  assertTaskMutationsEnabled()
   const { tasks } = readTaskStore(repoRoot)
   const task = tasks.find((item) => item.id === taskId) || null
   if (!task) return { task: null, tasks }

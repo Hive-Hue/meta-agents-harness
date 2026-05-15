@@ -8,9 +8,11 @@ type MonitorTab = "lifecycle" | "logs" | "artifacts";
 type ExecutionMonitorProps = {
   events: LifecycleEvent[];
   logLines: { time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }[];
+  contextDocs: Array<{ name: string; size: string; relevance: number }>;
+  artifacts: Array<{ path: string; action: "created" | "modified"; size: string }>;
 };
 
-export function ExecutionMonitor({ events, logLines }: ExecutionMonitorProps) {
+export function ExecutionMonitor({ events, logLines, contextDocs, artifacts }: ExecutionMonitorProps) {
   const [activeTab, setActiveTab] = useState<MonitorTab>("lifecycle");
 
   const tabs: { id: MonitorTab; label: string }[] = [
@@ -36,7 +38,7 @@ export function ExecutionMonitor({ events, logLines }: ExecutionMonitorProps) {
       <div className="run-monitor__panel">
         {activeTab === "lifecycle" && <LifecycleTimeline events={events} />}
         {activeTab === "logs" && <LogPanel logs={logLines} />}
-        {activeTab === "artifacts" && <ArtifactsPanel />}
+        {activeTab === "artifacts" && <ArtifactsPanel contextDocs={contextDocs} artifacts={artifacts} />}
       </div>
     </div>
   );

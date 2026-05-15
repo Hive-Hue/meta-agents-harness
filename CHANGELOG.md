@@ -38,6 +38,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
   - Qdrant via Docker (ready path)
   - qmd direct CLI adapter
   - native pgvector proxy and indexer flow
+- WebUI `Tasks -> Run Task -> /run` flow now opens Run Console with task prefill (`summary`, `crew`, `runtime`) without triggering an immediate second run.
+- Run Console runtime selector now preserves task runtime values even when they are not in the pre-detected runtime list.
+- Run Console artifacts detection now merges runtime session artifacts with workspace file changes during the run window, improving visibility for runtimes that write directly to repo paths.
 
 ### Fixed
 
@@ -45,6 +48,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - qmd adapter execution is more resilient across command variants (`query/search`, optional `--limit`) and output shapes.
 - qmd semantic results now preserve source filename/path in normalized MAH result IDs (instead of `qmd-result-*` fallbacks when metadata is available).
 - MAH home bootstrap copy flow is now resilient to local virtualenv/symlink tree edge-cases under `scripts/` (avoids non-directory overwrite failures while preparing `~/.mah` overlay).
+- Ad-hoc runs from `/run` now execute with task-mutation guard (`MAH_DISABLE_TASK_MUTATIONS=1`) to avoid creating/updating backlog tasks as side effects.
+- `mah task run` now also enforces task-mutation guard for the nested runtime execution path, preventing unintended task creation during run delegation.
+- OpenCode headless runs now temporarily elevate `.opencode/opencode.json` `ask` permissions to `allow` during execution and restore original config afterward, eliminating silent write rejection in non-interactive runs.
+- OpenClaude and Claude headless runs now pass explicit permission mode (`--permission-mode acceptEdits`) by default when not already provided.
+- Claude headless argument ordering for `ccr code` has been corrected to preserve prompt input in `-p` mode.
 
 
 ## v0.10.0 — Post-v0.9.0 Evolution (2026-05-09)

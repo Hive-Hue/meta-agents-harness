@@ -211,6 +211,36 @@ function loadPiDefaultExtensions(repoRoot) {
   }
 }
 
+function resolveCrewOrchestratorModel(repoRoot, crew = "dev") {
+  const metaPath = path.join(repoRoot, "meta-agents.yaml")
+  if (!existsSync(metaPath)) return ""
+  try {
+    const meta = YAML.parse(readFileSync(metaPath, "utf-8")) || {}
+    const catalogModels = meta?.catalog?.models && typeof meta.catalog.models === "object"
+      ? meta.catalog.models
+      : {}
+    const catalogFallbacks = meta?.catalog?.model_fallbacks && typeof meta.catalog.model_fallbacks === "object"
+      ? meta.catalog.model_fallbacks
+      : {}
+    const crewList = Array.isArray(meta?.crews) ? meta.crews : []
+    const crewConfig = crewList.find((item) => `${item?.id || ""}`.trim() === `${crew || "dev"}`.trim()) || crewList[0]
+    const agents = Array.isArray(crewConfig?.agents) ? crewConfig.agents : []
+    const orchestratorAgent = agents.find((item) => `${item?.role || ""}`.trim() === "orchestrator") || agents[0]
+    const modelRef = `${orchestratorAgent?.model_ref || ""}`.trim()
+    if (!modelRef) return ""
+    const primary = `${catalogModels?.[modelRef] || ""}`.trim()
+    const fallbackList = Array.isArray(catalogFallbacks?.[modelRef])
+      ? catalogFallbacks[modelRef].map((item) => `${item || ""}`.trim()).filter(Boolean)
+      : []
+    // Some catalog aliases (e.g. "*-coding-plan/*") are not accepted directly by PI CLI.
+    if (!primary) return fallbackList[0] || ""
+    if (/coding-plan\//i.test(primary) && fallbackList.length > 0) return fallbackList[0]
+    return primary
+  } catch {
+    return ""
+  }
+}
+
 function parsePiExtensionArgs(repoRoot, argv = []) {
   const collected = []
   const remaining = []
@@ -1104,6 +1134,19 @@ function hasHermesModelFlag(args = []) {
   return false
 }
 
+function hasPiModelFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "-m" || token === "--model" || token.startsWith("--model=")) return true
+  }
+  return false
+}
+
+function getPiModelArgs(fallbackModel = "", passthroughArgs = []) {
+  if (!fallbackModel || hasPiModelFlag(passthroughArgs)) return []
+  return ["--model", fallbackModel]
+}
+
 function hasHermesProviderFlag(args = []) {
   for (let i = 0; i < args.length; i += 1) {
     const token = `${args[i] || ""}`
@@ -1142,6 +1185,14 @@ function hasHermesQueryFlag(args = []) {
   for (let i = 0; i < args.length; i += 1) {
     const token = `${args[i] || ""}`
     if (token === "-q" || token === "--query" || token.startsWith("--query=")) return true
+  }
+  return false
+}
+
+function hasPermissionModeFlag(args = []) {
+  for (let i = 0; i < args.length; i += 1) {
+    const token = `${args[i] || ""}`
+    if (token === "--permission-mode" || token.startsWith("--permission-mode=")) return true
   }
   return false
 }
@@ -1752,6 +1803,43 @@ export function prepareOpencodeRunContext({ repoRoot, crew, configPath, argv = [
 }
 
 export function executeOpencodePreparedRun({ repoRoot, plan, runCommand }) {
+  const runWithTemporaryHeadlessPermissions = (callback) => {
+    const isHeadless = `${plan?.envOverrides?.OPENCODE_HEADLESS || ""}`.trim() === "1"
+    if (!isHeadless) return callback()
+
+    const configPath = path.join(repoRoot, ".opencode", "opencode.json")
+    if (!existsSync(configPath)) return callback()
+
+    let original = ""
+    try {
+      original = readFileSync(configPath, "utf-8")
+      const parsed = JSON.parse(original)
+      const permission = parsed && typeof parsed === "object" && parsed.permission && typeof parsed.permission === "object"
+        ? parsed.permission
+        : null
+      if (!permission) return callback()
+
+      const next = { ...parsed, permission: { ...permission } }
+      for (const tool of ["edit", "bash", "webfetch", "websearch"]) {
+        if (`${next.permission[tool] || ""}`.trim().toLowerCase() === "ask") {
+          next.permission[tool] = "allow"
+        }
+      }
+      writeFileSync(configPath, `${JSON.stringify(next, null, 2)}\n`, "utf-8")
+      return callback()
+    } catch {
+      return callback()
+    } finally {
+      if (original) {
+        try {
+          writeFileSync(configPath, original, "utf-8")
+        } catch {
+          // best effort restore
+        }
+      }
+    }
+  }
+
   const internal = plan.internal || {}
   if (internal.crew) {
     activateOpencodeCrewState({
@@ -1761,7 +1849,9 @@ export function executeOpencodePreparedRun({ repoRoot, plan, runCommand }) {
     })
   }
   const envOverrides = plan.envOverrides || {}
-  const status = runCommand(plan.exec, plan.args || [], plan.passthrough || [], envOverrides)
+  const status = runWithTemporaryHeadlessPermissions(() =>
+    runCommand(plan.exec, plan.args || [], plan.passthrough || [], envOverrides)
+  )
   try {
     if (internal.crew) {
       const explicitSessionId = parseOpencodeSessionIdFromArgs([...(plan.args || []), ...(plan.passthrough || [])])
@@ -1961,7 +2051,7 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
  * Prepare headless execution context for PI runtime.
  * PI supports native headless execution via direct CLI with task as argv.
  */
-export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], envOverrides = {} }) {
+export function preparePiHeadlessRunContext({ repoRoot, crew = "dev", task = "", argv = [], envOverrides = {} }) {
   const warnings = []
 
   if (!task && (!argv || argv.length === 0)) {
@@ -1979,6 +2069,8 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
     : loadPiDefaultExtensions(repoRoot).map((item) => resolvePiAssetPath(repoRoot, item))
 
   const loadedEnv = loadPiRuntimeEnv(repoRoot, envOverrides)
+  const fallbackModel = `${envOverrides.MAH_AGENT_MODEL_CANONICAL || envOverrides.MAH_PI_MODEL || envOverrides.MAH_AI_MODEL || process.env.MAH_AGENT_MODEL_CANONICAL || process.env.MAH_PI_MODEL || process.env.MAH_AI_MODEL || resolveCrewOrchestratorModel(repoRoot, crew) || ""}`.trim()
+  const modelArgs = getPiModelArgs(fallbackModel, argv)
 
   // Build task args - PI accepts task directly as argument in headless mode
   const taskArgs = []
@@ -1993,6 +2085,7 @@ export function preparePiHeadlessRunContext({ repoRoot, task = "", argv = [], en
     exec: "pi",
     args: [
       ...extensionPaths.flatMap((item) => ["-e", item]),
+      ...modelArgs,
       "-p"
     ],
     passthrough: taskArgs,
@@ -2033,6 +2126,7 @@ export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = []
   } else if (argv.length > 0) {
     taskArgs.push(...argv)
   }
+  const permissionArgs = hasPermissionModeFlag(argv) ? [] : ["--permission-mode", "acceptEdits"]
 
   // Claude in headless mode uses -p to run non-interactively
   return {
@@ -2040,6 +2134,7 @@ export function prepareClaudeHeadlessRunContext({ repoRoot, task = "", argv = []
     exec: "ccr",
     args: [
       "code",
+      ...permissionArgs,
       "-p"
     ],
     passthrough: taskArgs,
@@ -2075,10 +2170,12 @@ export function prepareOpenclaudeHeadlessRunContext({ repoRoot, task = "", argv 
     taskArgs.push(...argv)
   }
 
+  const permissionArgs = hasPermissionModeFlag(argv) ? [] : ["--permission-mode", "acceptEdits"]
+
   return {
     ok: true,
     exec: "openclaude",
-    args: ["-p"],
+    args: ["-p", ...permissionArgs],
     passthrough: taskArgs,
     envOverrides: {
       ...envOverrides,

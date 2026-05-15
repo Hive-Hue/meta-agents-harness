@@ -465,7 +465,6 @@ export function TasksPage() {
     deleteMission,
     commitMissionScope,
     applyMissionReplan,
-    runTask,
   } = useTasksData(workspacePath);
   const [toast, setToast] = useState<TasksToast | null>(null);
   const [isBoardModalOpen, setIsBoardModalOpen] = useState(false);
@@ -775,7 +774,7 @@ export function TasksPage() {
       || "planning-lead";
     setTaskDraft({
       title: "",
-      missionId: selectedMissionId || missions[0]?.id || "",
+      missionId: "",
       crewId: preferredCrewId,
       owner: preferredOwner,
       runtime: "openclaude",
@@ -823,7 +822,7 @@ export function TasksPage() {
 
   const handleCreateTask = async () => {
     if (!taskDraft.title.trim()) return;
-    const missionId = taskDraft.missionId || selectedMissionId || "";
+    const missionId = taskDraft.missionId || "";
     try {
       const created = await createTask({
         title: taskDraft.title.trim(),
@@ -952,17 +951,29 @@ export function TasksPage() {
   };
 
   const handleRunTask = async (taskId: string) => {
-    try {
-      const updated = await runTask(taskId);
-      if (updated?.sessionId) {
-        updateTasksParams({ task: updated.id, mission: updated.missionId }, false);
-        setToast({ message: `Execução iniciada para ${updated.id}.`, tone: "info" });
-      }
-      const returnTo = `${location.pathname}?${searchParams.toString()}`;
-      navigate(`/run?returnTo=${encodeURIComponent(returnTo)}`);
-    } catch (nextError) {
-      setToast({ message: nextError instanceof Error ? nextError.message : String(nextError), tone: "error" });
+    if (!taskId) {
+      setToast({ message: "Task ID inválido para execução.", tone: "error" });
+      return;
     }
+    const taskBefore = tasks.find((item) => item.id === taskId);
+    if (!taskBefore) {
+      setToast({ message: "Task não encontrada para abrir no Run Console.", tone: "error" });
+      return;
+    }
+
+    const returnTo = `${location.pathname}?${searchParams.toString()}`;
+    const navTaskText = taskBefore.summary || taskBefore.title || taskId;
+    const navCrew = taskBefore.crewId || "dev";
+    const navRuntime = taskBefore.runtime || "pi";
+    navigate(`/run?returnTo=${encodeURIComponent(returnTo)}`, {
+      state: {
+        autoRun: false,
+        taskText: navTaskText,
+        crew: navCrew,
+        runtime: navRuntime,
+        sourceTaskId: taskId,
+      },
+    });
   };
 
   const handleResumeTaskSession = (task?: TaskRecord) => {
@@ -1087,6 +1098,7 @@ export function TasksPage() {
               selectedTaskId={selectedTaskId}
               selectedMission={selectedMission}
               onSelectTask={handleSelectTask}
+              onRunTask={(taskId) => void handleRunTask(taskId)}
               onOpenPert={() => handleSelectView("pert")}
               onOpenModal={() => setIsBoardModalOpen(true)}
               onTransitionTask={(taskId, newState) => void handleUpdateTask(taskId, { state: newState })}
@@ -1105,6 +1117,7 @@ export function TasksPage() {
               selectedTask={t12SelectedTask}
               onSelectTask={(task) => setT12SelectedTask(task)}
               onCloseInspector={() => setT12SelectedTask(null)}
+              onRunTask={(taskId) => void handleRunTask(taskId)}
               onTransition={async (taskId, newState) => {
                 // Sync with main tasks list
                 const updated = tasks.map(t => t.id === taskId ? { ...t, state: newState as TaskState } : t);
@@ -1570,6 +1583,22 @@ export function TasksPage() {
                 <button type="button" className="tasks-toolbar__btn" onClick={() => setIsTaskEditOpen(false)}>
                   Cancel
                 </button>
+                {(taskEditDraft.state || selectedTask.state) === "ready" ? (
+                  <button
+                    type="button"
+                    className="tasks-toolbar__btn"
+                    onClick={async () => {
+                      const ok = await handleUpdateTask(selectedTask.id, taskEditDraft);
+                      if (!ok) return;
+                      setIsTaskEditOpen(false);
+                      await handleRunTask(selectedTask.id);
+                    }}
+                    disabled={busyAction === `update-task-${selectedTask.id}` || busyAction === `run-task-${selectedTask.id}`}
+                  >
+                    <Icon name="play_circle" size={16} />
+                    {busyAction === `run-task-${selectedTask.id}` ? "Running..." : "Run Task"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="tasks-toolbar__btn tasks-toolbar__btn--primary"
@@ -1612,6 +1641,7 @@ export function TasksPage() {
               selectedTaskId={selectedTaskId}
               selectedMission={selectedMission}
               onSelectTask={handleSelectTask}
+              onRunTask={(taskId) => void handleRunTask(taskId)}
               onOpenPert={() => handleSelectView("pert")}
               onOpenModal={() => undefined}
               onCloseModal={() => setIsBoardModalOpen(false)}
@@ -1697,6 +1727,7 @@ function T12BoardView({
   selectedTask,
   onSelectTask,
   onCloseInspector,
+  onRunTask,
   onTransition,
   onEditTask,
   onDeleteTask,
@@ -1710,6 +1741,7 @@ function T12BoardView({
   selectedTask: TaskRecord | null;
   onSelectTask: (t: TaskRecord) => void;
   onCloseInspector: () => void;
+  onRunTask: (taskId: string) => void;
   onTransition: (taskId: string, newState: string) => void;
   onEditTask: (task: TaskRecord) => void;
   onDeleteTask: (taskId: string) => void;
@@ -1752,6 +1784,7 @@ function T12BoardView({
             <TaskInspectorPanel
               task={selectedTask}
               onClose={onCloseInspector}
+              onRunTask={onRunTask}
               onTransition={onTransition}
               onEditTask={(task) => {
                 onEditTask(task);
@@ -1774,6 +1807,7 @@ function BoardView({
   selectedTaskId,
   selectedMission,
   onSelectTask,
+  onRunTask,
   onOpenPert,
   onOpenModal,
   onCloseModal,
@@ -1787,6 +1821,7 @@ function BoardView({
   selectedTaskId: string;
   selectedMission?: MissionRecord;
   onSelectTask: (id: string) => void;
+  onRunTask: (taskId: string) => void;
   onOpenPert: () => void;
   onOpenModal: () => void;
   onCloseModal?: () => void;
@@ -1939,6 +1974,7 @@ function BoardView({
             <TaskInspectorPanel
               task={boardModalTask}
               onClose={closeTaskModal}
+              onRunTask={onRunTask}
               onTransition={(taskId, newState) => void onTransitionTask(taskId, newState as TaskState)}
               onEditTask={(task) => {
                 onEditTask(task);

@@ -6,6 +6,12 @@ Context Manager is an operational layer for retrieving relevant task context aft
 
 This document covers the planned `v0.9.0` implementation and current unreleased behavior.
 
+## WebUI Operational Notes (Unreleased)
+
+- `Tasks -> Run Task` now routes to `/run` with task prefill (`summary`, `crew`, `runtime`) and **does not auto-start** a second execution.
+- Headless runs started from `/run` are protected against backlog mutation side effects (`MAH_DISABLE_TASK_MUTATIONS=1`), so ad-hoc execution does not create/update task board entries implicitly.
+- Artifact collection in `/run` merges runtime session artifacts with workspace file changes detected during execution, which improves visibility for runtimes that write directly into the repository tree.
+
 ## What It Is
 
 Context Manager answers the question: **What does this agent need to remember to execute this task well?**

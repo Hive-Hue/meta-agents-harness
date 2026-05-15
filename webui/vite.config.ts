@@ -38,9 +38,134 @@ const runSessions = new Map<string, {
   events: Array<{ event: string; at: string; details?: Record<string, unknown> }>;
   logs: Array<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }>;
   status: "running" | "completed" | "failed";
+  artifacts: Array<{ path: string; action: "created" | "modified"; size: string }>;
+  contextDocs: Array<{ name: string; size: string; relevance: number }>;
   process?: ReturnType<typeof spawn>;
   createdAt: number;
 }>();
+
+function formatBytes(size: number): string {
+  if (!Number.isFinite(size) || size <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = size;
+  let idx = 0;
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024;
+    idx += 1;
+  }
+  return `${value >= 10 || idx === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[idx]}`;
+}
+
+function listRunArtifactsFromSessions(workspaceRoot: string, runtime: string, crew: string, sinceMs: number) {
+  const sessionsRoot = path.join(workspaceRoot, `.${runtime}`, "crew", crew || "dev", "sessions");
+  if (!existsSync(sessionsRoot)) return [];
+  const directories = readdirSync(sessionsRoot, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => {
+      const fullPath = path.join(sessionsRoot, entry.name);
+      const stats = statSync(fullPath);
+      return { name: entry.name, fullPath, mtimeMs: stats.mtimeMs };
+    })
+    .filter((item) => item.mtimeMs >= sinceMs - 60_000)
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, 8);
+
+  const files: Array<{ path: string; action: "created" | "modified"; size: string; mtimeMs: number }> = [];
+  for (const session of directories) {
+    for (const entry of readdirSync(session.fullPath, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const fullPath = path.join(session.fullPath, entry.name);
+      const stats = statSync(fullPath);
+      files.push({
+        path: path.relative(workspaceRoot, fullPath),
+        action: stats.ctimeMs >= sinceMs ? "created" : "modified",
+        size: formatBytes(stats.size),
+        mtimeMs: stats.mtimeMs,
+      });
+    }
+    const artifactsDir = path.join(session.fullPath, "artifacts");
+    if (!existsSync(artifactsDir)) continue;
+    for (const entry of readdirSync(artifactsDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const fullPath = path.join(artifactsDir, entry.name);
+      const stats = statSync(fullPath);
+      files.push({
+        path: path.relative(workspaceRoot, fullPath),
+        action: stats.ctimeMs >= sinceMs ? "created" : "modified",
+        size: formatBytes(stats.size),
+        mtimeMs: stats.mtimeMs,
+      });
+    }
+  }
+
+  return files
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, 20)
+    .map(({ mtimeMs, ...item }) => item);
+}
+
+function listWorkspaceChangedFiles(workspaceRoot: string, sinceMs: number) {
+  const files: Array<{ path: string; action: "created" | "modified"; size: string; mtimeMs: number }> = [];
+  const ignoredDirs = new Set([".git", "node_modules", ".next", "dist", "build"]);
+  const queue: string[] = [workspaceRoot];
+  const maxVisited = 20_000;
+  let visited = 0;
+
+  while (queue.length > 0 && visited < maxVisited) {
+    const current = queue.shift()!;
+    let entries: import("node:fs").Dirent[];
+    try {
+      entries = readdirSync(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      visited += 1;
+      if (visited >= maxVisited) break;
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (ignoredDirs.has(entry.name)) continue;
+        queue.push(fullPath);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      let stats;
+      try {
+        stats = statSync(fullPath);
+      } catch {
+        continue;
+      }
+      if (stats.mtimeMs < sinceMs - 2000) continue;
+      files.push({
+        path: path.relative(workspaceRoot, fullPath),
+        action: stats.ctimeMs >= sinceMs ? "created" : "modified",
+        size: formatBytes(stats.size),
+        mtimeMs: stats.mtimeMs,
+      });
+    }
+  }
+
+  return files
+    .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    .slice(0, 40);
+}
+
+function normalizeRuntimeId(runtime: string): string {
+  return `${runtime || ""}`.trim().toLowerCase().replace(/^\./, "").replace(/\/+$/, "");
+}
+
+function listRuntimeArtifacts(workspaceRoot: string, runtime: string, crew: string, sinceMs: number) {
+  const rt = normalizeRuntimeId(runtime);
+  if (!rt) return [];
+  const sessionArtifacts = listRunArtifactsFromSessions(workspaceRoot, rt, crew, sinceMs);
+  const workspaceArtifacts = listWorkspaceChangedFiles(workspaceRoot, sinceMs);
+  const merged = new Map<string, { path: string; action: "created" | "modified"; size: string; mtimeMs?: number }>();
+  for (const item of workspaceArtifacts) merged.set(item.path, item);
+  for (const item of sessionArtifacts) merged.set(item.path, item);
+  return Array.from(merged.values())
+    .slice(0, 40)
+    .map(({ mtimeMs, ...rest }) => rest);
+}
 
 const INTERACTIVE_RESUME_RUNTIMES = new Set(["claude", "opencode", "pi", "hermes", "kilo", "openclaude"]);
 const WEBUI_AUTH_COOKIE = "mah_webui_session";
@@ -1445,6 +1570,7 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
     try {
       const raw = Buffer.concat(chunks).toString("utf-8") || "{}";
       const { task = "", crew = "dev", runtime = ".pi/", routingScope = "active_crew" } = JSON.parse(raw);
+      const runtimeId = normalizeRuntimeId(runtime);
       if (!task.trim()) { res.statusCode = 400; res.end(JSON.stringify({ ok: false, error: "no task" })); return; }
 
       const workspaceRoot = resolveWorkspaceRoot(req);
@@ -1466,17 +1592,19 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
         events: [{ event: "queued", at: new Date().toISOString(), details: { label: "Queued", desc: "Task received" } }],
         logs: [{ time: tp(), level: "INFO", msg: "Starting run..." }],
         status: "running",
+        artifacts: [],
+        contextDocs: [],
         createdAt: Date.now(),
       });
 
       const envPath = path.join(workspaceRoot, ENV_FILENAME);
       const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
       const workspaceEnv = parseDotEnvContent(rawEnv);
-      const runArgs = [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtime, "--headless"];
+      const runArgs = [cliPath, "run", "--task", task, "--crew", crew, "--runtime", runtimeId || runtime, "--headless"];
       if (routingScope === "full_crews") runArgs.push("--full-crews");
       const child = spawn(process.execPath, runArgs, {
         cwd: workspaceRoot,
-        env: { ...process.env, ...workspaceEnv },
+        env: { ...process.env, ...workspaceEnv, MAH_DISABLE_TASK_MUTATIONS: "1" },
       });
 
       const session = runSessions.get(sessionId)!;
@@ -1500,13 +1628,21 @@ function handleRunStart(req: import("http").IncomingMessage, res: import("http")
         const sess = runSessions.get(sessionId);
         if (!sess) return;
         const lines = d.toString("utf-8").split("\n").filter(Boolean);
-        for (const line of lines) if (line.trim()) sess.logs.push({ time: tp(), level: "ERROR", msg: line.slice(0, 500) });
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          const isHardError = /^ERROR[:\s]/i.test(trimmed) || /^FATAL[:\s]/i.test(trimmed);
+          sess.logs.push({ time: tp(), level: isHardError ? "ERROR" : "WARN", msg: line.slice(0, 500) });
+        }
         runSessions.set(sessionId, sess);
       });
 
       child.on("close", (code) => {
         const sess = runSessions.get(sessionId);
         if (!sess) return;
+        const artifacts = listRuntimeArtifacts(workspaceRoot, runtimeId || runtime, crew, sess.createdAt);
+        sess.artifacts = artifacts;
+        sess.contextDocs = [];
         sess.status = code === 0 ? "completed" : "failed";
         sess.events.push({ event: code === 0 ? "completed" : "failed", at: new Date().toISOString(), details: { label: code === 0 ? "Completed" : "Failed", desc: `Exit ${code}` } });
         runSessions.set(sessionId, sess);
@@ -1539,7 +1675,16 @@ function handleRunStatus(req: import("http").IncomingMessage, res: import("http"
   if (!session) { res.statusCode = 404; res.end(JSON.stringify({ ok: false, error: "session not found" })); return; }
 
   res.statusCode = 200;
-  res.end(JSON.stringify({ ok: true, sessionId: match[1], status: session.status, events: session.events, logs: session.logs, elapsedMs: Date.now() - session.createdAt }));
+  res.end(JSON.stringify({
+    ok: true,
+    sessionId: match[1],
+    status: session.status,
+    events: session.events,
+    logs: session.logs,
+    artifacts: session.artifacts || [],
+    contextDocs: session.contextDocs || [],
+    elapsedMs: Date.now() - session.createdAt
+  }));
 }
 
 function handleTerminalOpen(req: import("http").IncomingMessage, res: import("http").ServerResponse) {

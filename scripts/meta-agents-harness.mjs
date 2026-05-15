@@ -2539,9 +2539,12 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
   const normalized = normalizeRunArgs(runtime, normalizedPassthrough)
   const envOverrides = { ...normalized.envOverrides }
   const crew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+  const taskPrompt =
+    parseValueArg(normalized.args, "--task") ||
+    normalized.args.filter((arg) => !arg.startsWith("--")).join(" ")
   const headlessSessionId = `${runtime}:mah:headless-${Date.now()}`
   const headlessPlan = adapter.prepareHeadlessRunContext({
-    task: normalized.args.join(" "),
+    task: taskPrompt,
     repoRoot,
     runtime,
     adapter,
@@ -2565,14 +2568,33 @@ function dispatchHeadless(runtime, command, passthrough, outputMode = "text") {
     }
   }
 
-  // Execute with headless options
-  const result = runCommand(
-    headlessPlan.exec || adapter.directCli,
-    headlessPlan.args || [],
-    headlessPlan.passthrough || [],
-    { ...envOverrides, ...(headlessPlan.envOverrides || {}) },
-    { headless: true }
-  )
+  // Execute with headless options. If runtime provides a prepared-run executor,
+  // reuse it so session mirroring/alias side effects are preserved in headless mode.
+  const mergedEnvOverrides = { ...envOverrides, ...(headlessPlan.envOverrides || {}) }
+  const hasPreparedExecutor = typeof adapter.executePreparedRun === "function"
+  const result = hasPreparedExecutor
+    ? adapter.executePreparedRun({
+      repoRoot,
+      runtime,
+      adapter,
+      crew,
+      plan: {
+        exec: headlessPlan.exec || adapter.directCli,
+        args: headlessPlan.args || [],
+        passthrough: headlessPlan.passthrough || [],
+        envOverrides: mergedEnvOverrides,
+        crew
+      },
+      runCommand: (exec, args = [], passthroughArgs = [], runEnvOverrides = {}) =>
+        runCommand(exec, args, passthroughArgs, runEnvOverrides, { headless: true })
+    })
+    : runCommand(
+      headlessPlan.exec || adapter.directCli,
+      headlessPlan.args || [],
+      headlessPlan.passthrough || [],
+      mergedEnvOverrides,
+      { headless: true }
+    )
   recordLifecycleEvent(repoRoot, headlessSessionId, {
     event: result.status === 0 ? "completed" : "failed",
     result_code: result.status,
@@ -5741,6 +5763,7 @@ async function main() {
       // Handle headless mode for run command
       if (explainCommand === "run" && isHeadless) {
         const adapter = runtimeProfiles[runtimeResult.runtime]
+        const explainCrew = parseValueArg(passthrough, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
         if (!adapter) {
           console.error(`ERROR: runtime '${runtimeResult.runtime}' not found`)
           process.exitCode = 1
@@ -5763,7 +5786,7 @@ async function main() {
           repoRoot,
           runtime: runtimeResult.runtime,
           adapter,
-          crew,
+          crew: explainCrew,
           task: normalized.args.join(" "),
           argv: normalized.args,
           envOverrides

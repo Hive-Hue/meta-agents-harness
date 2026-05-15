@@ -6,6 +6,7 @@ interface TaskInspectorProps {
   task: TaskRecord | null;
   onClose: () => void;
   onTransition: (taskId: string, newState: string) => void;
+  onRunTask?: (taskId: string) => void;
   onEditTask: (task: TaskRecord) => void;
   onDeleteTask: (taskId: string) => void;
   busyAction?: string;
@@ -61,6 +62,7 @@ export function TaskInspector({
   task,
   onClose,
   onTransition,
+  onRunTask,
   onEditTask,
   onDeleteTask,
   busyAction = "",
@@ -120,53 +122,63 @@ export function TaskInspector({
           </div>
         </div>
 
-        {/* State Machine */}
-        <div className="task-inspector__section">
-          <h4 className="task-inspector__section-title">Task Actions</h4>
-          <div className="task-inspector__state-actions">
-            <button
-              type="button"
-              className="task-inspector__action-btn"
-              onClick={() => onEditTask(task)}
-            >
-              <Icon name="edit" size={14} />
-              Edit Task
-            </button>
-            <button
-              type="button"
-              className={`task-inspector__action-btn${confirmDelete ? " task-inspector__action-btn--danger" : ""}`}
-              onClick={() => {
-                if (!confirmDelete) {
-                  setConfirmDelete(true);
-                  return;
-                }
-                onDeleteTask(task.id);
-              }}
-              disabled={isDeleting}
-            >
-              <Icon name="delete" size={14} />
-              {isDeleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete Task"}
-            </button>
-          </div>
-        </div>
-
-        <div className="task-inspector__section">
-          <h4 className="task-inspector__section-title">State Machine</h4>
-          <div className="task-inspector__state-actions">
-            {validNext.map(next => (
+        <div className="task-inspector__section task-inspector__section--action-row">
+          <div className="task-inspector__action-col">
+            <h4 className="task-inspector__section-title">Task Actions</h4>
+            <div className="task-inspector__state-actions">
+              {task.state === "ready" && onRunTask ? (
+                <button
+                  type="button"
+                  className="task-inspector__action-btn task-inspector__action-btn--primary"
+                  onClick={() => onRunTask(task.id)}
+                >
+                  <Icon name="play_circle" size={14} />
+                  Run Task
+                </button>
+              ) : null}
               <button
-                key={next}
                 type="button"
                 className="task-inspector__action-btn"
-                onClick={() => onTransition(task.id, next)}
+                onClick={() => onEditTask(task)}
               >
-                <Icon name="arrow_forward" size={14} />
-                Mark {STATE_LABELS[next] || next}
+                <Icon name="edit" size={14} />
+                Edit Task
               </button>
-            ))}
-            {!canTransition && (
-              <span className="task-inspector__no-actions">No valid transitions</span>
-            )}
+              <button
+                type="button"
+                className={`task-inspector__action-btn${confirmDelete ? " task-inspector__action-btn--danger" : ""}`}
+                onClick={() => {
+                  if (!confirmDelete) {
+                    setConfirmDelete(true);
+                    return;
+                  }
+                  onDeleteTask(task.id);
+                }}
+                disabled={isDeleting}
+              >
+                <Icon name="delete" size={14} />
+                {isDeleting ? "Deleting..." : confirmDelete ? "Confirm Delete" : "Delete Task"}
+              </button>
+            </div>
+          </div>
+          <div className="task-inspector__action-col">
+            <h4 className="task-inspector__section-title">State Machine</h4>
+            <div className="task-inspector__state-actions">
+              {validNext.map(next => (
+                <button
+                  key={next}
+                  type="button"
+                  className="task-inspector__action-btn"
+                  onClick={() => onTransition(task.id, next)}
+                >
+                  <Icon name="arrow_forward" size={14} />
+                  Mark {STATE_LABELS[next] || next}
+                </button>
+              ))}
+              {!canTransition && (
+                <span className="task-inspector__no-actions">No valid transitions</span>
+              )}
+            </div>
           </div>
         </div>
 

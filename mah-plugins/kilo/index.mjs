@@ -663,7 +663,7 @@ export const runtimePlugin = {
       return status
     },
 
-    prepareHeadlessRunContext({ task = "", argv = [], envOverrides = {} }) {
+    prepareHeadlessRunContext({ crew = "", task = "", argv = [], envOverrides = {} }) {
       if (!task && (!Array.isArray(argv) || argv.length === 0)) {
         return {
           ok: false,
@@ -674,10 +674,11 @@ export const runtimePlugin = {
       return {
         ok: true,
         exec: this.directCli,
-        args: ["run"],
+        args: ["run", "--format", "json", "--auto"],
         passthrough: task ? [task] : argv,
         envOverrides: {
           ...envOverrides,
+          ...(crew ? { MAH_ACTIVE_CREW: `${crew}`.trim() } : {}),
           KILO_HEADLESS: "1"
         },
         warnings: [],

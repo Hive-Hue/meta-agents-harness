@@ -1,16 +1,12 @@
-const contextDocs = [
-  { name: "operational/delegation-patterns.md", size: "1.2KB", relevance: 0.92 },
-  { name: "operational/runtime-contracts.md", size: "0.8KB", relevance: 0.87 },
-  { name: "operational/domain-guardrails.md", size: "0.4KB", relevance: 0.81 },
-];
+type ContextDoc = { name: string; size: string; relevance: number };
+type Artifact = { path: string; action: "created" | "modified"; size: string };
 
-const artifacts = [
-  { path: "webui/src/features/run/RunConsole.tsx", action: "created" as const, size: "3.2KB" },
-  { path: "webui/src/features/run/run.css", action: "created" as const, size: "1.8KB" },
-  { path: "webui/src/App.tsx", action: "modified" as const, size: "+4 lines" },
-];
+type ArtifactsPanelProps = {
+  contextDocs: ContextDoc[];
+  artifacts: Artifact[];
+};
 
-export function ArtifactsPanel() {
+export function ArtifactsPanel({ contextDocs, artifacts }: ArtifactsPanelProps) {
   return (
     <div className="artifacts-panel">
       <div className="artifacts-section">
@@ -24,6 +20,11 @@ export function ArtifactsPanel() {
             </tr>
           </thead>
           <tbody>
+            {contextDocs.length === 0 && (
+              <tr>
+                <td className="artifact-table__path" colSpan={3}>No context docs captured for this run.</td>
+              </tr>
+            )}
             {contextDocs.map((doc) => (
               <tr key={doc.name}>
                 <td className="artifact-table__path">{doc.name}</td>
@@ -46,6 +47,11 @@ export function ArtifactsPanel() {
             </tr>
           </thead>
           <tbody>
+            {artifacts.length === 0 && (
+              <tr>
+                <td className="artifact-table__path" colSpan={3}>No runtime artifacts detected yet.</td>
+              </tr>
+            )}
             {artifacts.map((a) => (
               <tr key={a.path}>
                 <td className="artifact-table__path">{a.path}</td>

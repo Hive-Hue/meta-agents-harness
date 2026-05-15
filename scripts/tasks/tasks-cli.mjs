@@ -132,7 +132,7 @@ function runMahTask(repoRoot, task) {
     "--json"
   ], {
     cwd: repoRoot,
-    env: { ...process.env, ...workspaceEnv },
+    env: { ...process.env, ...workspaceEnv, MAH_DISABLE_TASK_MUTATIONS: "1" },
     encoding: "utf-8"
   })
 

@@ -8,6 +8,7 @@ type TaskComposerProps = {
   crews: Array<{ id: string; display_name?: string }>;
   onCrewChange: (val: string) => void;
   runtime: string;
+  runtimes: string[];
   onRuntimeChange: (val: string) => void;
   routingScope: "active_crew" | "full_crews";
   onRoutingScopeChange: (val: "active_crew" | "full_crews") => void;
@@ -17,16 +18,18 @@ type TaskComposerProps = {
   onStartRun: () => void;
   onStopRun: () => void;
   runState: string;
+  canStartRun?: boolean;
 };
 
 export function TaskComposer({
   taskText, onTaskTextChange,
   crew, crews, onCrewChange,
-  runtime, onRuntimeChange,
+  runtime, runtimes, onRuntimeChange,
   routingScope, onRoutingScopeChange,
   showRouting, onShowRouting, onHideRouting,
   onStartRun, onStopRun,
   runState,
+  canStartRun = true,
 }: TaskComposerProps) {
   const isRunning = runState === "running" || runState === "queued" || runState === "routed";
 
@@ -47,11 +50,9 @@ export function TaskComposer({
             : <option value="dev">dev</option>}
         </select>
         <select className="run-composer__select" value={runtime} onChange={(e) => onRuntimeChange(e.target.value)} disabled={isRunning}>
-          <option value="pi">pi</option>
-          <option value="claude">claude</option>
-          <option value="opencode">opencode</option>
-          <option value="hermes">hermes</option>
-          <option value="kilo">kilo</option>
+          {runtimes.length > 0
+            ? runtimes.map((rt) => <option key={rt} value={rt}>{rt}</option>)
+            : <option value="pi">pi</option>}
         </select>
         <select
           className="run-composer__select"
@@ -62,11 +63,11 @@ export function TaskComposer({
           <option value="active_crew">Active Crew</option>
           <option value="full_crews">Full Crews</option>
         </select>
-        <button className="run-action-btn" type="button" onClick={onShowRouting} disabled={isRunning || !taskText}>
+        <button className="run-action-btn" type="button" onClick={onShowRouting} disabled={isRunning || !taskText || !canStartRun}>
           <Icon name="route" size={14} />Preview Routing
         </button>
         {!isRunning ? (
-          <button className="run-action-btn run-action-btn--primary" type="button" onClick={onStartRun} disabled={!taskText}>
+          <button className="run-action-btn run-action-btn--primary" type="button" onClick={onStartRun} disabled={!taskText || !canStartRun}>
             <Icon name="play_arrow" size={14} />Start Run
           </button>
         ) : (

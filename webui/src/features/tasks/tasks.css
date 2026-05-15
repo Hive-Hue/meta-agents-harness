@@ -2196,6 +2196,16 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
+.task-inspector__section--action-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.task-inspector__action-col {
+  min-width: 0;
+}
+
 .task-inspector__section--alert {
   background: rgba(239, 68, 68, 0.04);
 }
@@ -2274,6 +2284,13 @@
   font-size: 12px;
   color: var(--color-text-dim);
   font-style: italic;
+}
+
+@media (max-width: 900px) {
+  .task-inspector__section--action-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
 }
 
 .task-inspector__deps {

@@ -18,7 +18,6 @@ runtimes:
       orchestrator_default: gpt-5.4-mini
       lead_default: gpt-5.4-mini
       worker_default: gpt-5.3-codex
-  corefake: {}
 catalog:
   models:
     orchestrator_default: minimax-coding-plan/MiniMax-M2.7
