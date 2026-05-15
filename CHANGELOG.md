@@ -41,6 +41,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - WebUI `Tasks -> Run Task -> /run` flow now opens Run Console with task prefill (`summary`, `crew`, `runtime`) without triggering an immediate second run.
 - Run Console runtime selector now preserves task runtime values even when they are not in the pre-detected runtime list.
 - Run Console artifacts detection now merges runtime session artifacts with workspace file changes during the run window, improving visibility for runtimes that write directly to repo paths.
+- Codex runtime plugin now supports headless execution using native `codex exec --cd <repo> --full-auto "<task>"`, enabling `/run` compatibility for runtime `codex`.
 
 ### Fixed
 
@@ -53,6 +54,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - OpenCode headless runs now temporarily elevate `.opencode/opencode.json` `ask` permissions to `allow` during execution and restore original config afterward, eliminating silent write rejection in non-interactive runs.
 - OpenClaude and Claude headless runs now pass explicit permission mode (`--permission-mode acceptEdits`) by default when not already provided.
 - Claude headless argument ordering for `ccr code` has been corrected to preserve prompt input in `-p` mode.
+- Codex `/run` failures caused by `headless not supported for this runtime` are resolved by implementing `prepareHeadlessRunContext` in the runtime plugin.
 
 
 ## v0.10.0 — Post-v0.9.0 Evolution (2026-05-09)

@@ -8,12 +8,14 @@ test("Codex adapter has headless capability", () => {
   assert.ok(adapter.capabilities?.headless)
 })
 
-test("Codex headless is not supported", () => {
-  assert.strictEqual(adapter.capabilities.headless.supported, false)
+test("Codex headless is supported", () => {
+  assert.strictEqual(adapter.capabilities.headless.supported, true)
 })
 
-test("Codex prepareHeadlessRunContext returns unsupported error", () => {
-  const result = adapter.prepareHeadlessRunContext({ repoRoot: "/tmp", task: "test" })
-  assert.strictEqual(result.ok, false)
-  assert.ok(result.error)
+test("Codex prepareHeadlessRunContext returns executable plan", () => {
+  const result = adapter.prepareHeadlessRunContext({ repoRoot: "/tmp/repo", task: "test task" })
+  assert.strictEqual(result.ok, true)
+  assert.strictEqual(result.exec, "codex")
+  assert.deepEqual(result.args, ["exec", "--cd", "/tmp/repo", "--full-auto"])
+  assert.deepEqual(result.passthrough, ["test task"])
 })

@@ -64,7 +64,8 @@ mah explain run --headless --trace -- "your task prompt"
 - **Kilo**: uses native `run` subcommand for non-interactive mode.
   Example: `kilo run "task"`
 - **Hermes**: session-gated — requires an active session for headless execution. Splash output is automatically stripped in headless mode.
-- **Codex**: currently declares headless unsupported.
+- **Codex**: supported via native `exec` subcommand.
+  Example: `codex exec --cd <repo> --full-auto "task"`
 
 ## Adapter Contract
 

@@ -186,6 +186,15 @@ function buildCodexInitialMessagesPrompt(prompt) {
   return `initial_messages=[{ role = "system", content = ${JSON.stringify(prompt)} }]`
 }
 
+function hasCodexModelFlag(argv = []) {
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = `${argv[i] || ""}`.trim()
+    if (!token) continue
+    if (token === "-m" || token === "--model" || token.startsWith("--model=")) return true
+  }
+  return false
+}
+
 function buildCodexMahMcpConfigArg(repoRoot) {
   const nodeExec = process.execPath
   const serverPath = path.join(repoRoot, "plugins", "mah", "mcp", "server.mjs")
@@ -386,7 +395,14 @@ export const runtimePlugin = {
       sessionRootFlag: false,
       sessionMirrorFlag: false,
       sessionNewArgs: [],
-      sessionContinueArgs: []
+      sessionContinueArgs: [],
+      headless: {
+        supported: true,
+        native: true,
+        requiresSession: false,
+        promptMode: "argv",
+        outputMode: "stdout"
+      }
     },
     supportsSessions: false,
     sessionListCommand: null,
@@ -420,6 +436,33 @@ export const runtimePlugin = {
 
     prepareRunContext(context) {
       return buildCodexRunContext.call(this, context)
+    },
+
+    prepareHeadlessRunContext({ task = "", argv = [], repoRoot, envOverrides = {} }) {
+      const taskPrompt = `${task || ""}`.trim() || argv.filter((arg) => !`${arg || ""}`.startsWith("--")).join(" ").trim()
+      if (!taskPrompt) {
+        return {
+          ok: false,
+          error: "Codex headless requires a task prompt. Pass task as argument or via -- task."
+        }
+      }
+      const modelArgs = hasCodexModelFlag(argv) ? [] : []
+      return {
+        ok: true,
+        exec: "codex",
+        args: ["exec", "--cd", repoRoot, "--full-auto", ...modelArgs],
+        passthrough: [taskPrompt],
+        envOverrides: {
+          ...envOverrides,
+          MAH_HEADLESS: "1"
+        },
+        warnings: [],
+        internal: {
+          mode: "headless",
+          promptMode: "argv",
+          runtime: "codex"
+        }
+      }
     },
 
     resolveCommandPlan(command, commandExistsFn) {
