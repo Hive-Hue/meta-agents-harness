@@ -1,28 +1,32 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { CommandPreview } from "../../components/ui/CommandPreview";
 import "./sync.css";
 
-const checklist = [
-  { label: "Catalog integrity: all agents have id + owner fields", status: "pass" as const },
-  { label: "No orphan proposals without source session", status: "pass" as const },
-  { label: "Expertise file size within 24KB budget", status: "pass" as const },
-  { label: "Context memory index up to date", status: "warn" as const },
-  { label: "No conflicting proposals for same agent", status: "pass" as const },
-];
-
-const diffLines = [
-  { op: "+", text: "engineering-lead: promote prop_01j4k3x (3 patterns)" },
-  { op: "+", text: "qa-reviewer: seed from operational (baseline)" },
-  { op: "~", text: "frontend-dev: update observation cache (2 entries)" },
-  { op: "-", text: "security-reviewer: reject stale proposal prop_01j3a2b" },
-];
-
-const crews = [
-  { crew: "dev", agents: 7, synced: 7, pending: 0, status: "synced" as const },
-  { crew: "planning", agents: 4, synced: 3, pending: 1, status: "partial" as const },
-  { crew: "staging", agents: 3, synced: 3, pending: 0, status: "synced" as const },
-];
+type SyncReviewPayload = {
+  ok: boolean;
+  summary: {
+    lastSync: string;
+    crews: number;
+    totalAgents: number;
+    proposalCount: number;
+  };
+  command: {
+    dryRun: string;
+    status: number;
+    stderr?: string;
+  };
+  checklist: Array<{ label: string; status: "pass" | "warn" }>;
+  diffLines: Array<{ op: string; text: string }>;
+  crews: Array<{ crew: string; agents: number; synced: number; pending: number; status: "synced" | "partial" }>;
+  apply?: {
+    command: string;
+    status: number;
+    stdout: string;
+    stderr: string;
+  };
+};
 
 const statusByTone = {
   synced: { tone: "completed" as const, label: "Synced" },
@@ -30,23 +34,82 @@ const statusByTone = {
 };
 
 export function SyncReview() {
+  const [data, setData] = useState<SyncReviewPayload | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [runningSync, setRunningSync] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const resp = await fetch("/api/mah/sync-review");
+      const payload = (await resp.json()) as SyncReviewPayload & { error?: string };
+      if (!resp.ok || !payload.ok) throw new Error(payload.error || "failed to load sync review");
+      setData(payload);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const runSync = useCallback(async () => {
+    setRunningSync(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const resp = await fetch("/api/mah/sync-review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "sync" }),
+      });
+      const payload = (await resp.json()) as SyncReviewPayload & { error?: string };
+      if (!resp.ok || !payload.ok) throw new Error(payload.error || "sync failed");
+      setData(payload);
+      setSuccess(payload.apply?.status === 0 ? "Sync applied successfully." : "Sync command finished with warnings.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRunningSync(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const meta = useMemo(() => {
+    if (!data) return "Loading sync data...";
+    const lastSync = data.summary.lastSync === "never" ? "never" : new Date(data.summary.lastSync).toLocaleString();
+    return `Last sync: ${lastSync} · ${data.summary.crews} crews · ${data.summary.totalAgents} agents`;
+  }, [data]);
+
   return (
     <div className="sync-panel">
       <div className="sync-panel__header">
         <div>
-          {/* <h3>Sync & Runtime Artifacts</h3> */}
-          <p className="sync-panel__meta">Last sync: just now · 3 crews · 14 agents</p>
+          <p className="sync-panel__meta">{meta}</p>
         </div>
-        {/* <div className="command-preview__command" style={{ flex: "none" }}> */}
-          <CommandPreview context="expertise" command={`mah expertise sync --dry-run`} />
-        {/* </div> */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="settings-btn" type="button" onClick={() => void load()} disabled={loading || runningSync}>
+            {loading ? "Refreshing..." : "Refresh"}
+          </button>
+          <button className="settings-btn settings-btn--primary" type="button" onClick={() => void runSync()} disabled={runningSync || loading}>
+            {runningSync ? "Applying..." : "Apply Sync"}
+          </button>
+        </div>
       </div>
+      <CommandPreview context="expertise" command={data?.command?.dryRun || "mah expertise sync --dry-run"} />
+      {error && <p className="settings-context-tools__error">{error}</p>}
+      {success && <p className="settings-context-tools__success">{success}</p>}
       <div className="sync-panel__content">
         <div className="sync-split">
           <div className="sync-left">
             <div className="sync-checklist">
               <h4>Validation Checklist</h4>
-              {checklist.map((item) => (
+              {(data?.checklist || []).map((item) => (
                 <div className="checklist-item" key={item.label}>
                   <Icon
                     name={item.status === "pass" ? "check_circle" : "warning"}
@@ -61,22 +124,23 @@ export function SyncReview() {
             </div>
 
             <div className="sync-diff">
-              <h4>Planned Changes</h4>
+              <h4>Dry-run Output</h4>
               <pre>
                 <code>
-                  {diffLines.map((line) => (
+                  {(data?.diffLines || []).map((line) => (
                     <span className={`diff-line diff-line--${line.op}`} key={line.text}>
                       {line.op} {line.text}
                       {"\n"}
                     </span>
                   ))}
+                  {!data?.diffLines?.length && "No output from dry-run.\n"}
                 </code>
               </pre>
             </div>
           </div>
 
           <div className="sync-right">
-            {crews.map((c) => {
+            {(data?.crews || []).map((c) => {
               const badge = statusByTone[c.status];
               return (
                 <div className="runtime-card" key={c.crew}>
@@ -97,6 +161,15 @@ export function SyncReview() {
                 </div>
               );
             })}
+            {!data?.crews?.length && (
+              <div className="runtime-card">
+                <h4>No crews</h4>
+                <div className="runtime-card__stat">
+                  <span>Agents</span>
+                  <strong>0</strong>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

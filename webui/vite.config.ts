@@ -555,6 +555,22 @@ function runMahCliJson(workspaceRoot: string, args: string[]): Record<string, un
   return payload;
 }
 
+function runMahCliText(workspaceRoot: string, args: string[]): { status: number; stdout: string; stderr: string } {
+  const envPath = path.join(workspaceRoot, ENV_FILENAME);
+  const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const workspaceEnv = parseDotEnvContent(rawEnv);
+  const child = spawnSync(process.execPath, [cliPath, ...args], {
+    cwd: workspaceRoot,
+    env: { ...process.env, ...workspaceEnv },
+    encoding: "utf-8",
+  });
+  return {
+    status: typeof child.status === "number" ? child.status : 1,
+    stdout: `${child.stdout || ""}`.trim(),
+    stderr: `${child.stderr || ""}`.trim(),
+  };
+}
+
 function redactSensitiveArgs(args: string[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < args.length; i += 1) {
@@ -918,6 +934,138 @@ function handleExpertiseProposalsApi(req: import("http").IncomingMessage, res: i
     res.statusCode = 500;
     res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
   }
+}
+
+function handleSyncReviewApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+  if (!hasWorkspaceConfig(workspaceRoot)) {
+    res.statusCode = 409;
+    res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+    return;
+  }
+
+  const buildPayload = (syncCommand: { status: number; stdout: string; stderr: string }) => {
+    let crewsSummary: Array<{ crew: string; agents: number; synced: number; pending: number; status: "synced" | "partial" }> = [];
+    let totalAgents = 0;
+    try {
+      const configPath = path.join(workspaceRoot, CONFIG_FILENAME);
+      const raw = readFileSync(configPath, "utf-8");
+      const cfg = (yaml.load(raw) || {}) as { crews?: Array<{ id?: string; agents?: unknown[] }> };
+      const crews = Array.isArray(cfg.crews) ? cfg.crews : [];
+      crewsSummary = crews.map((crew: { id?: string; agents?: unknown[] }) => {
+        const agents = Array.isArray(crew?.agents) ? crew.agents.length : 0;
+        totalAgents += agents;
+        return { crew: `${crew?.id || "unknown"}`, agents, synced: agents, pending: 0, status: "synced" as const };
+      });
+    } catch {
+      crewsSummary = [];
+    }
+
+    const registryPath = path.join(workspaceRoot, ".mah", "expertise", "registry.json");
+    const contextIndexPath = path.join(workspaceRoot, ".mah", "context", "index");
+    const proposalsPath = path.join(workspaceRoot, ".mah", "expertise", "proposals");
+    const hasRegistry = existsSync(registryPath);
+    const hasContextIndex = existsSync(contextIndexPath);
+    const proposalCount = existsSync(proposalsPath)
+      ? readdirSync(proposalsPath).filter((file) => file.endsWith(".yaml") || file.endsWith(".yml")).length
+      : 0;
+
+    let lastSync = "never";
+    if (hasRegistry) {
+      try {
+        lastSync = statSync(registryPath).mtime.toISOString();
+      } catch {
+        lastSync = "unknown";
+      }
+    }
+
+    const dryRunLines = syncCommand.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 80);
+    const diffLines = dryRunLines.map((line) => {
+      const op = line.startsWith("+") || line.startsWith("-") || line.startsWith("~") ? line[0] : "~";
+      const text = op === "~" ? line : line.slice(1).trim();
+      return { op, text };
+    });
+
+    const checklist = [
+      { label: `Workspace config (${CONFIG_FILENAME}) available`, status: "pass" as const },
+      { label: "Expertise registry present", status: hasRegistry ? ("pass" as const) : ("warn" as const) },
+      { label: "Context index available", status: hasContextIndex ? ("pass" as const) : ("warn" as const) },
+      { label: "Dry-run command succeeded", status: syncCommand.status === 0 ? ("pass" as const) : ("warn" as const) },
+      { label: "No pending proposals", status: proposalCount === 0 ? ("pass" as const) : ("warn" as const) },
+    ];
+
+    return {
+      ok: true,
+      summary: {
+        lastSync,
+        crews: crewsSummary.length,
+        totalAgents,
+        proposalCount,
+      },
+      command: {
+        dryRun: `mah expertise sync --dry-run`,
+        status: syncCommand.status,
+        stderr: syncCommand.stderr,
+      },
+      checklist,
+      diffLines,
+      crews: crewsSummary,
+    };
+  };
+
+  if (req.method === "GET") {
+    const dryRun = runMahCliText(workspaceRoot, ["expertise", "sync", "--dry-run"]);
+    res.statusCode = 200;
+    res.end(JSON.stringify(buildPayload(dryRun)));
+    return;
+  }
+
+  if (req.method === "POST") {
+    readJsonBody<{ action?: string }>(
+      req,
+      (body) => {
+        const action = `${body?.action || ""}`.trim();
+        if (action !== "sync") {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: "invalid action" }));
+          return;
+        }
+        const syncApply = runMahCliText(workspaceRoot, ["expertise", "sync"]);
+        const dryRunAfter = runMahCliText(workspaceRoot, ["expertise", "sync", "--dry-run"]);
+        res.statusCode = syncApply.status === 0 ? 200 : 500;
+        res.end(
+          JSON.stringify({
+            ...buildPayload(dryRunAfter),
+            apply: {
+              command: "mah expertise sync",
+              status: syncApply.status,
+              stdout: syncApply.stdout,
+              stderr: syncApply.stderr,
+            },
+          }),
+        );
+      },
+      (error) => {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      },
+    );
+    return;
+  }
+
+  res.statusCode = 405;
+  res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
 }
 
 function handleTasksApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
@@ -2055,6 +2203,10 @@ function mahApiMiddleware() {
         }
         if (url === "/api/mah/expertise-proposals") {
           handleExpertiseProposalsApi(req, res);
+          return;
+        }
+        if (url === "/api/mah/sync-review") {
+          handleSyncReviewApi(req, res);
           return;
         }
         if (url === "/api/mah/tasks" || /^\/api\/mah\/tasks\/[^/]+(?:\/run)?$/.test(url)) {
