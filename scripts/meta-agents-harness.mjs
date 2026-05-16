@@ -3256,6 +3256,12 @@ Subcommands:
   proposals show <id> [--json]        Show proposal with overlap detection
   proposals promote <id> [--stability <level>] [--force] [--json]  Promote to operational
   proposals reject <id> --reason "..." [--json]  Reject proposal
+  memory list [--crew <id>] [--agent <id>] [--json]
+  memory add --content "..." [--crew <id>] [--agent <id>] [--source <src>] [--tags a,b]
+  memory replace --old "..." --content "..." [--crew <id>] [--agent <id>]
+  memory remove --old "..." [--crew <id>] [--agent <id>]
+  memory search --task "..." [--crew <id>] [--agent <id>] [--limit <n>] [--json]
+  memory stats [--crew <id>] [--agent <id>] [--json]
 
 Options:
   --json        JSON output mode
@@ -3454,6 +3460,212 @@ detail, playbooks, and gotchas for agents AFTER routing decisions are made.`)
   }
 
   // --- mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
+  if (sub === "memory") {
+    const action = `${subArgv[0] || "list"}`.trim().toLowerCase()
+    const memArgv = subArgv.slice(1)
+    const crew = parseValueArg(memArgv, "--crew") || process.env.MAH_ACTIVE_CREW || "dev"
+    const agent = parseValueArg(memArgv, "--agent") || process.env.MAH_AGENT || "orchestrator"
+    const limit = Number.parseInt(parseValueArg(memArgv, "--limit") || "5", 10)
+    const content = parseValueArg(memArgv, "--content")
+    const oldText = parseValueArg(memArgv, "--old")
+    const task = parseValueArg(memArgv, "--task")
+    const source = parseValueArg(memArgv, "--source") || "manual"
+    const tags = parseValueArg(memArgv, "--tags")
+    const fromSession = parseValueArg(memArgv, "--from-session")
+    const fromPath = parseValueArg(memArgv, "--from-path")
+    const targetPercent = Number.parseInt(parseValueArg(memArgv, "--target-percent") || "80", 10)
+    const compact = !memArgv.includes("--no-compact")
+
+    const {
+      loadPersistentMemoryStore,
+      computePersistentMemoryUsage,
+      addPersistentMemoryEntry,
+      replacePersistentMemoryEntry,
+      removePersistentMemoryEntry,
+      searchPersistentMemory,
+      compactPersistentMemoryStore,
+      capturePersistentMemoryFromSession,
+    } = await import("./context/context-memory-persistent.mjs")
+
+    if (!action || action === "--help" || action === "-h" || action === "help") {
+      console.log(`Usage: mah context memory <subcommand> [options]
+
+Subcommands:
+  list [--crew <id>] [--agent <id>] [--json]
+  add --content "..." [--crew <id>] [--agent <id>] [--source <src>] [--tags a,b]
+  replace --old "..." --content "..." [--crew <id>] [--agent <id>]
+  remove --old "..." [--crew <id>] [--agent <id>]
+  search --task "..." [--crew <id>] [--agent <id>] [--limit <n>] [--json]
+  stats [--crew <id>] [--agent <id>] [--json]
+  compact [--crew <id>] [--agent <id>] [--target-percent <n>] [--json]
+  capture --from-session <runtime:crew:sessionId> [--crew <id>] [--agent <id>] [--limit <n>] [--no-compact] [--json]
+  capture --from-path <session-dir> [--crew <id>] [--agent <id>] [--limit <n>] [--no-compact] [--json]
+
+Notes:
+  - replace/remove use unique substring matching on --old
+  - exact duplicates are ignored on add
+  - char/entry limits are bounded and configurable via environment
+`)
+      return 0
+    }
+
+    if (action === "list") {
+      const loaded = loadPersistentMemoryStore(repoRoot, crew, agent)
+      if (!loaded.ok) { console.error("ERROR: " + loaded.error); return 1 }
+      const usage = computePersistentMemoryUsage(loaded.store)
+      if (jsonMode) {
+        console.log(JSON.stringify({ ok: true, crew, agent, file_path: loaded.file_path, usage, entries: loaded.store.entries }, null, 2))
+      } else {
+        console.log("=== Persistent Agent Memory ===")
+        console.log(`Store: ${crew}/${agent}`)
+        console.log(`Usage: ${usage.used_chars}/${usage.char_limit} chars (${usage.usage_percent}%)`)
+        console.log(`Entries: ${usage.entry_count}/${usage.entry_limit}`)
+        console.log(`Path: ${loaded.file_path}`)
+        if (!loaded.store.entries.length) {
+          console.log("\nNo memory entries yet.")
+        } else {
+          for (const entry of loaded.store.entries) {
+            console.log(`\n- [${entry.id.slice(0, 8)}] ${entry.content}`)
+          }
+        }
+      }
+      return 0
+    }
+
+    if (action === "stats") {
+      const loaded = loadPersistentMemoryStore(repoRoot, crew, agent)
+      if (!loaded.ok) { console.error("ERROR: " + loaded.error); return 1 }
+      const usage = computePersistentMemoryUsage(loaded.store)
+      if (jsonMode) {
+        console.log(JSON.stringify({ ok: true, crew, agent, usage, file_path: loaded.file_path }, null, 2))
+      } else {
+        console.log("=== Persistent Memory Stats ===")
+        console.log(`Store: ${crew}/${agent}`)
+        console.log(`Usage: ${usage.used_chars}/${usage.char_limit} chars (${usage.usage_percent}%)`)
+        console.log(`Entries: ${usage.entry_count}/${usage.entry_limit}`)
+        console.log(`Path: ${loaded.file_path}`)
+      }
+      return 0
+    }
+
+    if (action === "compact") {
+      const result = compactPersistentMemoryStore(repoRoot, {
+        crew,
+        agent,
+        targetPercent: Number.isFinite(targetPercent) ? targetPercent : 80,
+      })
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (jsonMode) {
+        console.log(JSON.stringify(result, null, 2))
+      } else {
+        console.log("=== Persistent Memory Compaction ===")
+        console.log(`Store: ${crew}/${agent}`)
+        console.log(`Target usage: ${result.target_percent}%`)
+        console.log(`Before: ${result.usage_before.used_chars}/${result.usage_before.char_limit} chars (${result.usage_before.usage_percent}%)`)
+        console.log(`After:  ${result.usage_after.used_chars}/${result.usage_after.char_limit} chars (${result.usage_after.usage_percent}%)`)
+        console.log(`Evicted entries: ${result.evicted.length}`)
+      }
+      return 0
+    }
+
+    if (action === "capture") {
+      if (!fromSession && !fromPath) {
+        console.error("ERROR: usage: mah context memory capture --from-session <runtime:crew:sessionId> [--crew <id>] [--agent <id>] [--limit <n>] [--no-compact]")
+        console.error("       or: mah context memory capture --from-path <session-dir> [--crew <id>] [--agent <id>] [--limit <n>] [--no-compact]")
+        return 1
+      }
+      const result = await capturePersistentMemoryFromSession(repoRoot, {
+        from_session: fromSession,
+        from_path: fromPath,
+        crew,
+        agent,
+        limit: Number.isFinite(limit) ? limit : 8,
+        compact,
+        tags,
+      })
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (jsonMode) {
+        console.log(JSON.stringify(result, null, 2))
+      } else {
+        console.log("=== Persistent Memory Capture ===")
+        console.log(`Store: ${result.crew}/${result.agent}`)
+        console.log(`Session: ${result.source_ref}`)
+        console.log(`Extracted candidates: ${result.extraction.selected_candidates}/${result.extraction.total_candidates}`)
+        console.log(`Added: ${result.capture.added.length} | Duplicates: ${result.capture.duplicates.length} | Skipped: ${result.capture.skipped.length} | Evicted: ${result.capture.evicted.length}`)
+        console.log(`Usage: ${result.capture.usage.used_chars}/${result.capture.usage.char_limit} chars (${result.capture.usage.usage_percent}%)`)
+      }
+      return 0
+    }
+
+    if (action === "add") {
+      if (!content) { console.error("ERROR: usage: mah context memory add --content \"...\" [--crew <id>] [--agent <id>]"); return 1 }
+      const result = addPersistentMemoryEntry(repoRoot, { crew, agent, content, source, tags })
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (jsonMode) console.log(JSON.stringify(result, null, 2))
+      else {
+        console.log("=== Persistent Memory Updated ===")
+        console.log(result.duplicate ? "Duplicate: entry already existed (no change)." : "Added new memory entry.")
+        console.log(`Store: ${crew}/${agent}`)
+        console.log(`Usage: ${result.usage.used_chars}/${result.usage.char_limit} chars (${result.usage.usage_percent}%)`)
+      }
+      return 0
+    }
+
+    if (action === "replace") {
+      if (!oldText || !content) { console.error("ERROR: usage: mah context memory replace --old \"...\" --content \"...\" [--crew <id>] [--agent <id>]"); return 1 }
+      const result = replacePersistentMemoryEntry(repoRoot, { crew, agent, old_text: oldText, content, source })
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (jsonMode) console.log(JSON.stringify(result, null, 2))
+      else {
+        console.log("=== Persistent Memory Updated ===")
+        console.log(`Replaced entry in ${crew}/${agent}.`)
+        console.log(`Usage: ${result.usage.used_chars}/${result.usage.char_limit} chars (${result.usage.usage_percent}%)`)
+      }
+      return 0
+    }
+
+    if (action === "remove" || action === "rm") {
+      if (!oldText) { console.error("ERROR: usage: mah context memory remove --old \"...\" [--crew <id>] [--agent <id>]"); return 1 }
+      const result = removePersistentMemoryEntry(repoRoot, { crew, agent, old_text: oldText })
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (jsonMode) console.log(JSON.stringify(result, null, 2))
+      else {
+        console.log("=== Persistent Memory Updated ===")
+        console.log(`Removed entry from ${crew}/${agent}.`)
+        console.log(`Usage: ${result.usage.used_chars}/${result.usage.char_limit} chars (${result.usage.usage_percent}%)`)
+      }
+      return 0
+    }
+
+    if (action === "search" || action === "find") {
+      if (!task) { console.error("ERROR: usage: mah context memory search --task \"...\" [--crew <id>] [--agent <id>] [--limit <n>]"); return 1 }
+      const result = searchPersistentMemory(repoRoot, { crew, agent, task, limit: Number.isFinite(limit) ? limit : 5 })
+      if (!result.ok) { console.error("ERROR: " + result.error); return 1 }
+      if (jsonMode) {
+        console.log(JSON.stringify(result, null, 2))
+      } else {
+        console.log("=== Persistent Memory Search ===")
+        console.log(`Store: ${crew}/${agent}`)
+        console.log(`Task: ${task}`)
+        if (!result.matches.length) {
+          console.log("\nNo memory entries matched.")
+          return 0
+        }
+        for (const match of result.matches) {
+          console.log(`\n- [${(match.id || "").slice(0, 8)}] (${(match.score * 100).toFixed(0)}%) ${match.content}`)
+          if (Array.isArray(match.reasons) && match.reasons.length > 0) {
+            console.log(`  reasons: ${match.reasons.join("; ")}`)
+          }
+        }
+      }
+      return 0
+    }
+
+    console.error("ERROR: unknown memory subcommand '" + action + "'. Use: list, add, replace, remove, search, stats, compact, capture")
+    return 1
+  }
+
+  // --- mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json] ---
   if (sub === "find") {
     if (subArgv.includes('--help') || subArgv.includes('-h')) {
       console.log(`Usage: mah context find --agent <name> --task "<desc>" [--capability <cap>] [--json]
@@ -3534,6 +3746,29 @@ Examples:
       result = retrieveDocuments(request, index)
     }
 
+    try {
+      const { searchPersistentMemory } = await import("./context/context-memory-persistent.mjs")
+      const pm = searchPersistentMemory(repoRoot, {
+        crew: process.env.MAH_ACTIVE_CREW || "dev",
+        agent,
+        task,
+        limit: 3,
+      })
+      if (pm.ok && Array.isArray(pm.matches) && pm.matches.length > 0) {
+        result.persistent_memory = {
+          matched_entries: pm.matches.map((entry) => ({
+            id: entry.id,
+            score: entry.score,
+            content: entry.content,
+            source: entry.source,
+          })),
+          usage: pm.usage,
+        }
+      }
+    } catch {
+      // Persistent memory is additive; ignore failures here.
+    }
+
     if (jsonMode) {
       console.log(JSON.stringify(result, null, 2))
     } else {
@@ -3560,6 +3795,12 @@ Examples:
       }
       if (result.tool_hints.length > 0) {
         console.log("\nTool hints: " + result.tool_hints.join(", "))
+      }
+      if (result.persistent_memory?.matched_entries?.length > 0) {
+        console.log("\nPersistent memory:")
+        for (const entry of result.persistent_memory.matched_entries) {
+          console.log(`  - (${(entry.score * 100).toFixed(0)}%) ${entry.content}`)
+        }
       }
     }
     return 0

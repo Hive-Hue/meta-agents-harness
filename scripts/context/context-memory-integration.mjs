@@ -11,6 +11,7 @@ import {
   buildOperationalIndex,
   retrieveDocuments,
 } from "./context-memory-schema.mjs"
+import { renderPersistentMemoryBlock } from "./context-memory-persistent.mjs"
 import {
   MAX_RETRIEVAL_TOTAL_SIZE_BYTES,
   DEFAULT_RETRIEVAL_TOP_N,
@@ -136,6 +137,18 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
   }
 
   const { limit, mode } = parseContextMemoryOptions(args)
+  const mission = (agentCtx.config?.mission || "").trim()
+  const sprintName = (agentCtx.config?.sprint_mode?.name || "").trim()
+  const targetRelease = (agentCtx.config?.sprint_mode?.target_release || "").trim()
+  const actualTask = extractTaskFromArgs(args)
+  const taskDescription = actualTask || mission || sprintName || targetRelease || `general ${agentCtx.agentRole} tasks`
+
+  const persistent = renderPersistentMemoryBlock(repoRoot, {
+    crew: agentCtx?.config?.crew || process.env.MAH_ACTIVE_CREW || "dev",
+    agent: agentCtx?.agentName || "orchestrator",
+    task: taskDescription,
+    limit: Math.min(5, limit),
+  })
 
   // Load or build index
   const contextRoot = resolve(repoRoot, ".mah", "context")
@@ -148,14 +161,8 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
   }
 
   if (!index || !index.entries || index.entries.length === 0) {
-    return null
+    index = { entries: [] }
   }
-
-  const mission = (agentCtx.config?.mission || "").trim()
-  const sprintName = (agentCtx.config?.sprint_mode?.name || "").trim()
-  const targetRelease = (agentCtx.config?.sprint_mode?.target_release || "").trim()
-  const actualTask = extractTaskFromArgs(args)
-  const taskDescription = actualTask || mission || sprintName || targetRelease || `general ${agentCtx.agentRole} tasks`
 
   const request = {
     agent: agentCtx.agentName,
@@ -169,7 +176,8 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
   // Vector adapter is used only in the async explain path.
   const result = retrieveLexical(request, index)
 
-  if (!result.matched_docs || result.matched_docs.length === 0) {
+  const hasPersistentMatches = Boolean(persistent?.ok && Array.isArray(persistent?.matches) && persistent.matches.length > 0)
+  if ((!result.matched_docs || result.matched_docs.length === 0) && !hasPersistentMatches) {
     return null
   }
 
@@ -186,13 +194,15 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
   lines.push(`Matched: ${matchedDocs.length} document(s) | Confidence: ${result.confidence}`)
   lines.push("────────────────────────────────────────────────────────────")
 
-  for (const doc of matchedDocs.slice(0, limit)) {
-    const scorePct = (doc.score * 100).toFixed(0)
-    lines.push("")
-    lines.push(`## [${doc.id}] (${scorePct}%)`)
-    lines.push(`Matched on: ${doc.reasons.join(", ")}`)
-    if (mode === "snippets" && doc.entry?.headings) {
-      lines.push("Sections: " + doc.entry.headings.slice(0, 3).join(" → "))
+  if (matchedDocs.length > 0) {
+    for (const doc of matchedDocs.slice(0, limit)) {
+      const scorePct = (doc.score * 100).toFixed(0)
+      lines.push("")
+      lines.push(`## [${doc.id}] (${scorePct}%)`)
+      lines.push(`Matched on: ${doc.reasons.join(", ")}`)
+      if (mode === "snippets" && doc.entry?.headings) {
+        lines.push("Sections: " + doc.entry.headings.slice(0, 3).join(" → "))
+      }
     }
   }
 
@@ -203,6 +213,11 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
 
   if (result.skill_hints.length > 0) {
     lines.push(`Skills referenced: ${result.skill_hints.join(", ")}`)
+  }
+
+  if (hasPersistentMatches) {
+    lines.push("────────────────────────────────────────────────────────────")
+    lines.push(persistent.block)
   }
 
   lines.push("────────────────────────────────────────────────────────────")
@@ -237,6 +252,18 @@ export async function buildContextMemoryBlockAsync(agentCtx, args = [], envOverr
   }
 
   const { limit, mode } = parseContextMemoryOptions(args)
+  const mission = (agentCtx.config?.mission || "").trim()
+  const sprintName = (agentCtx.config?.sprint_mode?.name || "").trim()
+  const targetRelease = (agentCtx.config?.sprint_mode?.target_release || "").trim()
+  const actualTask = extractTaskFromArgs(args)
+  const taskDescription = actualTask || mission || sprintName || targetRelease || `general ${agentCtx.agentRole} tasks`
+
+  const persistent = renderPersistentMemoryBlock(repoRoot, {
+    crew: agentCtx?.config?.crew || process.env.MAH_ACTIVE_CREW || "dev",
+    agent: agentCtx?.agentName || "orchestrator",
+    task: taskDescription,
+    limit: Math.min(5, limit),
+  })
 
   const contextRoot = resolve(repoRoot, ".mah", "context")
   const indexPath = resolve(contextRoot, "index", "operational-context.index.json")
@@ -248,14 +275,8 @@ export async function buildContextMemoryBlockAsync(agentCtx, args = [], envOverr
   }
 
   if (!index || !index.entries || index.entries.length === 0) {
-    return null
+    index = { entries: [] }
   }
-
-  const mission = (agentCtx.config?.mission || "").trim()
-  const sprintName = (agentCtx.config?.sprint_mode?.name || "").trim()
-  const targetRelease = (agentCtx.config?.sprint_mode?.target_release || "").trim()
-  const actualTask = extractTaskFromArgs(args)
-  const taskDescription = actualTask || mission || sprintName || targetRelease || `general ${agentCtx.agentRole} tasks`
 
   const request = {
     agent: agentCtx.agentName,
@@ -294,7 +315,8 @@ export async function buildContextMemoryBlockAsync(agentCtx, args = [], envOverr
     result = retrieveDocuments(request, index)
   }
 
-  if (!result.matched_docs || result.matched_docs.length === 0) {
+  const hasPersistentMatches = Boolean(persistent?.ok && Array.isArray(persistent?.matches) && persistent.matches.length > 0)
+  if ((!result.matched_docs || result.matched_docs.length === 0) && !hasPersistentMatches) {
     return null
   }
 
@@ -314,13 +336,15 @@ export async function buildContextMemoryBlockAsync(agentCtx, args = [], envOverr
   }
   lines.push("────────────────────────────────────────────────────────────")
 
-  for (const doc of matchedDocs.slice(0, limit)) {
-    const scorePct = (doc.score * 100).toFixed(0)
-    lines.push("")
-    lines.push(`## [${doc.id}] (${scorePct}%)`)
-    lines.push(`Matched on: ${doc.reasons.join(", ")}`)
-    if (mode === "snippets" && doc.entry?.headings) {
-      lines.push("Sections: " + doc.entry.headings.slice(0, 3).join(" → "))
+  if (matchedDocs.length > 0) {
+    for (const doc of matchedDocs.slice(0, limit)) {
+      const scorePct = (doc.score * 100).toFixed(0)
+      lines.push("")
+      lines.push(`## [${doc.id}] (${scorePct}%)`)
+      lines.push(`Matched on: ${doc.reasons.join(", ")}`)
+      if (mode === "snippets" && doc.entry?.headings) {
+        lines.push("Sections: " + doc.entry.headings.slice(0, 3).join(" → "))
+      }
     }
   }
 
@@ -331,6 +355,11 @@ export async function buildContextMemoryBlockAsync(agentCtx, args = [], envOverr
 
   if (result.skill_hints.length > 0) {
     lines.push(`Skills referenced: ${result.skill_hints.join(", ")}`)
+  }
+
+  if (hasPersistentMatches) {
+    lines.push("────────────────────────────────────────────────────────────")
+    lines.push(persistent.block)
   }
 
   lines.push("────────────────────────────────────────────────────────────")
@@ -378,21 +407,41 @@ export async function buildContextMemoryExplainPayload(args = []) {
     }
   }
 
+  const task = extractTaskFromArgs(args)
+  const persistent = renderPersistentMemoryBlock(repoRoot, {
+    crew: process.env.MAH_ACTIVE_CREW || "dev",
+    agent: process.env.MAH_AGENT || "orchestrator",
+    task,
+    limit: Math.min(5, limit),
+  })
+  const persistentMatches = persistent?.ok && Array.isArray(persistent.matches) ? persistent.matches : []
+
   if (!index || !index.entries || index.entries.length === 0) {
+    if (persistentMatches.length > 0) {
+      return {
+        enabled: true,
+        status: "matched",
+        mode,
+        limit,
+        matched_docs: [],
+        summary_blocks: [],
+        total_candidates: 0,
+        persistent_memory: {
+          enabled: true,
+          matched_entries: persistentMatches.map((entry) => ({
+            id: entry.id,
+            score: entry.score,
+            content: entry.content,
+            source: entry.source,
+          })),
+          usage: persistent?.usage || null,
+        },
+      }
+    }
     return { enabled: true, status: "missing-corpus", mode, limit }
   }
 
   try {
-    const task = extractTaskFromArgs(args)
-    
-    // Use async variant to support vector retrieval
-    const mockAgentCtx = {
-      agentName: "*",
-      agentRole: "",
-      config: {},
-      tools: [],
-    }
-    
     let result
     if (process.env.MAH_VECTOR_RETRIEVAL === "1") {
       try {
@@ -420,7 +469,9 @@ export async function buildContextMemoryExplainPayload(args = []) {
       }
     }
 
-    if (!result.matched_docs || result.matched_docs.length === 0) {
+    const hasDocMatches = Boolean(result.matched_docs && result.matched_docs.length > 0)
+    const hasPersistentMatches = persistentMatches.length > 0
+    if (!hasDocMatches && !hasPersistentMatches) {
       return { enabled: true, status: "no-match", mode, limit, matched_docs: [], summary_blocks: [] }
     }
 
@@ -429,13 +480,23 @@ export async function buildContextMemoryExplainPayload(args = []) {
       status: "matched",
       mode,
       limit,
-      matched_docs: result.matched_docs.slice(0, limit).map((doc) => ({
+      matched_docs: (result.matched_docs || []).slice(0, limit).map((doc) => ({
         id: doc.id,
         score: doc.score,
         reasons: doc.reasons || [],
       })),
       summary_blocks: (result.summary_blocks || []).slice(0, limit),
       total_candidates: result.total_candidates,
+      persistent_memory: {
+        enabled: true,
+        matched_entries: persistentMatches.map((entry) => ({
+          id: entry.id,
+          score: entry.score,
+          content: entry.content,
+          source: entry.source,
+        })),
+        usage: persistent?.usage || null,
+      },
     }
   } catch (err) {
     return {

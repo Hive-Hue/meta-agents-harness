@@ -30,6 +30,25 @@ It is separate from Expertise, which answers: **Which agent should receive this 
 
 ## Architecture
 
+Persistent memory for MAH agents is implemented as an additive layer inside Context Manager:
+
+1. **Operational corpus (`operational/`)**  
+Curated playbooks/gotchas with governance (`draft/curated/stable`) and deterministic retrieval.
+
+2. **Persistent agent memory (`persistent/agents/<crew>/<agent>.memory.json`)**  
+Bounded, mutable fact store per crew/agent for durable execution facts (conventions, lessons, recurring constraints).
+
+3. **Session-derived proposals (`proposals/`)**  
+Governed path for promoting session signals into operational corpus; no auto-promotion.
+
+### MAH-specific decisions (vs Hermes base)
+
+- **Per-agent topology awareness**: memory is keyed by `crew + agent` (not global profile files), aligned with MAH multi-agent routing model.
+- **Routing boundary preserved**: persistent memory never affects `mah expertise` selection logic; it is retrieval-only after routing.
+- **Bounded store by default**: char/entry limits enforce compaction pressure (`MAH_CONTEXT_PERSISTENT_MEMORY_CHAR_LIMIT`, `MAH_CONTEXT_PERSISTENT_MEMORY_ENTRY_LIMIT`).
+- **Operator-auditable CLI**: explicit `mah context memory` actions (`list/add/replace/remove/search/stats`) with deterministic substring semantics for updates.
+- **Additive runtime injection**: when `--with-context-memory` is enabled, operational retrieval + relevant persistent entries are injected together.
+
 
 
 ## Document Schema
@@ -134,6 +153,38 @@ Explain the retrieval reasoning for a task.
 mah context explain --agent planning-lead --task "create milestones"
 mah context explain --agent planning-lead --task "triage backlog" --json
 \`\`\`
+
+### mah context memory
+
+Manage bounded persistent memory per agent (inspired by Hermes persistent memory semantics, adapted to MAH crew/agent topology).
+
+\`\`\`bash
+# inspect
+mah context memory list --crew dev --agent planning-lead
+mah context memory stats --crew dev --agent planning-lead
+
+# write operations
+mah context memory add --crew dev --agent planning-lead --content "ClickUp milestones use weekly buckets." --source manual --tags clickup,planning
+mah context memory replace --crew dev --agent planning-lead --old "weekly buckets" --content "ClickUp milestones use bi-weekly buckets."
+mah context memory remove --crew dev --agent planning-lead --old "bi-weekly buckets"
+
+# task-scoped recall
+mah context memory search --crew dev --agent planning-lead --task "triage backlog and create milestones"
+
+# budget management
+mah context memory compact --crew dev --agent planning-lead --target-percent 70
+
+# session-to-memory ingestion (governed, bounded)
+mah context memory capture --from-session pi:dev:2026-05-15T19-32-39-841Z-4ehe7k --crew dev --agent planning-lead
+\`\`\`
+
+Rules:
+- substring matching is used for `replace` and `remove` (`--old` must match exactly one entry)
+- exact duplicates are ignored
+- memory is bounded by char and entry limits (`MAH_CONTEXT_PERSISTENT_MEMORY_CHAR_LIMIT`, `MAH_CONTEXT_PERSISTENT_MEMORY_ENTRY_LIMIT`)
+- `capture` extracts durable patterns from session artifacts (`events.jsonl`, `session_index.json`, `session.export.json`) and can evict low-value entries when `--no-compact` is not set
+- `compact` evicts least-used/oldest entries until the target usage budget is reached
+- persistent memory is additive; it does not override Expertise routing
 
 ### mah context propose
 
@@ -245,6 +296,8 @@ The context block is appended to the bootstrap query before "CONTEXT LOADED". If
 
 The bootstrap task context comes from the current runtime args first, then falls back to mission/sprint metadata if no task text is present.
 
+When persistent memory exists for the current crew/agent, relevant entries are injected into the same bootstrap context block alongside operational docs.
+
 ## Proposal Flow
 
 Derived memory proposals are created from sessions:
@@ -272,6 +325,9 @@ This is governed learning, not a raw memory dump. No auto-promotion. No transcri
 .mah/context/
   operational/           Curated corpus (committed to repo)
     crew/agent/capability/slug.md
+  persistent/            Bounded persistent memory stores (per crew/agent)
+    agents/
+      <crew>/<agent>.memory.json
   index/                 Derived index (auto-generated)
     operational-context.index.json
   proposals/             Draft proposals (review required)

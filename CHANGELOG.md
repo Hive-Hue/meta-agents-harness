@@ -26,6 +26,11 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
   - `Qdrant`
   - `pgvector`
   - `qmd`
+- Context Memory persistent-memory CLI was expanded with session ingestion and budget controls:
+  - `mah context memory capture --from-session <runtime:crew:sessionId>`
+  - `mah context memory capture --from-path <session-dir>`
+  - `mah context memory compact --target-percent <n>`
+- Session capture now derives bounded durable candidates from runtime artifacts (`events.jsonl`, `session_index.json`, `session.export.json`) and ingests them into `.mah/context/persistent/agents/<crew>/<agent>.memory.json`.
 
 ### Changed
 
@@ -42,6 +47,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Run Console runtime selector now preserves task runtime values even when they are not in the pre-detected runtime list.
 - Run Console artifacts detection now merges runtime session artifacts with workspace file changes during the run window, improving visibility for runtimes that write directly to repo paths.
 - Codex runtime plugin now supports headless execution using native `codex exec --cd <repo> --full-auto "<task>"`, enabling `/run` compatibility for runtime `codex`.
+- Session-based persistent-memory capture now resolves sessions using the full runtime registry (including plugin runtimes like `kilo`), avoiding false `session not found` for non-builtin runtimes.
 
 ### Fixed
 

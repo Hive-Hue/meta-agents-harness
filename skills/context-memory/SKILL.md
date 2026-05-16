@@ -28,6 +28,14 @@ Expertise chooses the agent. Context Memory only helps the chosen agent execute 
 5. If you changed the corpus, run `mah context validate --strict` and `mah context index`.
 6. If the source is a session, run `mah context propose --from-session <runtime:crew:session>`, review manually, then move approved content into `operational/`.
 7. For `planning-lead` backlog-planning tasks, prefer docs that mention ClickUp MCP explicitly and use the ClickUp MCP tools directly when the task requires backlog grooming or task creation.
+8. For durable agent-specific facts, use bounded persistent memory:
+   - `mah context memory add --crew <crew> --agent <agent> --content "..."`
+   - `mah context memory search --crew <crew> --agent <agent> --task "<task>"`
+9. For session-derived durable patterns, ingest bounded memory directly:
+   - `mah context memory capture --from-session <runtime:crew:sessionId> --crew <crew> --agent <agent>`
+   - Add `--no-compact` to disable eviction. Default capture can compact low-value entries to stay within budget.
+10. If persistent memory usage is high, compact before adding new facts:
+   - `mah context memory compact --crew <crew> --agent <agent> --target-percent 70`
 
 ## Rules
 
@@ -35,6 +43,7 @@ Expertise chooses the agent. Context Memory only helps the chosen agent execute 
 - Treat `tests/fixtures/context-memory/` as validation data, not production memory.
 - Prefer human-authored or curated docs over draft entries unless there is no better match.
 - If there is no strong match, fall back to the task spec or expertise.
+- Persistent memory entries must stay durable and reusable (patterns, constraints, conventions), not transient task logs.
 
 ## Retrieval Hints
 
@@ -48,3 +57,4 @@ Expertise chooses the agent. Context Memory only helps the chosen agent execute 
 
 - `mah run --with-context-memory` is for bootstrap injection, not for routing.
 - Rebuild the index after moving documents between proposal and operational folders.
+- Persistent memory is additive context, never a routing override.

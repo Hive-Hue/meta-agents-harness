@@ -13,6 +13,9 @@ export const CONTEXT_MEMORY_INDEX_VERSION = "mah.context-memory.index.v1"
 /** @type {string} */
 export const CONTEXT_MEMORY_PROPOSAL_VERSION = "mah.context-memory.proposal.v1"
 
+/** @type {string} */
+export const CONTEXT_PERSISTENT_MEMORY_VERSION = "mah.context-memory.persistent.v1"
+
 /** @type {string[]} */
 export const STABILITY_LEVELS = ["draft", "curated", "stable"]
 
@@ -33,6 +36,12 @@ export const MAX_CONTEXT_DOCUMENT_SIZE_BYTES = 65536
 
 /** @type {number} */
 export const MAX_RETRIEVAL_TOTAL_SIZE_BYTES = 32768
+
+/** @type {number} */
+export const DEFAULT_PERSISTENT_MEMORY_CHAR_LIMIT = 2200
+
+/** @type {number} */
+export const DEFAULT_PERSISTENT_MEMORY_ENTRY_LIMIT = 40
 
 /**
  * @typedef {"draft"|"curated"|"stable"} StabilityLevel
