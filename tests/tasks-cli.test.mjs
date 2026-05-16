@@ -138,3 +138,85 @@ test("mah task delete removes a persisted task", () => {
     rmSync(tempWorkspace, { recursive: true, force: true })
   }
 })
+
+test("mah task archive hides task from default list", () => {
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-task-archive-"))
+  try {
+    const create = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-300", title: "Archive me", missionId: "q4-audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
+    // Default list must include the task
+    const listBefore = run(["task", "list", "--json"], tempWorkspace)
+    assert.equal(listBefore.status, 0, listBefore.stderr)
+    const before = JSON.parse(listBefore.stdout)
+    assert.ok(before.tasks.some((t) => t.id === "TASK-300"), "task should appear before archive")
+
+    // Archive the task
+    const archive = run(["task", "archive", "TASK-300", "--json"], tempWorkspace)
+    assert.equal(archive.status, 0, archive.stderr)
+    const archivePayload = JSON.parse(archive.stdout)
+    assert.equal(archivePayload.ok, true)
+    assert.equal(archivePayload.task.id, "TASK-300")
+    assert.equal(archivePayload.task.archived, true)
+
+    // Default list must NOT include archived task
+    const listAfter = run(["task", "list", "--json"], tempWorkspace)
+    assert.equal(listAfter.status, 0, listAfter.stderr)
+    const after = JSON.parse(listAfter.stdout)
+    assert.ok(!after.tasks.some((t) => t.id === "TASK-300"), "archived task should be hidden")
+
+    // --archived flag should reveal it
+    const listArchived = run(["task", "list", "--archived", "--json"], tempWorkspace)
+    assert.equal(listArchived.status, 0, listArchived.stderr)
+    const archived = JSON.parse(listArchived.stdout)
+    assert.ok(archived.tasks.some((t) => t.id === "TASK-300"), "archived task should appear with --archived")
+  } finally {
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})
+
+test("mah task unarchive restores archived task to default list", () => {
+  const tempWorkspace = mkdtempSync(path.join(os.tmpdir(), "mah-task-unarchive-"))
+  try {
+    const create = run([
+      "task",
+      "create",
+      "--payload",
+      JSON.stringify({ id: "TASK-310", title: "Unarchive me", missionId: "q4-audit" }),
+      "--json"
+    ], tempWorkspace)
+    assert.equal(create.status, 0, create.stderr)
+
+    // Archive it
+    const archive = run(["task", "archive", "TASK-310", "--json"], tempWorkspace)
+    assert.equal(archive.status, 0, archive.stderr)
+
+    // Verify hidden
+    const listAfter = run(["task", "list", "--json"], tempWorkspace)
+    assert.equal(listAfter.status, 0, listAfter.stderr)
+    const after = JSON.parse(listAfter.stdout)
+    assert.ok(!after.tasks.some((t) => t.id === "TASK-310"), "task should be hidden after archive")
+
+    // Unarchive it
+    const unarchive = run(["task", "unarchive", "TASK-310", "--json"], tempWorkspace)
+    assert.equal(unarchive.status, 0, unarchive.stderr)
+    const unarchivePayload = JSON.parse(unarchive.stdout)
+    assert.equal(unarchivePayload.ok, true)
+    assert.equal(unarchivePayload.task.id, "TASK-310")
+    assert.equal(unarchivePayload.task.archived, false)
+
+    // Task should be visible again
+    const listRestored = run(["task", "list", "--json"], tempWorkspace)
+    assert.equal(listRestored.status, 0, listRestored.stderr)
+    const restored = JSON.parse(listRestored.stdout)
+    assert.ok(restored.tasks.some((t) => t.id === "TASK-310"), "task should be visible after unarchive")
+  } finally {
+    rmSync(tempWorkspace, { recursive: true, force: true })
+  }
+})

@@ -613,15 +613,16 @@ export function TasksPage() {
     return `${PERT_LAYOUT_STORAGE_PREFIX}:${workspaceScope}:${missionScope}`;
   }, [selectedMissionId, workspacePath]);
 
+  const activeTasks = tasks.filter((task) => !task.archived);
   const counts = useMemo(() => {
-    const blocked = tasks.filter((task) => task.state === "blocked").length;
-    const active = tasks.filter((task) => task.state === "in_progress").length;
+    const blocked = activeTasks.filter((task) => task.state === "blocked").length;
+    const active = activeTasks.filter((task) => task.state === "in_progress").length;
     return {
-      total: tasks.length,
+      total: activeTasks.length,
       blocked,
       active,
     };
-  }, [tasks]);
+  }, [activeTasks]);
 
   const timelineEntries = useMemo<TimelineEntry[]>(() => {
     const missionTasks = tasks.filter((task) => !selectedMissionId || task.missionId === selectedMissionId);
@@ -1751,6 +1752,7 @@ function T12BoardView({
 }) {
   // Apply filters
   const filtered = tasks.filter(t => {
+    if (t.archived) return false;
     if (filters.states.length > 0 && !filters.states.includes(t.state)) return false;
     if (filters.mission && t.missionId !== filters.mission) return false;
     if (filters.owner && t.owner !== filters.owner) return false;
@@ -1852,6 +1854,7 @@ function BoardView({
   );
   const filteredTasks = useMemo(
     () => tasks.filter((task) => {
+      if (task.archived) return false;
       if (boardFilters.states.length > 0 && !boardFilters.states.includes(task.state)) return false;
       if (boardFilters.mission && task.missionId !== boardFilters.mission) return false;
       if (boardFilters.owner && task.owner !== boardFilters.owner) return false;
@@ -2029,7 +2032,7 @@ function MissionsView({
   return (
     <div className="tasks-stack">
       <section className="tasks-missions-grid">
-        {missions.map((mission) => {
+        {missions.filter(m => !m.archived).map((mission) => {
           const badge = toneForMission(mission.status);
           return (
             <button

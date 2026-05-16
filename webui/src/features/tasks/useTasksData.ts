@@ -21,6 +21,7 @@ export type TaskRecord = {
   sessionId?: string;
   blockedReason?: string;
   rationale: string;
+  archived?: boolean;
   command: string;
 };
 
@@ -35,6 +36,7 @@ export type MissionRecord = {
   progress: number;
   health: string;
   successCriteria: string[];
+  archived?: boolean;
   command: string;
 };
 

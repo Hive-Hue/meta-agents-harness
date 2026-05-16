@@ -127,6 +127,7 @@ export function normalizeTaskRecord(input = {}, existingTasks = []) {
     sessionId: input.sessionId ? `${input.sessionId}`.trim() : undefined,
     blockedReason: input.blockedReason ? `${input.blockedReason}`.trim() : undefined,
     rationale: `${input.rationale || "Created from the Tasks page for operator planning."}`.trim(),
+    archived: Boolean(input.archived),
     command: buildTaskCommand({ id })
   }
 }
@@ -143,6 +144,7 @@ export function normalizeMissionRecord(input = {}, existingMissions = []) {
     capacity: `${input.capacity || "0%"}`.trim(),
     progress: Number.isFinite(input.progress) ? Number(input.progress) : 0,
     health: `${input.health || "Scoping"}`.trim(),
+    archived: Boolean(input.archived),
     successCriteria: Array.isArray(input.successCriteria) ? input.successCriteria.map((item) => `${item}`) : ["Define scope"],
     command: buildMissionCommand({ id })
   }
@@ -169,7 +171,9 @@ export function writeMissionStore(repoRoot, missions = []) {
 
 export function listTasks(repoRoot, filters = {}) {
   const { tasks } = readTaskStore(repoRoot)
+  const showArchived = filters.archived === true
   return tasks.filter((task) => {
+    if (!showArchived && task.archived) return false
     if (filters.id && task.id !== filters.id) return false
     if (filters.missionId && task.missionId !== filters.missionId) return false
     if (filters.state && task.state !== filters.state) return false
@@ -219,6 +223,14 @@ export function deleteTask(repoRoot, taskId) {
   return { task, tasks: nextTasks }
 }
 
+export function archiveTask(repoRoot, taskId) {
+  return updateTask(repoRoot, taskId, { archived: true })
+}
+
+export function unarchiveTask(repoRoot, taskId) {
+  return updateTask(repoRoot, taskId, { archived: false })
+}
+
 export function buildTaskPrompt(task) {
   const dependencies = Array.isArray(task.dependencies) && task.dependencies.length > 0
     ? task.dependencies.join(", ")
@@ -239,7 +251,9 @@ export function buildTaskPrompt(task) {
 
 export function listMissions(repoRoot, filters = {}) {
   const { missions } = readTaskStore(repoRoot)
+  const showArchived = filters.archived === true
   return missions.filter((mission) => {
+    if (!showArchived && mission.archived) return false
     if (filters.id && mission.id !== filters.id) return false
     if (filters.status && mission.status !== filters.status) return false
     return true
@@ -294,6 +308,14 @@ export function deleteMission(repoRoot, missionId, options = {}) {
     tasks: nextTasks,
     removedTasks: linkedTasks,
   }
+}
+
+export function archiveMission(repoRoot, missionId) {
+  return updateMission(repoRoot, missionId, { archived: true })
+}
+
+export function unarchiveMission(repoRoot, missionId) {
+  return updateMission(repoRoot, missionId, { archived: false })
 }
 
 export function commitMissionScope(repoRoot, missionId) {

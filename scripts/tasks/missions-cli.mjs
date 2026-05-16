@@ -1,9 +1,11 @@
 import {
   applyMissionReplan,
+  archiveMission,
   commitMissionScope,
   createMission,
   deleteMission,
   listMissions,
+  unarchiveMission,
   updateMission
 } from "./tasks-store.mjs"
 
@@ -37,10 +39,12 @@ function printMissionHelp() {
 mah mission — Missions CLI
 
 Usage:
-  mah mission list [--status <status>] [--json]
+  mah mission list [--status <status>] [--archived] [--json]
   mah mission show <id> [--json]
   mah mission create --payload '<json>' [--json]
   mah mission update <id> --payload '<json>' [--json]
+  mah mission archive --id <id> [--json]
+  mah mission unarchive --id <id> [--json]
   mah mission delete --id <id> [--cascade] [--json]
   mah mission commit-scope --id <id> [--json]
   mah mission replan --id <id> [--json]
@@ -77,7 +81,10 @@ async function main() {
   }
 
   if (subcommand === "list") {
-    const missions = listMissions(repoRoot, { status: parseValueArg(rest, "--status") })
+    const missions = listMissions(repoRoot, {
+      status: parseValueArg(rest, "--status"),
+      archived: hasFlag(rest, "--archived")
+    })
     process.exitCode = jsonMode ? printJson({ ok: true, missions }) : printMissionList(missions)
     return
   }
@@ -181,6 +188,32 @@ async function main() {
       ? printJson({ ok: true, mission: result.mission, missions: result.missions, tasks: result.tasks, summary: result.summary })
       : 0
     if (!jsonMode) console.log(`replanned ${result.mission.id}`)
+    return
+  }
+
+  if (subcommand === "archive") {
+    const missionId = parseValueArg(rest, "--id") || `${rest.find((token) => !token.startsWith("-")) || ""}`.trim()
+    const result = archiveMission(repoRoot, missionId)
+    if (!result.mission) {
+      process.exitCode = jsonMode ? printJson({ ok: false, error: "mission not found" }, 1) : 1
+      if (!jsonMode) console.error("ERROR: mission not found")
+      return
+    }
+    process.exitCode = jsonMode ? printJson({ ok: true, mission: result.mission, missions: result.missions }) : 0
+    if (!jsonMode) console.log(`archived ${result.mission.id}`)
+    return
+  }
+
+  if (subcommand === "unarchive") {
+    const missionId = parseValueArg(rest, "--id") || `${rest.find((token) => !token.startsWith("-")) || ""}`.trim()
+    const result = unarchiveMission(repoRoot, missionId)
+    if (!result.mission) {
+      process.exitCode = jsonMode ? printJson({ ok: false, error: "mission not found" }, 1) : 1
+      if (!jsonMode) console.error("ERROR: mission not found")
+      return
+    }
+    process.exitCode = jsonMode ? printJson({ ok: true, mission: result.mission, missions: result.missions }) : 0
+    if (!jsonMode) console.log(`unarchived ${result.mission.id}`)
     return
   }
 
