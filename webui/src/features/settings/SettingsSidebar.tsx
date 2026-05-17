@@ -1,6 +1,6 @@
 import { Icon } from "../../components/ui/Icon";
 
-export type SettingsTab = "workspace" | "runtimes" | "mcp" | "crews" | "models" | "skills" | "expertise" | "context" | "secrets" | "preferences" | "sync";
+export type SettingsTab = "workspace" | "runtimes" | "mcp" | "crews" | "models" | "skills" | "expertise" | "context" | "sync" | "hermes" | "secrets" | "preferences";
 
 const tabs: { id: SettingsTab; icon: string; label: string }[] = [
   { id: "workspace", icon: "folder", label: "Workspace" },
@@ -12,6 +12,7 @@ const tabs: { id: SettingsTab; icon: string; label: string }[] = [
   { id: "expertise", icon: "psychology", label: "Expertise" },
   { id: "context", icon: "database", label: "Context Memory" },
   { id: "sync", icon: "sync", label: "Sync & Artifacts" },
+  { id: "hermes", icon: "robot_2", label: "Hermes WebUI" },
   { id: "secrets", icon: "key", label: "Secrets" },
   { id: "preferences", icon: "tune", label: "Preferences" },
 ];

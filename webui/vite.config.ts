@@ -33,6 +33,12 @@ const CONTEXT_SETTING_SPECS = [
   { key: "MAH_PGVECTOR_COLLECTION_MODE", defaultValue: "none" },
 ] as const;
 
+const HERMES_GATEWAY_SETTING_SPECS = [
+  { key: "MAH_HERMES_GATEWAY_URL", defaultValue: "http://127.0.0.1:8642" },
+  { key: "MAH_HERMES_GATEWAY_API_KEY", defaultValue: "" },
+  { key: "MAH_HERMES_GATEWAY_MODEL", defaultValue: "" },
+] as const;
+
 // In-memory store for run sessions
 const runSessions = new Map<string, {
   events: Array<{ event: string; at: string; details?: Record<string, unknown> }>;
@@ -874,6 +880,932 @@ function handleContextVectorActionApi(req: import("http").IncomingMessage, res: 
       res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
     }
   });
+}
+
+function handleContextMemoryApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+  if (!hasWorkspaceConfig(workspaceRoot)) {
+    res.statusCode = 409;
+    res.end(JSON.stringify({ ok: false, error: `workspace config not found at ${workspaceRoot}/${CONFIG_FILENAME}` }));
+    return;
+  }
+
+  const validReadActions = new Set(["list", "stats", "search"]);
+  const validWriteActions = new Set(["add", "replace", "remove", "compact", "capture"]);
+
+  if (req.method === "GET") {
+    try {
+      const url = new URL(req.url ?? "", "http://localhost");
+      const action = `${url.searchParams.get("action") || "list"}`.trim().toLowerCase();
+      if (!validReadActions.has(action)) {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: "invalid action for GET. Use: list, stats, search." }));
+        return;
+      }
+
+      const crew = `${url.searchParams.get("crew") || "dev"}`.trim() || "dev";
+      const agent = `${url.searchParams.get("agent") || "orchestrator"}`.trim() || "orchestrator";
+      const args = ["context", "memory", action, "--crew", crew, "--agent", agent];
+
+      if (action === "search") {
+        const task = `${url.searchParams.get("task") || ""}`.trim();
+        if (!task) {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: "task is required for search action" }));
+          return;
+        }
+        args.push("--task", task);
+        const limit = Number.parseInt(`${url.searchParams.get("limit") || ""}`, 10);
+        if (Number.isFinite(limit) && limit > 0) args.push("--limit", `${Math.floor(limit)}`);
+      }
+
+      args.push("--json");
+      const result = runMahCliJson(workspaceRoot, args);
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, action, result }));
+    } catch (error) {
+      res.statusCode = 500;
+      res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+    }
+    return;
+  }
+
+  if (req.method === "POST") {
+    readJsonBody<{
+      action?: unknown;
+      crew?: unknown;
+      agent?: unknown;
+      content?: unknown;
+      oldText?: unknown;
+      source?: unknown;
+      tags?: unknown;
+      task?: unknown;
+      targetPercent?: unknown;
+      fromSession?: unknown;
+      fromPath?: unknown;
+      limit?: unknown;
+      noCompact?: unknown;
+    }>(
+      req,
+      (body) => {
+        try {
+          const action = `${body?.action || ""}`.trim().toLowerCase();
+          if (!validWriteActions.has(action)) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: "invalid action for POST. Use: add, replace, remove, compact, capture." }));
+            return;
+          }
+
+          const crew = `${body?.crew || "dev"}`.trim() || "dev";
+          const agent = `${body?.agent || "orchestrator"}`.trim() || "orchestrator";
+          const args = ["context", "memory", action, "--crew", crew, "--agent", agent];
+          const content = `${body?.content || ""}`.trim();
+          const oldText = `${body?.oldText || ""}`.trim();
+          const source = `${body?.source || ""}`.trim();
+          const task = `${body?.task || ""}`.trim();
+          const fromSession = `${body?.fromSession || ""}`.trim();
+          const fromPath = `${body?.fromPath || ""}`.trim();
+          const tags = Array.isArray(body?.tags)
+            ? body.tags.map((entry) => `${entry || ""}`.trim()).filter(Boolean).join(",")
+            : `${body?.tags || ""}`.trim();
+
+          const limit = Number.parseInt(`${body?.limit || ""}`, 10);
+          const targetPercent = Number.parseInt(`${body?.targetPercent || ""}`, 10);
+          const noCompact = body?.noCompact === true;
+
+          if (action === "add") {
+            if (!content) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: "content is required for add action" }));
+              return;
+            }
+            args.push("--content", content);
+            if (source) args.push("--source", source);
+            if (tags) args.push("--tags", tags);
+          } else if (action === "replace") {
+            if (!oldText || !content) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: "oldText and content are required for replace action" }));
+              return;
+            }
+            args.push("--old", oldText, "--content", content);
+            if (source) args.push("--source", source);
+          } else if (action === "remove") {
+            if (!oldText) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: "oldText is required for remove action" }));
+              return;
+            }
+            args.push("--old", oldText);
+          } else if (action === "compact") {
+            if (Number.isFinite(targetPercent) && targetPercent > 0) {
+              args.push("--target-percent", `${Math.floor(targetPercent)}`);
+            }
+          } else if (action === "capture") {
+            if (!fromSession && !fromPath) {
+              res.statusCode = 400;
+              res.end(JSON.stringify({ ok: false, error: "fromSession or fromPath is required for capture action" }));
+              return;
+            }
+            if (fromSession) args.push("--from-session", fromSession);
+            if (fromPath) args.push("--from-path", fromPath);
+            if (Number.isFinite(limit) && limit > 0) args.push("--limit", `${Math.floor(limit)}`);
+            if (tags) args.push("--tags", tags);
+            if (noCompact) args.push("--no-compact");
+          }
+
+          args.push("--json");
+          const result = runMahCliJson(workspaceRoot, args);
+          res.statusCode = 200;
+          res.end(JSON.stringify({ ok: true, action, result }));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+      },
+      (error) => {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      },
+    );
+    return;
+  }
+
+  res.statusCode = 405;
+  res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+}
+
+function handleHermesGatewayApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
+  res.setHeader("Content-Type", "application/json");
+  const workspaceRoot = resolveWorkspaceRoot(req);
+  const workspaceMeta = getWorkspaceMetadata(workspaceRoot);
+  if (!workspaceMeta.exists || !workspaceMeta.isDirectory) {
+    res.statusCode = 400;
+    res.end(JSON.stringify({ ok: false, error: `workspace path is invalid: ${workspaceRoot}` }));
+    return;
+  }
+
+  const envPath = path.join(workspaceRoot, ENV_FILENAME);
+  const rawEnv = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const parsedEnv = parseDotEnvContent(rawEnv);
+
+  const normalizeBaseUrl = (value: string): string => `${value || ""}`.trim().replace(/\/+$/, "");
+  const defaultSettings = Object.fromEntries(
+    HERMES_GATEWAY_SETTING_SPECS.map((spec) => [spec.key, spec.defaultValue]),
+  ) as Record<string, string>;
+  const resolvedSettings = () => {
+    const settings = { ...defaultSettings };
+    for (const spec of HERMES_GATEWAY_SETTING_SPECS) {
+      const value = `${parsedEnv[spec.key] || process.env[spec.key] || spec.defaultValue}`.trim();
+      settings[spec.key] = value;
+    }
+    settings.MAH_HERMES_GATEWAY_URL = normalizeBaseUrl(settings.MAH_HERMES_GATEWAY_URL);
+    return settings;
+  };
+
+  const buildHeaders = (apiKey: string) => {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    const trimmed = `${apiKey || ""}`.trim();
+    if (trimmed) headers.Authorization = trimmed.startsWith("Bearer ") ? trimmed : `Bearer ${trimmed}`;
+    return headers;
+  };
+
+  const buildCandidateUrls = (baseUrl: string, suffixes: string[]) => {
+    const normalized = normalizeBaseUrl(baseUrl);
+    if (!normalized) return [];
+    let parsed: URL;
+    try {
+      parsed = new URL(normalized);
+    } catch {
+      return [];
+    }
+    const origin = parsed.origin;
+    const basePath = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname.replace(/\/+$/, "") : "";
+    const urls = new Set<string>();
+    for (const suffixRaw of suffixes) {
+      const suffix = suffixRaw.startsWith("/") ? suffixRaw : `/${suffixRaw}`;
+      urls.add(`${origin}${suffix}`);
+      if (basePath) urls.add(`${origin}${basePath}${suffix}`);
+    }
+    return Array.from(urls);
+  };
+
+  const parseJsonSafely = async (response: Response) => {
+    const text = await response.text();
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  };
+
+  const extractAssistantText = (payload: unknown): string => {
+    const obj = payload as Record<string, unknown> | null;
+    if (!obj || typeof obj !== "object") return typeof payload === "string" ? payload : "";
+    const choices = Array.isArray(obj.choices) ? obj.choices : [];
+    if (choices.length > 0) {
+      const first = choices[0] as Record<string, unknown>;
+      const message = first?.message as Record<string, unknown> | undefined;
+      const delta = first?.delta as Record<string, unknown> | undefined;
+      const candidate = message?.content ?? delta?.content;
+      if (typeof candidate === "string") return candidate;
+      if (Array.isArray(candidate)) {
+        return candidate
+          .map((part) => {
+            if (typeof part === "string") return part;
+            const p = part as Record<string, unknown>;
+            if (typeof p?.text === "string") return p.text;
+            if (typeof p?.content === "string") return p.content;
+            return "";
+          })
+          .filter(Boolean)
+          .join("");
+      }
+    }
+    const message = obj.message as Record<string, unknown> | undefined;
+    if (typeof message?.content === "string") return message.content;
+    if (typeof obj.response === "string") return obj.response;
+    if (typeof obj.output_text === "string") return obj.output_text;
+    if (typeof obj.content === "string") return obj.content;
+    return "";
+  };
+
+  const toText = (value: unknown): string => {
+    if (typeof value === "string") return value.trim();
+    if (typeof value === "number" || typeof value === "boolean") return String(value);
+    if (Array.isArray(value)) {
+      return value
+        .map((item) => toText(item))
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+    }
+    if (value && typeof value === "object") {
+      const row = value as Record<string, unknown>;
+      const candidates = [
+        row.text,
+        row.content,
+        row.reasoning_content,
+        row.output_text,
+        row.summary,
+        row.message,
+      ];
+      return candidates
+        .map((item) => toText(item))
+        .filter(Boolean)
+        .join("\n")
+        .trim();
+    }
+    return "";
+  };
+
+  const extractThinkingBlocks = (payload: unknown): string[] => {
+    const blocks: string[] = [];
+    const pushUnique = (value: unknown) => {
+      const text = toText(value);
+      if (!text) return;
+      if (blocks.includes(text)) return;
+      blocks.push(text.length > 6000 ? `${text.slice(0, 6000)}…` : text);
+    };
+
+    const obj = payload as Record<string, unknown> | null;
+    if (!obj || typeof obj !== "object") return blocks;
+
+    const choices = Array.isArray(obj.choices) ? obj.choices : [];
+    if (choices.length > 0) {
+      const first = choices[0] as Record<string, unknown>;
+      const message = first?.message as Record<string, unknown> | undefined;
+      pushUnique(message?.reasoning_content);
+      pushUnique(message?.reasoning);
+      pushUnique(first?.reasoning);
+    }
+
+    pushUnique(obj.reasoning);
+    pushUnique(obj.thinking);
+
+    const output = Array.isArray(obj.output) ? obj.output : [];
+    for (const item of output) {
+      const row = (item && typeof item === "object") ? (item as Record<string, unknown>) : null;
+      const type = `${row?.type || ""}`.toLowerCase();
+      if (type.includes("reason") || type.includes("thinking")) {
+        pushUnique(row);
+      }
+    }
+
+    const activity = obj.activity as Record<string, unknown> | undefined;
+    if (activity) {
+      pushUnique(activity.thinking);
+      if (Array.isArray(activity.thinking)) {
+        for (const row of activity.thinking) pushUnique(row);
+      }
+    }
+
+    return blocks.slice(0, 4);
+  };
+
+  const extractToolCalls = (payload: unknown): Array<{ id?: string; type?: string; name: string; arguments?: string }> => {
+    const toolCalls: Array<{ id?: string; type?: string; name: string; arguments?: string }> = [];
+    const seen = new Set<string>();
+
+    const pushTool = (value: unknown) => {
+      if (!value || typeof value !== "object") return;
+      const row = value as Record<string, unknown>;
+      const fn = (row.function && typeof row.function === "object") ? row.function as Record<string, unknown> : null;
+      const name = `${fn?.name || row.name || row.tool || row.action || ""}`.trim();
+      if (!name) return;
+      const id = `${row.id || row.tool_call_id || ""}`.trim() || undefined;
+      const type = `${row.type || (fn ? "function" : "")}`.trim() || undefined;
+      const argsRaw = fn?.arguments ?? row.arguments ?? row.input ?? row.params;
+      const argumentsText = typeof argsRaw === "string"
+        ? argsRaw
+        : argsRaw !== undefined
+          ? JSON.stringify(argsRaw, null, 2)
+          : undefined;
+      const key = `${id || ""}|${name}|${argumentsText || ""}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      toolCalls.push({
+        id,
+        type,
+        name,
+        arguments: argumentsText && argumentsText.length > 4000 ? `${argumentsText.slice(0, 4000)}…` : argumentsText,
+      });
+    };
+
+    const obj = payload as Record<string, unknown> | null;
+    if (!obj || typeof obj !== "object") return toolCalls;
+
+    const choices = Array.isArray(obj.choices) ? obj.choices : [];
+    if (choices.length > 0) {
+      const first = choices[0] as Record<string, unknown>;
+      const message = first?.message as Record<string, unknown> | undefined;
+      if (Array.isArray(message?.tool_calls)) {
+        for (const row of message.tool_calls) pushTool(row);
+      }
+      const delta = first?.delta as Record<string, unknown> | undefined;
+      if (Array.isArray(delta?.tool_calls)) {
+        for (const row of delta.tool_calls) pushTool(row);
+      }
+    }
+
+    if (Array.isArray(obj.tool_calls)) {
+      for (const row of obj.tool_calls) pushTool(row);
+    }
+
+    const output = Array.isArray(obj.output) ? obj.output : [];
+    for (const item of output) {
+      const row = (item && typeof item === "object") ? (item as Record<string, unknown>) : null;
+      const type = `${row?.type || ""}`.toLowerCase();
+      if (type.includes("tool") || type.includes("function")) {
+        pushTool(row);
+      }
+    }
+
+    const activity = obj.activity as Record<string, unknown> | undefined;
+    if (activity && Array.isArray(activity.tool_calls)) {
+      for (const row of activity.tool_calls) pushTool(row);
+    }
+
+    return toolCalls.slice(0, 12);
+  };
+
+  const serializePreview = (payload: unknown, maxChars = 8000): string => {
+    try {
+      const text = typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+      if (!text) return "";
+      return text.length > maxChars ? `${text.slice(0, maxChars)}…` : text;
+    } catch {
+      return typeof payload === "string" ? payload : "";
+    }
+  };
+
+  const tryGatewayRequests = async (urls: string[], initFactory: (url: string) => RequestInit) => {
+    const errors: string[] = [];
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, initFactory(url));
+        const payload = await parseJsonSafely(response);
+        if (response.ok) return { ok: true as const, url, status: response.status, payload };
+        errors.push(`${url} -> HTTP ${response.status}`);
+      } catch (error) {
+        errors.push(`${url} -> ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return { ok: false as const, error: errors.join(" | ") || "gateway request failed" };
+  };
+
+  const tryGatewayStream = async (urls: string[], initFactory: (url: string) => RequestInit) => {
+    const errors: string[] = [];
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, initFactory(url));
+        if (response.ok && response.body) {
+          return { ok: true as const, url, response };
+        }
+        const payload = await parseJsonSafely(response);
+        const detail = typeof payload === "string" ? payload.slice(0, 160) : JSON.stringify(payload).slice(0, 160);
+        errors.push(`${url} -> HTTP ${response.status}${detail ? ` (${detail})` : ""}`);
+      } catch (error) {
+        errors.push(`${url} -> ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return { ok: false as const, error: errors.join(" | ") || "gateway stream request failed" };
+  };
+
+  const extractSkillsFromPayload = (payload: Record<string, unknown>): string[] => {
+    const rows = Array.isArray(payload.skills) ? payload.skills : [];
+    const names = rows
+      .map((row) => {
+        const item = (row && typeof row === "object") ? (row as Record<string, unknown>) : null;
+        return `${item?.skill || ""}`.trim();
+      })
+      .filter(Boolean);
+    return Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
+  };
+
+  const getMahSkillsContext = (crew: string, agent: string): { installed: string[]; assigned: string[]; warnings: string[] } => {
+    const warnings: string[] = [];
+    let installed: string[] = [];
+    let assigned: string[] = [];
+
+    try {
+      const installedPayload = runMahCliJson(workspaceRoot, ["skills", "list", "--json"]);
+      installed = extractSkillsFromPayload(installedPayload);
+    } catch (error) {
+      warnings.push(`could not load installed skills: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    try {
+      const assignedPayload = runMahCliJson(workspaceRoot, ["skills", "list", "--crew", crew, "--agent", agent, "--json"]);
+      assigned = extractSkillsFromPayload(assignedPayload);
+    } catch (error) {
+      warnings.push(`could not load assigned skills for ${crew}:${agent}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
+    return { installed, assigned, warnings };
+  };
+
+  const route = (req.url ?? "").split("?")[0] || "";
+
+  if (route === "/api/mah/hermes-gateway/config") {
+    if (req.method === "GET") {
+      const settings = resolvedSettings();
+      res.statusCode = 200;
+      res.end(JSON.stringify({ ok: true, settings }));
+      return;
+    }
+    if (req.method === "PUT") {
+      readJsonBody<{ settings?: Record<string, unknown> }>(
+        req,
+        (body) => {
+          try {
+            const incoming = body?.settings && typeof body.settings === "object" ? body.settings : {};
+            let nextEnv = rawEnv;
+            const settings: Record<string, string> = {};
+            for (const spec of HERMES_GATEWAY_SETTING_SPECS) {
+              const rawValue = incoming[spec.key];
+              const normalized = rawValue === null || rawValue === undefined ? "" : `${rawValue}`.trim();
+              const finalValue = spec.key === "MAH_HERMES_GATEWAY_URL"
+                ? normalizeBaseUrl(normalized || spec.defaultValue)
+                : normalized;
+              settings[spec.key] = finalValue;
+              nextEnv = upsertEnvVar(nextEnv, spec.key, finalValue);
+            }
+            writeFileSync(envPath, nextEnv, "utf-8");
+            res.statusCode = 200;
+            res.end(JSON.stringify({ ok: true, settings }));
+          } catch (error) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+          }
+        },
+        (error) => {
+          res.statusCode = 400;
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        },
+      );
+      return;
+    }
+    res.statusCode = 405;
+    res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+    return;
+  }
+
+  if (route === "/api/mah/hermes-gateway/health") {
+    if (req.method !== "POST") {
+      res.statusCode = 405;
+      res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+      return;
+    }
+    readJsonBody<{ baseUrl?: string; apiKey?: string }>(
+      req,
+      async (body) => {
+        try {
+          const settings = resolvedSettings();
+          const baseUrl = normalizeBaseUrl(`${body?.baseUrl || settings.MAH_HERMES_GATEWAY_URL}`.trim());
+          const apiKey = `${body?.apiKey || settings.MAH_HERMES_GATEWAY_API_KEY || ""}`.trim();
+          const urls = buildCandidateUrls(baseUrl, ["/api/version", "/api/models", "/api/tags", "/health"]);
+          if (urls.length === 0) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: "invalid gateway baseUrl" }));
+            return;
+          }
+          const result = await tryGatewayRequests(urls, () => ({
+            method: "GET",
+            headers: buildHeaders(apiKey),
+          }));
+          if (!result.ok) {
+            res.statusCode = 502;
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+          res.statusCode = 200;
+          res.end(JSON.stringify({
+            ok: true,
+            health: {
+              ok: true,
+              endpoint: result.url,
+              status: result.status,
+              payload: result.payload,
+            },
+          }));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+      },
+      (error) => {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      },
+    );
+    return;
+  }
+
+  if (route === "/api/mah/hermes-gateway/models") {
+    if (req.method !== "POST") {
+      res.statusCode = 405;
+      res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+      return;
+    }
+    readJsonBody<{ baseUrl?: string; apiKey?: string }>(
+      req,
+      async (body) => {
+        try {
+          const settings = resolvedSettings();
+          const baseUrl = normalizeBaseUrl(`${body?.baseUrl || settings.MAH_HERMES_GATEWAY_URL}`.trim());
+          const apiKey = `${body?.apiKey || settings.MAH_HERMES_GATEWAY_API_KEY || ""}`.trim();
+          const urls = buildCandidateUrls(baseUrl, ["/api/models", "/api/tags", "/v1/models"]);
+          if (urls.length === 0) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: "invalid gateway baseUrl" }));
+            return;
+          }
+          const result = await tryGatewayRequests(urls, () => ({
+            method: "GET",
+            headers: buildHeaders(apiKey),
+          }));
+          if (!result.ok) {
+            res.statusCode = 502;
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+
+          const payload = result.payload as Record<string, unknown> | null;
+          const normalized: Array<{ id: string; label: string }> = [];
+          const pushModel = (idRaw: unknown, labelRaw?: unknown) => {
+            const id = `${idRaw || ""}`.trim();
+            if (!id || normalized.some((item) => item.id === id)) return;
+            const label = `${labelRaw || id}`.trim() || id;
+            normalized.push({ id, label });
+          };
+
+          if (payload && Array.isArray(payload.data)) {
+            for (const row of payload.data as Array<Record<string, unknown>>) {
+              pushModel(row?.id, row?.name || row?.display_name || row?.id);
+            }
+          }
+          if (payload && Array.isArray(payload.models)) {
+            for (const row of payload.models as Array<Record<string, unknown>>) {
+              pushModel(row?.id || row?.model || row?.name, row?.name || row?.title || row?.model);
+            }
+          }
+          if (Array.isArray(result.payload)) {
+            for (const row of result.payload as Array<Record<string, unknown>>) {
+              pushModel(row?.id || row?.model || row?.name, row?.name || row?.title || row?.model);
+            }
+          }
+          if (normalized.length === 0 && settings.MAH_HERMES_GATEWAY_MODEL) {
+            normalized.push({ id: settings.MAH_HERMES_GATEWAY_MODEL, label: settings.MAH_HERMES_GATEWAY_MODEL });
+          }
+
+          res.statusCode = 200;
+          res.end(JSON.stringify({
+            ok: true,
+            endpoint: result.url,
+            models: normalized,
+          }));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+      },
+      (error) => {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      },
+    );
+    return;
+  }
+
+  if (route === "/api/mah/hermes-gateway/chat") {
+    if (req.method !== "POST") {
+      res.statusCode = 405;
+      res.end(JSON.stringify({ ok: false, error: "method not allowed" }));
+      return;
+    }
+    readJsonBody<{
+      baseUrl?: string;
+      apiKey?: string;
+      model?: string;
+      crew?: string;
+      agent?: string;
+      runtime?: string;
+      routingScope?: string;
+      includeMahContext?: boolean;
+      systemPrompt?: string;
+      temperature?: number;
+      maxTokens?: number;
+      stream?: boolean;
+      messages?: Array<{ role?: string; content?: string }>;
+    }>(
+      req,
+      async (body) => {
+        try {
+          const settings = resolvedSettings();
+          const baseUrl = normalizeBaseUrl(`${body?.baseUrl || settings.MAH_HERMES_GATEWAY_URL}`.trim());
+          const apiKey = `${body?.apiKey || settings.MAH_HERMES_GATEWAY_API_KEY || ""}`.trim();
+          const model = `${body?.model || settings.MAH_HERMES_GATEWAY_MODEL || ""}`.trim();
+          const systemPrompt = `${body?.systemPrompt || ""}`.trim();
+          const includeMahContext = body?.includeMahContext !== false;
+          const crew = `${body?.crew || process.env.MAH_ACTIVE_CREW || "dev"}`.trim() || "dev";
+          const agent = `${body?.agent || "orchestrator"}`.trim() || "orchestrator";
+          const runtime = `${body?.runtime || "hermes"}`.trim() || "hermes";
+          const routingScope = `${body?.routingScope || "active_crew"}`.trim() || "active_crew";
+          const sourceMessages = Array.isArray(body?.messages) ? body.messages : [];
+
+          if (sourceMessages.length === 0) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: "messages are required" }));
+            return;
+          }
+
+          const promptParts: string[] = [];
+          if (systemPrompt) promptParts.push(systemPrompt);
+          if (includeMahContext) {
+            const skillsContext = getMahSkillsContext(crew, agent);
+            const installedText = skillsContext.installed.length > 0 ? skillsContext.installed.join(", ") : "none";
+            const assignedText = skillsContext.assigned.length > 0 ? skillsContext.assigned.join(", ") : "none";
+            const warningText = skillsContext.warnings.length > 0
+              ? `Skill Catalog Warnings: ${skillsContext.warnings.join(" | ")}`
+              : "Skill Catalog Warnings: none";
+            promptParts.push([
+              "MAH ORCHESTRATION CONTEXT",
+              `Crew: ${crew}`,
+              `Agent: ${agent}`,
+              `Runtime: ${runtime}`,
+              `Routing Scope: ${routingScope}`,
+              `Installed Skills (${skillsContext.installed.length}): ${installedText}`,
+              `Assigned Skills for ${crew}:${agent} (${skillsContext.assigned.length}): ${assignedText}`,
+              warningText,
+              "Skill naming note: canonical skill id is `web-research` (not `web-search`).",
+              "If a skill is unavailable, explain whether it is missing from installed catalog vs not assigned to the active agent.",
+              "Act as the orchestrator. Route and decompose tasks before execution handoff.",
+            ].join("\n"));
+          }
+
+          const gatewayMessages: Array<{ role: string; content: string }> = [];
+          if (promptParts.length > 0) {
+            gatewayMessages.push({ role: "system", content: promptParts.join("\n\n") });
+          }
+          for (const message of sourceMessages) {
+            const role = `${message?.role || ""}`.trim().toLowerCase();
+            const content = `${message?.content || ""}`.trim();
+            if (!content) continue;
+            if (role === "user" || role === "assistant" || role === "system") {
+              gatewayMessages.push({ role, content });
+            }
+          }
+          if (gatewayMessages.length === 0) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: "no valid messages to send" }));
+            return;
+          }
+
+          const urls = buildCandidateUrls(baseUrl, ["/api/chat/completions", "/api/v1/chat/completions", "/v1/chat/completions"]);
+          if (urls.length === 0) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ ok: false, error: "invalid gateway baseUrl" }));
+            return;
+          }
+
+          const requestBody: Record<string, unknown> = {
+            messages: gatewayMessages,
+            stream: body?.stream !== false,
+          };
+          if (model) requestBody.model = model;
+          if (typeof body?.temperature === "number" && Number.isFinite(body.temperature)) requestBody.temperature = body.temperature;
+          if (typeof body?.maxTokens === "number" && Number.isFinite(body.maxTokens)) requestBody.max_tokens = Math.max(1, Math.floor(body.maxTokens));
+
+          const streamEnabled = requestBody.stream === true;
+          const runHistory = gatewayMessages.filter((item) => item.role !== "system");
+          const runInput = `${runHistory.length > 0
+            ? runHistory[runHistory.length - 1]?.content
+            : gatewayMessages[gatewayMessages.length - 1]?.content || ""}`.trim();
+          const runConversationHistory = runHistory.slice(0, -1);
+          const runInstructions = promptParts.join("\n\n").trim();
+
+          if (streamEnabled) {
+            let streamResult: { url: string; response: Response } | null = null;
+            let streamSource = "chat_completions";
+            let streamRunId = "";
+            let streamError = "";
+
+            if (runInput) {
+              const runCreateUrls = buildCandidateUrls(baseUrl, ["/v1/runs"]);
+              const runRequestBody: Record<string, unknown> = { input: runInput };
+              if (model) runRequestBody.model = model;
+              if (runInstructions) runRequestBody.instructions = runInstructions;
+              if (runConversationHistory.length > 0) runRequestBody.conversation_history = runConversationHistory;
+              if (typeof body?.temperature === "number" && Number.isFinite(body.temperature)) runRequestBody.temperature = body.temperature;
+              if (typeof body?.maxTokens === "number" && Number.isFinite(body.maxTokens)) runRequestBody.max_tokens = Math.max(1, Math.floor(body.maxTokens));
+
+              const runCreateResult = await tryGatewayRequests(runCreateUrls, () => ({
+                method: "POST",
+                headers: {
+                  ...buildHeaders(apiKey),
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify(runRequestBody),
+              }));
+              if (runCreateResult.ok) {
+                const runPayload = (runCreateResult.payload && typeof runCreateResult.payload === "object")
+                  ? runCreateResult.payload as Record<string, unknown>
+                  : null;
+                const runId = `${runPayload?.run_id || runPayload?.id || ""}`.trim();
+                if (runId) {
+                  const encodedRunId = encodeURIComponent(runId);
+                  const runEventUrls = buildCandidateUrls(baseUrl, [`/v1/runs/${encodedRunId}/events`]);
+                  const runStreamResult = await tryGatewayStream(runEventUrls, () => ({
+                    method: "GET",
+                    headers: {
+                      ...buildHeaders(apiKey),
+                      Accept: "text/event-stream",
+                    },
+                  }));
+                  if (runStreamResult.ok) {
+                    streamResult = runStreamResult;
+                    streamSource = "runs";
+                    streamRunId = runId;
+                  } else {
+                    streamError = runStreamResult.error;
+                  }
+                }
+              } else {
+                streamError = runCreateResult.error;
+              }
+            }
+
+            if (!streamResult) {
+              const chatStreamResult = await tryGatewayStream(urls, () => ({
+                method: "POST",
+                headers: {
+                  ...buildHeaders(apiKey),
+                  "Content-Type": "application/json",
+                  Accept: "text/event-stream",
+                },
+                body: JSON.stringify(requestBody),
+              }));
+              if (!chatStreamResult.ok) {
+                const detail = streamError ? ` | runs: ${streamError}` : "";
+                res.statusCode = 502;
+                res.end(JSON.stringify({ ok: false, error: `${chatStreamResult.error}${detail}` }));
+                return;
+              }
+              streamResult = chatStreamResult;
+              streamSource = "chat_completions";
+            }
+
+            res.statusCode = 200;
+            res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+            res.setHeader("Cache-Control", "no-cache, no-transform");
+            res.setHeader("Connection", "keep-alive");
+            res.setHeader("X-Accel-Buffering", "no");
+            if (typeof (res as { flushHeaders?: () => void }).flushHeaders === "function") {
+              (res as { flushHeaders?: () => void }).flushHeaders?.();
+            }
+
+            const reader = streamResult.response.body?.getReader();
+            if (!reader) {
+              res.write(`event: error\ndata: ${JSON.stringify({ error: "upstream stream body unavailable" })}\n\n`);
+              res.write("data: [DONE]\n\n");
+              res.end();
+              return;
+            }
+
+            res.write(`event: meta\ndata: ${JSON.stringify({ endpoint: streamResult.url, model, source: streamSource, run_id: streamRunId || undefined })}\n\n`);
+
+            let closed = false;
+            const closeStream = () => {
+              if (closed) return;
+              closed = true;
+              void reader.cancel().catch(() => {});
+              try {
+                res.end();
+              } catch {
+                // Ignore response close races.
+              }
+            };
+            req.on("close", closeStream);
+
+            try {
+              while (!closed) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (!value || value.length === 0) continue;
+                res.write(Buffer.from(value));
+              }
+              if (!closed) {
+                res.end();
+              }
+            } catch (error) {
+              if (!closed) {
+                res.write(`event: error\ndata: ${JSON.stringify({ error: error instanceof Error ? error.message : String(error) })}\n\n`);
+                res.write("data: [DONE]\n\n");
+                res.end();
+              }
+            } finally {
+              req.off("close", closeStream);
+              void reader.cancel().catch(() => {});
+            }
+            return;
+          }
+
+          const result = await tryGatewayRequests(urls, () => ({
+            method: "POST",
+            headers: {
+              ...buildHeaders(apiKey),
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          }));
+          if (!result.ok) {
+            res.statusCode = 502;
+            res.end(JSON.stringify({ ok: false, error: result.error }));
+            return;
+          }
+
+          const responseText = extractAssistantText(result.payload);
+          const thinking = extractThinkingBlocks(result.payload);
+          const toolCalls = extractToolCalls(result.payload);
+          const rawPreview = serializePreview(result.payload);
+          res.statusCode = 200;
+          res.end(JSON.stringify({
+            ok: true,
+            endpoint: result.url,
+            model: (result.payload as Record<string, unknown> | null)?.model || model,
+            responseText: responseText || "",
+            usage: (result.payload as Record<string, unknown> | null)?.usage || null,
+            activity: {
+              thinking,
+              toolCalls,
+              rawPreview,
+            },
+            raw: result.payload,
+          }));
+        } catch (error) {
+          res.statusCode = 500;
+          res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+        }
+      },
+      (error) => {
+        res.statusCode = 400;
+        res.end(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) }));
+      },
+    );
+    return;
+  }
+
+  res.statusCode = 404;
+  res.end(JSON.stringify({ ok: false, error: "unknown hermes gateway route" }));
 }
 
 function handleExpertiseProposalsApi(req: import("http").IncomingMessage, res: import("http").ServerResponse) {
@@ -2199,6 +3131,14 @@ function mahApiMiddleware() {
         }
         if (url === "/api/mah/context-vector-action") {
           handleContextVectorActionApi(req, res);
+          return;
+        }
+        if (url.startsWith("/api/mah/context-memory")) {
+          handleContextMemoryApi(req, res);
+          return;
+        }
+        if (url.startsWith("/api/mah/hermes-gateway")) {
+          handleHermesGatewayApi(req, res);
           return;
         }
         if (url === "/api/mah/expertise-proposals") {

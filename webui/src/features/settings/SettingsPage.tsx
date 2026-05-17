@@ -12,6 +12,7 @@ import { SecretsPanel } from "./SecretsPanel";
 import { PreferencesPanel } from "./PreferencesPanel";
 import { ModelsPanel } from "./ModelsPanel";
 import { SkillsSettingsPanel } from "./SkillsSettingsPanel";
+import { HermesGatewaySettingsPanel } from "./HermesGatewaySettingsPanel";
 import "./settings.css";
 
 export function SettingsPage() {
@@ -28,6 +29,7 @@ export function SettingsPage() {
       case "skills": return <SkillsSettingsPanel />;
       case "context": return <ContextPanel />;
       case "sync": return <SyncReview />;
+      case "hermes": return <HermesGatewaySettingsPanel />;
       case "secrets": return <SecretsPanel />;
       case "preferences": return <PreferencesPanel />;
     }

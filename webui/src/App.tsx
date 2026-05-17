@@ -14,6 +14,7 @@ import { SkillsManagement } from "./features/skills/SkillsManagement";
 import { AuthProvider, useAuth } from "./features/auth/useAuth";
 import { LoginPage } from "./features/auth/LoginPage";
 import { TasksPage } from "./features/tasks/TasksPage";
+import { HermesGatewayPage } from "./features/hermes-gateway/HermesGatewayPage";
 
 export function App() {
   return (
@@ -51,6 +52,7 @@ function AppRouter() {
         <Route path="expertise" element={<ExpertiseGovernance />} />
         <Route path="context" element={<ContextManager />} />
         <Route path="skills" element={<SkillsManagement />} />
+        <Route path="webui" element={<HermesGatewayPage />} />
       </Route>
     </Routes>
     </WorkspaceProvider>

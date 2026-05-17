@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Outlet, useLocation } from "react-router";
+import { Outlet, useLocation, useNavigate } from "react-router";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { HeaderBar } from "./HeaderBar";
@@ -22,15 +22,17 @@ const routeToNavItem: Record<string, string> = {
   "/expertise": "Expertise",
   "/skills": "Skills",
   "/context": "Context",
+  "/webui": "WebUI",
   "/sync": "Sync",
 };
 
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
   const activeItem = routeToNavItem[location.pathname] ?? "Overview";
   const { workspace, workspacePath, loading } = useWorkspace();
   const { logout } = useAuth();
-  const allowWithoutConfig = location.pathname === "/settings" || location.pathname === "/bootstrap";
+  const allowWithoutConfig = location.pathname === "/settings" || location.pathname === "/bootstrap" || location.pathname === "/webui";
   const showEmptyWorkspace = !loading && !allowWithoutConfig && workspace?.configExists === false;
   const [terminalRuntime, setTerminalRuntime] = useState("");
   const [terminalSessionId, setTerminalSessionId] = useState("");
@@ -426,12 +428,18 @@ export function AppShell() {
     void logout();
   }, [logout]);
 
+  const handleHeaderWebUiClick = useCallback(() => {
+    navigate("/webui");
+  }, [navigate]);
+
   return (
     <div className="app-shell">
       <HeaderBar
         onConsoleClick={handleHeaderConsoleClick}
+        onWebUiClick={handleHeaderWebUiClick}
         onLogoutClick={handleHeaderLogoutClick}
         consoleActive={terminalOpen}
+        webUiActive={location.pathname === "/webui"}
       />
       <div className="app-shell__body">
         <Sidebar activeItem={activeItem} />

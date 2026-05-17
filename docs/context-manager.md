@@ -11,6 +11,10 @@ This document covers the planned `v0.9.0` implementation and current unreleased 
 - `Tasks -> Run Task` now routes to `/run` with task prefill (`summary`, `crew`, `runtime`) and **does not auto-start** a second execution.
 - Headless runs started from `/run` are protected against backlog mutation side effects (`MAH_DISABLE_TASK_MUTATIONS=1`), so ad-hoc execution does not create/update task board entries implicitly.
 - Artifact collection in `/run` merges runtime session artifacts with workspace file changes detected during execution, which improves visibility for runtimes that write directly into the repository tree.
+- `Settings -> Context Memory` now exposes a **Persistent Memory** panel backed by CLI:
+  - read: `list`, `stats`, `search`
+  - write: `add`, `replace`, `remove`, `compact`, `capture`
+  - all actions are served by `/api/mah/context-memory` and execute `mah context memory ... --json` against the active workspace.
 
 ## What It Is
 
@@ -378,6 +382,7 @@ MAH supports optional qmd/pvector adapters for semantic retrieval. Vector retrie
 - `MAH_PGVECTOR_DSN=postgresql://mah:mah@localhost:5432/mah_context` configures pgvector proxy DB access.
 - `MAH_PGVECTOR_TABLE=context_vectors` sets the pgvector table used by the native proxy.
 - `MAH_PGVECTOR_COLLECTION_MODE=none|column|payload` controls how collection filtering is applied in pgvector.
+- `.env.sample` now ships these context/vector variables pre-declared so new workspaces can enable the stack without manual key discovery.
 
 When vector path is disabled or unavailable, output still succeeds with `retrieval_provider: "file-based"` and lexical matches.
 

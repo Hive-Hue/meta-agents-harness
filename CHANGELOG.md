@@ -22,6 +22,26 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
   - `index_qdrant` → runs `scripts/context/index-to-qdrant.py`
   - `index_pgvector` → runs `scripts/context/index-to-pgvector.py`
   - `proxy_health` → checks `<MAH_PVECTOR_URL>/health`
+- New dedicated route `WebUI -> /webui` (**Hermes Gateway WebUI**) with:
+  - persisted chat session state across route reloads
+  - markdown rendering with code blocks and copy actions
+  - activity surface for `thinking` and `tool_calls` (collapsible blocks)
+  - default streaming path enabled for Hermes gateway chat calls
+- New WebUI API namespace `/api/mah/hermes-gateway/*`:
+  - `GET/PUT /config`
+  - `POST /health`
+  - `POST /models`
+  - `POST /chat` (JSON and SSE streaming paths)
+- New WebUI API endpoint `GET/POST /api/mah/context-memory` for persistent memory operations backed by `mah context memory ... --json`.
+- `.env.sample` now includes Context Memory / Vector Retrieval runtime variables:
+  - `MAH_CONTEXT_MEMORY`
+  - `MAH_VECTOR_RETRIEVAL`
+  - `MAH_QMD_PATH`
+  - `MAH_PVECTOR_URL`
+  - `MAH_PVECTOR_COLLECTION`
+  - `MAH_PGVECTOR_DSN`
+  - `MAH_PGVECTOR_TABLE`
+  - `MAH_PGVECTOR_COLLECTION_MODE`
 - Context Memory presets in Settings:
   - `Qdrant`
   - `pgvector`
@@ -48,6 +68,9 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Run Console artifacts detection now merges runtime session artifacts with workspace file changes during the run window, improving visibility for runtimes that write directly to repo paths.
 - Codex runtime plugin now supports headless execution using native `codex exec --cd <repo> --full-auto "<task>"`, enabling `/run` compatibility for runtime `codex`.
 - Session-based persistent-memory capture now resolves sessions using the full runtime registry (including plugin runtimes like `kilo`), avoiding false `session not found` for non-builtin runtimes.
+- Header now exposes a direct `WebUI` action (next to `Console`) and highlights active state when `/webui` is selected.
+- `Settings` sidebar now includes a dedicated `Hermes Gateway` submenu; gateway config moved out of the main `/webui` chat canvas to reduce panel clutter.
+- Hermes Gateway state/actions were reorganized for compact layout (gateway status + health aligned in one row, model refresh action removed from the runtime canvas).
 
 ### Fixed
 
@@ -61,6 +84,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - OpenClaude and Claude headless runs now pass explicit permission mode (`--permission-mode acceptEdits`) by default when not already provided.
 - Claude headless argument ordering for `ccr code` has been corrected to preserve prompt input in `-p` mode.
 - Codex `/run` failures caused by `headless not supported for this runtime` are resolved by implementing `prepareHeadlessRunContext` in the runtime plugin.
+- Hermes Gateway response parsing now normalizes mixed payload shapes (chat completions, runs, and SSE chunks) to better recover activity traces and avoid raw-response leakage in the UI when structured fields are present.
 
 
 ## v0.10.0 — Post-v0.9.0 Evolution (2026-05-09)

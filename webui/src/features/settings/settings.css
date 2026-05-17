@@ -454,6 +454,13 @@
   align-items: end;
 }
 
+.settings-context-memory-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+}
+
 .settings-context-search__run {
   justify-content: center;
   align-self: stretch;
@@ -596,6 +603,10 @@
   }
 
   .settings-context-search {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-context-memory-grid {
     grid-template-columns: 1fr;
   }
 

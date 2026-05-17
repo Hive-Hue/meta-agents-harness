@@ -2,17 +2,26 @@ import { Icon } from "../ui/Icon";
 
 const utilityActions = [
   { label: "Console", icon: "terminal" },
+  { label: "WebUI", icon: "smart_toy" },
   { label: "Docs", icon: "help_outline" },
   { label: "Logout", icon: "logout" },
 ];
 
 type HeaderBarProps = {
   onConsoleClick?: () => void;
+  onWebUiClick?: () => void;
   onLogoutClick?: () => void;
   consoleActive?: boolean;
+  webUiActive?: boolean;
 };
 
-export function HeaderBar({ onConsoleClick, onLogoutClick, consoleActive = false }: HeaderBarProps) {
+export function HeaderBar({
+  onConsoleClick,
+  onWebUiClick,
+  onLogoutClick,
+  consoleActive = false,
+  webUiActive = false,
+}: HeaderBarProps) {
   return (
     <header className="header-bar">
       <div className="header-bar__brand" aria-label="MAH Operator Console">
@@ -41,12 +50,18 @@ export function HeaderBar({ onConsoleClick, onLogoutClick, consoleActive = false
         <div className="header-actions" aria-label="Global utilities">
           {utilityActions.map((action) => (
             <button
-              className={`header-action${action.label === "Console" && consoleActive ? " header-action--active" : ""}`}
+              className={`header-action${
+                (action.label === "Console" && consoleActive) || (action.label === "WebUI" && webUiActive)
+                  ? " header-action--active"
+                  : ""
+              }`}
               key={action.label}
               type="button"
               onClick={
                 action.label === "Console"
                   ? onConsoleClick
+                  : action.label === "WebUI"
+                    ? onWebUiClick
                   : action.label === "Logout"
                     ? onLogoutClick
                     : undefined

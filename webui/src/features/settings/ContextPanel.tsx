@@ -42,6 +42,47 @@ type ContextSettingsPayload = {
   MAH_PGVECTOR_COLLECTION_MODE: "none" | "column" | "payload";
 };
 
+type PersistentMemoryAction = "list" | "stats" | "search" | "add" | "replace" | "remove" | "compact" | "capture" | null;
+
+type PersistentMemoryUsage = {
+  used_chars: number;
+  char_limit: number;
+  entry_count: number;
+  entry_limit: number;
+  usage_percent: number;
+};
+
+type PersistentMemoryEntry = {
+  id: string;
+  content: string;
+  source?: string;
+  tags?: string[];
+  use_count?: number;
+  updated_at?: string;
+  created_at?: string;
+};
+
+type PersistentMemoryMatch = {
+  id: string;
+  score: number;
+  reasons?: string[];
+  content: string;
+  source?: string;
+  tags?: string[];
+};
+
+type PersistentMemoryResult = {
+  crew?: string;
+  agent?: string;
+  file_path?: string;
+  usage?: PersistentMemoryUsage;
+  entries?: PersistentMemoryEntry[];
+  matches?: PersistentMemoryMatch[];
+  added?: PersistentMemoryEntry[];
+  removed?: PersistentMemoryEntry;
+  evicted?: Array<{ id?: string; content?: string }>;
+};
+
 const DEFAULT_CONTEXT_SETTINGS: ContextSettingsPayload = {
   MAH_VECTOR_RETRIEVAL: "0",
   MAH_QMD_PATH: "qmd",
@@ -92,6 +133,26 @@ export function ContextPanel() {
   const [contextSettingsSaving, setContextSettingsSaving] = useState(false);
   const [contextSettingsError, setContextSettingsError] = useState<string | null>(null);
   const [contextSettingsSuccess, setContextSettingsSuccess] = useState<string>("");
+  const [memoryCrew, setMemoryCrew] = useState("dev");
+  const [memoryAgent, setMemoryAgent] = useState("");
+  const [memoryTask, setMemoryTask] = useState("");
+  const [memoryLimit, setMemoryLimit] = useState("5");
+  const [memoryContent, setMemoryContent] = useState("");
+  const [memoryOldText, setMemoryOldText] = useState("");
+  const [memorySource, setMemorySource] = useState("manual");
+  const [memoryTags, setMemoryTags] = useState("");
+  const [memoryTargetPercent, setMemoryTargetPercent] = useState("70");
+  const [memoryFromSession, setMemoryFromSession] = useState("");
+  const [memoryFromPath, setMemoryFromPath] = useState("");
+  const [memoryNoCompact, setMemoryNoCompact] = useState(false);
+  const [memoryRunningAction, setMemoryRunningAction] = useState<PersistentMemoryAction>(null);
+  const [memoryError, setMemoryError] = useState<string | null>(null);
+  const [memorySuccess, setMemorySuccess] = useState("");
+  const [memoryUsage, setMemoryUsage] = useState<PersistentMemoryUsage | null>(null);
+  const [memoryFilePath, setMemoryFilePath] = useState("");
+  const [memoryEntries, setMemoryEntries] = useState<PersistentMemoryEntry[]>([]);
+  const [memoryMatches, setMemoryMatches] = useState<PersistentMemoryMatch[]>([]);
+  const [memoryLastAction, setMemoryLastAction] = useState<"list" | "stats" | "search" | null>(null);
 
   const storageKey = useMemo(() => {
     const workspacePath = localStorage.getItem("mah_workspace_path") || "default";
@@ -334,6 +395,14 @@ export function ContextPanel() {
     aiModelOptions.push({ value: aiModel, label: `${aiModel} (custom)` });
   }
 
+  const crewOptions = useMemo(() => {
+    const unique = new Set<string>();
+    for (const crew of config?.crews ?? []) {
+      if (typeof crew?.id === "string" && crew.id.trim()) unique.add(crew.id.trim());
+    }
+    return Array.from(unique).map((value) => ({ value, label: value }));
+  }, [config?.crews]);
+
   const agentOptions = useMemo(() => {
     const unique = new Map<string, string>();
     for (const crew of config?.crews ?? []) {
@@ -346,10 +415,32 @@ export function ContextPanel() {
     return Array.from(unique.entries()).map(([value, label]) => ({ value, label }));
   }, [config?.crews]);
 
+  const memoryAgentOptions = useMemo(() => {
+    const selectedCrew = (config?.crews ?? []).find((crew) => `${crew?.id || ""}`.trim() === memoryCrew);
+    const crewAgents = Array.isArray(selectedCrew?.agents) ? selectedCrew.agents : [];
+    const directOptions = crewAgents
+      .map((agent) => `${agent?.id || ""}`.trim())
+      .filter(Boolean)
+      .map((value) => ({ value, label: value }));
+    if (directOptions.length > 0) return directOptions;
+    return agentOptions.map((opt) => ({ value: opt.value, label: opt.value }));
+  }, [config?.crews, memoryCrew, agentOptions]);
+
   useEffect(() => {
     if (searchAgent || agentOptions.length === 0) return;
     setSearchAgent(agentOptions[0].value);
   }, [searchAgent, agentOptions]);
+
+  useEffect(() => {
+    if (memoryCrew || crewOptions.length === 0) return;
+    setMemoryCrew(crewOptions[0].value);
+  }, [memoryCrew, crewOptions]);
+
+  useEffect(() => {
+    if (memoryAgentOptions.length === 0) return;
+    if (memoryAgent && memoryAgentOptions.some((opt) => opt.value === memoryAgent)) return;
+    setMemoryAgent(memoryAgentOptions[0].value);
+  }, [memoryAgent, memoryAgentOptions]);
 
   const runIndex = useCallback(async (rebuild: boolean) => {
     setRunningAction(rebuild ? "rebuild" : "index");
@@ -441,6 +532,181 @@ export function ContextPanel() {
       setRunningAction(null);
     }
   }, [indexStampKey, refreshCorpusStats]);
+
+  const fetchPersistentMemory = useCallback(
+    async (
+      action: Exclude<PersistentMemoryAction, null>,
+      payload: Record<string, unknown>,
+    ): Promise<PersistentMemoryResult> => {
+      const readActions = new Set(["list", "stats", "search"]);
+      if (readActions.has(action)) {
+        const params = new URLSearchParams();
+        params.set("action", action);
+        for (const [key, value] of Object.entries(payload)) {
+          const normalized = `${value ?? ""}`.trim();
+          if (normalized) params.set(key, normalized);
+        }
+        const resp = await fetch(`/api/mah/context-memory?${params.toString()}`);
+        const data = await resp.json();
+        if (!resp.ok || !data?.ok) {
+          throw new Error(data?.error || "persistent memory request failed");
+        }
+        return (data?.result || {}) as PersistentMemoryResult;
+      }
+
+      const resp = await fetch("/api/mah/context-memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...payload }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data?.ok) {
+        throw new Error(data?.error || "persistent memory mutation failed");
+      }
+      return (data?.result || {}) as PersistentMemoryResult;
+    },
+    [],
+  );
+
+  const applyPersistentMemoryResult = useCallback(
+    (action: Exclude<PersistentMemoryAction, null>, result: PersistentMemoryResult) => {
+      if (result.usage) setMemoryUsage(result.usage);
+      if (typeof result.file_path === "string") setMemoryFilePath(result.file_path);
+      if (action === "list") {
+        setMemoryEntries(Array.isArray(result.entries) ? result.entries : []);
+        setMemoryMatches([]);
+        setMemoryLastAction("list");
+        return;
+      }
+      if (action === "search") {
+        setMemoryMatches(Array.isArray(result.matches) ? result.matches : []);
+        setMemoryLastAction("search");
+        return;
+      }
+      if (action === "stats") {
+        setMemoryLastAction("stats");
+      }
+    },
+    [],
+  );
+
+  const runMemoryReadAction = useCallback(
+    async (action: "list" | "stats" | "search") => {
+      if (!memoryCrew.trim() || !memoryAgent.trim()) return;
+      if (action === "search" && !memoryTask.trim()) return;
+      setMemoryRunningAction(action);
+      setMemoryError(null);
+      setMemorySuccess("");
+      try {
+        const payload: Record<string, unknown> = {
+          crew: memoryCrew.trim(),
+          agent: memoryAgent.trim(),
+        };
+        if (action === "search") {
+          payload.task = memoryTask.trim();
+          const parsedLimit = Number.parseInt(memoryLimit, 10);
+          if (Number.isFinite(parsedLimit) && parsedLimit > 0) payload.limit = parsedLimit;
+        }
+        const result = await fetchPersistentMemory(action, payload);
+        applyPersistentMemoryResult(action, result);
+        if (action === "search") {
+          const count = Array.isArray(result.matches) ? result.matches.length : 0;
+          setMemorySuccess(`Persistent memory search completed: ${count} match(es).`);
+        } else if (action === "stats") {
+          setMemorySuccess("Persistent memory stats refreshed.");
+        } else {
+          const count = Array.isArray(result.entries) ? result.entries.length : 0;
+          setMemorySuccess(`Persistent memory loaded: ${count} entr${count === 1 ? "y" : "ies"}.`);
+        }
+      } catch (error) {
+        setMemoryError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setMemoryRunningAction(null);
+      }
+    },
+    [applyPersistentMemoryResult, fetchPersistentMemory, memoryAgent, memoryCrew, memoryLimit, memoryTask],
+  );
+
+  const runMemoryWriteAction = useCallback(
+    async (action: "add" | "replace" | "remove" | "compact" | "capture") => {
+      if (!memoryCrew.trim() || !memoryAgent.trim()) return;
+      if (action === "add" && !memoryContent.trim()) return;
+      if (action === "replace" && (!memoryOldText.trim() || !memoryContent.trim())) return;
+      if (action === "remove" && !memoryOldText.trim()) return;
+      if (action === "capture" && !memoryFromSession.trim() && !memoryFromPath.trim()) return;
+
+      setMemoryRunningAction(action);
+      setMemoryError(null);
+      setMemorySuccess("");
+      try {
+        const payload: Record<string, unknown> = {
+          crew: memoryCrew.trim(),
+          agent: memoryAgent.trim(),
+        };
+        if (action === "add") {
+          payload.content = memoryContent.trim();
+          if (memorySource.trim()) payload.source = memorySource.trim();
+          if (memoryTags.trim()) payload.tags = memoryTags.trim();
+        } else if (action === "replace") {
+          payload.oldText = memoryOldText.trim();
+          payload.content = memoryContent.trim();
+          if (memorySource.trim()) payload.source = memorySource.trim();
+        } else if (action === "remove") {
+          payload.oldText = memoryOldText.trim();
+        } else if (action === "compact") {
+          const parsedTarget = Number.parseInt(memoryTargetPercent, 10);
+          if (Number.isFinite(parsedTarget) && parsedTarget > 0) payload.targetPercent = parsedTarget;
+        } else if (action === "capture") {
+          if (memoryFromSession.trim()) payload.fromSession = memoryFromSession.trim();
+          if (memoryFromPath.trim()) payload.fromPath = memoryFromPath.trim();
+          const parsedLimit = Number.parseInt(memoryLimit, 10);
+          if (Number.isFinite(parsedLimit) && parsedLimit > 0) payload.limit = parsedLimit;
+          if (memoryTags.trim()) payload.tags = memoryTags.trim();
+          if (memoryNoCompact) payload.noCompact = true;
+        }
+
+        const result = await fetchPersistentMemory(action, payload);
+        if (result.usage) setMemoryUsage(result.usage);
+        if (typeof result.file_path === "string") setMemoryFilePath(result.file_path);
+        if (action === "capture") {
+          const captureResult = result as PersistentMemoryResult & { capture?: { added?: unknown[] } };
+          const added = Array.isArray(captureResult.added)
+            ? captureResult.added.length
+            : Array.isArray(captureResult.capture?.added)
+              ? captureResult.capture.added.length
+              : 0;
+          setMemorySuccess(`Capture completed. Added ${added} durable entr${added === 1 ? "y" : "ies"}.`);
+        } else {
+          setMemorySuccess(`Persistent memory action '${action}' completed.`);
+        }
+        await runMemoryReadAction("list");
+      } catch (error) {
+        setMemoryError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setMemoryRunningAction(null);
+      }
+    },
+    [
+      fetchPersistentMemory,
+      memoryAgent,
+      memoryContent,
+      memoryCrew,
+      memoryFromPath,
+      memoryFromSession,
+      memoryLimit,
+      memoryNoCompact,
+      memoryOldText,
+      memorySource,
+      memoryTags,
+      memoryTargetPercent,
+      runMemoryReadAction,
+    ],
+  );
+
+  useEffect(() => {
+    if (!memoryCrew.trim() || !memoryAgent.trim()) return;
+    void runMemoryReadAction("list");
+  }, [memoryCrew, memoryAgent, runMemoryReadAction]);
 
   return (
     <>
@@ -734,6 +1000,243 @@ export function ContextPanel() {
                       <td className="settings-table__mono">{item.id}</td>
                       <td>{Math.round(item.score * 100)}%</td>
                       <td>{item.reasons || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="settings-context-tools">
+          <div className="settings-context-tools__header">Persistent Memory</div>
+          <p className="settings-context-tools__hint">
+            Manage bounded durable memory in <code>.mah/context/persistent/agents/&lt;crew&gt;/&lt;agent&gt;.memory.json</code>.
+          </p>
+          <div className="settings-context-memory-grid">
+            <FormField
+              label="Crew"
+              type="select"
+              value={memoryCrew}
+              onChange={setMemoryCrew}
+              options={crewOptions.length > 0 ? crewOptions : [{ value: "dev", label: "dev" }]}
+            />
+            <FormField
+              label="Agent"
+              type="select"
+              value={memoryAgent}
+              onChange={setMemoryAgent}
+              options={memoryAgentOptions.length > 0 ? memoryAgentOptions : [{ value: "", label: "Select agent" }]}
+            />
+            <FormField
+              label="Task Query (search)"
+              value={memoryTask}
+              onChange={setMemoryTask}
+              placeholder="triage backlog and create milestones"
+            />
+            <FormField
+              label="Limit"
+              type="number"
+              value={memoryLimit}
+              onChange={setMemoryLimit}
+              min={1}
+              max={50}
+            />
+            <FormField
+              label="New Content (add/replace)"
+              type="textarea"
+              value={memoryContent}
+              onChange={setMemoryContent}
+              rows={3}
+              placeholder="Durable pattern to keep for this agent"
+            />
+            <FormField
+              label="Old Text (replace/remove)"
+              value={memoryOldText}
+              onChange={setMemoryOldText}
+              placeholder="unique substring to match"
+            />
+            <FormField
+              label="Source"
+              value={memorySource}
+              onChange={setMemorySource}
+              placeholder="manual"
+            />
+            <FormField
+              label="Tags (comma-separated)"
+              value={memoryTags}
+              onChange={setMemoryTags}
+              placeholder="planning,clickup"
+            />
+            <FormField
+              label="Capture from Session"
+              value={memoryFromSession}
+              onChange={setMemoryFromSession}
+              placeholder="runtime:crew:sessionId"
+            />
+            <FormField
+              label="Capture from Path"
+              value={memoryFromPath}
+              onChange={setMemoryFromPath}
+              placeholder=".pi/crew/dev/sessions/..."
+            />
+            <FormField
+              label="Compact Target %"
+              type="number"
+              value={memoryTargetPercent}
+              onChange={setMemoryTargetPercent}
+              min={10}
+              max={95}
+            />
+            <ToggleSwitch checked={memoryNoCompact} onChange={setMemoryNoCompact} label="Capture without compact (no-compact)" />
+          </div>
+
+          <div className="settings-context-tools__actions">
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryReadAction("list")}
+              disabled={memoryRunningAction !== null || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="list" size={14} />
+              {memoryRunningAction === "list" ? "Loading..." : "List"}
+            </button>
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryReadAction("stats")}
+              disabled={memoryRunningAction !== null || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="monitoring" size={14} />
+              {memoryRunningAction === "stats" ? "Loading..." : "Stats"}
+            </button>
+            <button
+              className="settings-btn settings-btn--primary"
+              type="button"
+              onClick={() => void runMemoryReadAction("search")}
+              disabled={memoryRunningAction !== null || !memoryAgent.trim() || !memoryCrew.trim() || !memoryTask.trim()}
+            >
+              <Icon name="search" size={14} />
+              {memoryRunningAction === "search" ? "Searching..." : "Search"}
+            </button>
+          </div>
+
+          <div className="settings-context-tools__actions">
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryWriteAction("add")}
+              disabled={memoryRunningAction !== null || !memoryContent.trim() || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="add" size={14} />
+              {memoryRunningAction === "add" ? "Adding..." : "Add"}
+            </button>
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryWriteAction("replace")}
+              disabled={memoryRunningAction !== null || !memoryContent.trim() || !memoryOldText.trim() || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="edit" size={14} />
+              {memoryRunningAction === "replace" ? "Replacing..." : "Replace"}
+            </button>
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryWriteAction("remove")}
+              disabled={memoryRunningAction !== null || !memoryOldText.trim() || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="delete" size={14} />
+              {memoryRunningAction === "remove" ? "Removing..." : "Remove"}
+            </button>
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryWriteAction("compact")}
+              disabled={memoryRunningAction !== null || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="compress" size={14} />
+              {memoryRunningAction === "compact" ? "Compacting..." : "Compact"}
+            </button>
+            <button
+              className="settings-btn"
+              type="button"
+              onClick={() => void runMemoryWriteAction("capture")}
+              disabled={memoryRunningAction !== null || (!memoryFromSession.trim() && !memoryFromPath.trim()) || !memoryAgent.trim() || !memoryCrew.trim()}
+            >
+              <Icon name="download" size={14} />
+              {memoryRunningAction === "capture" ? "Capturing..." : "Capture"}
+            </button>
+          </div>
+
+          {memoryError && <p className="settings-context-tools__error">{memoryError}</p>}
+          {memorySuccess && <p className="settings-context-tools__success">{memorySuccess}</p>}
+
+          {(memoryUsage || memoryFilePath) && (
+            <div className="settings-context-summary">
+              {memoryUsage && (
+                <>
+                  <span>
+                    Usage: <strong>{memoryUsage.used_chars}/{memoryUsage.char_limit}</strong> chars ({memoryUsage.usage_percent}%)
+                  </span>
+                  <span>
+                    Entries: <strong>{memoryUsage.entry_count}/{memoryUsage.entry_limit}</strong>
+                  </span>
+                </>
+              )}
+              {memoryFilePath && (
+                <span>
+                  Store: <strong className="settings-table__mono">{memoryFilePath}</strong>
+                </span>
+              )}
+            </div>
+          )}
+
+          {memoryLastAction === "search" && memoryMatches.length > 0 && (
+            <div className="settings-section__scroll settings-context-results">
+              <table className="settings-table">
+                <thead>
+                  <tr>
+                    <th>Content</th>
+                    <th>Score</th>
+                    <th>Tags</th>
+                    <th>Reasons</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memoryMatches.map((item) => (
+                    <tr key={`${item.id}:${item.score}`}>
+                      <td>{item.content}</td>
+                      <td>{Math.round(item.score * 100)}%</td>
+                      <td>{Array.isArray(item.tags) && item.tags.length > 0 ? item.tags.join(", ") : "—"}</td>
+                      <td>{Array.isArray(item.reasons) && item.reasons.length > 0 ? item.reasons.join("; ") : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {(memoryLastAction !== "search" || memoryMatches.length === 0) && memoryEntries.length > 0 && (
+            <div className="settings-section__scroll settings-context-results">
+              <table className="settings-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Content</th>
+                    <th>Source</th>
+                    <th>Tags</th>
+                    <th>Use Count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {memoryEntries.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="settings-table__mono">{entry.id.slice(0, 8)}</td>
+                      <td>{entry.content}</td>
+                      <td>{entry.source || "manual"}</td>
+                      <td>{Array.isArray(entry.tags) && entry.tags.length > 0 ? entry.tags.join(", ") : "—"}</td>
+                      <td>{Number.isFinite(entry.use_count) ? entry.use_count : 0}</td>
                     </tr>
                   ))}
                 </tbody>
