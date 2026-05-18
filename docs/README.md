@@ -29,6 +29,10 @@ Meta Agents Harness (MAH) is a runtime-agnostic orchestration layer for multi-ag
 - [Session Management](./hermes/session-management.md) — Session lifecycle
 - [Artifact Structure](./hermes/artifact-structure.md) — How Hermes persists artifacts
 
+## Mobile
+
+- [MAH Mobile Control Plane RFC](./mobile/mah-mobile-control-plane-rfc.md) — Mobile operator surface via Hermes Gateway
+
 ## Development
 
 _(Design notes and research artifacts live in the `development` branch.)_
@@ -47,6 +51,8 @@ docs/
 ├── runtime-boundary.md          # MAH vs. runtime responsibilities
 ├── headless-runtime.md          # Headless execution guide
 ├── validate-semantics.md        # Config validation
+├── mobile/                      # Mobile product docs
+│   └── mah-mobile-control-plane-rfc.md
 └── hermes/                     # Hermes-specific docs
     ├── quickstart.md
     ├── runtime-support.md
