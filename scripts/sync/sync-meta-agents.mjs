@@ -69,7 +69,15 @@ function listSubdirs(rootPath) {
 }
 
 function resolveExpertisePath(runtime, crewId, expertiseName) {
-  return `.${runtime}/crew/${crewId}/expertise/${expertiseName}.yaml`
+  const normalized = `${expertiseName || ""}`.trim()
+  if (!normalized) {
+    throw new Error(`missing expertise name for runtime=${runtime} crew=${crewId}`)
+  }
+  return `.${runtime}/crew/${crewId}/expertise/${normalized}.yaml`
+}
+
+function effectiveExpertiseName(agent) {
+  return `${agent?.expertise || agent?.id || ""}`.trim()
 }
 
 function defaultExpertiseContent(agent) {
@@ -258,7 +266,7 @@ function buildAgentPromptFromMeta(meta, crew, agent, currentRaw, runtime) {
     instruction_block: buildCrewInstructionBlock(crew, agent),
     expertise: {
       ...(existing.expertise && typeof existing.expertise === "object" ? existing.expertise : {}),
-      path: resolveExpertisePath(runtime, crew.id, agent.expertise)
+      path: resolveExpertisePath(runtime, crew.id, effectiveExpertiseName(agent))
     },
     tools: runtimeTools(agent, runtime),
     skills: runtimeSkillPaths(meta, agent.skills, runtime).map((item) => ({
@@ -351,7 +359,7 @@ function syncRuntimePrompts(meta, crew, runtime, mode, records, jsonOutput) {
     const expertiseDir = path.join(workspaceRoot, `.${runtime}`, "crew", crew.id, "expertise")
     mkdirSync(expertiseDir, { recursive: true })
     for (const agent of crew.agents || []) {
-      const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
+      const expertiseFile = path.join(expertiseDir, `${effectiveExpertiseName(agent)}.yaml`)
       const hadExpertiseFile = existsSync(expertiseFile)
       if (hadExpertiseFile) {
         pushRecord(records, { kind: "expertise", path: rel(expertiseFile), status: "ok", action: determineAction("ok"), crew: crew.id, agent: agent.id })
@@ -409,7 +417,7 @@ function ensureHermesArtifacts(crew) {
   mkdirSync(sessionsDir, { recursive: true })
 
   for (const agent of crew.agents || []) {
-    const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
+    const expertiseFile = path.join(expertiseDir, `${effectiveExpertiseName(agent)}.yaml`)
     if (!existsSync(expertiseFile)) {
       writeFileSync(expertiseFile, defaultExpertiseContent(agent), "utf-8")
       console.log(`generated: ${rel(expertiseFile)}`)
@@ -507,7 +515,7 @@ function ensureOpencodeArtifacts(crew, mode, records, jsonOutput) {
       pushRecord(records, { kind: "prompt", path: rel(agentFile), status: hadAgentFile ? "synced" : "generated", action: determineAction(hadAgentFile ? "synced" : "generated"), crew: crew.id, agent: agent.id })
     }
 
-    const expertiseFile = path.join(expertiseDir, `${agent.expertise}.yaml`)
+    const expertiseFile = path.join(expertiseDir, `${effectiveExpertiseName(agent)}.yaml`)
     const hadExpertiseFile = existsSync(expertiseFile)
 
     if (hadExpertiseFile) {
@@ -868,7 +876,7 @@ function buildOpencodeCrewDoc(meta, crew) {
         model_fallbacks: resolveAgentFallbacks(meta, "opencode", member),
         agent_file: `.opencode/crew/${crew.id}/agents/${member.id}.md`,
         expertise: {
-          path: resolveExpertisePath("opencode", crew.id, member.expertise),
+          path: resolveExpertisePath("opencode", crew.id, effectiveExpertiseName(member)),
           use_when: `Track durable learnings for ${member.id}.`
         },
         skills: runtimeSkillEntries(meta, member.skills, "opencode"),
@@ -891,7 +899,7 @@ function buildOpencodeCrewDoc(meta, crew) {
         model_fallbacks: resolveAgentFallbacks(meta, "opencode", lead),
         agent_file: `.opencode/crew/${crew.id}/agents/${lead.id}.md`,
         expertise: {
-          path: resolveExpertisePath("opencode", crew.id, lead.expertise),
+          path: resolveExpertisePath("opencode", crew.id, effectiveExpertiseName(lead)),
           use_when: `Track durable learnings for ${lead.id}.`
         },
         skills: runtimeSkillEntries(meta, lead.skills, "opencode"),
@@ -936,7 +944,7 @@ function buildOpencodeCrewDoc(meta, crew) {
       model_fallbacks: resolveAgentFallbacks(meta, "opencode", orchestrator),
       agent_file: `.opencode/crew/${crew.id}/agents/${orchestrator.id}.md`,
       expertise: {
-        path: resolveExpertisePath("opencode", crew.id, orchestrator.expertise),
+        path: resolveExpertisePath("opencode", crew.id, effectiveExpertiseName(orchestrator)),
         use_when: `Track durable learnings for ${orchestrator.id}.`
       },
       skills: runtimeSkillEntries(meta, orchestrator.skills, "opencode"),
@@ -975,7 +983,7 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
         instruction_block: buildCrewInstructionBlock(crew, member),
         prompt: resolvePromptPath(runtime, crew.id, member.id),
         expertise: {
-          path: resolveExpertisePath(runtime, crew.id, member.expertise),
+          path: resolveExpertisePath(runtime, crew.id, effectiveExpertiseName(member)),
           use_when: `Track durable learnings for ${member.id}.`,
           updatable: true,
           max_lines: 10000
@@ -999,7 +1007,7 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
         instruction_block: buildCrewInstructionBlock(crew, lead),
         prompt: resolvePromptPath(runtime, crew.id, lead.id),
         expertise: {
-          path: resolveExpertisePath(runtime, crew.id, lead.expertise),
+          path: resolveExpertisePath(runtime, crew.id, effectiveExpertiseName(lead)),
           use_when: `Track durable learnings for ${lead.id}.`,
           updatable: true,
           max_lines: 10000
@@ -1040,7 +1048,7 @@ function buildRuntimeCrewDoc(meta, crew, runtime) {
       instruction_block: buildCrewInstructionBlock(crew, orchestrator),
       prompt: resolvePromptPath(runtime, crew.id, orchestrator.id),
       expertise: {
-        path: resolveExpertisePath(runtime, crew.id, orchestrator.expertise),
+        path: resolveExpertisePath(runtime, crew.id, effectiveExpertiseName(orchestrator)),
         use_when: `Track durable learnings for ${orchestrator.id}.`,
         updatable: true,
         max_lines: 10000
