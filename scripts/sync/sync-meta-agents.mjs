@@ -4,12 +4,13 @@ import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 import { determineAction } from "./sync-utils.mjs"
 import { resolveMahHome } from "../core/mah-home.mjs"
+import { resolveWorkspaceRoot } from "../core/workspace-root.mjs"
 import { normalizeModelId } from "../../mah-plugins/shared-model-normalize.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const packageRoot = path.resolve(__dirname, "..", "..")
-const workspaceRoot = process.cwd()
+const workspaceRoot = resolveWorkspaceRoot(process.cwd())
 const metaConfigPath = path.join(workspaceRoot, "meta-agents.yaml")
 const managedRuntimes = ["pi", "claude", "codex", "kilo", "opencode", "openclaude", "hermes"]
 const runtimeMarkerRoots = Object.fromEntries(managedRuntimes.map((runtime) => [runtime, `.${runtime}`]))
