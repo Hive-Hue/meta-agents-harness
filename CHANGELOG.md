@@ -85,7 +85,7 @@ The format is based on Keep a Changelog, and Semantic Versioning is applied cons
 - Claude headless argument ordering for `ccr code` has been corrected to preserve prompt input in `-p` mode.
 - Codex `/run` failures caused by `headless not supported for this runtime` are resolved by implementing `prepareHeadlessRunContext` in the runtime plugin.
 - Hermes Gateway response parsing now normalizes mixed payload shapes (chat completions, runs, and SSE chunks) to better recover activity traces and avoid raw-response leakage in the UI when structured fields are present.
-
+- `mah expertise sync --dry-run` no longer hardcodes crew='dev' and errors when no 'dev' crew exists — operates on all crews when `--crew` is not specified, matching `seed` behavior. Explicit `--crew <name>` still filters to that crew.
 
 ## v0.10.0 — Post-v0.9.0 Evolution (2026-05-09)
 

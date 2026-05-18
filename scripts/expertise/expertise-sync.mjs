@@ -143,7 +143,7 @@ export async function syncExpertiseEntry(crew, agentId, options = {}) {
 }
 
 export async function syncExpertise(options = {}) {
-  const { crew = 'dev', dryRun = false, evidenceRoot: externalEvidenceRoot, catalogRoot: externalCatalogRoot, configPath: externalConfigPath } = options
+  const { dryRun = false, evidenceRoot: externalEvidenceRoot, catalogRoot: externalCatalogRoot, configPath: externalConfigPath } = options
   const errors = []
   const results = []
 
@@ -153,21 +153,29 @@ export async function syncExpertise(options = {}) {
   }
 
   const config = parseYaml(readFileSync(configPath, 'utf-8'))
-  const crewDef = (config.crews || []).find((c) => c.id === crew)
-  if (!crewDef) {
-    throw new Error(`Crew '${crew}' not found in meta-agents.yaml`)
+  const crews = config.crews || []
+
+  // If crew explicitly provided, validate and filter; otherwise process all crews
+  const crewsToProcess = options.crew !== undefined
+    ? crews.filter(c => c.id === options.crew)
+    : crews
+
+  if (options.crew !== undefined && crewsToProcess.length === 0) {
+    throw new Error(`Crew '${options.crew}' not found in meta-agents.yaml`)
   }
 
-  for (const agent of crewDef.agents || []) {
-    try {
-      const result = await syncExpertiseEntry(crew, agent.id, {
-        dryRun,
-        evidenceRoot: externalEvidenceRoot,
-        catalogRoot: externalCatalogRoot,
-      })
-      results.push({ agent: `${crew}:${agent.id}`, ...result })
-    } catch (err) {
-      errors.push(`${agent.id}: ${err.message}`)
+  for (const crewDef of crewsToProcess) {
+    for (const agent of crewDef.agents || []) {
+      try {
+        const result = await syncExpertiseEntry(crewDef.id, agent.id, {
+          dryRun,
+          evidenceRoot: externalEvidenceRoot,
+          catalogRoot: externalCatalogRoot,
+        })
+        results.push({ agent: `${crewDef.id}:${agent.id}`, ...result })
+      } catch (err) {
+        errors.push(`${crewDef.id}:${agent.id}: ${err.message}`)
+      }
     }
   }
 
