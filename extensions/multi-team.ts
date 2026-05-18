@@ -356,6 +356,121 @@ function stripFrontmatter(raw: string): string {
 	return match ? match[1].trim() : raw.trim();
 }
 
+const THINKING_OPEN = "<think";
+const THINKING_CLOSE = "</think";
+
+type ThinkingSegment =
+	| { type: "text"; text: string }
+	| { type: "thinking"; thinking: string };
+
+function extractThinkingBlocks(text: string): string[] {
+	const blocks: string[] = [];
+	let start = 0;
+	while (true) {
+		const open = text.indexOf(THINKING_OPEN, start);
+		if (open === -1) break;
+		const tagEnd = text.indexOf(">", open);
+		if (tagEnd === -1) break;
+		const close = text.indexOf(THINKING_CLOSE, tagEnd);
+		if (close === -1) break;
+		blocks.push(text.slice(tagEnd + 1, close).trim());
+		start = close + THINKING_CLOSE.length;
+	}
+	return blocks;
+}
+
+function stripThinkingTags(text: string): string {
+	// Match <think...>...</think...> including self-closing variations
+	let result = text;
+	// Handle <think ...>content</think...>
+	result = result.replace(/<think[^>]*>[\s\S]*?<\/think[^>]*>/g, "");
+	// Handle self-closing <think .../>
+	result = result.replace(/<think[^>]*\/>/g, "");
+	return result.trim();
+}
+
+function splitThinkingTaggedText(text: string): ThinkingSegment[] {
+	const segments: ThinkingSegment[] = [];
+	let cursor = 0;
+
+	while (cursor < text.length) {
+		const open = text.indexOf(THINKING_OPEN, cursor);
+		if (open === -1) {
+			if (cursor < text.length) segments.push({ type: "text", text: text.slice(cursor) });
+			break;
+		}
+
+		const tagEnd = text.indexOf(">", open);
+		if (tagEnd === -1) {
+			segments.push({ type: "text", text: text.slice(cursor) });
+			break;
+		}
+
+		if (open > cursor) {
+			segments.push({ type: "text", text: text.slice(cursor, open) });
+		}
+
+		const openTag = text.slice(open, tagEnd + 1);
+		if (/\/>\s*$/.test(openTag)) {
+			cursor = tagEnd + 1;
+			continue;
+		}
+
+		const close = text.indexOf(THINKING_CLOSE, tagEnd);
+		if (close === -1) {
+			segments.push({ type: "text", text: text.slice(open) });
+			break;
+		}
+
+		const closeEnd = text.indexOf(">", close);
+		if (closeEnd === -1) {
+			segments.push({ type: "text", text: text.slice(open) });
+			break;
+		}
+
+		segments.push({ type: "thinking", thinking: text.slice(tagEnd + 1, close) });
+		cursor = closeEnd + 1;
+	}
+
+	return segments.length > 0 ? segments : [{ type: "text", text }];
+}
+
+function normalizeAssistantThinkingContent(message: any): boolean {
+	if (!message || message.role !== "assistant" || !Array.isArray(message.content)) return false;
+
+	let changed = false;
+	const nextContent: any[] = [];
+
+	for (const block of message.content) {
+		if (!block || block.type !== "text" || typeof block.text !== "string" || !block.text.includes(THINKING_OPEN)) {
+			nextContent.push(block);
+			continue;
+		}
+
+		const segments = splitThinkingTaggedText(block.text);
+		const onlyPlainText = segments.length === 1
+			&& segments[0]?.type === "text"
+			&& segments[0].text === block.text;
+
+		if (onlyPlainText) {
+			nextContent.push(block);
+			continue;
+		}
+
+		changed = true;
+		for (const segment of segments) {
+			if (segment.type === "text") {
+				if (segment.text.length > 0) nextContent.push({ type: "text", text: segment.text });
+				continue;
+			}
+			nextContent.push({ type: "thinking", thinking: segment.thinking });
+		}
+	}
+
+	if (changed) message.content = nextContent;
+	return changed;
+}
+
 function parsePromptDefinition(raw: string): PromptDefinition {
 	const match = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n([\s\S]*)$/);
 	if (!match) {
@@ -1562,6 +1677,47 @@ function extractAssistantMessageText(messages: any[]): string {
 		.map((message) => extractStructuredText(message))
 		.filter(Boolean);
 	return texts.length > 0 ? texts[texts.length - 1] : "";
+}
+
+function extractAssistantMessageParts(messages: any[]): { displayText: string; thinkingText: string } {
+	const assistantMessages = Array.isArray(messages) ? messages.filter((message) => message?.role === "assistant") : [];
+	const lastMessage = assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : null;
+	if (!lastMessage) return { displayText: "", thinkingText: "" };
+
+	if (!Array.isArray(lastMessage.content)) {
+		const rawText = extractStructuredText(lastMessage);
+		return {
+			displayText: stripThinkingTags(rawText) || rawText,
+			thinkingText: extractThinkingBlocks(rawText).join("\n\n").trim(),
+		};
+	}
+
+	const textParts: string[] = [];
+	const thinkingParts: string[] = [];
+
+	for (const block of lastMessage.content) {
+		if (!block || typeof block !== "object") continue;
+		if (block.type === "thinking" && typeof block.thinking === "string") {
+			thinkingParts.push(block.thinking);
+			continue;
+		}
+		if (block.type !== "text" || typeof block.text !== "string") continue;
+
+		if (!block.text.includes(THINKING_OPEN)) {
+			textParts.push(block.text);
+			continue;
+		}
+
+		for (const segment of splitThinkingTaggedText(block.text)) {
+			if (segment.type === "thinking") thinkingParts.push(segment.thinking);
+			else textParts.push(segment.text);
+		}
+	}
+
+	return {
+		displayText: textParts.join("\n\n").trim(),
+		thinkingText: thinkingParts.join("\n\n").trim(),
+	};
 }
 
 function artifactFileName(parts: string[], extension = "md"): string {
@@ -3504,6 +3660,9 @@ function isLivenessTask(task: string): boolean {
 				effectiveOutput = `[stderr]\n${compactStderr}`;
 			}
 
+			// Strip thinking tags from display output (kept in artifacts via raw output)
+			effectiveOutput = stripThinkingTags(effectiveOutput) || effectiveOutput;
+
 			if (cardRefs.length > 0) {
 				if (!functionallyDone || effectiveExitCode !== 0) {
 					if (!functionallyDone) {
@@ -4712,18 +4871,24 @@ Note: Controls thinking level for delegated child agents only.`
 		return { systemPrompt: loadPromptBundle(runtime.agent) };
 	});
 
+	pi.on("message_end", async (event) => {
+		normalizeAssistantThinkingContent(event.message);
+	});
+
 	pi.on("agent_end", async (event, _ctx) => {
 		if (!runtime) return;
+		const { displayText, thinkingText } = extractAssistantMessageParts(event.messages || []);
 		const assistantText = extractAssistantMessageText(event.messages || []);
-		if (assistantText) {
-			appendConversation("assistant", assistantText, {
+		if (displayText || thinkingText || assistantText) {
+			appendConversation("assistant", displayText || assistantText, {
 				source: "assistant",
+				thinking: thinkingText || undefined,
 			});
 			if (currentDepth() === 0) {
 				persistArtifact(
 					"final-response",
 					`${runtime.agent.name}-final`,
-					assistantText,
+					displayText || assistantText,
 					{ agent: runtime.agent.name, role: runtime.role },
 				);
 			}
