@@ -4,8 +4,7 @@
  * @version 0.8.0
  */
 
-import { resolve, dirname } from "node:path"
-import { fileURLToPath } from "node:url"
+import { resolve } from "node:path"
 import {
   loadIndex,
   buildOperationalIndex,
@@ -16,7 +15,17 @@ import {
   DEFAULT_RETRIEVAL_TOP_N,
 } from "../../types/context-memory-types.mjs"
 
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
+/**
+ * Resolve context memory relative to the active workspace. The process working
+ * directory is the compatibility default for callers that have not yet been
+ * updated to pass a workspace explicitly; the MAH installation is never used
+ * as a fallback corpus.
+ * @param {string} [workspaceRoot]
+ * @returns {string}
+ */
+function resolveContextRoot(workspaceRoot = process.cwd()) {
+  return resolve(workspaceRoot, ".mah", "context")
+}
 
 /**
  * Determine if context memory injection is enabled.
@@ -103,9 +112,10 @@ function extractTaskFromArgs(args = []) {
  * @param {Object} agentCtx - Agent context from readHermesAgentContext
  * @param {string[]} args - CLI args (for flag detection)
  * @param {Object} envOverrides - Environment overrides
+ * @param {{ workspaceRoot?: string }} [options]
  * @returns {string|null} Formatted context block or null
  */
-export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) {
+export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}, options = {}) {
   if (!isContextMemoryEnabled(args, envOverrides)) {
     return null
   }
@@ -113,7 +123,7 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
   const { limit, mode } = parseContextMemoryOptions(args)
 
   // Load or build index
-  const contextRoot = resolve(repoRoot, ".mah", "context")
+  const contextRoot = resolveContextRoot(options.workspaceRoot)
   const indexPath = resolve(contextRoot, "index", "operational-context.index.json")
   let index = loadIndex(indexPath)
 
@@ -193,14 +203,15 @@ export function buildContextMemoryBlock(agentCtx, args = [], envOverrides = {}) 
  * Build a context_memory explain payload for `mah explain run`.
  * Does NOT inject into runtime — only returns diagnostic JSON.
  * @param {string[]} args - CLI args
+ * @param {{ workspaceRoot?: string }} [options]
  * @returns {{ enabled: boolean, status: string, mode?: string, limit?: number, matched_docs?: object[], summary_blocks?: string[], error_message?: string }}
  */
-export function buildContextMemoryExplainPayload(args = []) {
+export function buildContextMemoryExplainPayload(args = [], options = {}) {
   const { limit, mode } = parseContextMemoryOptions(args)
   if (!isContextMemoryEnabled(args)) {
     return { enabled: false, status: "disabled", mode, limit, matched_docs: [], summary_blocks: [] }
   }
-  const contextRoot = resolve(repoRoot, ".mah", "context")
+  const contextRoot = resolveContextRoot(options.workspaceRoot)
   const indexPath = resolve(contextRoot, "index", "operational-context.index.json")
 
   let index = loadIndex(indexPath)

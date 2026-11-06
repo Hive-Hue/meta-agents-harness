@@ -1,10 +1,80 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, writeFileSync, openSync, closeSync, fsyncSync, renameSync, unlinkSync, statSync, rmdirSync } from "node:fs"
 import path from "node:path"
+import { randomUUID } from "node:crypto"
 import yaml from "yaml"
 
 const TASKS_STORAGE_DIR = path.join(".mah", "tasks")
 const TASKS_FILE = "tasks.yaml"
 const MISSIONS_FILE = "missions.yaml"
+const pause = new Int32Array(new SharedArrayBuffer(4))
+const lockAgeMs = 30_000
+
+function withStoreLock(repoRoot, action) {
+  const { baseDir } = getTaskStoragePaths(repoRoot)
+  mkdirSync(baseDir, { recursive: true })
+  const lockPath = path.join(baseDir, ".store.lock")
+  const deadline = Date.now() + 10_000
+  let owned = false
+  while (!owned) {
+    try {
+      mkdirSync(lockPath)
+      writeFileSync(path.join(lockPath, "owner.json"), JSON.stringify({ pid: process.pid, time: Date.now() }))
+      owned = true
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error
+      let stale = false
+      try {
+        const owner = JSON.parse(readFileSync(path.join(lockPath, "owner.json"), "utf8"))
+        if (Date.now() - owner.time > lockAgeMs) {
+          try { process.kill(owner.pid, 0) } catch (probe) { stale = probe.code === "ESRCH" }
+        }
+      } catch {
+        try { stale = Date.now() - statSync(lockPath).mtimeMs > lockAgeMs } catch { /* another writer removed it */ }
+      }
+      if (stale) {
+        // Serialize reclaimers and re-check ownership inside the recovery lock.
+        // A second reclaimer must never remove a new writer's owner file based
+        // on its earlier observation of a dead process.
+        const recoveryPath = path.join(baseDir, ".store.recovery.lock")
+        let recovering = false
+        try {
+          mkdirSync(recoveryPath)
+          recovering = true
+          const owner = JSON.parse(readFileSync(path.join(lockPath, "owner.json"), "utf8"))
+          let dead = false
+          try { process.kill(owner.pid, 0) } catch (probe) { dead = probe.code === "ESRCH" }
+          if (dead && Date.now() - owner.time > lockAgeMs) {
+            unlinkSync(path.join(lockPath, "owner.json"))
+            rmdirSync(lockPath)
+          }
+        } catch { /* Contended/missing/invalid ownership fails closed. */ }
+        finally { if (recovering) rmdirSync(recoveryPath) }
+      }
+      if (Date.now() > deadline) throw new Error("task store lock timeout")
+      Atomics.wait(pause, 0, 0, 20)
+    }
+  }
+  try { return action() } finally {
+    try { unlinkSync(path.join(lockPath, "owner.json")) } catch { /* missing */ }
+    rmdirSync(lockPath)
+  }
+}
+
+function atomicYamlWrite(filePath, value) {
+  const temporary = `${filePath}.${process.pid}.${randomUUID()}.tmp`
+  let fd
+  try {
+    fd = openSync(temporary, "wx")
+    writeFileSync(fd, yaml.stringify(value), "utf8")
+    fsyncSync(fd)
+    closeSync(fd)
+    fd = undefined
+    renameSync(temporary, filePath)
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+    try { unlinkSync(temporary) } catch { /* renamed or never created */ }
+  }
+}
 
 function toTaskRuntime(runtime = "") {
   return `${runtime || "openclaude"}`.trim() || "openclaude"
@@ -53,10 +123,10 @@ export function ensureTaskStorage(repoRoot) {
   const { baseDir, tasksPath, missionsPath } = getTaskStoragePaths(repoRoot)
   if (!existsSync(baseDir)) mkdirSync(baseDir, { recursive: true })
   if (!existsSync(tasksPath)) {
-    writeFileSync(tasksPath, yaml.stringify({ tasks: defaultTaskRecords() }), "utf-8")
+    try { writeFileSync(tasksPath, yaml.stringify({ tasks: defaultTaskRecords() }), { flag: "wx" }) } catch (error) { if (error.code !== "EEXIST") throw error }
   }
   if (!existsSync(missionsPath)) {
-    writeFileSync(missionsPath, yaml.stringify({ missions: defaultMissionRecords() }), "utf-8")
+    try { writeFileSync(missionsPath, yaml.stringify({ missions: defaultMissionRecords() }), { flag: "wx" }) } catch (error) { if (error.code !== "EEXIST") throw error }
   }
   return { tasksPath, missionsPath }
 }
@@ -117,6 +187,10 @@ export function normalizeTaskRecord(input = {}, existingTasks = []) {
     summary: `${input.summary || "Task created from the Tasks workspace."}`.trim(),
     lastUpdate: `${input.lastUpdate || "just now"}`.trim(),
     sessionId: input.sessionId ? `${input.sessionId}`.trim() : undefined,
+    attemptId: input.attemptId ? `${input.attemptId}`.trim() : undefined,
+    startedAt: input.startedAt ? `${input.startedAt}`.trim() : undefined,
+    finishedAt: input.finishedAt ? `${input.finishedAt}`.trim() : undefined,
+    failureReason: input.failureReason ? `${input.failureReason}`.trim() : undefined,
     blockedReason: input.blockedReason ? `${input.blockedReason}`.trim() : undefined,
     rationale: `${input.rationale || "Created from the Tasks page for operator planning."}`.trim(),
     command: buildTaskCommand({ id })
@@ -150,13 +224,21 @@ export function readTaskStore(repoRoot) {
 }
 
 export function writeTaskStore(repoRoot, tasks = []) {
+  return withStoreLock(repoRoot, () => writeTaskStoreUnlocked(repoRoot, tasks))
+}
+
+function writeTaskStoreUnlocked(repoRoot, tasks) {
   const { tasksPath } = ensureTaskStorage(repoRoot)
-  writeFileSync(tasksPath, yaml.stringify({ tasks }), "utf-8")
+  atomicYamlWrite(tasksPath, { tasks })
 }
 
 export function writeMissionStore(repoRoot, missions = []) {
+  return withStoreLock(repoRoot, () => writeMissionStoreUnlocked(repoRoot, missions))
+}
+
+function writeMissionStoreUnlocked(repoRoot, missions) {
   const { missionsPath } = ensureTaskStorage(repoRoot)
-  writeFileSync(missionsPath, yaml.stringify({ missions }), "utf-8")
+  atomicYamlWrite(missionsPath, { missions })
 }
 
 export function listTasks(repoRoot, filters = {}) {
@@ -172,14 +254,21 @@ export function listTasks(repoRoot, filters = {}) {
 }
 
 export function createTask(repoRoot, payload = {}) {
+ return withStoreLock(repoRoot, () => {
   const { tasks } = readTaskStore(repoRoot)
   const task = normalizeTaskRecord(payload, tasks)
+  if (tasks.some((item) => item.id === task.id)) throw new Error(`task already exists: ${task.id}`)
   const nextTasks = [task, ...tasks]
-  writeTaskStore(repoRoot, nextTasks)
+  writeTaskStoreUnlocked(repoRoot, nextTasks)
   return { task, tasks: nextTasks }
+ })
 }
 
 export function updateTask(repoRoot, taskId, updates = {}) {
+ return withStoreLock(repoRoot, () => updateTaskUnlocked(repoRoot, taskId, updates))
+}
+
+function updateTaskUnlocked(repoRoot, taskId, updates = {}) {
   const { tasks } = readTaskStore(repoRoot)
   let updatedTask = null
   const nextTasks = tasks.map((task) => {
@@ -195,17 +284,49 @@ export function updateTask(repoRoot, taskId, updates = {}) {
     return updatedTask
   })
   if (!updatedTask) return { task: null, tasks }
-  writeTaskStore(repoRoot, nextTasks)
+  writeTaskStoreUnlocked(repoRoot, nextTasks)
   return { task: updatedTask, tasks: nextTasks }
 }
 
 export function deleteTask(repoRoot, taskId) {
+ return withStoreLock(repoRoot, () => {
   const { tasks } = readTaskStore(repoRoot)
   const task = tasks.find((item) => item.id === taskId) || null
   if (!task) return { task: null, tasks }
   const nextTasks = tasks.filter((item) => item.id !== taskId)
-  writeTaskStore(repoRoot, nextTasks)
+  writeTaskStoreUnlocked(repoRoot, nextTasks)
   return { task, tasks: nextTasks }
+ })
+}
+
+export function acquireTaskRun(repoRoot, taskId) {
+  return withStoreLock(repoRoot, () => {
+    const { tasks } = readTaskStore(repoRoot)
+    const task = tasks.find((item) => item.id === taskId)
+    if (!task) throw new Error("task not found")
+    if (task.state === "in_progress") throw new Error(`task already running: ${taskId}`)
+    if (!["ready", "backlog", "failed"].includes(task.state)) throw new Error(`task cannot run from state ${task.state}`)
+    for (const dependencyId of task.dependencies) {
+      const dependency = tasks.find((item) => item.id === dependencyId)
+      if (!dependency || dependency.state !== "done") throw new Error(`dependency not complete: ${dependencyId}`)
+    }
+    const attemptId = randomUUID()
+    return updateTaskUnlocked(repoRoot, taskId, { state: "in_progress", attemptId, startedAt: new Date().toISOString(), finishedAt: undefined, failureReason: undefined, sessionId: undefined, lastUpdate: new Date().toISOString() }).task
+  })
+}
+
+export function finishTaskRun(repoRoot, taskId, attemptId, result = {}) {
+  return withStoreLock(repoRoot, () => {
+    const task = readTaskStore(repoRoot).tasks.find((item) => item.id === taskId)
+    if (!task || task.attemptId !== attemptId || task.state !== "in_progress") throw new Error(`task attempt no longer active: ${taskId}`)
+    return updateTaskUnlocked(repoRoot, taskId, {
+      state: result.ok ? "review" : "failed",
+      sessionId: result.sessionId || undefined,
+      failureReason: result.ok ? undefined : String(result.error || "run failed"),
+      finishedAt: new Date().toISOString(),
+      lastUpdate: new Date().toISOString()
+    }).task
+  })
 }
 
 export function buildTaskPrompt(task) {
@@ -236,14 +357,18 @@ export function listMissions(repoRoot, filters = {}) {
 }
 
 export function createMission(repoRoot, payload = {}) {
+ return withStoreLock(repoRoot, () => {
   const { missions } = readTaskStore(repoRoot)
   const mission = normalizeMissionRecord(payload, missions)
+  if (missions.some((item) => item.id === mission.id)) throw new Error(`mission already exists: ${mission.id}`)
   const nextMissions = [mission, ...missions]
-  writeMissionStore(repoRoot, nextMissions)
+  writeMissionStoreUnlocked(repoRoot, nextMissions)
   return { mission, missions: nextMissions }
+ })
 }
 
 export function updateMission(repoRoot, missionId, updates = {}) {
+ return withStoreLock(repoRoot, () => {
   const { missions } = readTaskStore(repoRoot)
   let updatedMission = null
   const nextMissions = missions.map((mission) => {
@@ -256,11 +381,13 @@ export function updateMission(repoRoot, missionId, updates = {}) {
     return updatedMission
   })
   if (!updatedMission) return { mission: null, missions }
-  writeMissionStore(repoRoot, nextMissions)
+  writeMissionStoreUnlocked(repoRoot, nextMissions)
   return { mission: updatedMission, missions: nextMissions }
+ })
 }
 
 export function deleteMission(repoRoot, missionId, options = {}) {
+ return withStoreLock(repoRoot, () => {
   const { missions, tasks } = readTaskStore(repoRoot)
   const mission = missions.find((item) => item.id === missionId) || null
   if (!mission) return { mission: null, missions, tasks, removedTasks: [] }
@@ -274,8 +401,8 @@ export function deleteMission(repoRoot, missionId, options = {}) {
   const removedTaskIds = new Set(linkedTasks.map((task) => task.id))
   const nextTasks = linkedTasks.length > 0 ? tasks.filter((task) => !removedTaskIds.has(task.id)) : tasks
 
-  writeMissionStore(repoRoot, nextMissions)
-  if (linkedTasks.length > 0) writeTaskStore(repoRoot, nextTasks)
+  writeMissionStoreUnlocked(repoRoot, nextMissions)
+  if (linkedTasks.length > 0) writeTaskStoreUnlocked(repoRoot, nextTasks)
 
   return {
     mission,
@@ -283,6 +410,7 @@ export function deleteMission(repoRoot, missionId, options = {}) {
     tasks: nextTasks,
     removedTasks: linkedTasks,
   }
+ })
 }
 
 export function commitMissionScope(repoRoot, missionId) {
@@ -294,6 +422,7 @@ export function commitMissionScope(repoRoot, missionId) {
 }
 
 export function applyMissionReplan(repoRoot, missionId) {
+ return withStoreLock(repoRoot, () => {
   const { tasks, missions } = readTaskStore(repoRoot)
   const missionTasks = tasks.filter((task) => task.missionId === missionId)
   const firstBlocked = missionTasks.find((task) => task.state === "blocked")
@@ -343,8 +472,8 @@ export function applyMissionReplan(repoRoot, missionId) {
 
   if (!updatedMission) return { mission: null, missions, tasks, summary: "" }
 
-  writeTaskStore(repoRoot, nextTasks)
-  writeMissionStore(repoRoot, nextMissions)
+  writeTaskStoreUnlocked(repoRoot, nextTasks)
+  writeMissionStoreUnlocked(repoRoot, nextMissions)
   return {
     mission: updatedMission,
     missions: nextMissions,
@@ -354,4 +483,5 @@ export function applyMissionReplan(repoRoot, missionId) {
       unlockedTaskIds.length > 0 ? `unblocked ${unlockedTaskIds.join(", ")}` : "",
     ].filter(Boolean).join(" and ") || "Agentic replan applied with no task-level changes."
   }
+ })
 }

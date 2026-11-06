@@ -18,6 +18,7 @@ import { resolveWorkspaceCandidates } from "./routing/workspace-candidate-resolv
 import { rankCooperativeCandidates } from "./routing/cooperative-ranking.mjs"
 import { normalizeExecutionResult } from "../types/agent-execution-result.mjs"
 import { recordDelegationEvidence } from "./expertise/evidence/evidence-pipeline.mjs"
+import { runtimeCommandExists, spawnRuntimeSync } from "./runtime/process-launcher.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -39,11 +40,7 @@ function orderedRuntimeNames(profiles = runtimeProfiles) {
 }
 
 function commandExists(command) {
-  const probe = spawnSync("bash", ["-lc", `command -v ${command} >/dev/null 2>&1`], {
-    cwd: repoRoot,
-    env: process.env
-  })
-  return probe.status === 0
+  return runtimeCommandExists(command, { cwd: repoRoot, env: process.env })
 }
 
 function runtimeExecutableStatus(runtimeName) {
@@ -204,7 +201,8 @@ function printHelp() {
   console.log("  task [list|show|create|update|run] [args]")
   console.log("  mission [list|show|create|update|commit-scope|replan] [args]")
   console.log("  mcp [list|add|remove|sync] [args]  MCP registry and runtime sync")
-  console.log("  webui [dev|build|preview] [args]  run WebUI (use --prod for build+preview)")
+  console.log("  webui [dev|build|preview|start] [args]  run WebUI (--prod builds and starts standalone server)")
+  console.log("  computer [init|doctor|mcp|pause|resume]  policy-controlled local desktop broker")
   console.log("  graph [--crew <name>] [--run <id>] [--json] [--mermaid] [--mermaid-level <basic|group|detailed>]")
   console.log("  demo [crew]")
   console.log("  contract:runtime")
@@ -305,6 +303,14 @@ function sanitizeEnvOverrides(envOverrides = {}) {
     redacted[key] = sensitiveKeyPattern.test(key) ? "[redacted]" : value
   }
   return redacted
+}
+
+function sanitizeExplainPayload(payload = {}) {
+  if (!payload || typeof payload !== "object" || !payload.env || typeof payload.env !== "object") return payload
+  return {
+    ...payload,
+    env: Object.fromEntries(Object.keys(payload.env).map((key) => [key, "[redacted]"]))
+  }
 }
 
 function parseFilterArgs(argv) {
@@ -512,14 +518,14 @@ function runWebUi(argv = []) {
     return 1
   }
   if (argv.includes("--help") || argv.includes("-h")) {
-    console.log("Usage: mah webui [dev|build|preview] [vite args]")
+    console.log("Usage: mah webui [dev|build|preview|start] [server args]")
     console.log("")
     console.log("Examples:")
     console.log("  mah webui")
     console.log("  mah webui --host 0.0.0.0 --port 5173")
     console.log("  mah webui --prod")
     console.log("  mah webui build")
-    console.log("  mah webui preview --host 0.0.0.0 --port 4173")
+    console.log("  mah webui start --port 4173")
     console.log("")
     console.log("Flags:")
     console.log("  --prod         run production flow (build then API-enabled server)")
@@ -560,7 +566,7 @@ function runWebUi(argv = []) {
   const prodMode = passthrough.includes("--prod")
   const cleaned = passthrough.filter((arg) => arg !== "--prod")
   const first = cleaned[0]
-  const explicitCommand = first === "dev" || first === "build" || first === "preview" ? first : "dev"
+  const explicitCommand = ["dev", "build", "preview", "start"].includes(first) ? first : "dev"
   const viteArgs = explicitCommand === "dev" || explicitCommand === "preview"
     ? (first === explicitCommand ? cleaned.slice(1) : cleaned)
     : (first === explicitCommand ? cleaned.slice(1) : cleaned)
@@ -577,8 +583,8 @@ function runWebUi(argv = []) {
       if (buildResult.error) console.error(`ERROR: failed to build WebUI: ${buildResult.error.message}`)
       return typeof buildResult.status === "number" ? buildResult.status : 1
     }
-    const prodServerArgs = ["--mode", "production", ...viteArgs]
-    const previewResult = runNpm("dev", prodServerArgs)
+    const prodServerArgs = viteArgs
+    const previewResult = runNpm("start", prodServerArgs)
     if (typeof previewResult.status === "number") return previewResult.status
     if (previewResult.error) console.error(`ERROR: failed to start production WebUI server: ${previewResult.error.message}`)
     return 1
@@ -1036,7 +1042,7 @@ function normalizeRunArgs(runtime, passthrough) {
 function runCommand(command, args, passthrough = [], envOverrides = {}, options = {}) {
   const headless = options.headless === true
   const stdio = headless ? ["ignore", "pipe", "pipe"] : "inherit"
-  const child = spawnSync(command, [...args, ...passthrough], {
+  const child = spawnRuntimeSync(command, [...args, ...passthrough], {
     cwd: repoRoot,
     env: { ...process.env, ...envOverrides },
     stdio
@@ -1105,19 +1111,20 @@ function runtimeValidationReport(runtime) {
 }
 
 function printExplain(traceMode, payload) {
+  const safePayload = sanitizeExplainPayload(payload)
   if (traceMode) {
-    console.log(JSON.stringify(payload, null, 2))
+    console.log(JSON.stringify(safePayload, null, 2))
     return
   }
-  if (payload.runtime) console.log(`runtime=${payload.runtime}`)
-  if (payload.reason) console.log(`reason=${payload.reason}`)
-  if (payload.command) console.log(`command=${payload.command}`)
-  if (payload.mode) console.log(`mode=${payload.mode}`)
-  if (payload.exec) console.log(`resolved_exec=${payload.exec}`)
-  if (payload.execArgs) console.log(`resolved_args=${payload.execArgs.join(" ")}`)
-  if (payload.passthrough) console.log(`passthrough=${payload.passthrough.join(" ")}`)
-  if (payload.env && Object.keys(payload.env).length > 0) {
-    console.log(`env_overrides=${Object.keys(payload.env).join(",")}`)
+  if (safePayload.runtime) console.log(`runtime=${safePayload.runtime}`)
+  if (safePayload.reason) console.log(`reason=${safePayload.reason}`)
+  if (safePayload.command) console.log(`command=${safePayload.command}`)
+  if (safePayload.mode) console.log(`mode=${safePayload.mode}`)
+  if (safePayload.exec) console.log(`resolved_exec=${safePayload.exec}`)
+  if (safePayload.execArgs) console.log(`resolved_args=${safePayload.execArgs.join(" ")}`)
+  if (safePayload.passthrough) console.log(`passthrough=${safePayload.passthrough.join(" ")}`)
+  if (safePayload.env && Object.keys(safePayload.env).length > 0) {
+    console.log(`env_overrides=${Object.keys(safePayload.env).join(",")}`)
   }
   if (Array.isArray(payload.warnings)) {
     for (const warning of payload.warnings) {
@@ -2451,7 +2458,7 @@ function dispatch(runtime, command, passthrough) {
 function dispatchCapture(runtime, command, passthrough) {
   const plan = resolveDispatchPlan(runtime, command, passthrough)
   if (plan.error) return { status: 1, stdout: "", stderr: plan.error, plan: null }
-  const child = spawnSync(plan.exec, [...(plan.args || []), ...(plan.passthrough || [])], {
+  const child = spawnRuntimeSync(plan.exec, [...(plan.args || []), ...(plan.passthrough || [])], {
     cwd: repoRoot,
     env: { ...process.env, ...(plan.envOverrides || {}) },
     encoding: "utf-8"
@@ -2993,9 +3000,8 @@ async function runDelegate(passthrough, options = {}) {
 
   if (execute) {
     if (headless || verbose || !quiet) console.log("--- executing ---")
-    const { spawnSync } = await import("node:child_process")
     const forceCanonicalModelOutput = modelIdentityTask && Boolean(canonicalTargetModel)
-    const child = spawnSync(result.plan.exec, [...(result.plan.args || []), ...(result.plan.passthrough || [])], {
+    const child = spawnRuntimeSync(result.plan.exec, [...(result.plan.args || []), ...(result.plan.passthrough || [])], {
       cwd: repoRoot,
       env: { ...process.env, ...result.plan.envOverrides },
       stdio: (forceCanonicalModelOutput || headless) ? "pipe" : "inherit"
@@ -5029,6 +5035,12 @@ async function main() {
   const normalizedArgv = stripRuntimeArgs(removeFlag(removeFlag(removeFlag(removeFlag(removeFlag(argv, "--trace"), "--strict-markers"), "--json"), "--mermaid"), "--headless"))
   const first = normalizedArgv[0]
 
+  if (first === "computer") {
+    const { main: computerMain } = await import("./computer/computer-cli.mjs")
+    await computerMain(argv.slice(1))
+    return
+  }
+
   if (!first || first === "--help" || first === "-h" || first === "help") {
     printHelp()
     return
@@ -5729,14 +5741,14 @@ async function main() {
           internal: headlessPlan.internal || {}
         }
         if (normalizedArgv.includes("--with-context-memory")) {
-          payload.context_memory = buildContextMemoryExplainPayload(passthrough)
+          payload.context_memory = buildContextMemoryExplainPayload(passthrough, { workspaceRoot: repoRoot })
         }
         if (jsonMode) {
           printDiagnosticPayload(createDiagnosticPayload("explain", {
             status: 0,
             runtime: runtimeResult.runtime,
             reason: runtimeResult.reason,
-            data: { target: "run", mode: "headless", payload }
+            data: { target: "run", mode: "headless", payload: sanitizeExplainPayload(payload) }
           }))
         } else {
           printExplain(traceMode, payload)
@@ -5764,14 +5776,14 @@ async function main() {
         ...(explainCommand === "run" ? { ...explainRouting, cooperative_ranking: cooperativeRanking } : {})
       }
       if (normalizedArgv.includes("--with-context-memory")) {
-        payload.context_memory = buildContextMemoryExplainPayload(passthrough)
+        payload.context_memory = buildContextMemoryExplainPayload(passthrough, { workspaceRoot: repoRoot })
       }
       if (jsonMode) {
         printDiagnosticPayload(createDiagnosticPayload("explain", {
           status: 0,
           runtime: runtimeResult.runtime,
           reason: runtimeResult.reason,
-          data: { target: explainCommand, payload }
+          data: { target: explainCommand, payload: sanitizeExplainPayload(payload) }
         }))
       } else {
         printExplain(traceMode, payload)

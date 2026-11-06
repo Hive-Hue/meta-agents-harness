@@ -1,9 +1,9 @@
 import { existsSync, readFileSync } from "node:fs"
 import path from "node:path"
-import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import { collectSessions } from "../session/m3-ops.mjs"
-import { buildTaskPrompt, createTask, deleteTask, listTasks, normalizeTaskRuntime, readTaskStore, updateTask } from "./tasks-store.mjs"
+import { runBoundedProcess } from "../runtime/process-supervisor.mjs"
+import { buildTaskPrompt, createTask, deleteTask, listTasks, normalizeTaskRuntime, updateTask } from "./tasks-store.mjs"
+import { executeTaskAttempt } from "./task-runner.mjs"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -100,26 +100,12 @@ function printTaskList(tasks = []) {
   return 0
 }
 
-function resolveTaskSessionId(repoRoot, task, runPayload = {}) {
-  const runtime = normalizeTaskRuntime(task.runtime)
-  const crew = `${task.crewId || "dev"}`.trim() || "dev"
-  const sessions = collectSessions(repoRoot, { runtime, crew })
-  if (sessions[0]?.id) return sessions[0].id
-
-  const rawSessionId = `${runPayload.session_id || ""}`.trim()
-  if (rawSessionId) {
-    return rawSessionId.includes(":") ? rawSessionId : `${runtime}:${crew}:${rawSessionId}`
-  }
-
-  return ""
-}
-
-function runMahTask(repoRoot, task) {
+async function runMahTask(repoRoot, task) {
   const runtime = normalizeTaskRuntime(task.runtime)
   const crew = `${task.crewId || "dev"}`.trim() || "dev"
   const prompt = buildTaskPrompt(task)
   const workspaceEnv = loadWorkspaceEnv(repoRoot)
-  const child = spawnSync(process.execPath, [
+  const child = await runBoundedProcess(process.execPath, [
     cliPath,
     "run",
     "--runtime",
@@ -133,7 +119,8 @@ function runMahTask(repoRoot, task) {
   ], {
     cwd: repoRoot,
     env: { ...process.env, ...workspaceEnv },
-    encoding: "utf-8"
+    timeoutMs: Number(process.env.MAH_TASK_RUN_TIMEOUT_MS) || 3_600_000,
+    maxOutputBytes: 8 * 1024 * 1024
   })
 
   let payload = null
@@ -146,7 +133,7 @@ function runMahTask(repoRoot, task) {
   if (child.status !== 0 || !payload || typeof payload !== "object") {
     return {
       ok: false,
-      error: payload?.error || `${child.stderr || child.stdout || "mah run failed"}`.trim() || "mah run failed",
+      error: payload?.error || child.reason || `${child.stderr || child.stdout || "mah run failed"}`.trim() || "mah run failed",
       stdout: child.stdout || "",
       stderr: child.stderr || ""
     }
@@ -237,38 +224,29 @@ async function main() {
 
   if (subcommand === "run") {
     const taskId = parseValueArg(rest, "--id") || `${rest.find((token) => !token.startsWith("-")) || ""}`.trim()
-    const task = listTasks(repoRoot, { id: taskId })[0]
-    if (!task) {
-      process.exitCode = jsonMode ? printJson({ ok: false, error: "task not found" }, 1) : 1
-      if (!jsonMode) console.error("ERROR: task not found")
+    let result
+    try { result = await executeTaskAttempt(repoRoot, taskId, (task) => runMahTask(repoRoot, task)) } catch (error) {
+      process.exitCode = jsonMode ? printJson({ ok: false, error: error.message }, 1) : 1
+      if (!jsonMode) console.error(`ERROR: ${error.message}`)
       return
     }
-
-    const runResult = runMahTask(repoRoot, task)
-    if (!runResult.ok) {
-      process.exitCode = jsonMode ? printJson(runResult, 1) : 1
-      if (!jsonMode) console.error(`ERROR: ${runResult.error}`)
+    if (!result.ok) {
+      process.exitCode = jsonMode ? printJson(result, 1) : 1
+      if (!jsonMode) console.error(`ERROR: ${result.error}`)
       return
     }
-
-    const linkedSessionId = resolveTaskSessionId(repoRoot, task, runResult.payload)
-    const updated = updateTask(repoRoot, task.id, {
-      state: "in_progress",
-      sessionId: linkedSessionId || undefined,
-      lastUpdate: new Date().toISOString()
-    })
 
     const response = {
       ok: true,
-      task: updated.task,
-      tasks: updated.tasks,
-      run: runResult.payload,
-      command: updated.task?.command || task.command
+      task: result.task,
+      tasks: listTasks(repoRoot),
+      run: result.payload,
+      command: result.task.command
     }
     process.exitCode = jsonMode ? printJson(response) : 0
     if (!jsonMode) {
-      console.log(`started ${task.id}`)
-      if (linkedSessionId) console.log(`session=${linkedSessionId}`)
+      console.log(`completed ${taskId}; awaiting review`)
+      if (result.sessionId) console.log(`session=${result.sessionId}`)
     }
     return
   }

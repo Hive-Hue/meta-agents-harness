@@ -83,7 +83,10 @@ export function buildAssistantStatePayload({ repoRoot, crew, agent, task, runtim
   }
 
   try {
-    const cmPayload = buildContextMemoryExplainPayload(["--with-context-memory", "--task", safeTask || ""])
+    const cmPayload = buildContextMemoryExplainPayload(
+      ["--with-context-memory", "--task", safeTask || ""],
+      { workspaceRoot: repoRoot }
+    )
     cmSection = {
       status: cmPayload.status,
       matched_docs: (cmPayload.matched_docs || []).map((d) => d.id)

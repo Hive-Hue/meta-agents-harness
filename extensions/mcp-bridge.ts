@@ -102,9 +102,27 @@ function errorMessage(error: unknown): string {
 function mcpToolFailure(server: string, operation: string, error: unknown) {
 	const message = errorMessage(error);
 	return {
+		isError: true,
 		content: [{ type: "text", text: `MCP ${operation} failed for "${server}": ${message}` }],
 		details: { server, operation, error: message },
 	};
+}
+
+// Preserve model-visible modalities. Keep opaque resources in details without
+// serializing binary payloads into the model's text context.
+export function normalizeMcpToolResult(result: any) {
+	const content: any[] = [];
+	for (const block of Array.isArray(result?.content) ? result.content : []) {
+		if (block?.type === "text" && typeof block.text === "string") content.push(block);
+		else if (block?.type === "image" && typeof block.data === "string" && typeof block.mimeType === "string") content.push(block);
+		else if (block?.type === "resource" && typeof block.resource?.text === "string") {
+			content.push({ type: "text", text: JSON.stringify(block) });
+		} else if (block?.type === "resource_link") {
+			content.push({ type: "text", text: JSON.stringify(block) });
+		} else content.push({ type: "text", text: `[MCP ${block?.type || "unknown"} content is not supported by this bridge; see tool details.]` });
+	}
+	if (content.length === 0) content.push({ type: "text", text: jsonText(result?.structuredContent ?? result ?? {}) });
+	return { content, isError: result?.isError === true };
 }
 
 function parseArgumentsJson(raw?: string): Record<string, any> {
@@ -1034,8 +1052,8 @@ export default function (pi: ExtensionAPI) {
 			try {
 				const result = await getClient(server).callTool(tool, args);
 				return {
-					content: [{ type: "text", text: jsonText(result) }],
-					details: { server, tool, args, result },
+					...normalizeMcpToolResult(result),
+					details: { server, tool, result },
 				};
 			} catch (error) {
 				return mcpToolFailure(server, `tools/call:${tool}`, error);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-export type TaskState = "backlog" | "ready" | "in_progress" | "blocked" | "review" | "done";
+export type TaskState = "backlog" | "ready" | "in_progress" | "blocked" | "failed" | "review" | "done";
 export type TaskPriority = "high" | "medium" | "low";
 
 export type TaskRecord = {

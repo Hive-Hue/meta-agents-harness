@@ -1,4 +1,4 @@
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -28,21 +28,37 @@ function firstExisting(paths = []) {
   return ""
 }
 
+const MAH_HOME_SKIP_DIRS = new Set([
+  "node_modules",
+  ".venv",
+  "venv",
+  "__pycache__",
+  ".git",
+  "dist",
+  "build",
+  ".cache",
+  ".next",
+  ".turbo"
+])
+
 function copyDirectoryTree(sourcePath, targetPath) {
-  if (!sourcePath || !existsSync(sourcePath)) return false
-  if (existsSync(targetPath)) {
-    try {
-      if (lstatSync(targetPath).isSymbolicLink()) {
-        rmSync(targetPath, { recursive: true, force: true })
-      }
-    } catch {
-      // ignore stat errors and continue with copy
-    }
+  if (!existsSync(sourcePath)) {
+    return false
+  }
+  const sourceStat = lstatSync(sourcePath)
+  if (sourceStat.isSymbolicLink()) {
+    const deref = statSync(sourcePath)
+    if (!deref.isDirectory()) return false
+  } else if (!sourceStat.isDirectory()) {
+    return false
   }
   mkdirSync(targetPath, { recursive: true })
   for (const entry of readdirSync(sourcePath, { withFileTypes: true })) {
     const sourceEntry = path.join(sourcePath, entry.name)
     const targetEntry = path.join(targetPath, entry.name)
+    if (entry.isDirectory() && MAH_HOME_SKIP_DIRS.has(entry.name)) {
+      continue
+    }
     if (existsSync(targetEntry)) {
       try {
         if (lstatSync(targetEntry).isSymbolicLink()) {
@@ -56,7 +72,25 @@ function copyDirectoryTree(sourcePath, targetPath) {
       copyDirectoryTree(sourceEntry, targetEntry)
       continue
     }
-    cpSync(sourceEntry, targetEntry, { force: true, dereference: true })
+    if (entry.isSymbolicLink()) {
+      let derefStat = null
+      try {
+        derefStat = statSync(sourceEntry)
+      } catch {
+        derefStat = null
+      }
+      if (derefStat && derefStat.isDirectory()) {
+        if (MAH_HOME_SKIP_DIRS.has(entry.name)) continue
+        copyDirectoryTree(sourceEntry, targetEntry)
+        continue
+      }
+      if (!derefStat) {
+        continue
+      }
+      cpSync(sourceEntry, targetEntry, { force: true, recursive: true, dereference: true })
+      continue
+    }
+    cpSync(sourceEntry, targetEntry, { force: true, recursive: true, dereference: true })
   }
   return true
 }

@@ -38,7 +38,7 @@ test('evidence recorded after delegate_agent completes', async () => {
   const result = await recordEvidence(evidence, { evidenceRoot })
   assert.equal(result.ok, true)
 
-  const evidenceDir = join(evidenceRoot, evidence.expertise_id)
+  const evidenceDir = join(evidenceRoot, readdirSync(evidenceRoot)[0])
   const files = readdirSync(evidenceDir).filter((f) => f.endsWith('.json'))
   assert.equal(files.length, 1)
 
@@ -69,7 +69,7 @@ test('evidence shape matches expertise-types.mjs schema', async () => {
   const result = await recordEvidence(evidence, { evidenceRoot })
   assert.equal(result.ok, true)
 
-  const evidenceDir = join(evidenceRoot, evidence.expertise_id)
+  const evidenceDir = join(evidenceRoot, readdirSync(evidenceRoot)[0])
   const files = readdirSync(evidenceDir).filter((f) => f.endsWith('.json'))
   assert.equal(files.length, 1)
 

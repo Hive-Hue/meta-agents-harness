@@ -99,3 +99,21 @@ test("delegateAgentHandler omits runtime flag when no runtime hint is provided",
   }
 })
 
+test("delegateAgentHandler bounds a hung child without blocking the event loop", async () => {
+  const repoRoot = createCodexContextFixture()
+  try {
+    const scriptPath = path.join(repoRoot, "hang.mjs")
+    writeFileSync(scriptPath, "setInterval(() => {}, 1000)\n", "utf8")
+    let ticked = false
+    const timer = setTimeout(() => { ticked = true }, 10)
+    const result = await delegateAgentHandler(
+      { target: "backend-dev", task: "Simulated hang" },
+      { repoRoot, env: { MAH_AGENT: "engineering-lead" }, scriptPath, timeoutMs: 80 }
+    )
+    clearTimeout(timer)
+    assert.equal(ticked, true)
+    assert.equal(result.ok, false)
+    assert.match(result.summary, /deadline exceeded/)
+  } finally { rmSync(repoRoot, { recursive: true, force: true }) }
+})
+

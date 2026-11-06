@@ -468,9 +468,45 @@ test("pi explain run resolves to direct cli with MAH session env", (t) => {
   const payload = JSON.parse(result.stdout)
   assert.equal(payload.runtime, "pi")
   assert.equal(payload.exec, "pi")
-  assert.ok(payload.env?.PI_MULTI_CONFIG)
-  assert.ok(payload.env?.PI_MULTI_SESSION_ROOT)
-  assert.ok(payload.env?.PI_MULTI_SESSION_ID)
+  assert.equal(payload.env?.PI_MULTI_CONFIG, "[redacted]")
+  assert.equal(payload.env?.PI_MULTI_SESSION_ROOT, "[redacted]")
+  assert.equal(payload.env?.PI_MULTI_SESSION_ID, "[redacted]")
+
+  const jsonResult = run(["--runtime", "pi", "explain", "run", "--json", "--crew", "dev"])
+  assert.equal(jsonResult.status, 0, jsonResult.stderr)
+  const jsonPayload = JSON.parse(jsonResult.stdout)
+  const jsonEnv = jsonPayload.data?.payload?.env || {}
+  assert.ok(Object.keys(jsonEnv).length > 0)
+  assert.ok(Object.values(jsonEnv).every((value) => value === "[redacted]"))
+})
+
+test("pi run selects the crew orchestrator model unless the caller passes --model", () => {
+  const tempRepo = mkdtempSync(path.join(os.tmpdir(), "mah-pi-model-repo-"))
+  const configPath = path.join(tempRepo, ".pi", "crew", "dev", "multi-team.yaml")
+  mkdirSync(path.dirname(configPath), { recursive: true })
+  writeFileSync(configPath, "orchestrator:\n  model: openai/gpt-6-luna\n", "utf8")
+  try {
+    const defaults = preparePiRunContext({
+      repoRoot: tempRepo,
+      crew: "dev",
+      configPath,
+      argv: [],
+      envOverrides: {}
+    })
+    assert.deepEqual(defaults.args.slice(-2), ["--model", "openai/gpt-6-luna"])
+
+    const explicit = preparePiRunContext({
+      repoRoot: tempRepo,
+      crew: "dev",
+      configPath,
+      argv: ["--model", "openai/gpt-5.4-mini"],
+      envOverrides: {}
+    })
+    assert.equal(explicit.args.includes("--model"), false)
+    assert.deepEqual(explicit.passthrough.slice(-2), ["--model", "openai/gpt-5.4-mini"])
+  } finally {
+    rmSync(tempRepo, { recursive: true, force: true })
+  }
 })
 
 test("pi prepareRunContext falls back to MAH package extensions when repo extensions are missing", () => {

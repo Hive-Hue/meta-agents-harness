@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TaskComposer } from "./TaskComposer";
@@ -37,12 +37,53 @@ function RunConsoleInner() {
   const [logLines, setLogLines] = useState<{ time: string; level: "INFO" | "WARN" | "ERROR"; msg: string }[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
   const tp = () => new Date().toLocaleTimeString([], { hour12: false });
+
+  const pollRun = useCallback(async function poll(sessionId: string, signal: AbortSignal) {
+    if (signal.aborted) return;
+    try {
+      const response = await fetch(`/api/mah/run-status/${sessionId}`, { signal });
+      const status = await response.json();
+      if (!response.ok || !status.ok) throw new Error(status.error || "Run status unavailable");
+      const lifecycleMap: Record<string, RunState> = { queued: "queued", running: "running", completed: "completed", failed: "failed", cancelled: "failed", interrupted: "failed" };
+      setRunState(lifecycleMap[status.status] ?? "failed");
+      setEvents((status.events ?? []).map((event: { event: string; at: string; details?: { label?: string; desc?: string } }) => ({
+        time: new Date(event.at).toLocaleTimeString([], { hour12: false }),
+        state: (lifecycleMap[event.event] ?? "running") as LifecycleEvent["state"],
+        label: event.details?.label ?? event.event,
+        desc: event.details?.desc ?? "",
+        active: status.status === "running" && event.event === "running",
+      })));
+      setLogLines(status.logs ?? []);
+      if (status.status === "running") pollTimerRef.current = setTimeout(() => { void poll(sessionId, signal); }, POLL_INTERVAL);
+    } catch (error) {
+      if (signal.aborted) return;
+      setRunState("failed");
+      setLogLines(previous => [...previous, { time: tp(), level: "ERROR", msg: (error as Error).message }]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = sessionStorage.getItem("mah.lastRunId"); } catch { /* Storage may be disabled. */ }
+    if (saved && /^run-[a-f0-9-]+$/.test(saved)) {
+      sessionIdRef.current = saved;
+      abortControllerRef.current = new AbortController();
+      void pollRun(saved, abortControllerRef.current.signal);
+    }
+    return () => {
+      abortControllerRef.current?.abort();
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, [pollRun]);
 
   const startRun = useCallback(async () => {
     if (!taskText.trim()) return;
 
+    abortControllerRef.current?.abort();
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     abortControllerRef.current = new AbortController();
     setShowRouting(false);
     setLogLines([]);
@@ -60,42 +101,10 @@ function RunConsoleInner() {
       if (!result.ok) throw new Error(result.error || "Failed to start run");
 
       const { sessionId } = result;
+      sessionIdRef.current = sessionId;
+      try { sessionStorage.setItem("mah.lastRunId", sessionId); } catch { /* Storage may be disabled. */ }
       setRunState("running");
-
-      const poll = async () => {
-        if (abortControllerRef.current?.signal.aborted) return;
-        try {
-          const statusRes = await fetch(`/api/mah/run-status/${sessionId}`, { signal: abortControllerRef.current!.signal });
-          const status = await statusRes.json();
-          if (!status.ok) return;
-
-          const lifecycleMap: Record<string, RunState> = { queued: "queued", running: "running", completed: "completed", failed: "failed" };
-          const lastEvent = status.events?.[status.events.length - 1];
-          setRunState(lifecycleMap[lastEvent?.event ?? "running"] ?? "running");
-
-          const mapped: LifecycleEvent[] = (status.events ?? []).map((e: { event: string; at: string; details?: { label?: string; desc?: string } }) => ({
-            time: new Date(e.at).toLocaleTimeString([], { hour12: false }),
-            state: (lifecycleMap[e.event] ?? "running") as LifecycleEvent["state"],
-            label: e.details?.label ?? e.event,
-            desc: e.details?.desc ?? "",
-            active: e.event === "running",
-          }));
-          setEvents(mapped.length ? mapped : [{ time: tp(), state: "running" as const, label: "Running", desc: "In progress", active: true }]);
-
-          setLogLines(status.logs ?? []);
-
-          if (status.status === "running") {
-            pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
-          } else {
-            const hasErrors = (status.logs ?? []).some((l: { level: string }) => l.level === "ERROR");
-            setRunState(status.status === "completed" && !hasErrors ? "completed" : "failed");
-          }
-        } catch (err) {
-          if ((err as Error).name !== "AbortError") setRunState("failed");
-        }
-      };
-
-      pollTimerRef.current = setTimeout(poll, POLL_INTERVAL);
+      void pollRun(sessionId, abortControllerRef.current.signal);
 
     } catch (err) {
       const err2 = err as Error;
@@ -103,9 +112,18 @@ function RunConsoleInner() {
       setEvents(prev => [...prev.map(e => ({ ...e, active: false })), { time: tp(), state: "failed" as const, label: err2.name === "AbortError" ? "Aborted" : "Error", desc: err2.message, active: false }]);
       if (err2.name !== "AbortError") setLogLines(prev => [...prev, { time: tp(), level: "ERROR", msg: err2.message }]);
     }
-  }, [taskText, crew, runtime]);
+  }, [taskText, crew, runtime, routingScope, pollRun]);
 
-  const stopRun = useCallback(() => {
+  const stopRun = useCallback(async () => {
+    if (sessionIdRef.current) {
+      try {
+        const response = await fetch(`/api/mah/run-cancel/${sessionIdRef.current}`, { method: "POST" });
+        if (!response.ok) throw new Error("Cancellation refused; run may still be active");
+      } catch (error) {
+        setLogLines(previous => [...previous, { time: tp(), level: "ERROR", msg: (error as Error).message }]);
+        return;
+      }
+    }
     abortControllerRef.current?.abort();
     if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
     setRunState("failed");
@@ -113,6 +131,10 @@ function RunConsoleInner() {
   }, []);
 
   const resetRun = useCallback(() => {
+    abortControllerRef.current?.abort();
+    if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    sessionIdRef.current = null;
+    try { sessionStorage.removeItem("mah.lastRunId"); } catch { /* Storage may be disabled. */ }
     setTaskText("");
     setEvents(idleEvents);
     setLogLines([]);

@@ -5,7 +5,7 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
-import { join, dirname, resolve } from 'node:path'
+import { join, dirname, resolve, relative, isAbsolute, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { resolveWorkspaceRoot } from '../../core/workspace-root.mjs'
@@ -41,6 +41,20 @@ function resolveEvidenceRoot(overrideRoot = process.env.MAH_EXPERTISE_EVIDENCE_R
     return resolve(overrideRoot)
   }
   return resolvePath('.mah/expertise/evidence')
+}
+
+/**
+ * Resolve an expertise evidence directory using a Windows-safe encoding for
+ * the canonical `crew:agent` identifier. POSIX paths retain the existing layout.
+ * @param {string} evidenceRoot
+ * @param {string} expertiseId
+ * @returns {string}
+ */
+function evidenceDirectoryPath(evidenceRoot, expertiseId) {
+  const directoryName = process.platform === 'win32'
+    ? encodeURIComponent(expertiseId)
+    : expertiseId
+  return join(evidenceRoot, directoryName)
 }
 
 /**
@@ -92,9 +106,8 @@ function sanitizeExpertiseId(id) {
  * @returns {{ ok: boolean, error?: string }}
  */
 function ensurePathUnderBase(resolvedPath, basePath) {
-  const normalizedBase = resolve(basePath).replace(/\/+$/, '') + '/'
-  const normalizedTarget = resolve(resolvedPath).replace(/\/+$/, '') + '/'
-  if (!normalizedTarget.startsWith(normalizedBase)) {
+  const pathFromBase = relative(resolve(basePath), resolve(resolvedPath))
+  if (pathFromBase === '..' || pathFromBase.startsWith(`..${sep}`) || isAbsolute(pathFromBase)) {
     return { ok: false, error: `path escapes base directory: '${resolvedPath}' is not under '${basePath}'` }
   }
   return { ok: true }
@@ -166,7 +179,7 @@ export async function recordEvidence(evidence, options = {}) {
     }
 
     const evidenceRoot = resolveEvidenceRoot(options.evidenceRoot)
-    const baseDir = join(evidenceRoot, expertise_id)
+    const baseDir = evidenceDirectoryPath(evidenceRoot, expertise_id)
     // SECURITY: v0.7.0-patch — verify path stays under evidence root
     const pathCheck = ensurePathUnderBase(baseDir, evidenceRoot)
     if (!pathCheck.ok) {
@@ -191,8 +204,14 @@ export async function recordEvidence(evidence, options = {}) {
       duration_ms: evidence.duration_ms || evidence.evidence_data?.latency_ms || 0,
       quality_signals: {
         review_pass: evidence.quality_signals?.review_pass ?? evidence.evidence_data?.review_pass ?? null,
+        execution_succeeded: evidence.quality_signals?.execution_succeeded ?? null,
+        verification_passed: evidence.quality_signals?.verification_passed ?? null,
+        human_accepted: evidence.quality_signals?.human_accepted ?? null,
         test_coverage_delta: evidence.quality_signals?.test_coverage_delta ?? null,
-        rejection_count: evidence.quality_signals?.rejection_count ?? evidence.evidence_data?.error_type ? 1 : 0,
+        rejection_count: normalizeRejectionCount(
+          evidence.quality_signals?.rejection_count,
+          evidence.evidence_data?.error_type
+        ),
       },
       source_agent: evidence.source_agent,
       source_session: evidence.source_session || 'unknown',
@@ -202,12 +221,32 @@ export async function recordEvidence(evidence, options = {}) {
     if (evidence.execution_result) {
       normalized.execution_result = evidence.execution_result
     }
+    if (evidence.verification) {
+      normalized.verification = evidence.verification
+    }
+    if (evidence.human_acceptance) {
+      normalized.human_acceptance = evidence.human_acceptance
+    }
 
     writeFileSync(filePath, JSON.stringify(normalized, null, 2), 'utf-8')
     return { ok: true, path: filePath }
   } catch (err) {
     return { ok: false, error: err.message }
   }
+}
+
+/**
+ * Preserve explicit rejection counts; legacy evidence with only an error type
+ * still records one rejection.
+ * @param {unknown} count
+ * @param {unknown} errorType
+ * @returns {number}
+ */
+function normalizeRejectionCount(count, errorType) {
+  if (typeof count === "number" && Number.isFinite(count)) {
+    return Math.max(0, Math.floor(count))
+  }
+  return errorType ? 1 : 0
 }
 
 /**
@@ -228,7 +267,7 @@ export async function loadEvidenceFor(expertiseId, options = {}) {
       return []
     }
     const evidenceRoot = resolveEvidenceRoot(options.evidenceRoot)
-    const baseDir = join(evidenceRoot, expertiseId)
+    const baseDir = evidenceDirectoryPath(evidenceRoot, expertiseId)
 
     if (!existsSync(baseDir)) return []
 
@@ -296,7 +335,7 @@ export async function getMetricsFor(expertiseId, options = {}) {
   }
 
   const evidenceRoot = resolveEvidenceRoot(options.evidenceRoot)
-  const metricsPath = join(evidenceRoot, expertiseId, 'metrics.json')
+  const metricsPath = join(evidenceDirectoryPath(evidenceRoot, expertiseId), 'metrics.json')
   if (!existsSync(metricsPath)) return null
   try {
     const raw = readFileSync(metricsPath, 'utf-8')

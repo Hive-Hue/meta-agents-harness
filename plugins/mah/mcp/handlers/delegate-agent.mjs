@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process"
+import { runBoundedProcess } from "../../../../scripts/runtime/process-supervisor.mjs"
 import {
   buildDelegationTask,
   firstUsefulLine,
@@ -8,7 +8,7 @@ import {
 } from "../lib/runtime-context.mjs"
 
 function defaultExec(command, args, execOptions) {
-  return spawnSync(command, args, execOptions)
+  return runBoundedProcess(command, args, execOptions)
 }
 
 export async function delegateAgentHandler(args = {}, options = {}) {
@@ -58,7 +58,7 @@ export async function delegateAgentHandler(args = {}, options = {}) {
   const start = Date.now()
   const exec = options.exec || defaultExec
   const scriptPath = options.scriptPath || "scripts/meta-agents-harness.mjs"
-  const result = exec(
+  const result = await exec(
     process.execPath,
     [
       scriptPath,
@@ -77,7 +77,9 @@ export async function delegateAgentHandler(args = {}, options = {}) {
         ...options.env,
         MAH_ACTIVE_CREW: state.crew
       },
-      encoding: "utf-8"
+      timeoutMs: Math.max(1, Math.min(Number(args?.timeout_ms || options.timeoutMs || 600_000), 3_600_000)),
+      maxOutputBytes: Math.max(1024, Math.min(Number(options.maxOutputBytes || 1_048_576), 8_388_608)),
+      signal: options.signal
     }
   )
 
@@ -86,7 +88,7 @@ export async function delegateAgentHandler(args = {}, options = {}) {
   const stderr = `${result?.stderr || ""}`.trim()
   const combinedOutput = [stdout, stderr].filter(Boolean).join("\n\n").trim()
   const exitCode = typeof result?.status === "number" ? result.status : 1
-  const summary = firstUsefulLine(combinedOutput) || (exitCode === 0 ? "Delegation completed." : "Delegation failed.")
+  const summary = result?.reason || firstUsefulLine(combinedOutput) || (exitCode === 0 ? "Delegation completed." : "Delegation failed.")
 
   return {
     ok: exitCode === 0,
@@ -98,6 +100,7 @@ export async function delegateAgentHandler(args = {}, options = {}) {
     rerouted: resolution.rerouted,
     mechanism: "mah-cli-delegate-pipeline",
     summary,
+    truncated: result?.truncated === true,
     output: includeFullOutput ? combinedOutput : null,
     context: summarizeActiveContext(state)
   }

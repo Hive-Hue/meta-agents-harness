@@ -1338,6 +1338,17 @@ export function preparePiRunContext({ repoRoot, crew, configPath, argv = [], env
 
   const extensionParse = parsePiExtensionArgs(repoRoot, argv)
   const session = resolvePiSessionLayout(repoRoot, crew, extensionParse.remaining, envOverrides)
+  const explicitModel = extensionParse.remaining.some((item) => item === "--model" || item.startsWith("--model="))
+  let modelArgs = []
+  if (!explicitModel) {
+    try {
+      const config = YAML.parse(readFileSync(configPath, "utf-8")) || {}
+      const model = `${config.orchestrator?.model || ""}`.trim()
+      if (model) modelArgs = ["--model", model]
+    } catch {
+      // Keep Pi's normal model selection if the crew file has no model.
+    }
+  }
   const extensionPaths = extensionParse.extensionPaths.length > 0
     ? extensionParse.extensionPaths
     : loadPiDefaultExtensions(repoRoot).map((item) => resolvePiAssetPath(repoRoot, item))
@@ -1350,7 +1361,7 @@ export function preparePiRunContext({ repoRoot, crew, configPath, argv = [], env
   return {
     ok: true,
     exec: "pi",
-    args: extensionPaths.flatMap((item) => ["-e", item]),
+    args: [...extensionPaths.flatMap((item) => ["-e", item]), ...modelArgs],
     passthrough: session.passthrough,
     envOverrides: {
       ...loadedEnv,
@@ -1890,7 +1901,9 @@ export function executeHermesPreparedRun({ repoRoot, runtime, adapter, plan, run
       // Use createRequire for synchronous ESM require
       const req = createRequire(import.meta.url)
       const { buildContextMemoryBlock } = req("../context/context-memory-integration.mjs")
-      contextBlock = buildContextMemoryBlock(agentCtx, internal.contextArgs || args, envOverrides)
+      contextBlock = buildContextMemoryBlock(agentCtx, internal.contextArgs || args, envOverrides, {
+        workspaceRoot: repoRoot
+      })
     } catch (e) {
       // Context memory injection is optional — fail silently
     }

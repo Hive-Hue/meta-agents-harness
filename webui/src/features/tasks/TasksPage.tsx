@@ -32,7 +32,7 @@ type TimelineEntry = {
   start: number;
   duration: number;
   durationLabel: string;
-  status: "active" | "completed" | "waiting" | "blocked";
+  status: "active" | "completed" | "waiting" | "blocked" | "failed";
   sessionId?: string;
 };
 
@@ -67,6 +67,7 @@ function toneForState(state: TaskState): { tone: "running" | "completed" | "fail
   if (state === "in_progress") return { tone: "running", label: "In Progress" };
   if (state === "review" || state === "done") return { tone: "completed", label: state === "done" ? "Done" : "Review" };
   if (state === "blocked") return { tone: "failed", label: "Blocked" };
+  if (state === "failed") return { tone: "failed", label: "Failed" };
   return { tone: "completed", label: state === "ready" ? "Ready" : "Backlog" };
 }
 
@@ -531,7 +532,9 @@ export function TasksPage() {
         status:
           task.state === "done" || task.state === "review"
             ? "completed"
-            : task.state === "blocked"
+            : task.state === "failed"
+              ? "failed"
+              : task.state === "blocked"
               ? "blocked"
               : task.state === "in_progress"
                 ? "active"
@@ -560,7 +563,7 @@ export function TasksPage() {
       owner: task.owner,
       runtime: task.runtime,
       tone:
-        task.state === "blocked"
+        task.state === "blocked" || task.state === "failed"
           ? "failed"
           : task.state === "in_progress"
             ? "running"
@@ -1131,6 +1134,7 @@ export function TasksPage() {
                     <option value="ready">Ready</option>
                     <option value="in_progress">In Progress</option>
                     <option value="blocked">Blocked</option>
+                    <option value="failed">Failed</option>
                     <option value="review">Review</option>
                     <option value="done">Done</option>
                   </select>
@@ -1298,7 +1302,9 @@ function BoardView({
     { id: "ready", title: "Ready" },
     { id: "in_progress", title: "In Progress" },
     { id: "blocked", title: "Blocked" },
+    { id: "failed", title: "Failed" },
     { id: "review", title: "Review" },
+    { id: "done", title: "Done" },
   ];
 
   return (
@@ -1352,7 +1358,7 @@ function BoardView({
                     key={task.id}
                     role="button"
                     tabIndex={0}
-                    className={`task-card${selectedTaskId === task.id ? " task-card--selected" : ""}${task.state === "blocked" ? " task-card--blocked" : ""}`}
+                    className={`task-card${selectedTaskId === task.id ? " task-card--selected" : ""}${task.state === "blocked" ? " task-card--blocked" : ""}${task.state === "failed" ? " task-card--failed" : ""}`}
                     onClick={() => onSelectTask(task.id)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -1719,7 +1725,7 @@ function PertView({
               <button
                 key={node.task.id}
                 type="button"
-                className={`tasks-pert__node${selectedTaskId === node.task.id ? " tasks-pert__node--selected" : ""}${node.task.state === "blocked" ? " tasks-pert__node--blocked" : ""}${node.critical ? " tasks-pert__node--critical" : ""}${node.task.state === "in_progress" ? " tasks-pert__node--active" : ""}${node.task.state === "done" || node.task.state === "review" ? " tasks-pert__node--done" : ""}`}
+                className={`tasks-pert__node${selectedTaskId === node.task.id ? " tasks-pert__node--selected" : ""}${node.task.state === "blocked" ? " tasks-pert__node--blocked" : ""}${node.task.state === "failed" ? " tasks-pert__node--failed" : ""}${node.critical ? " tasks-pert__node--critical" : ""}${node.task.state === "in_progress" ? " tasks-pert__node--active" : ""}${node.task.state === "done" || node.task.state === "review" ? " tasks-pert__node--done" : ""}`}
                 style={{ left: node.x, top: node.y, width: node.width, minHeight: node.height }}
                 onClick={() => onSelectTask(node.task.id)}
               >

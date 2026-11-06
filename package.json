@@ -8,6 +8,7 @@
     "meta-agents-harness": "bin/mah"
   },
   "scripts": {
+    "test:audit": "node scripts/validation/run-audit-tests.mjs",
     "setup": "node scripts/bootstrap/setup.mjs",
     "stitch:secrets": "node scripts/security/generate-stitch-secrets.mjs",
     "install:global": "npm install -g . && node scripts/bootstrap/prepare-mah-home.mjs",
@@ -43,6 +44,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "cross-spawn": "^7.0.6",
     "yaml": "^2.8.1",
     "zod": "^3.23.8"
   },

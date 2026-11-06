@@ -23,6 +23,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statS
 import { basename, dirname, relative, resolve } from "path";
 import { createHash } from "crypto";
 import { fileURLToPath } from "url";
+import { resolvePiCliLaunch } from "../scripts/runtime/pi-cli-launch.mjs";
 import { applyExtensionDefaults } from "./themeMap.ts";
 import { loadPiEnv } from "./env-loader.ts";
 
@@ -3359,7 +3360,8 @@ function isLivenessTask(task: string): boolean {
 		resultPromise.then(() => activeDelegations.delete(activeKey)).catch(() => activeDelegations.delete(activeKey));
 
 		const delegationCli = delegationRuntimeCli(config);
-		const proc = spawn(delegationCli, args, {
+		const launch = delegationCli === "pi" ? resolvePiCliLaunch(args) : { command: delegationCli, args };
+		const proc = spawn(launch.command, launch.args, {
 			stdio: ["ignore", "pipe", "pipe"],
 			env: {
 				...process.env,

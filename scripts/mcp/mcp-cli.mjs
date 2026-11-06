@@ -273,7 +273,7 @@ function toOpenCodeServer(def) {
 
 function resolveEnabledServers(registry, runtime) {
   const declared = listify(registry.runtime_bindings?.[runtime])
-  if (declared.length > 0) return declared.filter((name) => registry.servers[name])
+  if (Object.hasOwn(registry.runtime_bindings || {}, runtime)) return declared.filter((name) => registry.servers[name])
   return Object.keys(registry.servers).sort()
 }
 
@@ -285,8 +285,8 @@ function syncToRuntimeFiles(registry) {
   writeJson(mcpJsonPath, { mcpServers })
 
   const piServers = {}
-  for (const [name, def] of Object.entries(registry.servers)) {
-    piServers[name] = toMcpJsonServer(def)
+  for (const name of resolveEnabledServers(registry, "pi")) {
+    piServers[name] = toMcpJsonServer(registry.servers[name])
   }
   writeJson(piMcpPath, { servers: piServers })
 

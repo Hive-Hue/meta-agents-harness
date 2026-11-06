@@ -66,26 +66,35 @@ mah doctor          # Run diagnostics
 
 📖 **For detailed bootstrap documentation, see [`docs/getting-started.md`](./docs/getting-started.md)**
 
-### WebUI (Dev and Prod)
+### WebUI (local development and preview)
 
 ```bash
 # Dev server
 mah webui
 
-# Production mode (build + preview)
+# Build and serve a local preview with the MAH API
 mah webui --prod
 
 # Equivalent explicit commands
 mah webui build
-mah webui preview --host 0.0.0.0 --port 4173
+mah webui preview --port 4173  # local preview only
+# Standalone production server after build:
+npm run start --prefix webui -- --port 4173
 ```
 
-WebUI credentials are read from environment variables:
+Set a strong password before starting the WebUI. There is no default password; login remains disabled until one is configured. The WebUI listens on localhost by default.
 
 ```bash
 MAH_WEBUI_USER=admin
-MAH_WEBUI_PASSWORD=mah
+MAH_WEBUI_PASSWORD=<a-long-random-password>
+MAH_WEBUI_ALLOW_EXEC=1  # required for runs, task execution and terminals
 ```
+
+Sessions expire after eight hours on the server. Login has a body limit and per-address attempt limit. API writes check the browser origin. Run records are stored in `.mah/webui-runs`; active runs remain visible beyond ten minutes, and a server restart marks previously active runs as interrupted. The Stop button cancels the process tree. `--prod` builds the frontend and API bundle, then starts the standalone Node server. Vite preview remains available for local validation. Remote bind requires `MAH_WEBUI_ALLOW_REMOTE=1` and `MAH_WEBUI_TLS_KEY` / `MAH_WEBUI_TLS_CERT` pointing to a TLS key/certificate. This remains a trusted single-operator service, not a multi-tenant sandbox.
+
+### Computer use
+
+`mah computer init` creates a local policy for the agent-desktop MCP broker. See [computer-use.md](docs/computer-use.md) for version pinning, allowed apps, runtime registration, takeover and deployment limits. Desktop actions are disabled by default.
 
 ---
 

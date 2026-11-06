@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import path from "node:path"
-import { spawnSync } from "node:child_process"
+import { spawnRuntimeSync } from "../../scripts/runtime/process-launcher.mjs"
 import { fileURLToPath } from "node:url"
 import YAML from "yaml"
 
@@ -410,7 +410,7 @@ function main() {
   }
   console.log("")
 
-  const child = spawnSync("pi", commandArgs, {
+  const child = spawnRuntimeSync("pi", commandArgs, {
     cwd: repoRoot,
     env,
     stdio: "inherit"

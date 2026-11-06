@@ -462,6 +462,12 @@
   border-color: #facc15;
 }
 
+.task-card--failed,
+.tasks-pert__node--failed,
+.tasks-gantt__bar--failed {
+  border-color: #ef4444;
+}
+
 .task-card__top,
 .task-card__meta,
 .task-card__actions,

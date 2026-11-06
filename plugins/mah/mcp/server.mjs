@@ -11,8 +11,9 @@ import { delegateAgentHandler } from "./handlers/delegate-agent.mjs"
 const DEBUG_LOG = "/tmp/mah-mcp-debug.log"
 
 function debug(direction, payload) {
+  if (process.env.MAH_MCP_DEBUG !== "1") return
   try {
-    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${direction} ${JSON.stringify(payload)}\n`)
+    appendFileSync(DEBUG_LOG, `[${new Date().toISOString()}] ${direction}\n`, { mode: 0o600 })
   } catch {
     // Ignore debug logging failures.
   }
@@ -70,7 +71,7 @@ server.registerTool(
       include_full_output: z.boolean().optional().describe("Include the full command output in the result.")
     }
   },
-  async ({ target, task, target_runtime, include_full_output }) => {
+  async ({ target, task, target_runtime, include_full_output }, extra) => {
     const result = await delegateAgentHandler(
       {
         target,
@@ -78,7 +79,7 @@ server.registerTool(
         target_runtime,
         include_full_output
       },
-      {}
+      { signal: extra.signal }
     )
     return asTextResult(result)
   }

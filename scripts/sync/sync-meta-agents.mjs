@@ -823,7 +823,10 @@ function resolveAgentModel(meta, runtime, agent) {
 }
 
 function resolveModelFallbacks(meta, runtime, modelRef) {
-  const refs = meta.catalog?.model_fallbacks?.[modelRef]
+  const runtimeFallbacks = meta.runtimes?.[runtime]?.model_fallbacks
+  const refs = runtimeFallbacks && Object.hasOwn(runtimeFallbacks, modelRef)
+    ? runtimeFallbacks[modelRef]
+    : meta.catalog?.model_fallbacks?.[modelRef]
   if (!Array.isArray(refs)) return []
   return refs
     .map((item) => {
@@ -837,7 +840,7 @@ function resolveModelFallbacks(meta, runtime, modelRef) {
 
 function resolveAgentFallbacks(meta, runtime, agent) {
   const explicit = agent?.model_fallbacks
-  if (Array.isArray(explicit) && explicit.length > 0) {
+  if (Array.isArray(explicit)) {
     return explicit
       .map((item) => resolveModelToken(meta, runtime, item))
       .filter(Boolean)

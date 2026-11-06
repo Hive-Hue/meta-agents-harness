@@ -95,6 +95,17 @@
         "@playwright/mcp@latest"
       ],
       "timeout_ms": 60000
+    },
+    "mah-computer": {
+      "transport": "stdio",
+      "command": "node",
+      "args": [
+        "D:/WSL/Github/meta-agents-harness/scripts/computer/computer-cli.mjs",
+        "mcp",
+        "--config",
+        "D:/WSL/Github/meta-agents-harness/.mah/computer.json"
+      ],
+      "timeout_ms": 30000
     }
   }
 }

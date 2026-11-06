@@ -2,9 +2,9 @@ name: Validate
 
 on:
   push:
-    branches: [main]
+    branches: [main, development]
   pull_request:
-    branches: [main]
+    branches: [main, development]
 
 jobs:
   validate:
@@ -20,10 +20,10 @@ jobs:
           node-version: 22
 
       - name: Install root dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install OpenCode runtime dependencies
-        run: (cd .opencode && npm install)
+        run: npm ci --prefix .opencode
 
       - name: Prepare canonical workspace artifacts
         run: |
@@ -52,3 +52,35 @@ jobs:
 
       - name: Validate canonical sync drift
         run: npm run check:meta-sync
+
+  audit-regressions:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Isolated audit regression tests (no model calls)
+        run: npm run test:audit
+
+  webui-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+      - run: npm ci --prefix webui
+      - run: npm run typecheck --prefix webui
+      - run: npm run build --prefix webui
+      - run: node webui/server/smoke.mjs
