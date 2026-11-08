@@ -3,10 +3,12 @@ import path from 'node:path'
 import os from 'node:os'
 import { randomUUID } from 'node:crypto'
 
-export const READ_TOOLS = ['desktop_status', 'desktop_version', 'desktop_skills_get', 'desktop_snapshot']
+export const READ_TOOLS = ['desktop_status', 'desktop_version', 'desktop_skills_get', 'desktop_list_windows', 'desktop_snapshot']
 export const ACTION_TOOLS = ['desktop_click', 'desktop_set_value', 'desktop_type', 'desktop_check', 'desktop_uncheck', 'desktop_select', 'desktop_drag']
 export const LAUNCH_TOOLS = ['desktop_launch']
-const MUTATING_TOOLS = [...ACTION_TOOLS, ...LAUNCH_TOOLS]
+export const WINDOW_TOOLS = ['desktop_focus_window']
+const MUTATING_TOOLS = [...ACTION_TOOLS, ...LAUNCH_TOOLS, ...WINDOW_TOOLS]
+const APP_SCOPED_TOOLS = ['desktop_list_windows', 'desktop_snapshot', 'desktop_launch', ...WINDOW_TOOLS]
 const REF_PATTERN = /^@[A-Za-z0-9_-]+:e\d+$/
 const MAX_DRAG_DISTANCE = 800
 const CANVAS_NAME_PATTERN = /(?:\bcanvas\b|\bartboard\b|\bwhiteboard\b|\bdrawing (?:area|surface)\b|tela (?:de )?desenho|área de desenho)/i
@@ -75,6 +77,30 @@ function attachCanvasRefs(result, canvases) {
       }
     } catch { /* non-JSON text is preserved */ }
   }
+}
+
+function replaceEnvelopeData(result, data) {
+  if (result?.structuredContent && Object.hasOwn(result.structuredContent, 'data')) result.structuredContent.data = data
+  for (const block of result?.content ?? []) {
+    if (block.type !== 'text') continue
+    try {
+      const payload = JSON.parse(block.text)
+      if (payload && Object.hasOwn(payload, 'data')) {
+        payload.data = data
+        block.text = JSON.stringify(payload)
+      }
+    } catch { /* non-JSON text is preserved */ }
+  }
+}
+
+function windowsFromData(data) {
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.windows)) return data.windows
+  return []
+}
+
+function withWindowsData(data, windows) {
+  return Array.isArray(data) ? windows : data && Array.isArray(data.windows) ? { ...data, windows } : data
 }
 
 function pointInside(bounds, point) {
@@ -174,6 +200,7 @@ export class ComputerBroker {
     this.refs = new Set()
     this.refBounds = new Map()
     this.canvasBounds = new Map()
+    this.windowIds = new Map()
     this.refApp = ''
     this.actionCount = 0
     this.busy = false
@@ -182,26 +209,33 @@ export class ComputerBroker {
     this.epoch = readControl(this.paths).epoch
   }
 
-  clearObservedRefs() {
+  clearElementRefs() {
     this.refs.clear()
     this.refBounds.clear()
     this.canvasBounds.clear()
     this.refApp = ''
   }
 
+  clearObservedRefs() {
+    this.clearElementRefs()
+    this.windowIds.clear()
+  }
+
   async listTools() {
     this.checkPolicy()
     const result = await this.driver.listTools()
     this.checkPolicy()
-    return { tools: result.tools.filter(tool => this.config.tools.includes(tool.name) && (!['desktop_snapshot', 'desktop_launch'].includes(tool.name) || this.config.allow_all_apps || this.config.apps.length > 0) && (tool.name !== 'desktop_drag' || this.config.args.includes('--headed'))).map(tool => {
-      const allowed = tool.name === 'desktop_snapshot' ? ['app', 'interactive_only', 'compact', 'skeleton', 'max_depth', 'include_bounds']
+    return { tools: result.tools.filter(tool => this.config.tools.includes(tool.name) && (!APP_SCOPED_TOOLS.includes(tool.name) || this.config.allow_all_apps || this.config.apps.length > 0) && (tool.name !== 'desktop_drag' || this.config.args.includes('--headed'))).map(tool => {
+      const allowed = tool.name === 'desktop_snapshot' ? ['app', 'window_id', 'interactive_only', 'compact', 'skeleton', 'max_depth', 'include_bounds']
+        : tool.name === 'desktop_list_windows' ? ['app']
+        : tool.name === 'desktop_focus_window' ? ['app', 'window_id']
         : tool.name === 'desktop_launch' ? ['app', 'activate']
         : tool.name === 'desktop_drag' ? ['from_xy', 'to_xy', 'duration']
         : tool.name === 'desktop_skills_get' ? ['name']
         : ACTION_TOOLS.includes(tool.name) ? ['ref_id', ...(tool.name === 'desktop_type' ? ['text'] : ['desktop_set_value', 'desktop_select'].includes(tool.name) ? ['value'] : [])] : []
-      const isAppScoped = ['desktop_snapshot', 'desktop_launch'].includes(tool.name)
+      const isAppScoped = APP_SCOPED_TOOLS.includes(tool.name)
       const isDrag = tool.name === 'desktop_drag'
-      const required = isAppScoped ? ['app'] : isDrag ? ['canvas_ref', 'from_xy', 'to_xy'] : (tool.inputSchema?.required || []).filter(key => allowed.includes(key))
+      const required = tool.name === 'desktop_focus_window' ? ['app', 'window_id'] : isAppScoped ? ['app'] : isDrag ? ['canvas_ref', 'from_xy', 'to_xy'] : (tool.inputSchema?.required || []).filter(key => allowed.includes(key))
       const properties = Object.fromEntries(Object.entries(tool.inputSchema?.properties || {}).filter(([key]) => allowed.includes(key)))
       if (isAppScoped) {
         const appProperty = properties.app || { type: 'string' }
@@ -209,12 +243,14 @@ export class ComputerBroker {
           ? { ...appProperty, description: `${appProperty.description || 'Application name'} Any app identifier supported by the desktop driver; use the exact name of the app requested by the user.` }
           : { ...appProperty, enum: [...this.config.apps], description: `${appProperty.description || 'Application name'} Must exactly match one of the allowlisted app names.` }
       }
+      if (['desktop_snapshot', 'desktop_focus_window'].includes(tool.name) && properties.window_id) properties.window_id = { ...properties.window_id, description: 'Use a window id returned by the most recent desktop_list_windows call for the same app. Window ids expire after any mutation.' }
       if (isDrag) properties.canvas_ref = { type: 'string', description: 'Use data.mah_canvases[n].canvas_ref returned by the most recent desktop_snapshot with include_bounds=true.' }
       const sequencing = 'Call desktop tools one at a time and wait for each result. Do not issue parallel desktop operations.'
       const allowedApps = this.config.allow_all_apps
         ? ' Policy allows any app; operate only on the app the user explicitly requested.'
         : this.config.apps.length ? ` Allowed app names: ${this.config.apps.join(', ')}.` : ' No app names are allowlisted.'
       const launchGuidance = tool.name === 'desktop_launch' ? ' Use only when the app is not already open; snapshot it first when possible to avoid duplicate instances.' : ''
+      const windowGuidance = tool.name === 'desktop_list_windows' ? ' Lists visible windows for this exact app only. Use a returned window id in desktop_focus_window or desktop_snapshot; ids expire after any mutation.' : tool.name === 'desktop_snapshot' ? ' If the app has multiple windows, first call desktop_list_windows for this exact app and pass one returned window id.' : tool.name === 'desktop_focus_window' ? ' Focuses only a window id observed for this exact app in the latest desktop_list_windows call. This is an action and invalidates observed refs and window ids.' : ''
       const dragGuidance = isDrag ? ' This is headed physical input. Use only for a user-requested drawing or drag, after snapshotting with include_bounds=true. Select a canvas from data.mah_canvases and use its canvas_ref; the broker confines both endpoints to that observed element.' : ''
       const textEntryGuidance = this.config.platform === 'win32' && tool.name === 'desktop_set_value'
         ? ' For Windows text fields in strict-headless runs, prefer this accessible value setter; desktop_type may be refused because headed physical input is disabled.'
@@ -222,7 +258,7 @@ export class ComputerBroker {
           ? ' Windows strict-headless sessions may refuse physical typing; use desktop_set_value when available.'
           : ''
       const description = isAppScoped
-        ? `${tool.description || ''}${allowedApps}${launchGuidance} ${sequencing}`.trim()
+        ? `${tool.description || ''}${allowedApps}${launchGuidance}${windowGuidance} ${sequencing}`.trim()
         : `${tool.description || ''}${textEntryGuidance}${dragGuidance} ${sequencing}`.trim()
       return { ...tool, description, inputSchema: { type: 'object', properties, additionalProperties: false, ...(required.length ? { required } : {}) } }
     }) }
@@ -250,8 +286,10 @@ export class ComputerBroker {
 
   async callTool(name, args = {}, { signal } = {}) {
     const action = ACTION_TOOLS.includes(name)
+    const listWindows = name === 'desktop_list_windows'
     const launch = LAUNCH_TOOLS.includes(name)
-    const mutating = action || launch
+    const focusWindow = WINDOW_TOOLS.includes(name)
+    const mutating = action || launch || focusWindow
     const observedApp = this.refApp
     let release
     let poll
@@ -264,12 +302,19 @@ export class ComputerBroker {
       if (!this.config.tools.includes(name)) throw new Error('POLICY_DENIED: tool is not allowed')
       if (!args || typeof args !== 'object' || Array.isArray(args)) throw new Error('Invalid arguments')
       if (name === 'desktop_snapshot') {
-        const permitted = new Set(['app', 'interactive_only', 'compact', 'skeleton', 'max_depth', 'include_bounds'])
+        const permitted = new Set(['app', 'window_id', 'interactive_only', 'compact', 'skeleton', 'max_depth', 'include_bounds'])
         if (Object.keys(args).some(key => !permitted.has(key))) throw new Error('POLICY_DENIED: unsupported snapshot scope')
         if (!appIsAllowed(this.config, args.app)) throw new Error(this.config.allow_all_apps ? 'POLICY_DENIED: an app identifier is required' : `POLICY_DENIED: app is not allowed; use an exact app name from the allowlist (${this.config.apps.join(', ')})`)
+        if ('window_id' in args && (typeof args.window_id !== 'string' || this.windowIds.get(args.window_id) !== args.app)) throw new Error('STALE_WINDOW: list windows for this exact app and use one of the returned window ids')
         for (const key of ['interactive_only', 'compact', 'skeleton']) if (key in args && typeof args[key] !== 'boolean') throw new Error(`Invalid ${key}`)
         if ('include_bounds' in args && typeof args.include_bounds !== 'boolean') throw new Error('Invalid include_bounds')
         if ('max_depth' in args && (!Number.isInteger(args.max_depth) || args.max_depth < 0 || args.max_depth > 20)) throw new Error('Invalid max_depth')
+        this.clearElementRefs()
+      }
+      if (listWindows) {
+        const permitted = new Set(['app'])
+        if (Object.keys(args).some(key => !permitted.has(key))) throw new Error('POLICY_DENIED: unsupported list-windows scope')
+        if (!appIsAllowed(this.config, args.app)) throw new Error(this.config.allow_all_apps ? 'POLICY_DENIED: an app identifier is required' : `POLICY_DENIED: app is not allowed; use an exact app name from the allowlist (${this.config.apps.join(', ')})`)
         this.clearObservedRefs()
       }
       if (launch) {
@@ -277,6 +322,12 @@ export class ComputerBroker {
         if (Object.keys(args).some(key => !permitted.has(key))) throw new Error('POLICY_DENIED: unsupported launch argument; only app and activate are permitted')
         if (!appIsAllowed(this.config, args.app)) throw new Error(this.config.allow_all_apps ? 'POLICY_DENIED: an app identifier is required' : `POLICY_DENIED: app is not allowed; use an exact app name from the allowlist (${this.config.apps.join(', ')})`)
         if ('activate' in args && typeof args.activate !== 'boolean') throw new Error('Invalid activate')
+      }
+      if (focusWindow) {
+        const permitted = new Set(['app', 'window_id'])
+        if (Object.keys(args).some(key => !permitted.has(key))) throw new Error('POLICY_DENIED: unsupported focus-window argument; only app and window_id are permitted')
+        if (!appIsAllowed(this.config, args.app)) throw new Error(this.config.allow_all_apps ? 'POLICY_DENIED: an app identifier is required' : `POLICY_DENIED: app is not allowed; use an exact app name from the allowlist (${this.config.apps.join(', ')})`)
+        if (typeof args.window_id !== 'string' || this.windowIds.get(args.window_id) !== args.app) throw new Error('STALE_WINDOW: list windows for this exact app and use one of the returned window ids')
       }
       if (name === 'desktop_skills_get' && (Object.keys(args).some(key => key !== 'name') || !['desktop', 'platform'].includes(args.name))) throw new Error('Unsupported skill; supported names are desktop and platform')
       if (['desktop_status', 'desktop_version'].includes(name) && Object.keys(args).length) throw new Error('POLICY_DENIED: unsupported read argument')
@@ -318,7 +369,7 @@ export class ComputerBroker {
       const timeoutMs = launch ? this.config.launch_timeout_ms : this.config.timeout_ms
       const deadline = setTimeout(() => controller.abort(), timeoutMs)
       poll = setInterval(() => {
-        try { this.checkPolicy(); if (!this.config.tools.includes(name) || (mutating && (!this.config.allow_actions || this.actionCount > this.config.max_actions)) || (action && !appIsAllowed(this.config, observedApp)) || (['desktop_snapshot', 'desktop_launch'].includes(name) && !appIsAllowed(this.config, args.app))) controller.abort() }
+        try { this.checkPolicy(); if (!this.config.tools.includes(name) || (mutating && (!this.config.allow_actions || this.actionCount > this.config.max_actions)) || (action && !appIsAllowed(this.config, observedApp)) || (APP_SCOPED_TOOLS.includes(name) && !appIsAllowed(this.config, args.app))) controller.abort() }
         catch { controller.abort() }
       }, 100)
       let result
@@ -332,12 +383,13 @@ export class ComputerBroker {
         appendFileSync(this.paths.audit, JSON.stringify({ action_id, event: 'started', tool: name, principal_id: this.config.principal_id, at: new Date().toISOString() }) + '\n', { mode: 0o600 })
         const driverArgs = name === 'desktop_drag'
           ? { from_xy: args.from_xy, to_xy: args.to_xy, ...(args.duration === undefined ? {} : { duration: args.duration }) }
+          : focusWindow ? { window_id: args.window_id }
           : args
         result = await Promise.race([this.driver.callTool(name, driverArgs, { signal: controller.signal, timeout: timeoutMs }), aborted])
         if (controller.signal.aborted) throw new Error('Cancelled; outcome must be reconciled')
         this.checkPolicy()
         if (!this.config.tools.includes(name) || (mutating && !this.config.allow_actions)) throw new Error('POLICY_DENIED: permission changed during call')
-        if ((['desktop_snapshot', 'desktop_launch'].includes(name) && !appIsAllowed(this.config, args.app)) || (action && !appIsAllowed(this.config, observedApp))) throw new Error('POLICY_DENIED: app changed during call')
+        if ((APP_SCOPED_TOOLS.includes(name) && !appIsAllowed(this.config, args.app)) || (action && !appIsAllowed(this.config, observedApp))) throw new Error('POLICY_DENIED: app changed during call')
       } catch (error) {
         // A transport timeout does not prove an action was not delivered.
         if (mutating) this.uncertain = true
@@ -372,6 +424,14 @@ export class ComputerBroker {
         this.canvasBounds = new Map(canvases.map(canvas => [canvas.canvas_ref, canvas.bounds]))
         attachCanvasRefs(result, canvases)
         this.refApp = args.app
+      }
+      if (listWindows && success) {
+        const requestedApp = args.app.toLocaleLowerCase()
+        const windows = windowsFromData(body.data).filter(window => typeof window?.id === 'string' && typeof window?.app_name === 'string' && window.app_name.toLocaleLowerCase() === requestedApp)
+        this.windowIds = new Map(windows.map(window => [window.id, args.app]))
+        const filteredData = withWindowsData(body.data, windows)
+        body.data = filteredData
+        replaceEnvelopeData(result, filteredData)
       }
       // Never retry actions automatically, including stale references.
       appendFileSync(this.paths.audit, JSON.stringify({ action_id, event: 'finished', tool: name, ok: success, at: new Date().toISOString() }) + '\n', { mode: 0o600 })
