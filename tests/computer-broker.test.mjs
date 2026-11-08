@@ -22,10 +22,10 @@ test('policy rejects arbitrary scopes and action argument bypasses', async () =>
   try {
     assert.match(message(await f.broker.callTool('desktop_snapshot', { app: 'Editor', window_id: 'other' })), /STALE_WINDOW/)
     assert.match(message(await f.broker.callTool('desktop_snapshot', { app: 'Other' })), /app is not allowed; use an exact app name from the allowlist \(Editor\)/)
-    assert.match(message(await f.broker.callTool('desktop_status', { command: 'shell' })), /unsupported read argument/)
+    assert.match(message(await f.broker.callTool('desktop_status', { command: 'shell' })), /unsupported desktop_status argument/)
     assert.match(message(await f.broker.callTool('desktop_click', { ref_id: ref })), /STALE_REF/)
     await f.broker.callTool('desktop_snapshot', { app: 'Editor' })
-    assert.match(message(await f.broker.callTool('desktop_click', { ref_id: ref, force: true })), /unsupported action argument/)
+    assert.match(message(await f.broker.callTool('desktop_click', { ref_id: ref, force: true })), /unsupported desktop_click argument/)
     assert.match(message(await f.broker.callTool('desktop_type', { ref_id: ref, text: 'x'.repeat(20_000) })), /Invalid text/)
     assert.match(message(await f.broker.callTool('desktop_launch', {})), /tool is not allowed/)
     assert.equal(f.calls.length, 1)
@@ -72,7 +72,7 @@ test('desktop calls refuse concurrency with a safe retry instruction', async () 
   } finally { f.cleanup() }
 })
 
-test('launch is allowlisted, narrowly scoped, and invalidates old refs', async () => {
+test('launch keeps upstream arguments, enforces app policy, and invalidates old refs', async () => {
   const f = fixture({ tools: ['desktop_snapshot', 'desktop_launch', 'desktop_click', 'desktop_status', 'desktop_type'], timeout_ms: 200, launch_timeout_ms: 5000 })
   try {
     let driverTimeout
@@ -85,9 +85,10 @@ test('launch is allowlisted, narrowly scoped, and invalidates old refs', async (
     assert.equal(launched.structuredContent.ok, true)
     assert.deepEqual(f.calls.at(-1), { name: 'desktop_launch', args: { app: 'Editor', activate: false } })
     assert.match(message(await f.broker.callTool('desktop_click', { ref_id: ref })), /STALE_REF/)
+    const launchedWithOptions = await f.broker.callTool('desktop_launch', { app: 'Editor', args: ['--safe-test-arg'] })
+    assert.equal(launchedWithOptions.structuredContent.ok, true)
+    assert.deepEqual(f.calls.at(-1), { name: 'desktop_launch', args: { app: 'Editor', args: ['--safe-test-arg'] } })
     const callCount = f.calls.length
-    assert.match(message(await f.broker.callTool('desktop_launch', { app: 'Editor', args: ['--unsafe'] })), /unsupported launch argument/)
-    assert.equal(f.calls.length, callCount)
     assert.match(message(await f.broker.callTool('desktop_launch', { app: 'Other' })), /exact app name from the allowlist/)
     assert.equal(f.calls.length, callCount)
   } finally { f.cleanup() }
@@ -115,7 +116,7 @@ test('allow_all_apps explicitly bypasses app enums while preserving tool policy'
     const snapshot = tools.find(tool => tool.name === 'desktop_snapshot')
     const launch = tools.find(tool => tool.name === 'desktop_launch')
     assert.equal(snapshot.inputSchema.properties.app.enum, undefined)
-    assert.match(snapshot.description, /Policy allows any app/)
+    assert.match(snapshot.description, /Policy permits any app/)
     assert.equal(launch.inputSchema.properties.app.enum, undefined)
     assert.equal((await f.broker.callTool('desktop_snapshot', { app: 'Paint.exe' })).structuredContent.ok, true)
     assert.match(message(await f.broker.callTool('desktop_launch', { app: '' })), /app identifier is required/)
@@ -128,7 +129,7 @@ test('window ids are app-scoped observations and expire after a mutation', async
     f.driver.listTools = async () => ({ tools: [
       { name: 'desktop_list_windows', inputSchema: { properties: { app: { type: 'string' } } } },
       { name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' }, window_id: { type: 'string' }, include_bounds: { type: 'boolean' } } } },
-      { name: 'desktop_focus_window', inputSchema: { properties: { window_id: { type: 'string' } } } },
+      { name: 'desktop_focus_window', inputSchema: { properties: { app: { type: 'string' }, window_id: { type: 'string' } } } },
       { name: 'desktop_click', inputSchema: { properties: { ref_id: { type: 'string' } } } }
     ] })
     f.driver.callTool = async (name, args) => {
@@ -142,14 +143,14 @@ test('window ids are app-scoped observations and expire after a mutation', async
     }
     const { tools } = await f.broker.listTools()
     const listWindows = tools.find(tool => tool.name === 'desktop_list_windows')
-    assert.deepEqual(listWindows.inputSchema.required, ['app'])
+    assert.deepEqual(listWindows.inputSchema.required, undefined)
     const listed = await f.broker.callTool('desktop_list_windows', { app: 'Editor' })
     assert.deepEqual(listed.structuredContent.data, [{ id: 'w-writer', app_name: 'Editor', title: 'Writer' }])
     assert.match(message(await f.broker.callTool('desktop_snapshot', { app: 'Editor', window_id: 'w-other' })), /STALE_WINDOW/)
     assert.match(message(await f.broker.callTool('desktop_focus_window', { app: 'Editor', window_id: 'w-other' })), /STALE_WINDOW/)
     const focused = await f.broker.callTool('desktop_focus_window', { app: 'Editor', window_id: 'w-writer' })
     assert.equal(focused.structuredContent.ok, true)
-    assert.deepEqual(f.calls.at(-1), { name: 'desktop_focus_window', args: { window_id: 'w-writer' } })
+    assert.deepEqual(f.calls.at(-1), { name: 'desktop_focus_window', args: { app: 'Editor', window_id: 'w-writer' } })
     assert.match(message(await f.broker.callTool('desktop_snapshot', { app: 'Editor', window_id: 'w-writer' })), /STALE_WINDOW/)
     await f.broker.callTool('desktop_list_windows', { app: 'Editor' })
     const snapshot = await f.broker.callTool('desktop_snapshot', { app: 'Editor', window_id: 'w-writer', include_bounds: true })
@@ -161,34 +162,41 @@ test('window ids are app-scoped observations and expire after a mutation', async
 })
 
 test('desktop_drag is headed, canvas-bounded, distance-limited, and consumes refs', async () => {
-  const f = fixture({ apps: [], allow_all_apps: true, args: ['--headed'], tools: ['desktop_snapshot', 'desktop_drag'] })
+  const f = fixture({ apps: [], allow_all_apps: true, args: ['--headed'], tools: ['desktop_snapshot', 'desktop_list_windows', 'desktop_drag'] })
   try {
     f.driver.listTools = async () => ({ tools: [
-      { name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' }, include_bounds: { type: 'boolean' } } } },
+      { name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' }, window_id: { type: 'string' }, include_bounds: { type: 'boolean' } } } },
+      { name: 'desktop_list_windows', inputSchema: { properties: { app: { type: 'string' } } } },
       { name: 'desktop_drag', description: 'Headed drag', inputSchema: { properties: { from_xy: { type: 'string' }, to_xy: { type: 'string' }, duration: { type: 'integer' } }, required: ['from_xy', 'to_xy'] } }
     ] })
     const { tools } = await f.broker.listTools()
     const dragTool = tools.find(tool => tool.name === 'desktop_drag')
-    assert.deepEqual(dragTool.inputSchema.required, ['canvas_ref', 'from_xy', 'to_xy'])
-    assert.match(dragTool.description, /data\.mah_canvases/)
-    assert.match(dragTool.description, /confines both endpoints to that observed element/)
+    assert.deepEqual(dragTool.inputSchema.required, ['from_xy', 'to_xy', 'app', 'window_id'])
+    assert.match(dragTool.inputSchema.properties.canvas_ref.description, /data\.mah_canvases/)
+    assert.match(dragTool.description, /allow_actions=true/)
     const driverCall = f.driver.callTool
     f.driver.callTool = async (name, args, options) => {
+      if (name === 'desktop_list_windows') {
+        f.calls.push({ name, args })
+        return ok([{ id: 'w-paint', app_name: 'Paint.exe', bounds: { x: 0, y: 0, width: 900, height: 700 } }])
+      }
       if (name === 'desktop_snapshot') {
         const payload = { ok: true, data: { snapshot_id: 'snapshot-1', tree: { children: [{ name: 'Drawing Canvas', role: 'group', bounds: { x: 100, y: 80, width: 500, height: 400 } }] } } }
         return { structuredContent: payload, content: [{ type: 'text', text: JSON.stringify(payload) }] }
       }
       return driverCall(name, args, options)
     }
-    const snapshot = await f.broker.callTool('desktop_snapshot', { app: 'Paint.exe', include_bounds: true })
+    await f.broker.callTool('desktop_list_windows', { app: 'Paint.exe' })
+    const snapshot = await f.broker.callTool('desktop_snapshot', { app: 'Paint.exe', window_id: 'w-paint', include_bounds: true })
     const canvas = snapshot.structuredContent.data.mah_canvases[0]
     assert.deepEqual(canvas, { canvas_ref: 'mah-canvas:snapshot-1:1', name: 'Drawing Canvas', bounds: { x: 100, y: 80, width: 500, height: 400 } })
     assert.deepEqual(JSON.parse(snapshot.content[0].text).data.mah_canvases, [canvas])
-    assert.match(message(await f.broker.callTool('desktop_drag', { canvas_ref: canvas.canvas_ref, from_xy: '50,90', to_xy: '180,160' })), /inside the observed canvas bounds/)
-    const drawn = await f.broker.callTool('desktop_drag', { canvas_ref: canvas.canvas_ref, from_xy: '150,120', to_xy: '260,220', duration: 700 })
+    const dragScope = { app: 'Paint.exe', window_id: 'w-paint' }
+    assert.match(message(await f.broker.callTool('desktop_drag', { ...dragScope, canvas_ref: canvas.canvas_ref, from_xy: '50,90', to_xy: '180,160' })), /inside the observed window and canvas bounds/)
+    const drawn = await f.broker.callTool('desktop_drag', { ...dragScope, canvas_ref: canvas.canvas_ref, from_xy: '150,120', to_xy: '260,220', duration: 700 })
     assert.equal(drawn.structuredContent.ok, true)
     assert.deepEqual(f.calls.at(-1), { name: 'desktop_drag', args: { from_xy: '150,120', to_xy: '260,220', duration: 700 } })
-    assert.match(message(await f.broker.callTool('desktop_drag', { canvas_ref: canvas.canvas_ref, from_xy: '150,120', to_xy: '260,220' })), /fresh bounds-bearing snapshot/)
+    assert.match(message(await f.broker.callTool('desktop_drag', { ...dragScope, canvas_ref: canvas.canvas_ref, from_xy: '150,120', to_xy: '260,220' })), /STALE_WINDOW/)
   } finally { f.cleanup() }
 })
 
@@ -223,9 +231,9 @@ test('config pins platform, version and supported tools', async () => {
   const f = fixture()
   try {
     assert.throws(() => validateComputerConfig({ ...f.policy, platform: process.platform === 'win32' ? 'linux' : 'win32' }), /target OS/)
-    assert.throws(() => validateComputerConfig({ ...f.policy, tools: ['desktop_shell'] }), /Unsupported tool/)
-    assert.throws(() => validateComputerConfig({ ...f.policy, tools: ['desktop_launch'], allow_actions: false }), /Actions require explicit allow_actions/)
-    assert.throws(() => validateComputerConfig({ ...f.policy, tools: ['desktop_drag'], args: [] }), /requires the explicit --headed driver mode/)
+    assert.throws(() => validateComputerConfig({ ...f.policy, tools: ['invalid'] }), /Unsupported tool/)
+    assert.equal(validateComputerConfig({ ...f.policy, tools: ['desktop_launch'], allow_actions: false }).allow_actions, false)
+    assert.throws(() => validateComputerConfig({ ...f.policy, tools: ['desktop_drag'], args: [] }), /require the explicit --headed driver mode/)
     assert.throws(() => validateComputerConfig({ ...f.policy, launch_timeout_ms: 999 }), /launch_timeout_ms must be 1000..120000/)
     assert.equal(validateComputerConfig(f.policy).launch_timeout_ms, 60000)
     assert.throws(() => validateComputerConfig({ ...f.policy, allow_all_apps: 'true' }), /allow_all_apps must be a boolean/)
@@ -239,10 +247,10 @@ test('advertised snapshot schema matches supported upstream max_depth and policy
   try {
     f.driver.listTools = async () => ({ tools: [{ name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' }, max_depth: { type: 'integer' }, window_id: { type: 'string' }, surface: { type: 'string' } } } }] })
     const catalog = await f.broker.listTools()
-    assert.deepEqual(Object.keys(catalog.tools[0].inputSchema.properties), ['app', 'max_depth', 'window_id'])
-    assert.deepEqual(catalog.tools[0].inputSchema.required, ['app'])
+    assert.deepEqual(Object.keys(catalog.tools[0].inputSchema.properties), ['app', 'max_depth', 'window_id', 'surface'])
+    assert.deepEqual(catalog.tools[0].inputSchema.required, undefined)
     assert.equal((await f.broker.callTool('desktop_snapshot', { app: 'Editor', max_depth: 5 })).structuredContent.ok, true)
-    assert.match(message(await f.broker.callTool('desktop_snapshot', { app: 'Editor', depth: 5 })), /unsupported snapshot scope/)
+    assert.match(message(await f.broker.callTool('desktop_snapshot', { app: 'Editor', depth: 5 })), /unsupported desktop_snapshot argument/)
   } finally { f.cleanup() }
 })
 
@@ -262,14 +270,14 @@ test('advertised app-scoped tool schemas enumerate exact allowlisted names and s
     const launch = tools.find(tool => tool.name === 'desktop_launch')
     assert.deepEqual(snapshot.inputSchema.properties.app.enum, ['Editor'])
     assert.match(snapshot.description, /Allowed app names: Editor/)
-    assert.deepEqual(Object.keys(windows.inputSchema.properties), ['app'])
+    assert.deepEqual(Object.keys(windows.inputSchema.properties), ['app', 'timeout_ms'])
     assert.deepEqual(windows.inputSchema.properties.app.enum, ['Editor'])
-    assert.deepEqual(windows.inputSchema.required, ['app'])
-    assert.deepEqual(Object.keys(focus.inputSchema.properties), ['window_id', 'app'])
+    assert.equal(windows.inputSchema.required, undefined)
+    assert.deepEqual(Object.keys(focus.inputSchema.properties), ['window_id', 'force', 'app'])
     assert.deepEqual(focus.inputSchema.properties.app.enum, ['Editor'])
     assert.deepEqual(focus.inputSchema.required, ['app', 'window_id'])
     assert.match(focus.description, /latest desktop_list_windows call/)
-    assert.deepEqual(Object.keys(launch.inputSchema.properties), ['app', 'activate'])
+    assert.deepEqual(Object.keys(launch.inputSchema.properties), ['app', 'activate', 'args', 'env'])
     assert.deepEqual(launch.inputSchema.properties.app.enum, ['Editor'])
     assert.deepEqual(launch.inputSchema.required, ['app'])
     assert.match(launch.description, /Use only when the app is not already open/)
@@ -284,9 +292,130 @@ test('app-scoped tools are hidden when the policy has no allowed apps', async ()
   } finally { f.cleanup() }
 })
 
-test('unsupported skill error names the accepted skill identifiers', async () => {
+test('skills are forwarded to the pinned driver instead of using a stale built-in list', async () => {
   const f = fixture({ tools: ['desktop_skills_get'] })
   try {
-    assert.match(message(await f.broker.callTool('desktop_skills_get', { name: 'windows' })), /supported names are desktop and platform/)
+    const result = await f.broker.callTool('desktop_skills_get', { name: 'windows' })
+    assert.equal(result.structuredContent.ok, true)
+    assert.deepEqual(f.calls.at(-1), { name: 'desktop_skills_get', args: { name: 'windows' } })
+  } finally { f.cleanup() }
+})
+
+test('wildcard mirrors future pinned-driver tools while action and headed gates remain active', async () => {
+  const f = fixture({ tools: ['*'], args: ['--headed'] })
+  try {
+    f.driver.listTools = async () => ({ tools: [
+      { name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' } } } },
+      { name: 'desktop_session_start', inputSchema: { properties: { name: { type: 'string' } } } },
+      { name: 'desktop_cursor_overlay_enable', inputSchema: { properties: { label: { type: 'string' } } } },
+      { name: 'desktop_clipboard_set', inputSchema: { properties: { text: { type: 'string' } } } },
+      { name: 'desktop_mouse_click', inputSchema: { properties: { xy: { type: 'string' } } } },
+      { name: 'desktop_trace_export', inputSchema: { properties: { out: { type: 'string' } } } }
+    ] })
+    const { tools } = await f.broker.listTools()
+    assert.deepEqual(tools.map(tool => tool.name), ['desktop_snapshot', 'desktop_session_start', 'desktop_cursor_overlay_enable', 'desktop_clipboard_set', 'desktop_mouse_click', 'desktop_trace_export'])
+    assert.deepEqual(Object.keys(tools[1].inputSchema.properties), ['name'])
+  } finally { f.cleanup() }
+})
+
+test('wildcard does not expose mutations or physical input until explicitly enabled', async () => {
+  const f = fixture({ tools: ['*'], allow_actions: false, args: [] })
+  try {
+    f.driver.listTools = async () => ({ tools: [
+      { name: 'desktop_status', inputSchema: { properties: {} } },
+      { name: 'desktop_permissions', inputSchema: { properties: { guide: { type: 'boolean' }, request: { type: 'boolean' } } } },
+      { name: 'desktop_clipboard_set', inputSchema: { properties: { text: { type: 'string' } } } },
+      { name: 'desktop_mouse_click', inputSchema: { properties: { xy: { type: 'string' } } } }
+    ] })
+    const { tools } = await f.broker.listTools()
+    assert.deepEqual(tools.map(tool => tool.name), ['desktop_status', 'desktop_permissions'])
+    assert.deepEqual(Object.keys(tools[1].inputSchema.properties), [])
+  } finally { f.cleanup() }
+})
+
+test('physical pointer actions are window-bounded and focus the observed target', async () => {
+  const f = fixture({ tools: ['desktop_list_windows', 'desktop_mouse_click'], args: ['--headed'] })
+  try {
+    f.driver.listTools = async () => ({ tools: [
+      { name: 'desktop_list_windows', inputSchema: { properties: { app: { type: 'string' } } } },
+      { name: 'desktop_mouse_click', inputSchema: { properties: { xy: { type: 'string' } } } }
+    ] })
+    f.driver.callTool = async (name, args) => {
+      f.calls.push({ name, args })
+      if (name === 'desktop_list_windows') return ok([{ id: 'w-editor', app_name: 'Editor', bounds: { x: 0, y: 0, width: 100, height: 100 } }])
+      return ok({})
+    }
+    await f.broker.listTools()
+    await f.broker.callTool('desktop_list_windows', { app: 'Editor' })
+    const clicked = await f.broker.callTool('desktop_mouse_click', { app: 'Editor', window_id: 'w-editor', xy: '50,60' })
+    assert.equal(clicked.structuredContent.ok, true)
+    assert.deepEqual(f.calls.slice(-2), [
+      { name: 'desktop_focus_window', args: { window_id: 'w-editor' } },
+      { name: 'desktop_mouse_click', args: { xy: '50,60' } }
+    ])
+    await f.broker.callTool('desktop_list_windows', { app: 'Editor' })
+    const callCount = f.calls.length
+    assert.match(message(await f.broker.callTool('desktop_mouse_click', { app: 'Editor', window_id: 'w-editor', xy: '120,60' })), /stay inside the observed window bounds/)
+    assert.equal(f.calls.length, callCount)
+  } finally { f.cleanup() }
+})
+
+test('desktop_batch keeps child policy, window bounds, and automatic focus', async () => {
+  const f = fixture({ tools: ['desktop_batch', 'desktop_list_windows', 'desktop_mouse_click'], args: ['--headed'] })
+  try {
+    f.driver.listTools = async () => ({ tools: [
+      { name: 'desktop_batch', inputSchema: { properties: { commands_json: { type: 'string' }, stop_on_error: { type: 'boolean' } }, required: ['commands_json'] } },
+      { name: 'desktop_list_windows', inputSchema: { properties: { app: { type: 'string' } } } },
+      { name: 'desktop_mouse_click', inputSchema: { properties: { xy: { type: 'string' } }, required: ['xy'] } }
+    ] })
+    f.driver.callTool = async (name, args) => {
+      f.calls.push({ name, args })
+      if (name === 'desktop_list_windows') return ok([{ id: 'w-editor', app_name: 'Editor', bounds: { x: 0, y: 0, width: 100, height: 100 } }])
+      return ok({})
+    }
+    await f.broker.listTools()
+    await f.broker.callTool('desktop_list_windows', { app: 'Editor' })
+    const commands = [{ command: 'mouse-click', args: { app: 'Editor', window_id: 'w-editor', xy: '25,25' } }]
+    const result = await f.broker.callTool('desktop_batch', { commands_json: JSON.stringify(commands) })
+    assert.equal(result.structuredContent.ok, true)
+    assert.deepEqual(JSON.parse(f.calls.at(-1).args.commands_json), [
+      { command: 'focus-window', args: { window_id: 'w-editor' } },
+      { command: 'mouse-click', args: { xy: '25,25' } }
+    ])
+  } finally { f.cleanup() }
+})
+
+test('desktop_batch returns refs from its final snapshot for the next MAH call', async () => {
+  const f = fixture({ tools: ['desktop_batch', 'desktop_snapshot', 'desktop_click'] })
+  try {
+    f.driver.listTools = async () => ({ tools: [
+      { name: 'desktop_batch', inputSchema: { properties: { commands_json: { type: 'string' } }, required: ['commands_json'] } },
+      { name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' } } } },
+      { name: 'desktop_click', inputSchema: { properties: { ref_id: { type: 'string' } }, required: ['ref_id'] } }
+    ] })
+    f.driver.callTool = async (name, args) => {
+      f.calls.push({ name, args })
+      if (name === 'desktop_batch') return ok({ results: [{ command: 'snapshot', index: 0, ok: true, data: { tree: [{ ref_id: ref }] } }] })
+      return ok({})
+    }
+    await f.broker.listTools()
+    const batch = await f.broker.callTool('desktop_batch', { commands_json: JSON.stringify([{ command: 'snapshot', args: { app: 'Editor' } }]) })
+    assert.equal(batch.structuredContent.ok, true)
+    assert.equal((await f.broker.callTool('desktop_click', { ref_id: ref })).structuredContent.ok, true)
+    assert.deepEqual(f.calls.at(-1), { name: 'desktop_click', args: { ref_id: ref } })
+  } finally { f.cleanup() }
+})
+
+test('global surface and screenshot paths respect app scope', async () => {
+  const f = fixture({ tools: ['desktop_snapshot', 'desktop_screenshot'], allow_all_apps: false })
+  try {
+    f.driver.listTools = async () => ({ tools: [
+      { name: 'desktop_snapshot', inputSchema: { properties: { app: { type: 'string' }, surface: { type: 'string' } } } },
+      { name: 'desktop_screenshot', inputSchema: { properties: { app: { type: 'string' }, screen: { type: 'integer' } } } }
+    ] })
+    await f.broker.listTools()
+    assert.match(message(await f.broker.callTool('desktop_snapshot', { surface: 'taskbar' })), /global system surfaces require allow_all_apps/)
+    assert.match(message(await f.broker.callTool('desktop_screenshot', { screen: 0 })), /screen-wide screenshots require allow_all_apps/)
+    assert.match(message(await f.broker.callTool('desktop_screenshot', {})), /requires an app from the MAH allowlist/)
   } finally { f.cleanup() }
 })

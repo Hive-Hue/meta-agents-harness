@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { ComputerBroker, READ_TOOLS, computerIsPaused, computerStatePaths, setComputerPaused, validateComputerConfig } from './broker.mjs'
+import { ComputerBroker, computerIsPaused, computerStatePaths, setComputerPaused, validateComputerConfig } from './broker.mjs'
 import { connectDesktop } from './driver.mjs'
 
 export async function main(argv = process.argv.slice(2), { stateRoot, connect = connectDesktop } = {}) {
@@ -13,13 +13,13 @@ export async function main(argv = process.argv.slice(2), { stateRoot, connect = 
   const option = (name, fallback) => { const at = argv.indexOf(name); if (at < 0) return fallback; if (!argv[at + 1] || argv[at + 1].startsWith('--')) throw new Error(`Missing value for ${name}`); return argv[at + 1] }
   const configPath = path.resolve(option('--config', '.mah/computer.json'))
   if (['help', '--help', '-h'].includes(command)) {
-    console.log('mah computer init|doctor|mcp|pause|resume [--config FILE]\ninit creates disabled-by-version local policy; edit expected_version and apps before use.\nRun broker on target OS. This is a trusted-user local integration, not a sandbox.')
+    console.log('mah computer init|doctor|mcp|pause|resume [--config FILE]\ninit grants tools:["*"] with actions disabled; set expected_version and app scope, then enable allow_actions and --headed only when needed.\nRun broker on target OS. This is a trusted-user local integration, not a sandbox.')
     return
   }
   if (command === 'init') {
     if (existsSync(configPath)) throw new Error('Computer config already exists; refusing to overwrite')
     mkdirSync(path.dirname(configPath), { recursive: true })
-    writeFileSync(configPath, JSON.stringify({ schema: 'mah.computer.v1', environment_id: 'local-desktop', principal_id: 'local-operator', platform: process.platform, command: process.platform === 'win32' ? 'agent-desktop.exe' : 'agent-desktop', args: [], expected_version: 'SET_VERIFIED_MCP_VERSION', apps: [], allow_all_apps: false, tools: READ_TOOLS, allow_actions: false, timeout_ms: 15000, launch_timeout_ms: 60000, max_actions: 50 }, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
+    writeFileSync(configPath, JSON.stringify({ schema: 'mah.computer.v1', environment_id: 'local-desktop', principal_id: 'local-operator', platform: process.platform, command: process.platform === 'win32' ? 'agent-desktop.exe' : 'agent-desktop', args: [], expected_version: 'SET_VERIFIED_MCP_VERSION', apps: [], allow_all_apps: false, tools: ['*'], allow_actions: false, timeout_ms: 15000, launch_timeout_ms: 60000, max_actions: 50, max_output_bytes: 20 * 1024 * 1024 }, null, 2) + '\n', { flag: 'wx', mode: 0o600 })
     console.log(JSON.stringify({ ok: true, config: configPath, next: 'Install a pinned agent-desktop binary on target OS; doctor reports its MCP version. Set expected_version and allowed apps explicitly.' }))
     return
   }

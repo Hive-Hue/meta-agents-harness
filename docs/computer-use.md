@@ -19,15 +19,16 @@ Edit `.mah/computer.json`. Set `command` to the native executable path, `expecte
   "principal_id": "local-operator",
   "platform": "win32",
   "command": "C:/Tools/agent-desktop/agent-desktop.exe",
-  "args": [],
+  "args": ["--headed"],
   "expected_version": "1.2.0",
   "apps": ["Your test application"],
   "allow_all_apps": false,
-  "tools": ["desktop_status", "desktop_version", "desktop_skills_get", "desktop_snapshot"],
+  "tools": ["*"],
   "allow_actions": false,
   "timeout_ms": 15000,
   "launch_timeout_ms": 60000,
-  "max_actions": 50
+  "max_actions": 50,
+  "max_output_bytes": 20971520
 }
 ```
 
@@ -40,7 +41,7 @@ mah computer doctor
 mah computer mcp
 ```
 
-Doctor only requests the tool catalog and platform status, and does not inspect app contents. It skips driver requests during takeover. A version mismatch is reported as a failed check. MCP exposes only the permitted subset and validates each invocation. The `desktop_snapshot` and `desktop_launch` schemas list the exact configured app names; pass those names verbatim, including the executable suffix when present. Read upstream skills `desktop` and `platform` before using GUI tools.
+Doctor only requests the tool catalog and platform status, and does not inspect app contents. It skips driver requests during takeover. A version mismatch is reported as a failed check. MCP mirrors the tool names and argument schemas exposed by the pinned agent-desktop version, subject to MAH policy. Set `tools: ["*"]` to allow every command in that catalog, or list exact `desktop_*` tool names. Mutating tools are hidden until `allow_actions: true`; physical input tools also require `--headed` in `args`. App values are constrained to the configured allowlist unless `allow_all_apps: true`. Global system surfaces and screen-wide screenshots require `allow_all_apps: true`; app snapshots, search, screenshots and notifications require an allowed app when running with an allowlist. Read upstream skills `desktop` and the target platform before using GUI tools.
 
 ## Register with a runtime
 
@@ -68,12 +69,12 @@ The canonical MAH registry is `.mah/mcp/servers.json`. Its server shape uses `ty
 
 ## Actions, pause and recovery
 
-Actions are disabled by default. An operator may set `allow_actions: true` and add individual tools. `desktop_focus_window` is app-scoped: it requires a window ID from the latest `desktop_list_windows` result for that exact app. Focusing a window counts as an action and invalidates observed refs and window IDs; list windows again before the next snapshot or focus. Ref-based UI tools are `desktop_click`, `desktop_type`, `desktop_set_value`, `desktop_check`, `desktop_uncheck`, and `desktop_select`. `desktop_drag` is a headed physical action: it requires `--headed` in driver `args`, a `canvas_ref` selected from `data.mah_canvases` in a fresh snapshot with `include_bounds: true`, and endpoints inside that element's captured bounds. The broker only issues canvas refs for accessibility elements whose names identify a canvas or drawing surface, and the refs expire after any mutation. Drag length and duration are limited. `desktop_list_windows` lists visible windows for one allowed app; if a snapshot is ambiguous, pass an ID from that result as `window_id` on `desktop_snapshot`. Those IDs expire after any mutation. `desktop_launch` accepts only an app identifier allowed by the policy plus optional `activate`; it rejects process arguments, environment variables, working-directory overrides, and other launch options. Launch and drag count against `max_actions` and revoke prior refs. This grants tool-level capability, not proof that every possible click is safe. Restrict the test app/environment accordingly.
+Actions are disabled by default. Enable the full action surface by setting `allow_actions: true` with `tools: ["*"]`, or enable exact commands individually. The broker forwards the pinned driver's schemas, including accessibility actions, screenshots, search, clipboard, waits, notifications, sessions, traces, app/window management, keyboard, mouse, cursor overlays, permissions and batch. Headed physical input commands require `--headed` and an observed app/window ID; pointer coordinates are confined to that window's most recently observed bounds. `desktop_press` also requires an observed app and window. `desktop_drag` requires an observed app/window and accepts accessibility refs or coordinates bounded to the window; `canvas_ref` adds a stricter canvas-bound path. `desktop_list_windows` returns IDs that MAH validates for app-scoped window tools; IDs and refs expire after mutations. `desktop_batch` only runs child commands enabled by MAH policy, applies the same app/window checks, and requires action permission. `max_actions` counts mutations and internally focused pointer operations, `max_output_bytes` bounds returned tool data, and a per-call timeout can extend the broker deadline up to 120 seconds. Clipboard reads/writes, screenshot file output, permission requests, session cleanup and trace export can expose or change local state; enable only the tools the runtime needs.
 
-On Windows strict-headless runs, `desktop_type` may be refused because it synthesizes physical keystrokes. Prefer `desktop_set_value` for accessible text fields; this broker does not expose headed input flags.
+On Windows strict-headless runs, `desktop_type` may be refused because it synthesizes physical keystrokes. Prefer `desktop_set_value` for accessible text fields. Enable `--headed` when the requested use case needs physical typing, clicks or pointer movement.
 
 - Every ref-based action requires a ref from the last successful snapshot of an allowed app in that broker connection. Ref-based actions consume the refs; launch also clears prior refs, so observe again before acting.
-- The broker advertises only argument shapes it supports. Snapshot supports `app`, the observed `window_id`, `interactive_only`, `compact`, `skeleton`, `max_depth`, and `include_bounds`. It refuses arbitrary surfaces and accepts a window ID only after `desktop_list_windows` observed that ID for the same app. Clipboard, raw keyboard/mouse, force and headed flags are not exposed as tools.
+- The broker advertises the argument shapes returned by the pinned driver and adds app/window scope to physical input tools. It accepts a window ID only after `desktop_list_windows` observed it for the same app. `force` remains available only on upstream tools that define it and only when that tool is enabled by policy.
 - Make one desktop tool call at a time and wait for its result. `DESKTOP_BUSY` means another operation is active; do not issue parallel calls or remove its lease. After a successful launch, take a new snapshot before acting.
 - Snapshot the allowlisted app first when possible. If the app is already open, keep using that instance; launch only when it is absent and the user requested opening it.
 - One operation owns the user's local desktop lease at a time, across broker processes and environment labels. Different environment IDs do not imply isolation.
@@ -92,10 +93,10 @@ State lives under `~/.mah/computer/local-desktop`. The audit stores tool name, a
 
 A crash can leave `lease/owner.json`. Inspect the owning process and reconcile desktop state before removing a stale lease; age alone does not make it safe. No automatic deletion of uncertain leases is performed.
 
-## Validation status — 2026-11-05
+## Validation status — 2026-11-08
 
 - Automated fixtures cover allowlists, argument refusal, consumed refs, app/tool revocation, shared lease, takeover, timeout, failed shutdown, version/platform checks and CLI bootstrap.
-- Real Windows x64 `agent-desktop v1.2.0` was downloaded to a temporary directory; SHA-256 matched upstream checksums (`a4199f741a441cedd349bf56c5eba01783b1261258b498efeb7ec9945220c3e8`). MCP initialization, tool catalog and `desktop_status` succeeded and reported accessibility granted. This exposed the actual `max_depth` argument, which is now used by the broker.
+- Real Windows x64 `agent-desktop v1.2.0` is persisted under `%USERPROFILE%\\.mah\\agent-desktop\\v1.2.0`. With the local wildcard policy, MAH advertised all 67 tools and schemas; `desktop_version` and a batch containing only the read-only `version` command succeeded through the broker. `mah computer doctor` reported accessibility granted. No GUI app was operated during this catalog check.
 - No personal app was edited. Snapshot/action end-to-end on a disposable GUI, Linux/macOS graphical compatibility, multi-runtime integration, remote isolation and unattended operation remain separate acceptance gates.
 
 Sources: [upstream MCP guide](https://github.com/vercel-labs/agent-desktop/blob/main/apps/docs/content/docs/guides/mcp.mdx), [platform requirements](https://github.com/vercel-labs/agent-desktop/blob/main/README.md).
